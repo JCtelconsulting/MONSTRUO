@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monstruo - Command Center</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-title">MONSTRUO</div>
+        <div class="brand-sub">Command Center</div>
+      </div>
+      <nav class="nav">
+        <a class="nav-item active" href="/ui/home.html">Panel Principal</a>
+        <a class="nav-item" href="/ui/workflow.html">Flujo de Trabajo</a>
+        <a class="nav-item" href="/ui/crm.html">Contacts</a>
+        <a class="nav-item" href="/ui/companies.html">Companies</a>
+        <div class="nav-label">Modules</div>
+        
+        <a class="nav-item disabled" href="#">Compliance (soon)</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="kv">
+          <div class="k">Session</div>
+          <div class="v" id="meBox">-</div>
+        </div>
+        <button class="btn btn-ghost" id="logoutBtn">Cerrar Sesión</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="h1">Command Center</h1>
+          <div class="muted">System status and key metrics overview.</div>
+        </div>
+        <div class="topbar-right">
+          <div class="pill" id="clock">--:--:--</div>
+        </div>
+      </header>
+      
+      <!-- Metrics Grid -->
+      <section class="grid grid-3" id="kpiArea">
+         <!-- Injected via JS -->
+      </section>
+
+      <section class="card" id="loginCard" style="display:none;margin-top:20px;max-width:400px;">
+        <div class="card-head"><div class="h2">Login</div></div>
+        <div class="card-body">
+             <input class="input" id="u" placeholder="user" />
+             <input class="input" id="p" type="password" placeholder="pass" />
+             <button class="btn" id="loginBtn">Login</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+<script>
+const API = location.origin;
+const $ = (id) => document.getElementById(id);
+
+function getToken() { return localStorage.getItem("token"); }
+function authHeaders() { return { "Authorization": "Bearer " + getToken() }; }
+
+async function loadSummary() {
+  const t = getToken();
+  if(!t) { $("loginCard").style.display="block"; return; }
+  
+  try {
+    const r = await fetch(API + "/summary/home", { headers: authHeaders() });
+    if(r.status === 401) {
+        $("loginCard").style.display="block"; 
+        return;
+    }
+    const d = await r.json();
+    renderKpis(d);
+    
+    // Auth info
+    const me = await fetch(API + "/auth/me", { headers: authHeaders() });
+    if(me.ok) {
+        const m = await me.json();
+        $("meBox").textContent = m.username;
+    }
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function card(title, items, link) {
+    let list = "";
+    for(const [k,v] of Object.entries(items)) {
+        list += `<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+    }
+    return `
+    <div class="card">
+      <div class="card-head">
+         <div class="h2">${title}</div>
+         ${link ? `<a class="btn btn-sm" href="${link}">Go</a>` : ''}
+      </div>
+      <div class="card-body">
+        <div class="kv-grid">${list}</div>
+      </div>
+    </div>`;
+}
+
+function renderKpis(d) {
+  const area = $("kpiArea");
+  area.innerHTML = "";
+  
+  // Workflow
+  if(d.workflow) {
+      area.innerHTML += card("Workflow", {
+          "Open Cases": d.workflow.cases_open,
+          "Open Tasks": d.workflow.tasks_open,
+          "High Prio": d.workflow.tasks_high_priority
+      }, "/ui/workflow.html");
+  }
+  
+  // Sales
+  if(d.sales) {
+      area.innerHTML += card("Sales & Collection", {
+          "Discrepancies": d.sales.discrepancies,
+          "Status": d.sales.note || "OK"
+      }, null);
+  }
+
+  // HR
+  if(d.hr) {
+      area.innerHTML += card("HR (Buk)", {
+          "Employees": d.hr.employees_total,
+          "Onboarding Active": d.hr.onboarding_cases
+      }, null);
+  }
+
+  // Finance
+  if(d.banks) {
+      area.innerHTML += card("Finance", {
+          "Staging Rows": d.banks.staging_rows,
+          "Pending Reconcile": d.banks.reconcile_tasks
+      }, null);
+  }
+
+  // CRM
+  if(d.crm) {
+      area.innerHTML += card("CRM", {
+          "Total Contacts": d.crm.contacts,
+          "Suppressed": d.crm.suppressed,
+          "Consent Unknown": d.crm.consent_unknown
+      }, "/ui/crm.html");
+  }
+
+  // Support
+  if(d.support) {
+      area.innerHTML += card("Support (Jira)", {
+          "Active Issues": d.support.jira_active
+      }, null);
+  }
+}
+
+$("loginBtn").onclick = async () => {
+    const res = await fetch(API+"/auth/login", {
+        method:"POST", 
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({username:$("u").value, password:$("p").value})
+    });
+    if(res.ok) {
+        const j = await res.json();
+        localStorage.setItem("token", j.token);
+        location.reload();
+    } else {
+        alert("Login failed");
+    }
+};
+
+$("logoutBtn").onclick = () => { localStorage.removeItem("token"); location.reload(); };
+
+setInterval(() => {
+    $("clock").textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+loadSummary();
+</script>
+</body>
+</html>

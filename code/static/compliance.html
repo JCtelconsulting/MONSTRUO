@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monstruo - Compliance</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-title">MONSTRUO</div>
+        <div class="brand-sub">Compliance</div>
+      </div>
+      <nav class="nav">
+        <a class="nav-item" href="/ui/home.html">Dashboard</a>
+        <a class="nav-item" href="/ui/workflow.html">Workflow</a>
+        <a class="nav-item" href="/ui/crm.html">Contacts</a>
+        <a class="nav-item" href="/ui/companies.html">Companies</a>
+        <div class="nav-label">Controls</div>
+        <a class="nav-item active" href="/ui/compliance.html">Compliance Center</a>
+      </nav>
+      <div class="sidebar-foot">
+        <button class="btn btn-ghost" onclick="location.href='/ui/'">Back</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="h1">Compliance Center</h1>
+          <div class="muted">Audit log, suppression lists, and anomalies.</div>
+        </div>
+      </header>
+
+      <section class="grid grid-3" id="kpiArea">
+         <!-- JS injected -->
+      </section>
+
+      <section class="grid grid-1">
+        <div class="card">
+          <div class="card-head"><div class="h2">Audit Log</div></div>
+          <div class="card-body">
+             <div class="table-wrap">
+               <table class="table" id="auditTbl">
+                 <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+                 <tbody></tbody>
+               </table>
+             </div>
+          </div>
+        </div>
+      </section>
+      
+      <section class="grid grid-1" id="anomArea" style="display:none">
+         <div class="card" style="border-color:red">
+            <div class="card-head"><div class="h2" style="color:red">Anomalies Detected</div></div>
+            <div class="card-body" id="anomList"></div>
+         </div>
+      </section>
+
+    </main>
+  </div>
+
+<script>
+const API = location.origin;
+const $ = (id) => document.getElementById(id);
+function authHeaders() { return { "Authorization": "Bearer " + localStorage.getItem("token") }; }
+
+function tile(title, val, muted) {
+    return `
+    <div class="card">
+       <div class="card-body">
+         <div class="muted">${title}</div>
+         <div class="h1">${val}</div>
+         ${muted ? `<div class="muted">${muted}</div>` : ''}
+       </div>
+    </div>`;
+}
+
+async function load() {
+    const res = await fetch(API+"/crm/compliance/summary", { headers: authHeaders() });
+    if(res.ok) {
+        const d = await res.json();
+        const area = $("kpiArea");
+        area.innerHTML = "";
+        
+        area.innerHTML += tile("Total Contacts", d.total_contacts, "");
+        area.innerHTML += tile("Marketing Unknown", d.consents_marketing_unknown, "System default (Safe)");
+        area.innerHTML += tile("Marketing Denied", d.consents_marketing_denied, "Explicit Opt-out");
+        
+        // Suppression detail
+        let suppTxt = "";
+        for(const [ch, n] of Object.entries(d.suppressed_by_channel)) {
+            suppTxt += `${ch}: ${n} `;
+        }
+        area.innerHTML += tile("Suppressed", Object.values(d.suppressed_by_channel).reduce((a,b)=>a+b,0), suppTxt || "None");
+
+        // Anomalies
+        const anom = d.anomalies || [];
+        if(anom.length > 0) {
+            $("anomArea").style.display = "block";
+            $("anomList").innerHTML = anom.map(x => `<div class="list-item" style="color:red"><b>[${x.severity.toUpperCase()}]</b> ${x.msg}</div>`).join("");
+        }
+        
+        // Audit
+        const tb = $("auditTbl").querySelector("tbody");
+        tb.innerHTML = "";
+        (d.last_audit_events || []).forEach(e => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${e.created_at.substring(0,16).replace("T"," ")}</td>
+              <td>${e.actor}</td>
+              <td>${e.action}</td>
+              <td>${e.entity_type} ${e.entity_id}</td>
+              <td style="font-size:0.8rem">${(e.details||"").substring(0,60)}...</td>
+            `;
+            tb.appendChild(tr);
+        });
+    }
+}
+load();
+</script>
+</body>
+</html>

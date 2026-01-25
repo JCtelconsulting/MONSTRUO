@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monstruo - CRM Companies</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-title">MONSTRUO</div>
+        <div class="brand-sub">CRM</div>
+      </div>
+      <nav class="nav">
+        <a class="nav-item" href="/ui/home.html">Dashboard</a>
+        <a class="nav-item" href="/ui/workflow.html">Workflow</a>
+        <a class="nav-item" href="/ui/crm.html">Contacts</a>
+        <a class="nav-item active" href="/ui/companies.html">Companies</a>
+      </nav>
+      <div class="sidebar-foot">
+        <button class="btn btn-ghost" onclick="location.href='/ui/'">Back</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <h1 class="h1">Companies & Opportunities</h1>
+        <div class="muted">Manage B2B accounts and sales pipeline.</div>
+      </header>
+
+      <section class="grid grid-2">
+        <div class="card">
+          <div class="card-head">
+             <div class="h2">Companies</div>
+             <button class="btn btn-sm" onclick="showCreateCompany()">New</button>
+          </div>
+          <div class="card-body">
+             <div class="row">
+               <input class="input" id="q" placeholder="Search..." onkeyup="if(event.key=='Enter') fetchCompanies()" />
+               <button class="btn" onclick="fetchCompanies()">Go</button>
+             </div>
+             <div class="table-wrap">
+               <table class="table" id="compTbl">
+                 <thead><tr><th>Name</th><th>VAT</th><th>Created</th></tr></thead>
+                 <tbody></tbody>
+               </table>
+             </div>
+          </div>
+        </div>
+
+        <div class="card" id="detailCard" style="display:none;">
+           <div class="card-head">
+             <div class="h2" id="cName">Company</div>
+             <div class="muted" id="cID"></div>
+           </div>
+           
+           <div class="card-body">
+             <div class="kv-grid">
+               <div class="kv"><div class="k">VAT</div><div class="v" id="cVat">-</div></div>
+               <div class="kv"><div class="k">Domain</div><div class="v" id="cDomain">-</div></div>
+             </div>
+             
+             <div class="sep"></div>
+             <div class="h2">Contacts</div>
+             <ul id="contactsList" class="list"></ul>
+
+             <div class="sep"></div>
+             <div class="h2">Opportunities</div>
+             <div class="row">
+               <button class="btn btn-sm" onclick="showCreateOpp()">Add Deal</button>
+             </div>
+             <div id="oppList" class="list" style="margin-top:10px;"></div>
+           </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+<script>
+const API = location.origin;
+const $ = (id) => document.getElementById(id);
+function authHeaders() { return { "Authorization": "Bearer " + localStorage.getItem("token") }; }
+
+let selectedCompanyId = null;
+
+async function fetchCompanies() {
+    const q = $("q").value;
+    const res = await fetch(API + "/crm/companies?q=" + encodeURIComponent(q), { headers: authHeaders() });
+    if(res.ok) {
+        const d = await res.json();
+        const tb = $("compTbl").querySelector("tbody");
+        tb.innerHTML = "";
+        d.items.forEach(c => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${c.name}</td><td>${c.vat_id||""}</td><td>${c.created_at.substring(0,10)}</td>`;
+            tr.onclick = () => loadCompany(c.id);
+            tb.appendChild(tr);
+        });
+    }
+}
+
+async function loadCompany(id) {
+    selectedCompanyId = id;
+    $("detailCard").style.display = "block";
+    const res = await fetch(API + "/crm/companies/" + id, { headers: authHeaders() });
+    if(res.ok) {
+        const d = await res.json();
+        $("cName").textContent = d.company.name;
+        $("cID").textContent = "ID " + d.company.id;
+        $("cVat").textContent = d.company.vat_id;
+        $("cDomain").textContent = d.company.domain;
+
+        // Contacts
+        $("contactsList").innerHTML = d.contacts.length ? "" : "<li class='muted'>No contacts</li>";
+        d.contacts.forEach(c => {
+            $("contactsList").innerHTML += `<li>${c.full_name} (${c.title||""})</li>`;
+        });
+
+        // Opps
+        const ol = $("oppList");
+        ol.innerHTML = "";
+        d.opportunities.forEach(o => {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.innerHTML = `
+              <div>
+                <strong>${o.title}</strong>
+                <span class="chip">${o.stage}</span>
+                <span class="muted">${o.value_estimated} CLP</span>
+              </div>
+              <div class="muted">Next: ${o.next_action} (Due ${o.next_action_due})</div>
+              <button class="btn btn-sm btn-ghost" onclick='editOpp(${JSON.stringify(o)})'>Edit</button>
+            `;
+            ol.appendChild(div);
+        });
+    }
+}
+
+async function showCreateCompany() {
+   const name = prompt("Company Name:");
+   if(!name) return;
+   const vat = prompt("VAT ID (optional):");
+   const res = await fetch(API+"/crm/companies", {
+       method:"POST", headers:{"Content-Type":"application/json", ...authHeaders()},
+       body: JSON.stringify({name, vat_id: vat||"", domain:""})
+   });
+   if(res.ok) fetchCompanies();
+}
+
+async function showCreateOpp() {
+    if(!selectedCompanyId) return;
+    const title = prompt("Deal Title:");
+    if(!title) return;
+    const val = prompt("Estimated Value:", "0");
+    const next = prompt("Next Action:", "Follow up");
+    const res = await fetch(API+"/crm/opportunities", {
+        method:"POST", headers:{"Content-Type":"application/json", ...authHeaders()},
+        body: JSON.stringify({
+            company_id: selectedCompanyId, 
+            title, 
+            stage:"lead", 
+            value_estimated: parseFloat(val), 
+            next_action: next,
+            next_action_due: new Date().toISOString().substring(0,10)
+        })
+    });
+    if(res.ok) loadCompany(selectedCompanyId);
+}
+
+async function editOpp(o) {
+   const stage = prompt("New Stage (lead|qualified|proposal|won|lost):", o.stage);
+   if(!stage) return;
+   const next = prompt("Next Action:", o.next_action);
+   const res = await fetch(API+"/crm/opportunities/"+o.id, {
+        method:"POST", headers:{"Content-Type":"application/json", ...authHeaders()},
+        body: JSON.stringify({
+            stage, 
+            next_action: next, 
+            next_action_due: new Date().toISOString().substring(0,10),
+            value_estimated: o.value_estimated
+        })
+   });
+   if(res.ok) loadCompany(selectedCompanyId);
+}
+
+fetchCompanies();
+</script>
+</body>
+</html>

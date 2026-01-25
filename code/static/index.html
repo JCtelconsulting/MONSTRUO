@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monstruo | Dashboard</title>
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+  <!-- Theme -->
+  <link rel="stylesheet" href="css/theme.css?v=1.0">
+</head>
+
+<body>
+
+  <!-- SIDEBAR -->
+  <header>
+    <h1><i class="fas fa-ghost"></i> Monstruo</h1>
+
+    <nav class="side-nav">
+      <button class="side-link" onclick="scrollToId('sec-login')">
+        <i class="fas fa-key"></i> <span>Access</span>
+      </button>
+      <button class="side-link active" onclick="scrollToId('sec-dashboard')">
+        <i class="fas fa-chart-pie"></i> <span>Panel Principal</span>
+      </button>
+      <button class="side-link" onclick="scrollToId('sec-alerts')">
+        <i class="fas fa-bell"></i> <span>Alerts</span>
+      </button>
+      <hr style="border:0; border-top:1px solid var(--border); margin: 10px 0;">
+      <button class="side-link" onclick="syncNow()">
+        <i class="fas fa-sync"></i> <span>Sync Data</span>
+      </button>
+      <button class="side-link" onclick="loadAll()">
+        <i class="fas fa-redo"></i> <span>Refresh</span>
+      </button>
+    </nav>
+
+    <div style="margin-top: auto;">
+      <div id="me" class="muted" style="margin-bottom: 10px; padding: 0 10px;"></div>
+      <button class="btn" style="width:100%; border-color:var(--danger); color:var(--danger);" onclick="logout()">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main>
+
+    <!-- LOGIN SECTION -->
+    <div id="sec-login" class="row" style="margin-bottom: 30px;">
+      <div class="card" style="max-width: 500px;">
+        <h2><i class="fas fa-user-shield"></i> System Access</h2>
+        <div class="bar">
+          <input id="u" placeholder="Username" />
+          <input id="p" placeholder="Password" type="password" />
+          <button class="btn" onclick="doLogin()">Iniciar Sesión</button>
+        </div>
+        <div id="status" class="muted" style="min-height: 20px;">Source: Laudus API</div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD SECTION -->
+    <div id="sec-dashboard">
+      <div class="row">
+        <!-- Aging Buckets -->
+        <div class="card">
+          <h2><i class="fas fa-hourglass-half"></i> Aging Report</h2>
+          <div id="agingBuckets" class="bar" style="gap:15px;">Loading...</div>
+        </div>
+
+        <!-- Top Debt -->
+        <div class="card">
+          <h2><i class="fas fa-trophy"></i> Top Debtors</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Debt</th>
+              </tr>
+            </thead>
+            <tbody id="topDebt">
+              <tr>
+                <td colspan="2">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALERTS SECTION -->
+    <div id="sec-alerts" style="margin-top: 30px;">
+      <div class="row">
+        <!-- Alerts Summary -->
+        <div class="card">
+          <h2><i class="fas fa-info-circle"></i> Alerts Summary</h2>
+          <div id="alertsSummary">Login required to view alerts.</div>
+        </div>
+
+        <!-- Open Alerts List -->
+        <div class="card">
+          <h2><i class="fas fa-exclamation-triangle"></i> Open Issues</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Sev</th>
+                <th>Rule</th>
+                <th>Entity</th>
+                <th>Summary</th>
+              </tr>
+            </thead>
+            <tbody id="alertsOpen">
+              <tr>
+                <td colspan="4">Login required</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // --- LOGIC ---
+    function setToken(t) { localStorage.setItem("token", t || ""); }
+    function getToken() { return localStorage.getItem("token") || ""; }
+
+    async function jget(url, auth = false) {
+      const h = { "Accept": "application/json" };
+      if (auth) {
+        const t = getToken();
+        if (t) h["Authorization"] = "Bearer " + t;
+      }
+      const r = await fetch(url, { headers: h });
+      if (!r.ok) throw new Error(url + " -> " + r.status);
+      return await r.json();
+    }
+
+    async function jpost(url, body, auth = false) {
+      const h = { "Accept": "application/json", "Content-Type": "application/json" };
+      if (auth) {
+        const t = getToken();
+        if (t) h["Authorization"] = "Bearer " + t;
+      }
+      const r = await fetch(url, { method: "POST", headers: h, body: JSON.stringify(body || {}) });
+      if (!r.ok) {
+        let msg = "";
+        try { msg = JSON.stringify(await r.json()); } catch { }
+        throw new Error(url + " -> " + r.status + " " + msg);
+      }
+      return await r.json();
+    }
+
+    function fmt(n) {
+      try { return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+      catch { return String(n); }
+    }
+
+    function scrollToId(id) {
+      document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function refreshMe() {
+      const el = document.getElementById("me");
+      try {
+        const me = await jget("/auth/me", true);
+        el.innerHTML = `<span class="text-neon">${me.username}</span> <br><small class="muted">${me.role}</small>`;
+      } catch {
+        el.textContent = "Not logged in";
+      }
+    }
+
+    async function doLogin() {
+      const st = document.getElementById("status");
+      st.textContent = "Logging in...";
+      st.className = "muted text-neon";
+      try {
+        const u = document.getElementById("u").value;
+        const p = document.getElementById("p").value;
+        const res = await jpost("/auth/login", { username: u, password: p }, false);
+        setToken(res.access_token);
+        await refreshMe();
+        st.textContent = "Login Successful";
+        loadAll(); // Reload data with new permissions
+      } catch (e) {
+        st.textContent = "Error: " + e.message;
+        st.className = "muted text-danger";
+      }
+    }
+
+    function logout() {
+      setToken("");
+      document.getElementById("status").textContent = "Logged out";
+      refreshMe();
+      loadAll(); // Clear protected data
+    }
+
+    async function syncNow() {
+      const st = document.getElementById("status");
+      st.textContent = "Syncing with Laudus...";
+      try {
+        const res = await jpost("/actions/sync-now", {}, true);
+        st.textContent = "Sync Complete";
+        await loadAll();
+      } catch (e) {
+        st.textContent = "Sync Failed: " + e.message;
+        st.className = "muted text-danger";
+      }
+    }
+
+    async function loadAll() {
+      const st = document.getElementById("status");
+      try {
+        const aging = await jget("/reports/aging");
+        const top = await jget("/reports/top-debt?limit=10");
+
+        // Alerts are protected
+        let sum = { by_severity: {}, by_rule: {} };
+        let open = { items: [] };
+        try {
+          sum = await jget("/alerts/summary", true);
+          open = await jget("/alerts?status=open&limit=25", true);
+        } catch {
+          // not logged or forbidden, clear alerts UI
+        }
+
+        // Render Aging
+        const b = aging.buckets || {};
+        document.getElementById("agingBuckets").innerHTML =
+          Object.keys(b).map(k => `<div><span class="pill">${k}</span> <span style="font-size:1.1em; font-weight:bold;">${fmt(b[k])}</span></div>`).join("");
+
+        // Render Top Debt
+        document.getElementById("topDebt").innerHTML =
+          (top.items || []).map(it => `<tr><td>${it.customer}</td><td class="text-neon" style="font-weight:bold;">${fmt(it.debt)}</td></tr>`).join("")
+          || `<tr><td colspan="2" class="muted">No data</td></tr>`;
+
+        // Render Alerts Summary
+        const bySev = sum.by_severity || {};
+        const byRule = sum.by_rule || {};
+        const summaryHtml = Object.keys(bySev).length ?
+          `<div><b>Severity:</b> ${Object.keys(bySev).map(k => `<span class="pill" style="border-color:var(--element-color, #555)">${k}: ${bySev[k]}</span>`).join("")}</div>
+       <div style="margin-top:10px;"><b>Rules:</b><br/>${Object.keys(byRule).map(k => `<div class="mono muted" style="margin-top:4px;">${k}: ${byRule[k]}</div>`).join("")}</div>`
+          : `<div class="muted">No alerts or login required</div>`;
+
+        document.getElementById("alertsSummary").innerHTML = summaryHtml;
+
+        // Render Open Alerts
+        document.getElementById("alertsOpen").innerHTML =
+          (open.items || []).map(a =>
+            `<tr>
+          <td><span class="pill" style="color:${a.severity == 'high' ? 'var(--danger)' : 'inherit'}">${a.severity}</span></td>
+          <td class="mono" style="font-size:0.85em;">${a.rule}</td>
+          <td class="mono" style="font-size:0.85em;">${a.entity_type}:${a.entity_id}</td>
+          <td>${a.summary}</td>
+        </tr>`
+          ).join("") || `<tr><td colspan="4" class="muted">No open alerts or login required</td></tr>`;
+
+        await refreshMe();
+      } catch (e) {
+        st.textContent = "Load Error: " + e.message;
+      }
+    }
+
+    // Init
+    refreshMe();
+    loadAll();
+  </script>
+</body>
+
+</html>
