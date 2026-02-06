@@ -1,0 +1,123 @@
+<div class="ciclos-container">
+    <div class="section-header" style="margin-bottom: 1.5rem;">
+        <div>
+            <h3>Configuración de Ciclos</h3>
+            <p style="opacity:0.6;">Reglas de facturación recurrente por cliente</p>
+        </div>
+        <button class="btn-primary" onclick="openNewRuleModal()">
+            <i class="fas fa-plus"></i> Nueva Regla
+        </button>
+    </div>
+
+    <!-- KPI / Info -->
+    <div class="kpi-grid"
+        style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div class="kpi-card">
+            <span class="kpi-label">Valor UF Hoy</span>
+            <div id="uf-today-val" class="kpi-value">--</div>
+            <span id="uf-date-val" class="kpi-sub" style="font-size: 0.75rem; opacity: 0.5;">Cargando...</span>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-label">Reglas Activas</span>
+            <div id="active-rules-count" class="kpi-value">0</div>
+        </div>
+    </div>
+
+    <!-- Reglas Table -->
+    <div class="data-card">
+        <table class="monstruo-table">
+            <thead>
+                <tr>
+                    <th>Cliente</th>
+                    <th>Periodicidad</th>
+                    <th>Valor/Moneda</th>
+                    <th>Día</th>
+                    <th>Prox. Factura</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-ciclos">
+                <tr>
+                    <td colspan="6" style="text-align:center; padding:3rem; opacity:0.5;">
+                        Cargando reglas...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Nueva/Editar Regla -->
+<dialog id="modal-rule" class="monstruo-modal">
+    <form method="dialog">
+        <div class="modal-header">
+            <h3 id="modal-rule-title">Nueva Regla de Ciclo</h3>
+            <button class="btn-icon"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>ID Cliente (Laudus)</label>
+                <select id="rule-customer-id" required>
+                    <option value="" disabled selected>Cargando clientes...</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group half">
+                    <label>Moneda</label>
+                    <select id="rule-currency" onchange="toggleUFRules()">
+                        <option value="CLP">CLP (Pesos)</option>
+                        <option value="UF">UF</option>
+                    </select>
+                </div>
+                <div class="form-group half">
+                    <label>Monto Base</label>
+                    <input type="number" id="rule-base-amount" step="0.01" value="0" />
+                </div>
+            </div>
+
+            <div id="uf-rules-container"
+                style="display:none; border: 1px dashed rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <label style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.5rem; display: block;">Regla de
+                    Conversión UF</label>
+                <div class="form-group">
+                    <select id="rule-uf-type" onchange="toggleUFValue()">
+                        <option value="VALOR_DIA">Valor del Día (Auto)</option>
+                        <option value="VALOR_FIJO">Valor Fijo (Estático)</option>
+                        <option value="VALOR_CONTRATO">Valor Contrato (Pactado)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="uf-custom-value-group" style="display:none;">
+                    <label>Valor UF a usar</label>
+                    <input type="number" id="rule-uf-custom-val" step="0.1" value="37000" />
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group half">
+                    <label>Cada (Meses)</label>
+                    <input type="number" id="rule-frequency" min="1" max="12" value="1" />
+                </div>
+                <div class="form-group half">
+                    <label>Día del Mes</label>
+                    <input type="number" id="rule-day" min="1" max="31" value="5" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Descripción / Glosa Factura</label>
+                <textarea id="rule-description" rows="3" placeholder="Ej: Servicios Mensuales..."></textarea>
+            </div>
+
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px; display: flex;">
+                <input type="checkbox" id="rule-auto-issue" style="width: auto;" />
+                <label for="rule-auto-issue" style="margin: 0;">Emitir automáticamente (Sin pasar por Borrador)</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary"
+                onclick="document.getElementById('modal-rule').close()">Cancelar</button>
+            <button type="button" class="btn-primary" onclick="saveRule()">Guardar Regla</button>
+        </div>
+    </form>
+</dialog>

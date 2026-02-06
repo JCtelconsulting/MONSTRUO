@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bodega | Monstruo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.3" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="css/bodega-shared.css?v=67.0" />
+</head>
+
+<body class="sidebar-collapsed bodega-shell">
+    <header id="app-header">
+        <div class="header-top">
+            <h1>MONSTRUO</h1>
+            <button id="sidebar-toggle" class="btn-icon"><i class="fas fa-bars"></i></button>
+        </div>
+        <nav id="dynamic-sidebar" class="side-nav"></nav>
+        <div class="header-actions">
+            <span id="who" class="pill"
+                style="display:block; margin-bottom:10px; font-size:0.8rem; opacity:0.7;">Usuario</span>
+            <div class="footer-buttons-container">
+                <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i> <span>Cuenta</span>
+                </button>
+                <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="main-inner">
+            <section class="section-block" style="height: 100%; display:flex; flex-direction:column;">
+                <div class="section-header" style="border:none; padding-bottom:0;">
+                    <div>
+                        <h2 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px;">Bodega Maestra (WMS)
+                        </h2>
+                        <p style="opacity:0.6;">Gestión de Inventario y Catálogo</p>
+                    </div>
+                </div>
+
+                <div class="tab-bar">
+                    <button class="tab-btn active" data-tab="inventario" onclick="loadBodegaTab('inventario', this)"
+                        id="tab-inventario">Inventario</button>
+                    <button class="tab-btn" data-tab="catalogo" onclick="loadBodegaTab('catalogo', this)"
+                        id="tab-catalogo">Catálogo</button>
+                </div>
+
+                <!-- Tab Content Container -->
+                <div id="tab-content" style="flex:1; overflow:hidden; display:flex; flex-direction:column;"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Drawers Compartidos -->
+    <div id="kardex-drawer" class="kardex-drawer">
+        <div class="kardex-header">
+            <div>
+                <h3>Kardex</h3>
+                <p id="kardex-subtitle">Movimientos recientes</p>
+            </div>
+            <button class="btn-icon" title="Cerrar" onclick="window.BodegaCore && window.BodegaCore.closeKardex()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="table-container">
+            <table class="data-table" id="kardexTable">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Cantidad</th>
+                        <th>Usuario</th>
+                        <th>Referencia</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="catalog-drawer" class="kardex-drawer">
+        <div class="kardex-header">
+            <div>
+                <h3>Acciones Catálogo</h3>
+                <p id="catalog-drawer-subtitle">Selecciona un item</p>
+            </div>
+            <button class="btn-icon" title="Cerrar"
+                onclick="window.BodegaCore && window.BodegaCore.closeCatalogDrawer()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="table-container" style="background:transparent;">
+            <div id="catalog-drawer-info" style="margin-bottom:1rem;">
+                <div style="font-weight:600; font-size:1.1rem;" id="catalog-drawer-name">-</div>
+                <div style="opacity:0.7; font-size:0.9rem;" id="catalog-drawer-meta">-</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.6rem;">
+                <button class="btn-primary" id="cat-action-kardex">
+                    <i class="fas fa-list"></i> Ver Kardex
+                </button>
+                <button class="btn-primary" id="cat-action-adjust">
+                    <i class="fas fa-sliders-h"></i> Ajustar Stock
+                </button>
+                <button class="btn-secondary" id="cat-action-categorize">
+                    <i class="fas fa-tags"></i> Categorizar
+                </button>
+                <button class="btn-secondary" id="cat-action-detail">
+                    <i class="fas fa-info-circle"></i> Detalle
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Dialog Genérico -->
+    <dialog id="modal-dialog"
+        style="background:#1a1f2b; color:#fff; border:1px solid #444; border-radius:8px; width:80%; max-width:600px; padding:0;">
+        <div
+            style="padding:10px 15px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2);">
+            <h4 id="modal-title" style="margin:0;">Resultado</h4>
+            <button onclick="document.getElementById('modal-dialog').close()"
+                style="background:none; border:none; color:#aaa; cursor:pointer;"><i
+                    class="fas fa-times"></i></button>
+        </div>
+        <div id="modal-content" style="padding:15px; max-height:70vh; overflow-y:auto;"></div>
+    </dialog>
+
+    <!-- Modal: Resolve Duplicate -->
+    <dialog id="modal-resolve-dup"
+        style="background:#1a1f2b; color:#fff; border:1px solid #444; border-radius:8px; width:90%; max-width:900px; padding:0;">
+        <div
+            style="padding:15px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2);">
+            <h4 style="margin:0;">Resolución de Duplicados</h4>
+            <button onclick="document.getElementById('modal-resolve-dup').close()"
+                style="background:none; border:none; color:#aaa; cursor:pointer;"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="padding:20px; display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+            <!-- ITEM A -->
+            <div id="dup-item-a" style="background:rgba(255,255,255,0.05); padding:1rem; border-radius:8px;">
+                <div class="dup-img"
+                    style="height:150px; background:#000; display:flex; align-items:center; justify-content:center; margin-bottom:10px;">
+                    <img src="" style="max-height:100%; max-width:100%;">
+                </div>
+                <h3 class="dup-name">Nombre A</h3>
+                <div class="dup-meta">Marca: ... | SKU: ...</div>
+                <button class="btn-primary" style="width:100%; margin-top:10px;" id="btn-keep-a">Conservar ESTE
+                    (A)</button>
+            </div>
+
+            <!-- ITEM B -->
+            <div id="dup-item-b" style="background:rgba(255,255,255,0.05); padding:1rem; border-radius:8px;">
+                <div class="dup-img"
+                    style="height:150px; background:#000; display:flex; align-items:center; justify-content:center; margin-bottom:10px;">
+                    <img src="" style="max-height:100%; max-width:100%;">
+                </div>
+                <h3 class="dup-name">Nombre B</h3>
+                <div class="dup-meta">Marca: ... | SKU: ...</div>
+                <button class="btn-primary" style="width:100%; margin-top:10px;" id="btn-keep-b">Conservar ESTE
+                    (B)</button>
+            </div>
+        </div>
+
+        <div style="padding:15px; border-top:1px solid #444; text-align:center; background:rgba(0,0,0,0.2);">
+            <p style="margin-bottom:10px; color:#ccc;">Opciones Avanzadas:</p>
+            <button class="btn-secondary" id="btn-mark-variant">Son Variantes (Distintos)</button>
+            <button class="btn-secondary" id="btn-ignore-dup">Ignorar Sugerencia</button>
+        </div>
+
+        <!-- Logic for Variant Selector -->
+        <div id="variant-selector-container"
+            style="display:none; padding:15px; border-top:1px solid #444; flex-direction:column; gap:10px;">
+            <h5 style="margin:0 0 5px 0;">Selecciona Categoría Común para Variantes:</h5>
+            <div id="variant-tree-root"
+                style="min-height:250px; flex:1; border:1px solid #555; display:flex; flex-direction:column; background:rgba(0,0,0,0.2);">
+            </div>
+            <button class="btn-primary" id="btn-confirm-variant" style="align-self:flex-end;">Confirmar
+                Variantes</button>
+        </div>
+    </dialog>
+
+    <!-- Modal: Create Category -->
+    <dialog id="modal-create-category"
+        style="background:#1a1f2b; color:#fff; border:1px solid #444; border-radius:8px; width:400px; padding:0;">
+        <div
+            style="padding:15px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="margin:0;">Nueva Categoría</h4>
+            <button onclick="document.getElementById('modal-create-category').close()"
+                style="background:none; border:none; color:#aaa; cursor:pointer;"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="padding:20px; display:flex; flex-direction:column; gap:15px;">
+            <div>
+                <label style="display:block; margin-bottom:5px; font-size:0.9rem; color:#ccc;">Nombre</label>
+                <input type="text" id="modal-cat-name"
+                    style="width:100%; padding:8px; background:rgba(255,255,255,0.05); border:1px solid #555; color:#fff; border-radius:4px;"
+                    placeholder="Ej: Zapatillas">
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:5px; font-size:0.9rem; color:#ccc;">Categoría Padre</label>
+                <!-- Selected Parent Display -->
+                <div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <input type="text" id="modal-cat-parent-name" readonly value="-- Raíz --"
+                        style="flex:1; padding:8px; background:rgba(255,255,255,0.1); border:1px solid #555; color:#fff; border-radius:4px; font-style:italic;">
+                    <input type="hidden" id="modal-cat-parent-id" value="">
+                    <button class="btn-secondary"
+                        onclick="document.getElementById('modal-cat-parent-id').value=''; document.getElementById('modal-cat-parent-name').value='-- Raíz --'; window.parentPickerTree.clearSelection();"
+                        title="Limpiar selección (Ir a Raíz)">
+                        <i class="fas fa-eraser"></i>
+                    </button>
+                </div>
+                <!-- Tree Container -->
+                <div id="modal-parent-tree-container"
+                    style="height:200px; border:1px solid #555; border-radius:4px; overflow:hidden; display:flex; flex-direction:column; background:rgba(0,0,0,0.2);">
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                <button class="btn-secondary"
+                    onclick="document.getElementById('modal-create-category').close()">Cancelar</button>
+                <button class="btn-primary" id="btn-modal-create-save">Guardar</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Modal: Move Category -->
+    <dialog id="modal-assign-category"
+        style="background:#1a1f2b; color:#fff; border:1px solid #444; border-radius:8px; width:480px; padding:0;">
+        <div
+            style="padding:15px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="margin:0;">Mover a Categoría</h4>
+            <button onclick="document.getElementById('modal-assign-category').close()"
+                style="background:none; border:none; color:#aaa; cursor:pointer;"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="padding:20px; display:flex; flex-direction:column; gap:15px;">
+            <div>
+                <label style="display:block; margin-bottom:5px; font-size:0.9rem; color:#ccc;">Item</label>
+                <input type="text" id="assign-item-name" readonly value=""
+                    style="width:100%; padding:8px; background:rgba(255,255,255,0.1); border:1px solid #555; color:#fff; border-radius:4px;">
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:5px; font-size:0.9rem; color:#ccc;">Categoría
+                    Seleccionada</label>
+                <div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <input type="text" id="assign-cat-name" readonly value="-- Selecciona una categoría --"
+                        style="flex:1; padding:8px; background:rgba(255,255,255,0.1); border:1px solid #555; color:#fff; border-radius:4px; font-style:italic;">
+                    <input type="hidden" id="assign-cat-id" value="">
+                    <button class="btn-secondary"
+                        onclick="document.getElementById('assign-cat-id').value=''; document.getElementById('assign-cat-name').value='-- Selecciona una categoría --';"
+                        title="Limpiar selección">
+                        <i class="fas fa-eraser"></i>
+                    </button>
+                </div>
+                <div id="assign-tree-container"
+                    style="height:240px; border:1px solid #555; border-radius:4px; overflow:hidden; display:flex; flex-direction:column; background:rgba(0,0,0,0.2);">
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                <button class="btn-secondary"
+                    onclick="document.getElementById('modal-assign-category').close()">Cancelar</button>
+                <button class="btn-primary" id="btn-assign-category-save">Mover</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script src="/modulos/_compartido/js/utilidades.js?v=203"></script>
+    <script src="/modulos/_compartido/js/admin.js?v=4"></script>
+    <script src="/modulos/_compartido/js/sidebar.js?v=6"></script>
+    <script src="js/chatbot_admin.js?v=2"></script>
+
+    <!-- MODULAR SYSTEM v8 -->
+    <script src="js/bodega_api.js?v=2"></script>
+    <script src="js/category_tree.js?v=1"></script>
+    <script src="js/bodega_ui.js?v=18"></script>
+    <script src="js/bodega_ai.js?v=1"></script>
+    <script src="js/bodega_core.js?v=24"></script>
+
+    <script>
+        const BODEGA_TAB_ALIASES = {
+            inventory: 'inventario',
+            inventario: 'inventario',
+            catalog: 'catalogo',
+            catalogo: 'catalogo',
+            pending: 'pendientes',
+            pendientes: 'pendientes',
+            analysis: 'analisis',
+            analisis: 'analisis'
+        };
+
+        function normalizeBodegaTab(tab) {
+            return BODEGA_TAB_ALIASES[tab] || tab;
+        }
+
+        let currentTab = null;
+        const loadedResources = new Set();
+
+        async function loadBodegaTab(tabName, triggerEl) {
+            const normalized = normalizeBodegaTab(tabName);
+            if (currentTab === normalized) return;
+            currentTab = normalized;
+
+            // Update active button
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = triggerEl || document.querySelector(`.tab-btn[data-tab="${normalized}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const container = document.getElementById('tab-content');
+            if (!container) return;
+
+            try {
+                // Load HTML
+                const htmlResp = await fetch(`/modulos/bodega/${normalized}/${normalized}.html`);
+                if (!htmlResp.ok) throw new Error(`HTTP ${htmlResp.status}`);
+                const html = await htmlResp.text();
+                container.innerHTML = html;
+
+                // Load CSS if not already loaded
+                const cssKey = `css-${normalized}`;
+                if (!loadedResources.has(cssKey)) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = `/modulos/bodega/${normalized}/${normalized}.css?v=66.7`;
+                    document.head.appendChild(link);
+                    loadedResources.add(cssKey);
+                }
+
+                // Load JS if not already loaded
+                const jsKey = `js-${normalized}`;
+                if (!loadedResources.has(jsKey)) {
+                    const script = document.createElement('script');
+                    script.src = `/modulos/bodega/${normalized}/${normalized}.js?v=66.7`;
+                    document.body.appendChild(script);
+                    loadedResources.add(jsKey);
+
+                    await new Promise(resolve => {
+                        script.onload = resolve;
+                        script.onerror = resolve;
+                    });
+                }
+
+                if (window.BodegaCore && typeof window.BodegaCore.onTabLoaded === 'function') {
+                    window.BodegaCore.onTabLoaded(normalized);
+                }
+            } catch (e) {
+                console.error(`Error loading tab ${normalized}:`, e);
+                container.innerHTML =
+                    `<div style="text-align:center; padding:4rem;"><p>Error al cargar la pestaña.</p></div>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initLogout) window.initLogout();
+            loadBodegaTab('inventario');
+        });
+    </script>
+</body>
+
+</html>

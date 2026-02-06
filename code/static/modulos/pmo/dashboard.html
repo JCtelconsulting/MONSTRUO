@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Oficina Técnica | Monstruo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=68.0" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Estilos específicos que sobrescriban o complementen */
+        body {
+            overflow-x: hidden;
+        }
+
+        main {
+            padding: 2rem 2.5rem;
+        }
+
+        .main-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .status-borrador {
+            background: #444;
+            color: #ccc;
+        }
+
+        .status-ejecucion {
+            background: #00d4ff;
+            color: #000;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+
+        .status-cerrado {
+            background: #28a745;
+            color: #fff;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background-color: #00d4ff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            background-color: #33e0ff;
+        }
+
+        /* Modal / Dialog Refinements */
+        dialog.modal {
+            margin: auto;
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            background: #121a24;
+            /* panel */
+            border: 1px solid #1f2935;
+            /* border */
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 0;
+            max-width: 600px;
+        }
+
+        dialog.modal::backdrop {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-actions {
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #fff;
+            outline: none;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            border-color: #00d4ff;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body class="sidebar-collapsed">
+    <header id="app-header">
+        <div class="header-top">
+            <h1>MONSTRUO</h1>
+            <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <nav id="dynamic-sidebar" class="side-nav">
+        </nav>
+        <div class="header-actions">
+            <span id="who" class="pill"
+                style="display:block; margin-bottom:10px; font-size:0.8rem; opacity:0.7;">Usuario</span>
+            <div class="footer-buttons-container">
+                <button id="btn-open-change-password" class="btn-account">
+                    <i class="fas fa-key"></i> <span>Cuenta</span>
+                </button>
+                <button id="btnLogout" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="main-inner">
+            <!-- Header Section Style ERP -->
+            <div class="section-header" style="border:none; padding-bottom:0;">
+                <div>
+                    <h2 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px;">Oficina Técnica (PMO)</h2>
+                    <p style="opacity:0.6;">Gestión de Proyectos, Costos y Tareas</p>
+                </div>
+                <div>
+                    <button class="btn-primary" onclick="window.pmoDashboard.openCreateModal()">
+                        <i class="fas fa-plus"></i> Nuevo Proyecto
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs Style ERP -->
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="window.pmoDashboard.switchTab('resumen')">Resumen</button>
+                <button class="tab-btn" onclick="window.pmoDashboard.switchTab('proyectos')">Proyectos</button>
+                <button class="tab-btn" onclick="window.pmoDashboard.switchTab('tareas')">Tareas</button>
+            </div>
+
+            <!-- VIEW: RESUMEN -->
+            <div id="view-resumen" class="view-section active">
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-val" id="kpi-active-projects">0</div>
+                        <div class="kpi-lbl">Proyectos Activos</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-val" id="kpi-total-budget" style="color:var(--neon);">$0</div>
+                        <div class="kpi-lbl">Presupuesto Venta</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-val" style="color:#ffcc00;">0</div>
+                        <div class="kpi-lbl">Alertas Costos</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: PROYECTOS -->
+            <div id="view-proyectos" class="view-section">
+                <style>
+                    /* Wide Card Layout */
+                    .project-wide-card {
+                        background: var(--panel-strong);
+                        border: 1px solid var(--border);
+                        border-radius: 12px;
+                        margin-bottom: 15px;
+                        display: flex;
+                        flex-direction: column;
+                        /* For accordion */
+                        transition: transform 0.2s, border-color 0.2s;
+                        position: relative;
+                        overflow: hidden;
+                    }
+
+                    .project-wide-card:hover {
+                        border-color: var(--neon);
+                    }
+
+                    .card-main-row {
+                        padding: 20px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        cursor: pointer;
+                        width: 100%;
+                    }
+
+                    .project-info {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                        flex: 1;
+                    }
+
+                    /* Timeline Area */
+                    .project-timeline-area {
+                        flex: 1;
+                        padding: 0 30px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                    }
+
+                    .timeline-dates {
+                        width: 100%;
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 0.75rem;
+                        color: #aaa;
+                        margin-bottom: 5px;
+                    }
+
+                    .timeline-bar-bg {
+                        width: 100%;
+                        height: 8px;
+                        background: rgba(255, 255, 255, 0.1);
+                        border-radius: 4px;
+                        overflow: hidden;
+                        position: relative;
+                    }
+
+                    .timeline-progress {
+                        height: 100%;
+                        background: linear-gradient(90deg, var(--neon), #00d4ff);
+                    }
+
+                    /* Gauge */
+                    .gauge-container {
+                        width: 80px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 5px;
+                    }
+
+                    .gauge-donut {
+                        width: 60px;
+                        height: 60px;
+                        border-radius: 50%;
+                        background: conic-gradient(var(--card-accent, #444) var(--percent, 0%), #222 0);
+                        position: relative;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+                    }
+
+                    .gauge-donut::before {
+                        content: '';
+                        position: absolute;
+                        width: 48px;
+                        height: 48px;
+                        background: var(--panel-strong);
+                        border-radius: 50%;
+                    }
+
+                    .gauge-value {
+                        position: relative;
+                        z-index: 2;
+                        font-size: 0.75rem;
+                        font-weight: 800;
+                        color: #fff;
+                    }
+
+                    .gauge-label {
+                        font-size: 0.7rem;
+                        color: #aaa;
+                        text-transform: uppercase;
+                    }
+
+                    /* Accordion & Details */
+                    .card-details {
+                        max-height: 0;
+                        overflow: hidden;
+                        transition: max-height 0.3s ease-out;
+                        background: rgba(0, 0, 0, 0.2);
+                        border-top: 1px solid transparent;
+                    }
+
+                    .card-details.open {
+                        border-top-color: var(--border);
+                    }
+
+                    .details-grid {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 20px;
+                        padding: 20px;
+                    }
+
+                    .edit-input {
+                        background: rgba(0, 0, 0, 0.3);
+                        border: 1px solid #444;
+                        color: #fff;
+                        padding: 8px;
+                        border-radius: 4px;
+                        width: 100%;
+                    }
+                </style>
+
+                <div id="projects-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Injected by JS -->
+                    <div style="text-align:center; padding:2rem; opacity:0.5;">Cargando proyectos...</div>
+                </div>
+            </div>
+
+            <!-- VIEW: TAREAS (Placeholder) -->
+            <div id="view-tareas" class="view-section">
+                <div style="text-align:center; padding:4rem; opacity:0.6;">
+                    <i class="fas fa-tasks fa-3x" style="margin-bottom:1rem;"></i>
+                    <h3>Módulo de Tareas</h3>
+                    <p>Aquí se listarán las tareas extraídas por la IA.</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Floating Action Button for AI (Automatización) -->
+    <button onclick="window.pmoDashboard.openIAModal()"
+        style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background: #a855f7; color: white; border: none; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4); font-size: 24px; cursor: pointer; transition: transform 0.2s, background 0.2s; z-index: 1000; display: flex; align-items: center; justify-content: center;"
+        onmouseover="this.style.transform='scale(1.1)'; this.style.background='#9333ea'"
+        onmouseout="this.style.transform='scale(1)'; this.style.background='#a855f7'" title="Automatizar con IA">
+        <i class="fas fa-magic"></i>
+    </button>
+
+    <script src="/modulos/_compartido/js/utilidades.js"></script>
+    <script src="/modulos/_compartido/js/sidebar.js?v=7"></script>
+
+    <!-- Modal Create Project -->
+    <dialog id="modal-create-project" class="modal">
+        <div class="modal-content" style="width: 500px;">
+            <div class="modal-header">
+                <h3>Nuevo Proyecto Operativo</h3>
+                <button onclick="document.getElementById('modal-create-project').close()" class="close-btn"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-create-project" onsubmit="event.preventDefault(); window.pmoDashboard.submitCreate();">
+                    <div class="form-group">
+                        <label>Nombre del Proyecto</label>
+                        <input type="text" id="proj-name" required placeholder="Ej: Instalación Fibra Cliente X">
+                    </div>
+                    <div class="form-group">
+                        <label>Cliente (Opcional)</label>
+                        <input type="text" id="proj-client" placeholder="Para internos dejar en blanco">
+                    </div>
+                    <div class="form-group">
+                        <label>Presupuesto Venta (Opcional)</label>
+                        <input type="number" id="proj-budget" placeholder="0">
+                        <small style="color:#666; font-size:0.75rem;">Dejar en 0 si es solo gasto interno</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Inicio Estimado</label>
+                            <input type="date" id="proj-start">
+                        </div>
+                        <div class="form-group">
+                            <label>Fin Estimado</label>
+                            <input type="date" id="proj-end">
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary"
+                            onclick="document.getElementById('modal-create-project').close()">Cancelar</button>
+                        <button type="submit" class="btn-primary">Crear Proyecto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Modal IA Ingest -->
+    <dialog id="modal-ia-ingest" class="modal">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-robot"></i> Ingesta Inteligente</h3>
+                <button onclick="document.getElementById('modal-ia-ingest').close()" class="close-btn"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:#aaa; font-size:0.9rem; margin-bottom:10px;">Pega aquí correos, minutas o
+                    requerimientos. La IA detectará costos y tareas.</p>
+                <form id="form-ia-ingest" onsubmit="event.preventDefault(); window.pmoDashboard.submitIA();">
+                    <div class="form-group">
+                        <label>Contenido (Email / Minuta)</label>
+                        <textarea id="ia-content" rows="6"
+                            style="width:100%; background:#111; color:#fff; border:1px solid #444; border-radius:4px; padding:10px;"
+                            placeholder="Ej: Se requiere instalar 50 metros de cable utp... el costo del rollo es $30.000... asignar a Juan..."></textarea>
+                    </div>
+
+                    <div id="ia-result"
+                        style="display:none; margin-top:15px; background:#1e293b; padding:15px; border-radius:8px; border:1px solid #475569;">
+                        <h4 style="margin-top:0; color:#a855f7;">Resultados del Análisis:</h4>
+                        <div id="ia-result-content" style="font-size:0.9rem; line-height:1.4;"></div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary"
+                            onclick="document.getElementById('modal-ia-ingest').close()">Cerrar</button>
+                        <button type="submit" class="btn-primary"
+                            style="background: #a855f7; border-color: #9333ea;">PROCESAR</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module">
+        import { PMODashboard } from './js/dashboard.js';
+        window.pmoDashboard = new PMODashboard();
+    </script>
+</body>
+
+</html>

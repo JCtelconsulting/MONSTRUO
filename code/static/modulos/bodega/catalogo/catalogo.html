@@ -1,0 +1,53 @@
+<div id="view-catalogo" class="view-section">
+    <div class="cat-grid">
+        <div class="cat-tree" id="categoryTree">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+                <h5 style="margin:0; font-size:0.85rem; letter-spacing:0.8px; text-transform:uppercase; opacity:0.7;">
+                    Categorías
+                </h5>
+                <button class="btn-primary" style="background:#28a745; border-color:#28a745;"
+                    onclick="window.BodegaCore && window.BodegaCore.openCreateCategoryModal()">
+                    <i class="fas fa-plus"></i> Nueva
+                </button>
+            </div>
+            <div id="tree-container">Cargando...</div>
+        </div>
+        <div style="display:flex; flex-direction:column; overflow:hidden;">
+            <div
+                style="display:flex; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+                <h4 id="selectedCatTitle" style="margin:0;">Todos los Items</h4>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn-primary"
+                        onclick="window.BodegaCore && window.BodegaCore.createItemPrompt && window.BodegaCore.createItemPrompt()">+ Nuevo
+                        Item</button>
+                </div>
+            </div>
+            <div class="toolbar">
+                <input type="text" id="cat-search" class="search-box" placeholder="Buscar en catálogo..."
+                    oninput="window.BodegaCore && window.BodegaCore.handleCatSearch && window.BodegaCore.handleCatSearch(this.value)">
+                <button class="btn-icon" title="Refrescar"
+                    onclick="window.BodegaCore && window.BodegaCore.loadCatItems && window.BodegaCore.loadCatItems()">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            <div class="table-container">
+                <table class="data-table" id="catItemsTable">
+                    <thead>
+                        <tr>
+                            <th style="width:32px; text-align:center;">
+                                <input type="checkbox" id="cat-select-all"
+                                    onchange="window.BodegaCore && window.BodegaCore.toggleAllCatalogSelection(this.checked)">
+                            </th>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Stock</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div id="cat-items-list" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+</div>

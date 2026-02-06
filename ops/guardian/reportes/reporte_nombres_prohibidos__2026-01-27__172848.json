@@ -1,0 +1,67 @@
+{
+  "backups_root": "/srv/monstruo/backups",
+  "excluir": [
+    ".git",
+    "__pycache__",
+    "backups",
+    "venv"
+  ],
+  "hallazgos": [
+    {
+      "accion_sugerida": "revisar_manual",
+      "mtime_utc": "2026-01-25T15:11:50Z",
+      "nombre": "diagnostico_final_parrotfy.py",
+      "patron": "_final",
+      "ruta": "/srv/monstruo/ops/diagnostico_final_parrotfy.py",
+      "tamano": 2291
+    },
+    {
+      "accion_sugerida": "mover_a_backups",
+      "mtime_utc": "2026-01-27T19:45:09Z",
+      "nombre": "limpiador_backups.py",
+      "patron": "_backup",
+      "ruta": "/srv/monstruo/ops/guardian/limpiador_backups.py",
+      "tamano": 5179
+    },
+    {
+      "accion_sugerida": "revisar_manual",
+      "mtime_utc": "2026-01-25T18:12:52Z",
+      "nombre": "db_migrate_tks_v2.py",
+      "patron": "_v2",
+      "ruta": "/srv/monstruo/ops/scripts/db_migrate_tks_v2.py",
+      "tamano": 1860
+    },
+    {
+      "accion_sugerida": "revisar_manual",
+      "mtime_utc": "2026-01-25T18:11:00Z",
+      "nombre": "db_migrate_catalogo_v2.py",
+      "patron": "_v2",
+      "ruta": "/srv/monstruo/ops/scripts/db_migrate_catalogo_v2.py",
+      "tamano": 3799
+    },
+    {
+      "accion_sugerida": "revisar_manual",
+      "mtime_utc": "2026-01-25T09:30:45Z",
+      "nombre": "refine_history_v2.py",
+      "patron": "_v2",
+      "ruta": "/srv/monstruo/ops/scripts/refine_history_v2.py",
+      "tamano": 2617
+    }
+  ],
+  "patrones_prohibidos": [
+    ".bak",
+    ".old",
+    "_backup",
+    "_final",
+    "_v2",
+    "v1",
+    "v2"
+  ],
+  "por_accion": {
+    "mover_a_backups": 1,
+    "revisar_manual": 4
+  },
+  "raiz": "/srv/monstruo",
+  "total_hallazgos": 5,
+  "ts_utc": "2026-01-27T20:28:48Z"
+}

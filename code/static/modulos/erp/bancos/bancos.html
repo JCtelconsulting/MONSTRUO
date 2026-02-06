@@ -1,0 +1,74 @@
+<div class="bank-workspace">
+    <!-- Header / Toolbar -->
+    <div class="bank-toolbar">
+        <div class="node-info">
+            <span class="node-label"><i class="fas fa-server" style="color:var(--neon); margin-right:5px;"></i> Nodo
+                Android-01</span>
+
+            <div class="status-badge">
+                <div id="lockLed" class="led"></div>
+                <span id="lockText">Disponible</span>
+            </div>
+        </div>
+
+        <div class="zoom-controls" style="display:flex; align-items:center; gap:10px; margin-right:20px;">
+            <i class="fas fa-search-minus" style="font-size:0.8rem; color:var(--text-soft);"></i>
+            <input type="range" id="zoomSlider" min="0.5" max="1.5" step="0.05" value="1.0"
+                style="width:100px; accent-color:var(--neon);" oninput="applyZoom(this.value)">
+            <i class="fas fa-search-plus" style="font-size:0.8rem; color:var(--text-soft);"></i>
+            <span id="zoomValue" style="font-size:0.75rem; color:var(--text-soft); min-width:30px;">100%</span>
+        </div>
+
+        <button onclick="requestBankControl()" class="erp-btn primary">
+            <i class="fas fa-fingerprint" style="margin-right:8px;"></i> Solicitar Control
+        </button>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="bank-layout">
+
+        <!-- Center: Phone -->
+        <div class="phone-area">
+            <div class="phone-frame">
+                <!-- Loader -->
+                <div id="androidLoader" class="phone-loader">
+                    <i class="fas fa-spinner fa-spin fa-2x" style="color:var(--neon); margin-bottom:10px;"></i>
+                    <span>Conectando WebRTC...</span>
+                </div>
+
+                <!-- Iframe: Point to Native Bridge (ws-scrcpy) on Host Port 8000 -->
+                <!-- Iframe: Point to Native Bridge (ws-scrcpy) on Host Port 9001 -->
+                <iframe id="androidFrame"
+                    src="http://127.0.0.1:9001/#!action=stream&udid=192.168.20.230:42419&player=mse&ws=ws%3A%2F%2F127.0.0.1%3A9001%2F%3Faction%3Dproxy-adb%26remote%3Dtcp%3A8886%26udid%3D192.168.20.230:42419"
+                    class="phone-iframe" style="border:none; overflow:hidden;" scrolling="no"
+                    allow="clipboard-read; clipboard-write"></iframe>
+            </div>
+        </div>
+
+        <!-- Right: Controls -->
+        <div class="controls-area">
+
+            <!-- Session Message -->
+            <div class="control-group"
+                style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding: 2rem;">
+                <i class="fas fa-user-lock"
+                    style="font-size: 3rem; color: var(--neon); opacity: 0.5; margin-bottom: 1rem;"></i>
+                <h3 style="margin-bottom: 0.5rem; color: var(--text-soft);">Sesión Protegida</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">
+                    Para garantizar la privacidad, solo un administrador puede gestionar este nodo bancario a la vez.
+                    Por favor, solicita control antes de operar.
+                </p>
+            </div>
+
+            <!-- Warning -->
+            <div class="warning-box">
+                <i class="fas fa-info-circle text-warning"></i>
+                <span class="warning-text">
+                    La sesión de control expira en <b>10 min</b>. <br>
+                    Cierra tus apps bancarias al finalizar.
+                </span>
+            </div>
+
+        </div>
+    </div>
+</div>

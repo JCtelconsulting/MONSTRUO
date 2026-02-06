@@ -1,0 +1,290 @@
+/* ERP - Estilos Compartidos */
+
+/* Tab Bar - EXACT copy from original */
+.tab-bar {
+    display: flex;
+    gap: 2rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+    padding-left: 10px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-soft);
+    padding: 10px 0;
+    font-size: 1rem;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.3s;
+}
+
+.tab-btn.active {
+    color: var(--neon);
+    font-weight: 700;
+}
+
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--neon);
+    box-shadow: 0 0 10px var(--neon);
+}
+
+.view-section {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.view-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ERP Table - EXACT from original */
+.erp-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 12px;
+    margin-top: 10px;
+}
+
+.erp-table thead th {
+    padding: 12px 20px;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    text-align: left;
+    border-bottom: 2px solid var(--border);
+}
+
+.erp-table tbody tr {
+    transition: transform 0.2s;
+    cursor: pointer;
+}
+
+.erp-table tbody tr:hover {
+    transform: scale(1.002);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.erp-table tbody td {
+    background: var(--panel-strong);
+    padding: 16px 20px;
+    color: #fff;
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.erp-table tbody td:first-child {
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+}
+
+.erp-table tbody td:last-child {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+    text-align: right;
+}
+
+/* KPI Cards */
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.kpi-card {
+    background: var(--panel);
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    text-align: center;
+}
+
+.kpi-val {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.kpi-lbl {
+    font-size: 0.8rem;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+
+/* Status Pills */
+.pill-status {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    display: inline-block;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.status-pagada {
+    background: #00ff41;
+    color: #000;
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+}
+
+.status-emitida {
+    background: #00f3ff;
+    color: #000;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+}
+
+.status-anulada {
+    background: #ff3333;
+    color: #fff;
+    box-shadow: 0 0 15px rgba(255, 51, 51, 0.4);
+}
+
+.status-borrador {
+    background: #ccc;
+    color: #000;
+}
+
+/* Buttons */
+.btn-primary,
+.btn-secondary {
+    padding: 8px 15px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: var(--neon);
+    color: #000;
+}
+
+.btn-primary:hover {
+    box-shadow: 0 0 15px var(--neon);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Input Dark */
+.input-dark {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    color: white;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.input-dark:focus {
+    outline: none;
+    border-color: var(--neon);
+}
+
+/* Drawer Component */
+.drawer {
+    position: fixed;
+    top: 0;
+    right: -500px;
+    width: 450px;
+    height: 100vh;
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    z-index: 1000;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.drawer.open {
+    right: 0;
+}
+
+.drawer-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.drawer-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.03);
+}
+
+.drawer-body {
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.drawer-footer {
+    padding: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.03);
+}
+
+/* Detail UI in Drawer */
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.detail-item label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.detail-item .val {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.erp-table.mini {
+    margin-top: 5px;
+    font-size: 0.9rem;
+}
+
+.erp-table.mini td {
+    padding: 8px 12px;
+}

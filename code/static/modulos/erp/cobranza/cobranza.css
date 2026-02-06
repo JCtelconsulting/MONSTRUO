@@ -1,0 +1,62 @@
+/* Cobranza Styles */
+
+.risk-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.risk-critical {
+    background-color: #ff3333;
+    box-shadow: 0 0 8px #ff3333;
+}
+
+.risk-warning {
+    background-color: #ffcc00;
+    box-shadow: 0 0 8px #ffcc00;
+}
+
+.risk-normal {
+    background-color: #00ff41;
+}
+
+.amount-critical {
+    color: #ff3333;
+    font-weight: bold;
+}
+
+.amount-warning {
+    color: #ffcc00;
+    font-weight: bold;
+}
+
+/* Modal Styling */
+/* Modal Styling */
+dialog#modal-gestion {
+    /* Reset & Position */
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    z-index: 1000;
+
+    /* Size */
+    width: 90%;
+    max-width: 500px;
+    height: fit-content;
+    max-height: 90vh;
+
+    /* Style */
+    background: #1a1f2b;
+    color: #fff;
+    border: 1px solid #444;
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+dialog#modal-gestion::backdrop {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(2px);
+}

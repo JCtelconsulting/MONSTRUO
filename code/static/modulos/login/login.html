@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso | TERRENEITOR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/login.css?v=4.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+
+<body>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="card-header">
+                <h1>Telconsulting</h1>
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Identificacion</label>
+                    <input type="email" id="email" placeholder="usuario@telconsulting.cl" required autocomplete="email">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Credencial</label>
+                    <input type="password" id="password" placeholder="********" required
+                        autocomplete="current-password">
+                </div>
+
+                <button type="submit" id="btnLogin" class="btn-login">
+                    Iniciar Sesion</button>
+
+                <div id="status" class="modal-status"></div>
+            </form>
+        </div>
+        <div class="sys-id">SYS.VER.6.3.PROD (TOXIC)</div>
+    </div>
+
+    <script src="/modulos/_compartido/js/utilidades.js?v=201"></script>
+    <script src="js/login.js?v=107"></script>
+</body>
+
+</html>

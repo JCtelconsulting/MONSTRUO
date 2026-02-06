@@ -1,0 +1,17 @@
+[Unit]
+Description=Monstruo API Service (Port 9000)
+After=network.target
+
+[Service]
+User=juan
+Group=juan
+# WorkingDirectory updated to inner module to support local imports (nucleo, dependencias)
+WorkingDirectory=/srv/monstruo/code
+# Environment variables
+Environment="PORT=9000"
+# ExecStart using the venv python directly module style
+ExecStart=/srv/monstruo/code/venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 9000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

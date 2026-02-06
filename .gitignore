@@ -1,4 +1,6 @@
 .env
+.env.*
+code/.env
 *.db
 *.sqlite
 *.sqlite3
@@ -13,3 +15,7 @@ backups/
 logs/
 *.pem
 *.key
+node_modules/
+ops/guardian/config/entorno_guardian.env
+ops/guardian/guardian.sqlite-wal
+ops/guardian/guardian.sqlite-shm
