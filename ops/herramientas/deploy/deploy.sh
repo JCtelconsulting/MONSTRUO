@@ -18,8 +18,13 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
-  echo "[deploy] ERROR: docker compose no está disponible"
+COMPOSE_CMD=""
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE_CMD="docker-compose"
+else
+  echo "[deploy] ERROR: docker compose no está disponible (ni 'docker compose' ni 'docker-compose')"
   exit 1
 fi
 
@@ -45,7 +50,7 @@ git clean -fd \
   -e "*.db"
 
 echo "[deploy] compose up..."
-docker compose up -d --build
+$COMPOSE_CMD up -d --build
 
 echo "[deploy] health..."
 for i in {1..30}; do
@@ -59,4 +64,3 @@ done
 echo "[deploy] ERROR: healthcheck falló: $HEALTH_URL"
 docker compose ps || true
 exit 1
-
