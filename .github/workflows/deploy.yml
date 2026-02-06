@@ -10,42 +10,14 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Nota: evitamos webfactory/ssh-agent porque algunos secrets llegan con CRLF y
-      # ssh-add falla con "error in libcrypto". Iniciamos el agente manualmente y
-      # normalizamos saltos de linea.
-      - name: Start SSH agent + add key
+      - name: Deploy (local)
         env:
-          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
-        run: |
-          if [ -z "${DEPLOY_SSH_KEY_B64:-}" ]; then
-            echo "DEPLOY_SSH_KEY_B64 vacío"
-            exit 1
-          fi
-          eval "$(ssh-agent -s)"
-          mkdir -p ~/.ssh
-          printf "%s" "$DEPLOY_SSH_KEY_B64" | tr -d '\r\n' | base64 -d > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-add ~/.ssh/id_ed25519
-
-      - name: Add known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Deploy
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_BRANCH: main
         run: |
-          PORT="${DEPLOY_PORT:-22}"
-          PATH_REMOTE="${DEPLOY_PATH:-/srv/monstruo}"
-          ssh -p "$PORT" -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
-            "export DEPLOY_PATH='$PATH_REMOTE' DEPLOY_BRANCH='main' && bash '$PATH_REMOTE/ops/herramientas/deploy/deploy.sh'"
+          APP_DIR="${DEPLOY_PATH:-/srv/monstruo}"
+          cd "$APP_DIR"
+          bash ops/herramientas/deploy/deploy.sh
