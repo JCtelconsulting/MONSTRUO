@@ -16,10 +16,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Start SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      # Nota: evitamos webfactory/ssh-agent porque algunos secrets llegan con CRLF y
+      # ssh-add falla con "error in libcrypto". Iniciamos el agente manualmente y
+      # normalizamos saltos de linea.
+      - name: Start SSH agent + add key
+        env:
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
+        run: |
+          if [ -z "${DEPLOY_SSH_KEY_B64:-}" ]; then
+            echo "DEPLOY_SSH_KEY_B64 vacío"
+            exit 1
+          fi
+          eval "$(ssh-agent -s)"
+          mkdir -p ~/.ssh
+          printf "%s" "$DEPLOY_SSH_KEY_B64" | tr -d '\r\n' | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-add ~/.ssh/id_ed25519
 
       - name: Add known_hosts
         run: |
@@ -37,4 +49,3 @@ jobs:
           PATH_REMOTE="${DEPLOY_PATH:-/srv/monstruo}"
           ssh -p "$PORT" -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
             "export DEPLOY_PATH='$PATH_REMOTE' DEPLOY_BRANCH='main' && bash '$PATH_REMOTE/ops/herramientas/deploy/deploy.sh'"
-
