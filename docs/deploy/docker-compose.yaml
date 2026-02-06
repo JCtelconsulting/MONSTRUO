@@ -1,0 +1,37 @@
+version: "3.9"
+
+volumes:
+  monstruo_pgdata:
+
+services:
+  db:
+    image: postgres:16
+    container_name: monstruo-postgres
+    environment:
+      POSTGRES_DB: monstruo
+      POSTGRES_USER: monstruo
+      POSTGRES_PASSWORD: monstruo
+    volumes:
+      - monstruo_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: code/docker/Dockerfile.api
+    container_name: monstruo-api
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+      - DB_URL=postgresql://monstruo:monstruo@db:5432/monstruo
+      - SECRET_KEY=${SECRET_KEY:-CAMBIAME_ESTO_ES_INSEGURO_F8A9}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-0}
+      - LAUDUS_BASE_URL=${LAUDUS_BASE_URL:-https://api.laudus.cl}
+      - LAUDUS_USERNAME=${LAUDUS_USERNAME:-}
+      - LAUDUS_PASSWORD=${LAUDUS_PASSWORD:-}
+      - LAUDUS_COMPANY_VAT_ID=${LAUDUS_COMPANY_VAT_ID:-}
+    depends_on:
+      - db
+    restart: unless-stopped
