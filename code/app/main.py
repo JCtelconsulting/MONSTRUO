@@ -122,7 +122,7 @@ def inicio_redirect():
     return RedirectResponse("/modulos/dashboard/inicio.html")
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok", "app": "monstruo"}
 
