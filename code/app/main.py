@@ -9,6 +9,7 @@ import subprocess
 import os
 import asyncio
 from dotenv import load_dotenv
+from urllib.parse import unquote
 
 # Cargar .env desde /srv/monstruo/.env (dos niveles arriba de cerebro.py si esta en code/sistema_gestion)
 # Path actual de cerebro.py: /srv/monstruo/code/sistema_gestion/cerebro.py
@@ -54,6 +55,18 @@ SUBDOMAIN_MAP = {
 }
 
 app.add_middleware(AuthIdentityMiddleware)
+
+
+def _resolve_cookie_domain(request: Request) -> Optional[str]:
+    configured_domain = os.getenv("COOKIE_DOMAIN", "").strip()
+    if not configured_domain:
+        return None
+
+    request_host = (request.url.hostname or "").strip().lower()
+    base_domain = configured_domain.lstrip(".").lower()
+    if request_host == base_domain or request_host.endswith("." + base_domain):
+        return configured_domain
+    return None
 
 
 # --- JOB REGISTRY ---
@@ -206,7 +219,8 @@ def auth_login_compat(req: LoginRequest, response: Response, request: Request):
     # Terreneitor expects cookie 'access_token'
     # Format: "Bearer <token>"
     token_val = f"Bearer {token}"
-    cookie_domain = os.getenv("COOKIE_DOMAIN", "").strip() or None
+    configured_domain = os.getenv("COOKIE_DOMAIN", "").strip() or None
+    cookie_domain = _resolve_cookie_domain(request)
     cookie_secure = os.getenv("COOKIE_SECURE", "").strip().lower() in (
         "1",
         "true",
@@ -215,6 +229,10 @@ def auth_login_compat(req: LoginRequest, response: Response, request: Request):
         "y",
         "si",
     )
+    response.delete_cookie("access_token")
+    if configured_domain:
+        response.delete_cookie("access_token", domain=configured_domain)
+
     response.set_cookie(
         key="access_token",
         value=token_val,
@@ -241,6 +259,7 @@ def auth_whoami_compat(request: Request):
         return {"logged": False}
 
     # Parse Bearer
+    token = unquote(token)
     if token.startswith("Bearer "):
         token = token[7:]
 
@@ -259,9 +278,15 @@ def auth_whoami_compat(request: Request):
 
 
 @app.post("/api/auth/logout")
-def auth_logout_compat(response: Response):
-    cookie_domain = os.getenv("COOKIE_DOMAIN", "").strip() or None
-    response.delete_cookie("access_token", domain=cookie_domain)
+def auth_logout_compat(response: Response, request: Request):
+    configured_domain = os.getenv("COOKIE_DOMAIN", "").strip() or None
+    cookie_domain = _resolve_cookie_domain(request)
+
+    response.delete_cookie("access_token")
+    if cookie_domain:
+        response.delete_cookie("access_token", domain=cookie_domain)
+    if configured_domain and configured_domain != cookie_domain:
+        response.delete_cookie("access_token", domain=configured_domain)
     return {"ok": True}
 
 
