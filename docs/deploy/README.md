@@ -26,7 +26,12 @@ cd /srv/monstruo
 ```
 
 ### Crear `.env` del servidor (NO va a git)
-Crear `/srv/monstruo/.env` basado en `.env.example` y setear secretos reales.
+Usar plantilla de servidor y completar secretos:
+
+```bash
+cd /srv/monstruo
+cp .env.server.example .env.server
+```
 
 Claves recomendadas para PROD:
 - `SECRET_KEY=<largo/aleatorio>`
@@ -36,7 +41,7 @@ Claves recomendadas para PROD:
 ### Levantar
 ```bash
 cd /srv/monstruo
-docker compose up -d --build
+docker compose --env-file .env.server up -d --build
 curl -fsS http://127.0.0.1:9000/health
 ```
 
@@ -57,6 +62,7 @@ Luego habilita TLS (ej con certbot) y recarga Nginx.
 Workflow: `.github/workflows/deploy.yml`
 
 Este flujo corre tests en GitHub y despliega desde un runner self-hosted en la VM de la app.
+El deploy está configurado para usar explícitamente `DEPLOY_ENV_FILE=/srv/monstruo/.env.server`.
 
 Pasos:
 - En GitHub → Settings → Actions → Runners, agrega un runner self-hosted para este repo y ejecútalo en `192.168.60.5` (puedes usar `/srv/monstruo/runner`).
@@ -69,7 +75,29 @@ Pasos:
 - Nginx: solo enruta por dominios (no se toca el código)
 
 ## Nota: compatibilidad PC/servidor
-- En PC/dev deja `COOKIE_DOMAIN` vacío y `COOKIE_SECURE=0`.
-- En servidor/prod usa `COOKIE_DOMAIN=.telconsulting.cl` y `COOKIE_SECURE=1` para compartir sesión entre subdominios.
+- En PC/dev usa `.env.local` con `COOKIE_DOMAIN=` y `COOKIE_SECURE=0`.
+- En servidor/prod usa `.env.server` con `COOKIE_DOMAIN=.telconsulting.cl` y `COOKIE_SECURE=1` para compartir sesión entre subdominios.
+
+## Nota: flujo seguro de variables por entorno
+- No subir `.env*` al repo (ya ignorado por `.gitignore`).
+- Plantillas versionadas:
+  - `.env.local.example`
+  - `.env.server.example`
+  - `.env.example` (base genérica)
+- Local recomendado:
+
+```bash
+cd /srv/monstruo
+cp .env.local.example .env.local
+docker compose --env-file .env.local up -d
+```
+
+- Servidor recomendado:
+
+```bash
+cd /srv/monstruo
+cp .env.server.example .env.server
+docker compose --env-file .env.server up -d --build
+```
 
 Prueba de CI/CD: 2026-02-08.

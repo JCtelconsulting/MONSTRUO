@@ -42,6 +42,7 @@ jobs:
         env:
           DEPLOY_PATH: /srv/monstruo
           DEPLOY_BRANCH: main
+          DEPLOY_ENV_FILE: /srv/monstruo/.env.server
         run: |
           set -euo pipefail
           # Asegurar permisos de ejecución en el script del workspace

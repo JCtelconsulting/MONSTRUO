@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="${DEPLOY_PATH:-/srv/monstruo}"
 BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:9000/health}"
+DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE:-}"
 
 DEFAULT_COMPOSE_FILE="$APP_DIR/docker-compose.yaml"
 LEGACY_COMPOSE_FILE="$APP_DIR/docs/deploy/docker-compose.yaml"
@@ -17,6 +18,23 @@ fi
 
 echo "[deploy] dir=$APP_DIR branch=$BRANCH"
 cd "$APP_DIR"
+
+if [ -z "$DEPLOY_ENV_FILE" ]; then
+  if [ -f "$APP_DIR/.env.server" ]; then
+    DEPLOY_ENV_FILE="$APP_DIR/.env.server"
+  elif [ -f "$APP_DIR/.env" ]; then
+    DEPLOY_ENV_FILE="$APP_DIR/.env"
+  else
+    echo "[deploy] ERROR: no se encontró archivo de entorno (.env.server o .env)."
+    exit 1
+  fi
+fi
+
+if [ ! -f "$DEPLOY_ENV_FILE" ]; then
+  echo "[deploy] ERROR: env file no existe: $DEPLOY_ENV_FILE"
+  exit 1
+fi
+echo "[deploy] env_file=$DEPLOY_ENV_FILE"
 
 HAS_GIT_REPO=0
 if [ -d "$APP_DIR/.git" ]; then
@@ -75,7 +93,7 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   echo "[deploy] ERROR: compose file no existe: $COMPOSE_FILE"
   exit 1
 fi
-"${COMPOSE_BIN[@]}" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" up -d --build
+"${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" up -d --build
 
 echo "[deploy] health..."
 for i in {1..30}; do
