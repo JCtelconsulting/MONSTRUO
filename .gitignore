@@ -14,6 +14,8 @@ venv.bak/
 # Environment variables
 .env
 .env.*
+code/.env
+ops/guardian/config/entorno_guardian.env
 
 # IDEs
 .idea/
@@ -34,6 +36,7 @@ yarn-error.log*
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+ops/guardian/*.sqlite*
 
 # Backups
 backups/
@@ -56,3 +59,7 @@ dmypy.json
 
 # Agent
 .agent/
+
+# Security keys
+*.pem
+*.key
