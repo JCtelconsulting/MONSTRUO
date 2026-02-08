@@ -40,9 +40,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Deploy to server
         env:
-          DEPLOY_PATH: /srv/MONSTRUO
+          DEPLOY_PATH: ${{ github.workspace }}
           DEPLOY_BRANCH: main
-          DEPLOY_ENV_FILE: /srv/MONSTRUO/.env.server
+          DEPLOY_ENV_FILE: /srv/monstruo/.env.server
         run: |
           set -euo pipefail
           # Asegurar permisos de ejecución en el script del workspace
