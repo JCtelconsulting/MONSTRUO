@@ -35,6 +35,12 @@ if [ ! -f "$DEPLOY_ENV_FILE" ]; then
   exit 1
 fi
 echo "[deploy] env_file=$DEPLOY_ENV_FILE"
+if grep -Eq '^DB_URL=.*(localhost|127\.0\.0\.1|::1)' "$DEPLOY_ENV_FILE"; then
+  DB_URL='postgresql://monstruo:monstruo@db:5432/monstruo'
+  export DB_URL
+  echo "[deploy] WARN: DB_URL local detectado en env. Se fuerza host docker: $DB_URL"
+fi
+
 
 HAS_GIT_REPO=0
 if [ -d "$APP_DIR/.git" ]; then
