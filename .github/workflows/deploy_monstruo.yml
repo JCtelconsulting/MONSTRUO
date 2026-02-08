@@ -9,23 +9,35 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
-      - name: Checkout Código
-        uses: actions/checkout@v4
-
-      - name: Despliegue y Reinicio
+      - name: Actualizar /srv/monstruo y Reiniciar
         run: |
-          echo "🚀 Iniciando despliegue en $(hostname)..."
+          echo "🚀 Iniciando actualización en producción..."
           
-          # 1. Asegurar permisos correctos (por si acaso)
-          # chown -R $USER:$USER .
+          # 1. Ir a la carpeta REAL de producción
+          TARGET="/srv/monstruo"
+          if [ ! -d "$TARGET" ]; then
+            echo "❌ Error: $TARGET no existe."
+            exit 1
+          fi
+          cd "$TARGET"
           
-          # 2. Re-construir y reiniciar contenedores
-          # Usamos sleep para dar tiempo a bajar gracefully si es necesario
-          echo "🔄 Reiniciando contenedores Docker..."
+          # 2. Configurar Git seguro (por si cambia el usuario del runner)
+          git config --global --add safe.directory "$TARGET"
+          
+          # 3. Descargar cambios (Forzando estado remoto)
+          echo "↓ Descargando código..."
+          # git fetch origin main
+          # git reset --hard origin/main
+          # Usamos pull simple si confiamos en la historia, reset es más agresivo pero seguro para deploy
+          git pull origin main
+          
+          # 4. Reiniciar Docker
+          echo "🔄 Reiniciando contenedores..."
+          # Prevenir conflicto de puertos bajando primero
           docker compose down --remove-orphans
           docker compose up -d --build
           
-          # 3. Limpieza de sistema (opcional, buena práctica)
+          # 5. Limpieza
           docker system prune -f
           
-          echo "✅ Despliegue completado exitosamente."
+          echo "✅ Despliegue completado."
