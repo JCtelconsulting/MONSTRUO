@@ -93,7 +93,7 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   echo "[deploy] ERROR: compose file no existe: $COMPOSE_FILE"
   exit 1
 fi
-"${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" up -d --build
+ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" up -d --build
 
 echo "[deploy] health..."
 for i in {1..30}; do
