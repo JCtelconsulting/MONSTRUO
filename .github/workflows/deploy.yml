@@ -42,4 +42,7 @@ jobs:
           DEPLOY_BRANCH: main
         run: |
           set -euo pipefail
-          bash /srv/monstruo/ops/herramientas/deploy/deploy.sh
+          # Asegurar permisos de ejecución en el script del workspace
+          chmod +x ops/herramientas/deploy/deploy.sh
+          # Ejecutar el script DESDE EL WORKSPACE, apuntando al directorio destino
+          bash ops/herramientas/deploy/deploy.sh
