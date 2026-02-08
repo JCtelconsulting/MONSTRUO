@@ -71,3 +71,5 @@ Pasos:
 ## Nota: compatibilidad PC/servidor
 - En PC/dev deja `COOKIE_DOMAIN` vacío y `COOKIE_SECURE=0`.
 - En servidor/prod usa `COOKIE_DOMAIN=.telconsulting.cl` y `COOKIE_SECURE=1` para compartir sesión entre subdominios.
+
+Prueba de CI/CD: 2026-02-08.
