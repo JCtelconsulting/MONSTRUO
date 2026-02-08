@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "politicas_globales": {
+    "prohibido_exponer_secretos": true,
+    "prohibido_urls_externas_en_ui": true
+  },
+  "agentes": [
+    {"id": "central", "nombre": "ULTRON", "tipo": "orquestador"},
+    {"id": "erp", "nombre": "IA ERP", "tipo": "modulo"},
+    {"id": "crm", "nombre": "IA CRM", "tipo": "modulo"},
+    {"id": "bodega", "nombre": "IA Bodega", "tipo": "modulo"},
+    {"id": "tks", "nombre": "IA TKs", "tipo": "modulo"},
+    {"id": "conciliacion", "nombre": "IA Conciliacion", "tipo": "modulo"},
+    {"id": "reportes", "nombre": "IA Reportes", "tipo": "modulo"},
+    {"id": "configuracion", "nombre": "IA Configuracion", "tipo": "modulo"},
+    {"id": "integraciones", "nombre": "IA Integraciones", "tipo": "modulo"},
+    {"id": "zabbix", "nombre": "IA Zabbix", "tipo": "modulo"}
+  ],
+  "reglas_por_modulo": {
+    "bodega": {
+      "acciones_prohibidas": ["borrar_movimientos"],
+      "campos_requeridos": ["sku", "bodega"]
+    },
+    "tks": {
+      "campos_requeridos": ["titulo", "estado"]
+    }
+  }
+}

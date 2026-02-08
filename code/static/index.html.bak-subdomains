@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Monstruo | Cargando...</title>
+  <script>
+    // Redirect logic to centralize entry point
+    window.location.href = "/modulos/login/login.html";
+  </script>
+</head>
+
+<body
+  style="background:#070b11; color:#00ff41; font-family:sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0;">
+  <div>Cargando Monstruo...</div>
+</body>
+
+</html>

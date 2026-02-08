@@ -1,0 +1,276 @@
+/* bancos.css - Estilos específicos para el módulo de Bancos */
+
+.bank-workspace {
+    display: flex;
+    flex-direction: column;
+    /* Usamos 100% del espacio disponible en el tab, pero limitamos la altura máxima 
+       para asegurar que quepa en la pantalla sin scroll del body */
+    height: calc(100vh - 250px);
+    width: 100%;
+    overflow: hidden;
+    /* Clave: evita scroll interno */
+    padding-bottom: 0.5rem;
+}
+
+.bank-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    /* Reducir margen */
+    padding-left: 0.5rem;
+    flex-shrink: 0;
+    /* No encoger toolbar */
+}
+
+/* ... (Node Info y Status Badge iguales) ... */
+.node-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.node-label {
+    font-size: 0.85rem;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background-color: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--text-main);
+}
+
+.led {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--success);
+    box-shadow: 0 0 5px var(--success);
+}
+
+.led.busy {
+    background-color: var(--neon);
+    box-shadow: 0 0 8px var(--neon);
+    animation: pulse 1.5s infinite;
+}
+
+.bank-layout {
+    display: flex;
+    flex: 1;
+    /* Ocupa el resto */
+    gap: 1.5rem;
+    overflow: hidden;
+    /* Importante */
+    align-items: stretch;
+}
+
+/* Phone Container */
+.phone-area {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(10, 15, 30, 0.4);
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    min-width: 0;
+    overflow: hidden;
+    /* Keep hidden to contain standard view */
+}
+
+/* 
+   TÉCNICA DE CROP VISUAL 
+   El marco (.phone-frame) actúa como una "ventana" de recorte.
+   El contenido (.phone-iframe) es mucho más grande que la ventana 
+   y se desplaza para que solo se vea el centro (el celular).
+*/
+.phone-frame {
+    position: relative;
+    aspect-ratio: 9 / 16;
+    height: 95%;
+    width: auto;
+
+    background-color: #000;
+    border-radius: 2rem;
+    border: 8px solid #1a1a1a;
+    /* Marco físico del teléfono */
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.1);
+
+    overflow: hidden;
+    /* El secreto: esconde lo que sobra */
+    margin: 0 auto;
+    z-index: 5;
+    transition: transform 0.1s ease-out;
+}
+
+.phone-loader {
+    position: absolute;
+    inset: 0;
+    background-color: var(--panel-strong);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    color: var(--text-soft);
+}
+
+.phone-iframe {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+
+    top: 0;
+    left: 0;
+    transform: none;
+
+    border: none;
+    pointer-events: auto;
+    overflow: hidden;
+}
+
+/* Controls Side */
+.controls-area {
+    width: 300px;
+    /* Fixed width */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.control-group {
+    background-color: var(--panel-strong);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.group-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.nav-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.nav-btn {
+    background-color: var(--panel-light);
+    border: none;
+    color: white;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.1rem;
+}
+
+.nav-btn:hover {
+    background-color: var(--panel-stark);
+    transform: translateY(-2px);
+}
+
+.nav-btn:active {
+    transform: translateY(0);
+}
+
+.app-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.app-btn {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+}
+
+.app-btn:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+}
+
+.app-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.app-name {
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.app-desc {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+}
+
+.warning-box {
+    background-color: rgba(234, 179, 8, 0.1);
+    border: 1px solid rgba(234, 179, 8, 0.2);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    display: flex;
+    gap: 0.75rem;
+    align-items: start;
+}
+
+.warning-text {
+    font-size: 0.7rem;
+    color: #fde047;
+    line-height: 1.4;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}

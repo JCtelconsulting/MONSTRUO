@@ -1,0 +1,20 @@
+/* Add to banks.css */
+.drop-zone {
+    flex: 1;
+    border: 2px dashed var(--border-color);
+    border-radius: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 1rem;
+}
+
+.drop-zone.dragover {
+    border-color: var(--neon);
+    background-color: rgba(0, 255, 65, 0.05);
+    transform: scale(0.98);
+}

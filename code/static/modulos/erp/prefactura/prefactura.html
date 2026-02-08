@@ -1,0 +1,113 @@
+<div class="builder-layout">
+  <!-- Left: Catalog -->
+  <div class="catalog-panel">
+    <div style="display:flex; gap:10px; align-items:center; justify-content:space-between;">
+      <h3 style="margin:0;">Productos</h3>
+      <button class="btn-secondary" onclick="loadProducts('')" title="Refrescar">
+        <i class="fas fa-rotate"></i>
+      </button>
+    </div>
+
+    <div class="catalog-search">
+      <input id="productSearch" class="input-dark" placeholder="Buscar SKU, nombre o categoría..." oninput="filterProducts()"
+        style="width:100%; margin-bottom:8px;" />
+      <label style="display:flex; gap:8px; align-items:center; font-size:0.8rem; opacity:0.8;">
+        <input id="onlyServices" type="checkbox" onchange="filterProducts()" />
+        Solo servicios
+      </label>
+    </div>
+
+    <div id="serviceQuickAdd" style="display:none; border:1px dashed rgba(255,255,255,0.12); border-radius:10px; padding:10px;">
+      <div style="font-weight:800; margin-bottom:8px;">Agregar servicio</div>
+      <div style="display:grid; grid-template-columns: 1fr; gap:8px;">
+        <button class="btn-secondary" onclick="syncServicesFromLaudus()"><i class="fas fa-cloud-download-alt"></i> Sincronizar desde Laudus</button>
+        <input id="svc-sku" class="input-dark" placeholder="SKU (Ej: SALM)" />
+        <input id="svc-name" class="input-dark" placeholder="Nombre (Ej: Soporte mensual)" />
+        <input id="svc-price" class="input-dark" placeholder="Precio (CLP o UF según moneda)" type="number" step="0.01" />
+        <button class="btn-primary" onclick="createServiceAndAdd()"><i class="fas fa-plus"></i> Crear y agregar</button>
+      </div>
+    </div>
+
+    <div id="productsList" class="products-list"></div>
+  </div>
+
+  <!-- Right: Builder -->
+  <div class="invoice-builder-panel">
+    <div class="builder-header">
+      <div style="display:flex; flex-direction:column; gap:10px; min-width:420px;">
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;">
+            <label style="font-size:0.75rem; opacity:0.7;">Cliente</label>
+            <select id="builder-customer" class="input-dark" onchange="loadCustomerDefaults()" style="width:100%;">
+              <option value="" selected>Seleccionar Cliente...</option>
+            </select>
+          </div>
+          <div style="width:140px;">
+            <label style="font-size:0.75rem; opacity:0.7;">Moneda</label>
+            <select id="builder-currency" class="input-dark" onchange="recalcTotals()" style="width:100%;">
+              <option value="CLP">CLP</option>
+              <option value="UF">UF</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;">
+            <label style="font-size:0.75rem; opacity:0.7;">Nombre Plantilla (opcional)</label>
+            <input id="template-name" class="input-dark" placeholder="Ej: Servicios Mensuales - Proyecto X"
+              style="width:100%;" />
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:10px;">
+            <button class="btn-secondary" onclick="saveTemplate()"><i class="fas fa-save"></i> Guardar Plantilla</button>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;">
+            <label style="font-size:0.75rem; opacity:0.7;">Cargar desde Plantilla</label>
+            <select id="builder-template" class="input-dark" style="width:100%;">
+              <option value="" selected>Seleccionar Plantilla...</option>
+            </select>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:10px;">
+            <button class="btn-secondary" onclick="loadSelectedTemplate()"><i class="fas fa-download"></i> Cargar</button>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;">
+            <div style="font-size:0.75rem; opacity:0.7;">Importar desde Laudus</div>
+            <div style="font-size:0.75rem; opacity:0.55;">Trae la última factura del cliente y la guarda como plantilla (ideal para precios en UF).</div>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:10px;">
+            <button class="btn-secondary" onclick="importLastLaudusTemplate()"><i class="fas fa-file-import"></i> Importar última factura</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:flex-end;">
+        <button class="btn-secondary" onclick="clearBuilder()"><i class="fas fa-broom"></i> Limpiar</button>
+        <button class="btn-primary" onclick="emitInvoice()"><i class="fas fa-file-invoice"></i> Crear Borrador</button>
+      </div>
+    </div>
+
+    <div id="dropZone" class="builder-dropzone">
+      <div class="empty-state-msg">
+        <div style="font-size:1.2rem; font-weight:700;">Arrastra productos aquí</div>
+        <div style="opacity:0.7;">o haz doble click en un producto</div>
+      </div>
+      <div id="invoiceLines"></div>
+    </div>
+
+    <div class="builder-footer">
+      <div style="opacity:0.6;">
+        IVA aplicado: 19%
+      </div>
+      <div class="totals-area">
+        <div>Neto: <span id="total-neto">0</span></div>
+        <div>IVA: <span id="total-iva">0</span></div>
+        <div class="big-total">Total: <span id="total-final">0</span></div>
+      </div>
+    </div>
+  </div>
+</div>

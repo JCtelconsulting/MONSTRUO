@@ -1,0 +1,12 @@
+[Unit]
+Description=MONSTRUO Guardian - Envio a IA local (timer)
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Persistent=true
+Unit=monstruo-guardian-envio.service
+
+[Install]
+WantedBy=timers.target

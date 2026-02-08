@@ -1,0 +1,69 @@
+<!-- Filter/Control Bar -->
+<div class="filter-bar"
+    style="background:var(--panel); padding:15px; border-radius:12px; margin-bottom:20px; display:flex; flex-wrap:wrap; gap:10px; align-items:end;">
+
+    <!-- Selector de Cuenta -->
+    <div style="flex:1; min-width:200px;">
+        <label style="display:block; margin-bottom:5px; font-size:0.85rem; opacity:0.8;">Cuenta Bancaria</label>
+        <select id="bancoSelector" class="input-dark"
+            style="width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border); color:white; padding:8px; border-radius:6px;">
+            <option value="">Seleccione cuenta...</option>
+        </select>
+    </div>
+
+    <!-- Archivo Input (Hidden) -->
+    <input type="file" id="fileCartola" accept=".csv,.txt" style="display:none;">
+
+    <!-- Botones de Acción  -->
+    <button id="btnUploadCartola" onclick="document.getElementById('fileCartola').click()" class="btn-primary"
+        style="padding:8px 15px;">
+        <i class="fas fa-upload"></i> Subir CSV
+    </button>
+    <button id="btnSyncLaudus" onclick="syncFromLaudus()" class="btn-secondary" style="padding:8px 15px;">
+        <i class="fas fa-sync"></i> Sync Laudus
+    </button>
+</div>
+
+<!-- Movimientos Table -->
+<div class="table-container" style="margin-bottom:30px;">
+    <h4 style="margin-bottom:10px; padding-left:5px;">Movimientos Recientes</h4>
+    <table class="erp-table" id="movimientosTable">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Glosa</th>
+                <th>Ref</th>
+                <th style="text-align:right">Monto</th>
+                <th style="text-align:right">Saldo</th>
+                <th>Coincidencia</th>
+            </tr>
+        </thead>
+        <tbody id="tabla-movimientos">
+            <tr>
+                <td colspan="6" style="text-align:center;">Seleccione una cuenta para ver movimientos.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Historial Table -->
+<div class="table-container">
+    <h4 style="margin-bottom:10px; padding-left:5px;">Historial de Cargas</h4>
+    <table class="erp-table" id="cartolasTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Fecha Carga</th>
+                <th>Archivo / Origen</th>
+                <th>Periodo</th>
+                <th>Estado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="tabla-cartolas">
+            <tr>
+                <td colspan="6" style="text-align:center;">No hay cartolas cargadas.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>

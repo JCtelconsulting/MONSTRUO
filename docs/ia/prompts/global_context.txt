@@ -1,0 +1,4 @@
+PROJECT: Monstruo
+INDUSTRY: Telecom, Hardware, Infrastructure.
+LOCATION: Chile (Spanish is primary language).
+CURRENCY: CLP / USD.

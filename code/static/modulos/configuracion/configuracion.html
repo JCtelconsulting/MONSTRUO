@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Modulo | Monstruo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.3" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+
+<body class="sidebar-collapsed">
+    <header id="app-header">
+        <div class="header-top">
+            <h1>MONSTRUO</h1>
+            <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <nav id="dynamic-sidebar" class="side-nav">
+        </nav>
+        <div class="header-actions">
+            <span class="pill">MONSTRUO V1</span>
+            <button id="btnLogout" class="btn-logout" title="Cerrar Sesión"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+    </header>
+
+    <main>
+        <div class="main-inner">
+            <section class="section-block">
+                <div class="section-header">
+                    <h3>Módulo</h3>
+                    <p>Sección en construcción</p>
+                </div>
+                <div class="empty-state">
+                    <i class="fas fa-hammer" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                    <p>Funcionalidad disponible próximamente.</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/modulos/_compartido/js/utilidades.js?v=202"></script>
+    <script src="/modulos/_compartido/js/admin.js?v=3"></script>
+    <!-- NO portal.js here -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initLogout) window.initLogout();
+            // Set title based on URL
+            const path = window.location.pathname;
+            const name = path.split('/').pop().replace('.html', '').toUpperCase();
+            document.querySelector('.section-header h3').textContent = name;
+            document.title = name + " | Monstruo";
+        });
+    </script>
+    <script src="/modulos/_compartido/js/sidebar.js?v=6"></script>
+</body>
+
+</html>

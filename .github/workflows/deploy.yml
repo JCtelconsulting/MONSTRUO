@@ -1,0 +1,57 @@
+name: Deploy (Server)
+
+on:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync to /srv/monstruo
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          TARGET="${DEPLOY_PATH:-/srv/monstruo}"
+          if [ ! -d "$TARGET" ]; then
+            echo "[deploy] DEPLOY_PATH no existe ($TARGET); usando /srv/monstruo"
+            TARGET="/srv/monstruo"
+          fi
+
+          if ! command -v rsync >/dev/null 2>&1; then
+            echo "[deploy] ERROR: rsync no está instalado en el runner (VM). Instálalo y reintenta."
+            exit 1
+          fi
+
+          mkdir -p "$TARGET"
+          rsync -a --delete \
+            --exclude ".git/" \
+            --exclude ".env" \
+            --exclude ".env.*" \
+            --exclude "logs/" \
+            --exclude "cache/" \
+            --exclude "backups/" \
+            --exclude "*.db" \
+            --exclude "*.sqlite" \
+            --exclude "*.sqlite3" \
+            ./ "$TARGET/"
+
+      - name: Deploy (local)
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_BRANCH: main
+        run: |
+          set -euo pipefail
+          APP_DIR="${DEPLOY_PATH:-/srv/monstruo}"
+          if [ ! -d "$APP_DIR" ]; then APP_DIR="/srv/monstruo"; fi
+          cd "$APP_DIR"
+          bash ops/herramientas/deploy/deploy.sh

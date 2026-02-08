@@ -1,0 +1,6 @@
+/* Resumen - KPIs */
+.kpi-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}

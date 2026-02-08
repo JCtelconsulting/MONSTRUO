@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ERP & Finanzas | Monstruo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.5" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="css/erp-shared.css" />
+</head>
+
+<body class="sidebar-collapsed">
+    <header id="app-header">
+        <div class="header-top">
+            <h1>MONSTRUO</h1>
+            <button id="sidebar-toggle" class="btn-icon"><i class="fas fa-bars"></i></button>
+        </div>
+        <nav id="dynamic-sidebar" class="side-nav"></nav>
+        <div class="header-actions">
+            <span class="pill">FINANZAS</span>
+            <button id="btnLogout" class="btn-logout"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+    </header>
+
+    <main>
+        <div class="main-inner">
+            <div class="section-header" style="border:none; padding-bottom:0;">
+                <div>
+                    <h2 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px;">ERP & Finanzas</h2>
+                    <p style="opacity:0.6;">Gestión centralizada de operaciones financieras</p>
+                </div>
+            </div>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('resumen')">Resumen</button>
+                <button class="tab-btn" onclick="switchTab('facturacion')">Facturación</button>
+                <button class="tab-btn" onclick="switchTab('prefactura')">Pre‑Factura</button>
+                <button class="tab-btn" onclick="switchTab('conciliacion')">Conciliación</button>
+                <button class="tab-btn" onclick="switchTab('cobranza')">Cobranza</button>
+
+                <button class="tab-btn" onclick="switchTab('bancos')"><i
+                        class="fas fa-mobile-alt mr-2"></i>Bancos</button>
+            </div>
+
+            <!-- Tab Content Container -->
+            <div id="tab-content-container"></div>
+        </div>
+    </main>
+
+    <script src="/modulos/_compartido/js/utilidades.js?v=203"></script>
+    <script src="/modulos/_compartido/js/admin.js?v=4"></script>
+    <script src="/modulos/_compartido/js/sidebar.js?v=6"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initLogout) window.initLogout();
+            switchTab('resumen');
+        });
+
+        let currentTab = null;
+        const loadedResources = new Set();
+
+        function switchTab(tabId) {
+            // Update active button
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                const onclick = el.getAttribute('onclick');
+                if (onclick && onclick.includes(tabId)) el.classList.add('active');
+            });
+
+            // Load tab content if not already loaded
+            if (currentTab !== tabId) {
+                loadTabContent(tabId);
+                currentTab = tabId;
+            }
+        }
+
+        async function loadTabContent(tabName) {
+            const container = document.getElementById('tab-content-container');
+
+            try {
+                // Load HTML
+                const htmlResp = await fetch(`/modulos/erp/${tabName}/${tabName}.html?v=${Date.now()}`);
+                if (!htmlResp.ok) throw new Error(`HTTP ${htmlResp.status}`);
+                const html = await htmlResp.text();
+                container.innerHTML = html;
+
+                // Load CSS if not already loaded
+                const cssKey = `css-${tabName}`;
+                if (!loadedResources.has(cssKey)) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = `/modulos/erp/${tabName}/${tabName}.css?v=${Date.now()}`;
+                    document.head.appendChild(link);
+                    loadedResources.add(cssKey);
+                }
+
+                // Load JS if not already loaded
+                // Load JS (Force reload if debugging)
+                const jsKey = `js-${tabName}`;
+                // Always reload JS for now during dev
+                const existingScript = document.querySelector(`script[src^="/modulos/erp/${tabName}/${tabName}.js"]`);
+                if (existingScript) existingScript.remove();
+
+                const script = document.createElement('script');
+                script.src = `/modulos/erp/${tabName}/${tabName}.js?v=${Date.now()}_fix4`;
+                document.body.appendChild(script);
+
+                // Wait for script
+                await new Promise(resolve => {
+                    script.onload = resolve;
+                    script.onerror = resolve;
+                });
+
+                // Call init functions if they exist
+                if (tabName === 'facturacion' && typeof loadInvoices === 'function') {
+                    loadInvoices();
+                }
+                if (tabName === 'conciliacion' && typeof initBancos === 'function') {
+                    initBancos();
+                }
+                if (tabName === 'bancos' && typeof initBancosModule === 'function') {
+                    initBancosModule();
+                }
+                if (tabName === 'cobranza' && typeof loadDebtors === 'function') {
+                    loadDebtors();
+                }
+
+                if (tabName === 'resumen' && typeof window.initResumen === 'function') {
+                    window.initResumen();
+                }
+                if (tabName === 'prefactura' && typeof window.initPrefactura === 'function') {
+                    window.initPrefactura();
+                }
+            } catch (e) {
+                console.error(`Error loading tab ${tabName}:`, e);
+                container.innerHTML = `
+                    <div style="text-align:center; padding:4rem; opacity:0.6;">
+                        <i class="fas fa-exclamation-triangle fa-3x" style="margin-bottom:1rem;"></i>
+                        <h3>Error al cargar la pestaña</h3>
+                        <p>${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+
+</html>

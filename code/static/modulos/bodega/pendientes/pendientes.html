@@ -1,0 +1,10 @@
+<div id="view-pendientes" class="view-section">
+    <div class="toolbar">
+        <input type="text" id="pend-search" class="search-box" placeholder="Buscar por nombre o SKU..."
+            onkeyup="if(event.key==='Enter' && window.BodegaCore && window.BodegaCore.loadPending) window.BodegaCore.loadPending()">
+        <button class="btn-primary" onclick="window.BodegaCore && window.BodegaCore.loadPending && window.BodegaCore.loadPending()">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+    </div>
+    <div id="pendingList" style="flex:1; overflow-y:auto; padding-right:10px;"></div>
+</div>

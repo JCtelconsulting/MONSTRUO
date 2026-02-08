@@ -1,0 +1,21 @@
+/* Conciliación Bancaria - Estilos específicos */
+
+.filter-bar {
+    background: var(--panel);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: end;
+}
+
+.table-container {
+    margin-bottom: 30px;
+}
+
+.table-container h4 {
+    margin-bottom: 10px;
+    padding-left: 5px;
+}

@@ -1,0 +1,179 @@
+<!-- Unified Filter/Action Bar -->
+<div class="filter-bar"
+    style="background:var(--panel); padding:15px; border-radius:12px; margin-bottom:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+
+    <!-- Left: Filters -->
+    <select id="erpStatus" class="input-dark"
+        style="background:rgba(0,0,0,0.3); border:1px solid var(--border); color:white; padding:8px; border-radius:6px; min-width:150px;">
+        <option value="">Estado: Todos</option>
+        <option value="ISSUED">Emitida</option>
+        <option value="PAID">Pagada</option>
+        <option value="DRAFT">Borrador</option>
+    </select>
+    <button onclick="loadInvoicesOnly()" class="btn-primary" style="padding:8px 15px;"><i class="fas fa-filter"></i>
+        Filtrar</button>
+
+    <div style="flex:1;"></div> <!-- Spacer -->
+
+    <!-- Right: Rules & Info -->
+    <div
+        style="display:flex; align-items:center; gap:15px; background:rgba(255,255,255,0.05); padding:5px 15px; border-radius:8px;">
+        <div style="text-align:right;">
+            <span style="font-size:0.75rem; opacity:0.6; display:block;">Valor UF Hoy</span>
+            <span id="uf-today-val-mini" style="font-weight:700; color:var(--neon);">--</span>
+        </div>
+        <div style="width:1px; height:30px; background:rgba(255,255,255,0.1);"></div>
+        <button onclick="openRulesDrawer()" class="btn-secondary" style="padding:8px 15px; border-color:transparent;">
+            <i class="fas fa-tasks"></i> Gestionar Reglas
+        </button>
+        <button onclick="openNewRuleModal()" class="btn-primary" style="padding:8px 15px;">
+            <i class="fas fa-plus"></i> Nueva Regla
+        </button>
+    </div>
+</div>
+
+<!-- Main Table: Invoices -->
+<div class="table-container">
+    <table class="erp-table" id="invoicesTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Origen</th>
+                <th>Cliente</th>
+                <th>Estado</th>
+                <th>Total</th>
+                <th>Fecha</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="7" style="text-align:center;">Cargando...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Drawer: Invoice Details -->
+<div id="invoice-drawer" class="drawer">
+    <div class="drawer-content">
+        <div class="drawer-header">
+            <h3>Detalle de Factura <span id="drawer-invoice-id">#000</span></h3>
+            <button onclick="closeInvoiceDrawer()" class="btn-icon"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="drawer-body" id="drawer-invoice-body">
+            <div style="text-align:center; padding:2rem; opacity:0.5;">Cargando...</div>
+        </div>
+        <div class="drawer-footer" id="drawer-invoice-footer">
+            <button class="btn-secondary" onclick="closeInvoiceDrawer()">Cerrar</button>
+            <div id="drawer-actions" style="display:flex; gap:10px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Drawer: Manage Rules -->
+<div id="rules-drawer" class="drawer">
+    <div class="drawer-content" style="max-width:600px;"> <!-- Wider drawer for rules table -->
+        <div class="drawer-header">
+            <h3>Reglas de Facturación</h3>
+            <button onclick="closeRulesDrawer()" class="btn-icon"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="drawer-body">
+            <div style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                <p style="opacity:0.6; font-size:0.9rem; margin:0;">Reglas activas para generación automática.</p>
+                <span id="active-rules-count-badge" class="pill-status status-paid">0 Activas</span>
+            </div>
+
+            <table class="monstruo-table mini" style="font-size:0.85rem;">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Periodicidad</th>
+                        <th>Monto</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-ciclos-drawer">
+                    <tr>
+                        <td colspan="4" style="text-align:center; opacity:0.5;">Cargando...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="drawer-footer">
+            <button class="btn-secondary" onclick="closeRulesDrawer()">Cerrar</button>
+            <button class="btn-primary" onclick="openNewRuleModal()">Nueva Regla</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: New/Edit Rule -->
+<dialog id="modal-rule" class="monstruo-modal">
+    <form method="dialog">
+        <div class="modal-header">
+            <h3 id="modal-rule-title">Nueva Regla de Ciclo</h3>
+            <button class="btn-icon"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <!-- Form content preserved -->
+            <div class="form-group">
+                <label>ID Cliente (Laudus)</label>
+                <select id="rule-customer-id" required>
+                    <option value="" disabled selected>Cargando clientes...</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label>Moneda</label>
+                    <select id="rule-currency" onchange="toggleUFRules()">
+                        <option value="CLP">CLP (Pesos)</option>
+                        <option value="UF">UF</option>
+                    </select>
+                </div>
+                <div class="form-group half">
+                    <label>Monto Base</label>
+                    <input type="number" id="rule-base-amount" step="0.01" value="0" />
+                </div>
+            </div>
+            <div id="uf-rules-container"
+                style="display:none; border: 1px dashed rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <label style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.5rem; display: block;">Regla de
+                    Conversión UF</label>
+                <div class="form-group">
+                    <select id="rule-uf-type" onchange="toggleUFValue()">
+                        <option value="VALOR_DIA">Valor del Día (Auto)</option>
+                        <option value="VALOR_FIJO">Valor Fijo (Estático)</option>
+                        <option value="VALOR_CONTRATO">Valor Contrato (Pactado)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="uf-custom-value-group" style="display:none;">
+                    <label>Valor UF a usar</label>
+                    <input type="number" id="rule-uf-custom-val" step="0.1" value="37000" />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label>Cada (Meses)</label>
+                    <input type="number" id="rule-frequency" min="1" max="12" value="1" />
+                </div>
+                <div class="form-group half">
+                    <label>Día del Mes</label>
+                    <input type="number" id="rule-day" min="1" max="31" value="5" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Descripción / Glosa Factura</label>
+                <textarea id="rule-description" rows="3" placeholder="Ej: Servicios Mensuales..."></textarea>
+            </div>
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px; display: flex;">
+                <input type="checkbox" id="rule-auto-issue" style="width: auto;" />
+                <label for="rule-auto-issue" style="margin: 0;">Emitir automáticamente (Sin pasar por Borrador)</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary"
+                onclick="document.getElementById('modal-rule').close()">Cancelar</button>
+            <button type="button" class="btn-primary" onclick="saveRule()">Guardar Regla</button>
+        </div>
+    </form>
+</dialog>

@@ -1,0 +1,31 @@
+name: Deploy Monstruo (Self-Hosted)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Despliegue y Reinicio
+        run: |
+          echo "🚀 Iniciando despliegue en $(hostname)..."
+          
+          # 1. Asegurar permisos correctos (por si acaso)
+          # chown -R $USER:$USER .
+          
+          # 2. Re-construir y reiniciar contenedores
+          # Usamos sleep para dar tiempo a bajar gracefully si es necesario
+          echo "🔄 Reiniciando contenedores Docker..."
+          docker compose down --remove-orphans
+          docker compose up -d --build
+          
+          # 3. Limpieza de sistema (opcional, buena práctica)
+          docker system prune -f
+          
+          echo "✅ Despliegue completado exitosamente."
