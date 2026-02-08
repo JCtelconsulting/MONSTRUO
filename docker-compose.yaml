@@ -1,5 +1,3 @@
-version: "3.9"
-
 volumes:
   monstruo_pgdata:
 
@@ -20,11 +18,13 @@ services:
       context: .
       dockerfile: code/docker/Dockerfile.api
     container_name: monstruo-api
+    env_file:
+      - ${ENV_FILE:-.env}
     ports:
-      - "9000:9000"
+      - "${PORT:-9000}:9000"
     environment:
-      - PORT=9000
-      - DB_URL=postgresql://monstruo:monstruo@db:5432/monstruo
+      - PORT=${PORT:-9000}
+      - DB_URL=${DB_URL:-postgresql://monstruo:monstruo@db:5432/monstruo}
       - SECRET_KEY=${SECRET_KEY:-CAMBIAME_ESTO_ES_INSEGURO_F8A9}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-0}
