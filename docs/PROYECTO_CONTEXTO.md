@@ -2,6 +2,16 @@
 **Fecha de actualizacion:** 05 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-08 08:35 - Configuración Flujo Git/GitHub Automático
+- **Solicitud**: Configurar despliegue automático desde GitHub (Push-to-Deploy) compatible con firewall estricto.
+- **Entregable**: 
+  - Repositorio remoto vinculado: `git@github.com:JCtelconsulting/MONSTRUO.git`.
+  - Autorización SSH (Deploy Key "SERVIDOR").
+  - Workflow `deploy_monstruo.yml` para Self-Hosted Runner.
+  - Documentación `README.md` creada.
+  - **Fix Runner:** Reconfigurado servicio systemd para ejecutar como usuario `juan` y movido a `/srv/monstruo/runner` (Solución a Permission Denied).
+- **Estado**: CERRADO.
+
 ## HITO: 2026-02-07 19:59 - Diagnóstico y Corrección de Permisos Git/Sistema
 - **Solicitud**: Recuperar control de carpeta `/srv/monstruo` (pertenecía a deploy) e inicializar versionamiento.
 - **Entregable**: 
