@@ -35,12 +35,16 @@ if [ ! -f "$DEPLOY_ENV_FILE" ]; then
   exit 1
 fi
 echo "[deploy] env_file=$DEPLOY_ENV_FILE"
+
 if grep -Eq '^DB_URL=.*(localhost|127\.0\.0\.1|::1)' "$DEPLOY_ENV_FILE"; then
   DB_URL='postgresql://monstruo:monstruo@db:5432/monstruo'
   export DB_URL
   echo "[deploy] WARN: DB_URL local detectado en env. Se fuerza host docker: $DB_URL"
 fi
 
+APP_GIT_SHA="unknown"
+APP_GIT_BRANCH="$BRANCH"
+APP_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 HAS_GIT_REPO=0
 if [ -d "$APP_DIR/.git" ]; then
@@ -75,8 +79,8 @@ if [ "$HAS_GIT_REPO" = "1" ]; then
   echo "[deploy] checkout/reset..."
   git checkout -q "$BRANCH"
   git reset --hard "origin/$BRANCH"
+  APP_GIT_SHA="$(git rev-parse --short HEAD)"
 
-  # Limpieza segura: NO borrar env/local data
   echo "[deploy] clean..."
   git clean -fd \
     -e ".env" \
@@ -99,7 +103,9 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   echo "[deploy] ERROR: compose file no existe: $COMPOSE_FILE"
   exit 1
 fi
-ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" up -d --build
+
+echo "[deploy] version sha=$APP_GIT_SHA branch=$APP_GIT_BRANCH build_time=$APP_BUILD_TIME"
+APP_GIT_SHA="$APP_GIT_SHA" APP_GIT_BRANCH="$APP_GIT_BRANCH" APP_BUILD_TIME="$APP_BUILD_TIME" ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" up -d --build
 
 echo "[deploy] health..."
 for i in {1..60}; do

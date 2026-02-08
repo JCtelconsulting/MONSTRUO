@@ -101,3 +101,20 @@ docker compose --env-file .env.server up -d --build
 ```
 
 Prueba de CI/CD: 2026-02-08.
+
+## 5) Ver versión desplegada
+
+La API expone `GET /version` con metadata del deploy:
+
+```bash
+curl -fsS http://127.0.0.1:9000/version
+```
+
+Respuesta esperada:
+- `git_sha`: commit desplegado
+- `branch`: rama usada en deploy
+- `build_time`: timestamp UTC de construcción/despliegue
+
+### Relación con GitHub
+- En GitHub Actions puedes ver el SHA del run (`actions/checkout`).
+- Debe coincidir con `git_sha` del endpoint `/version` para confirmar que el server está en esa versión.

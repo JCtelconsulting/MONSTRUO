@@ -135,6 +135,16 @@ def health():
     return {"status": "ok", "app": "monstruo"}
 
 
+@app.get("/version")
+def version():
+    return {
+        "app": "monstruo",
+        "git_sha": os.getenv("APP_GIT_SHA", "unknown"),
+        "branch": os.getenv("APP_GIT_BRANCH", "unknown"),
+        "build_time": os.getenv("APP_BUILD_TIME", "unknown"),
+    }
+
+
 class LoginIn(BaseModel):
     username: str
     password: str
