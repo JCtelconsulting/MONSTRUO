@@ -22,8 +22,6 @@ jobs:
           ls -ld /srv
           echo "--- Permissions /srv/monstruo ---"
           ls -ld /srv/monstruo || echo "/srv/monstruo does not exist"
-          echo "--- Permissions /srv/MONSTRUO ---"
-          ls -ld /srv/MONSTRUO || echo "/srv/MONSTRUO does not exist"
 
       - name: Docker Access
         run: |
