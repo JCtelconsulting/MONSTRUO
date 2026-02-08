@@ -36,6 +36,8 @@ jobs:
     environment: production
     timeout-minutes: 20
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Deploy to server
         env:
           DEPLOY_PATH: /srv/monstruo
