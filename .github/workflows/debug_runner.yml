@@ -1,0 +1,31 @@
+name: Debug Runner
+
+on:
+  push:
+    branches: ["main", "prueba-configuracion", "debug-*"]
+  workflow_dispatch:
+
+jobs:
+  debug-info:
+    runs-on: self-hosted
+    steps:
+      - name: Runner Identity
+        run: |
+          echo "User: $(whoami)"
+          echo "Groups: $(id)"
+          echo "Home: $HOME"
+          echo "PWD: $(pwd)"
+      
+      - name: Directory Permissions
+        run: |
+          echo "--- Permissions /srv ---"
+          ls -ld /srv
+          echo "--- Permissions /srv/monstruo ---"
+          ls -ld /srv/monstruo || echo "/srv/monstruo does not exist"
+          echo "--- Permissions /srv/MONSTRUO ---"
+          ls -ld /srv/MONSTRUO || echo "/srv/MONSTRUO does not exist"
+
+      - name: Docker Access
+        run: |
+          docker ps || echo "Cannot list docker containers"
+          docker compose version || echo "Docker compose not found"
