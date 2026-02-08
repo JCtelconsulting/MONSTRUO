@@ -59,6 +59,7 @@ dmypy.json
 
 # Agent
 .agent/
+runner/
 
 # Security keys
 *.pem

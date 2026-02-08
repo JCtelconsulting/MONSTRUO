@@ -56,14 +56,12 @@ Luego habilita TLS (ej con certbot) y recarga Nginx.
 
 Workflow: `.github/workflows/deploy.yml`
 
-Crear secrets en GitHub (repo):
-- `DEPLOY_HOST`: `192.168.60.5`
-- `DEPLOY_USER`: usuario SSH (ej `deploy`)
-- `DEPLOY_SSH_KEY`: private key PEM
-- `DEPLOY_PORT`: `22` (opcional)
-- `DEPLOY_PATH`: `/srv/monstruo` (opcional)
+Este flujo corre tests en GitHub y despliega desde un runner self-hosted en la VM de la app.
 
-El servidor debe permitir SSH con esa key.
+Pasos:
+- En GitHub → Settings → Actions → Runners, agrega un runner self-hosted para este repo y ejecútalo en `192.168.60.5` (puedes usar `/srv/monstruo/runner`).
+- Asegura que el usuario del runner tenga acceso a Docker (`docker` group).
+- En GitHub → Settings → Environments, crea el entorno `production` y configura "Required reviewers" para aprobar el deploy.
 
 ## 4) Flujo de trabajo recomendado
 - PC: branch → PR → merge a `main`
@@ -73,4 +71,3 @@ El servidor debe permitir SSH con esa key.
 ## Nota: compatibilidad PC/servidor
 - En PC/dev deja `COOKIE_DOMAIN` vacío y `COOKIE_SECURE=0`.
 - En servidor/prod usa `COOKIE_DOMAIN=.telconsulting.cl` y `COOKIE_SECURE=1` para compartir sesión entre subdominios.
-

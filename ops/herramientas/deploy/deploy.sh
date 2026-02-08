@@ -4,7 +4,16 @@ set -euo pipefail
 APP_DIR="${DEPLOY_PATH:-/srv/monstruo}"
 BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:9000/health}"
-COMPOSE_FILE="${COMPOSE_FILE:-$APP_DIR/docs/deploy/docker-compose.yaml}"
+
+DEFAULT_COMPOSE_FILE="$APP_DIR/docker-compose.yaml"
+LEGACY_COMPOSE_FILE="$APP_DIR/docs/deploy/docker-compose.yaml"
+if [ -n "${COMPOSE_FILE:-}" ]; then
+  COMPOSE_FILE="$COMPOSE_FILE"
+elif [ -f "$DEFAULT_COMPOSE_FILE" ]; then
+  COMPOSE_FILE="$DEFAULT_COMPOSE_FILE"
+else
+  COMPOSE_FILE="$LEGACY_COMPOSE_FILE"
+fi
 
 echo "[deploy] dir=$APP_DIR branch=$BRANCH"
 cd "$APP_DIR"
@@ -35,6 +44,7 @@ else
 fi
 
 if [ "$HAS_GIT_REPO" = "1" ]; then
+  git config --global --add safe.directory "$APP_DIR" || true
   echo "[deploy] fetch..."
   git fetch origin "$BRANCH" --prune
 
@@ -51,6 +61,7 @@ if [ "$HAS_GIT_REPO" = "1" ]; then
     -e "backups/" \
     -e "logs/" \
     -e "cache/" \
+    -e "runner/" \
     -e "monstruo.db" \
     -e "*.sqlite" \
     -e "*.sqlite3" \
