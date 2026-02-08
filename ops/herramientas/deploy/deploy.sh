@@ -96,7 +96,7 @@ fi
 ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" up -d --build
 
 echo "[deploy] health..."
-for i in {1..30}; do
+for i in {1..60}; do
   if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
     echo "[deploy] OK"
     exit 0
@@ -105,5 +105,6 @@ for i in {1..30}; do
 done
 
 echo "[deploy] ERROR: healthcheck falló: $HEALTH_URL"
-"${COMPOSE_BIN[@]}" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" ps || true
+ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" ps || true
+ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" logs --tail=120 api || true
 exit 1
