@@ -83,6 +83,29 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 - 2026-01-29: Refinamiento de Jerarquía: Carpetas "Sin Asignar" ocultas en Equipos/Materiales + Limpieza de duplicados.
 
 
+0.5 Flujo de Despliegue (CI/CD / GitHub Actions)
+
+El proyecto cuenta con un sistema de despliegue continuo automatizado.
+
+**Regla:** NO se toca el servidor manualmente para actualizar código.
+
+El ciclo es:
+1.  **Desarrollo Local:** Trabajas en tu PC/WSL.
+2.  **Commit & Push:** Subes tus cambios a GitHub.
+    *   Ramas feature: `git push origin mi-rama` (No despliega).
+    *   Rama main: `git push origin main` (Despliega automáticamente).
+3.  **GitHub Actions:** Un runner en el servidor detecta el cambio en `main`, baja el código y actualiza containers/servicios.
+
+**Comandos para desplegar a prod:**
+```bash
+git checkout main
+git pull origin main
+git merge mi-rama-lista
+git push origin main
+```
+*(Esperar 2 minutos y verificar cambios en el servidor)*
+
+
 ---
 
 1) Visión y alcance
