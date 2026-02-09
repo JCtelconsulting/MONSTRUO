@@ -267,3 +267,58 @@ window.fetchApi = fetchApi;
 window.initLogout = initLogout;
 window.initModal = initModal;
 window.showToast = showToast;
+
+// --- ENV SWITCH (PROD/DEV) ---
+function initEnvSwitchGlobal() {
+  const header = document.querySelector('.header-actions');
+  if (!header) return;
+  if (document.getElementById('env-indicator')) return;
+
+  const indicator = document.createElement('div');
+  indicator.id = 'env-indicator';
+  indicator.className = 'pill';
+  indicator.style.display = 'block';
+  indicator.style.marginBottom = '10px';
+  indicator.style.fontSize = '0.75rem';
+  indicator.textContent = 'Modo: ...';
+
+  const btn = document.createElement('button');
+  btn.id = 'btnEnvSwitch';
+  btn.className = 'btn-account';
+  btn.title = 'Cambiar entorno';
+  btn.innerHTML = '<i class="fas fa-exchange-alt"></i> <span>Cambiar entorno</span>';
+
+  const footer = header.querySelector('.footer-buttons-container');
+  header.insertBefore(indicator, footer || null);
+  header.insertBefore(btn, footer || null);
+
+  const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
+  if (!isProdHost) {
+    indicator.textContent = 'Modo: LOCAL';
+    btn.style.display = 'none';
+    return;
+  }
+
+  fetch('/version', { credentials: 'include' })
+    .then((resp) => resp.json())
+    .then((info) => {
+      const isDev = String(info.branch || '').toLowerCase() === 'dev';
+      indicator.classList.remove('env-prod', 'env-dev');
+      indicator.classList.add(isDev ? 'env-dev' : 'env-prod');
+      const envText = isDev ? 'DEV' : 'PROD';
+      indicator.innerHTML = `<span class="env-prefix">Modo:</span> <span class="env-long">${envText}</span><span class="env-short">${envText}</span>`;
+      btn.innerHTML = isDev
+        ? '<i class="fas fa-toggle-off"></i> <span>Ir a PROD</span>'
+        : '<i class="fas fa-toggle-on"></i> <span>Ir a DEV</span>';
+      btn.onclick = () => {
+        window.location.href = isDev ? '/__env/prod' : '/__env/dev';
+      };
+    })
+    .catch(() => {
+      indicator.textContent = 'Modo: ?';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initEnvSwitchGlobal();
+});
