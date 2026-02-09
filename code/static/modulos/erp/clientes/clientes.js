@@ -1,126 +1,179 @@
 // clientes.js
 let allClients = [];
+let activeClientId = null;
 
 async function loadClients() {
-    const grid = document.getElementById('clientsGrid');
-    grid.innerHTML = '<div class="loading-state"><i class="fas fa-circle-notch fa-spin"></i> Cargando clientes...</div>';
+    const tbody = document.getElementById('clientsTableBody');
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-state"><i class="fas fa-circle-notch fa-spin"></i> Cargando clientes...</td></tr>';
 
     try {
-        // Fetch status which gives us the active list + debt info
         const data = await window.fetchApi('/api/collection/customer-status?limit=200');
         allClients = Array.isArray(data) ? data : [];
         renderClients(allClients);
     } catch (e) {
         console.error("Error loading clients:", e);
-        grid.innerHTML = '<div class="empty-state">Error al cargar clientes</div>';
+        tbody.innerHTML = '<tr><td colspan="5" class="error-msg">Error al cargar clientes</td></tr>';
     }
 }
 
 function renderClients(list) {
-    const grid = document.getElementById('clientsGrid');
+    const tbody = document.getElementById('clientsTableBody');
     if (!list || list.length === 0) {
-        grid.innerHTML = '<div class="empty-state">No se encontraron clientes</div>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No se encontraron clientes</td></tr>';
         return;
     }
 
-    grid.innerHTML = list.map(c => {
+    tbody.innerHTML = list.map(c => {
         const hasDebt = c.status === 'DEBT';
-        const debtClass = hasDebt ? 'text-danger' : 'text-success';
+        const debtClass = hasDebt ? 'status-anulada' : 'status-pagada'; // Reuse styling classes essentially
         const debtText = hasDebt ? formatCurrency(c.total_debt) : 'Al día';
-        
-        // Icon based on status
-        const icon = hasDebt ? 'fa-exclamation-circle' : 'fa-check-circle';
-        
+        const badgeStyle = hasDebt ? 'background:#ff3333; color:#fff;' : 'background:#00cc66; color:#000;';
+
         return `
-            <div class="client-card" onclick="openClientModal('${c.customer_id || ''}', '${c.customer_name}')">
-                <div class="client-icon ${debtClass}">
-                    <i class="fas ${icon}"></i>
-                </div>
-                <div class="client-info">
-                    <div class="client-name">${c.customer_name}</div>
-                    <div class="client-debt ${debtClass}">${debtText}</div>
-                </div>
-            </div>
+            <tr class="client-row">
+                <td><span class="pill-status" style="${badgeStyle}">${hasDebt ? 'DEUDA' : 'OK'}</span></td>
+                <td style="font-weight:600; color:var(--text-main);">${c.customer_name}</td>
+                <td style="opacity:0.7;">${c.customer_id || '-'}</td>
+                <td style="font-weight:bold; ${hasDebt ? 'color:#ff5555;' : ''}">${debtText}</td>
+                <td style="text-align:right;">
+                    <div class="action-buttons">
+                        <button class="btn-secondary btn-icon" title="Reglas de Facturación" onclick="openBillingDrawer('${c.customer_id}', '${c.customer_name}')">
+                            <i class="fas fa-file-invoice"></i>
+                        </button>
+                        <button class="btn-secondary btn-icon" title="Gestión de Cobranza" onclick="openCollectionDrawer('${c.customer_id}', '${c.customer_name}')">
+                            <i class="fas fa-comment-dollar"></i>
+                        </button>
+                        <button class="btn-secondary btn-icon" title="Historial" onclick="openHistoryDrawer('${c.customer_id}', '${c.customer_name}')">
+                            <i class="fas fa-history"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
         `;
     }).join('');
 }
 
 function filterClients() {
     const term = document.getElementById('clientSearch').value.toLowerCase();
-    const filtered = allClients.filter(c => 
+    const filtered = allClients.filter(c =>
         (c.customer_name || '').toLowerCase().includes(term) ||
         (c.customer_id || '').toLowerCase().includes(term)
     );
     renderClients(filtered);
 }
 
-// --- MODAL LOGIC ---
+// --- DRAWER MANAGEMENT ---
 
-async function openClientModal(id, name) {
-    if (!id) return;
-    
-    document.getElementById('modalClientName').innerText = name;
-    document.getElementById('clientModal').classList.add('active');
-    
-    // Reset contents
-    document.getElementById('modalProfilesList').innerHTML = '<div class="loading-small">Cargando...</div>';
-    document.getElementById('modalInvoiceHistory').innerHTML = '<div class="loading-small">Cargando...</div>';
-    document.getElementById('modalUFRules').innerHTML = '';
-
-    // Parallel Fetch
-    Promise.all([
-        loadClientProfiles(id),
-        loadClientHistory(id),
-        loadClientRules(id)
-    ]).catch(console.error);
+function openDrawer(drawerId) {
+    // Close others
+    document.querySelectorAll('.drawer').forEach(d => d.classList.remove('open'));
+    const drawer = document.getElementById(drawerId);
+    if (drawer) drawer.classList.add('open');
 }
 
-function closeClientModal() {
-    document.getElementById('clientModal').classList.remove('active');
+function closeDrawer(drawerId) {
+    const drawer = document.getElementById(drawerId);
+    if (drawer) drawer.classList.remove('open');
 }
 
-async function loadClientProfiles(customerId) {
-    const container = document.getElementById('modalProfilesList');
+// 1. BILLING DRAWER (Perfiles)
+async function openBillingDrawer(id, name) {
+    activeClientId = id;
+    openDrawer('drawer-billing');
+
+    // Set Header if possible, or just load
+    const container = document.getElementById('billingProfilesList');
+    container.innerHTML = '<div class="loading-small">Cargando perfiles...</div>';
+
     try {
-        const profiles = await window.fetchApi(`/api/facturacion/perfiles?customer_id=${encodeURIComponent(customerId)}`);
-        
+        const profiles = await window.fetchApi(`/api/facturacion/perfiles?customer_id=${encodeURIComponent(id)}`);
+
         if (!profiles || profiles.length === 0) {
-            container.innerHTML = '<div class="empty-list">No hay servicios recurrentes configurados.</div>';
+            container.innerHTML = `
+                <div class="empty-list">No hay perfiles configurados.</div>
+                <button class="btn-primary" style="margin-top:10px; width:100%;" onclick="createDefaultProfile('${id}')">
+                    <i class="fas fa-plus"></i> Crear Perfil Base
+                </button>
+            `;
             return;
         }
-        
+
         container.innerHTML = profiles.map(p => `
-            <div class="profile-row">
-                <div class="profile-info">
-                    <div class="profile-name">${p.name}</div>
-                    <div class="profile-details">
-                        ${p.currency} $${p.base_amount || 0} (${p.uf_rule})
-                    </div>
+            <div class="profile-card">
+                <div class="profile-header">
+                    <span class="profile-title">${p.name}</span>
+                    <span class="badge">${p.currency === 'UF' ? 'UF' : '$'}</span>
                 </div>
-                <button class="btn-xs btn-primary" onclick="generateDraftFromProfile(${p.id})">
-                    <i class="fas fa-magic"></i> Generar
-                </button>
+                <div class="profile-body">
+                    <div>Monto: ${p.currency} $${p.base_amount || 0}</div>
+                    <div style="font-size:0.8rem; opacity:0.7;">${p.uf_rule}</div>
+                </div>
+                <div class="profile-actions">
+                    <button class="btn-xs btn-primary" onclick="generateDraftFromProfile(${p.id})">
+                        <i class="fas fa-magic"></i> Generar
+                    </button>
+                </div>
             </div>
         `).join('');
-        
+
     } catch (e) {
         container.innerHTML = '<div class="error-msg">Error cargando perfiles</div>';
     }
 }
 
-async function loadClientHistory(customerId) {
-    const container = document.getElementById('modalInvoiceHistory');
+// 2. COLLECTION DRAWER
+async function openCollectionDrawer(id, name) {
+    activeClientId = id;
+    openDrawer('drawer-collection');
+
+    document.getElementById('collectionStats').innerHTML = '<div class="loading-small">Cargando datos...</div>';
+    document.getElementById('collectionLog').innerHTML = '';
+
+    // Here we would fetch debt details + log
+    // For now, re-using customer status debt logic visually
+    // In real implementation we need an endpoint for collection history
+
+    const clientData = allClients.find(c => c.customer_id === id);
+    if (clientData) {
+        const debtFormatted = formatCurrency(clientData.total_debt);
+        document.getElementById('collectionStats').innerHTML = `
+            <div class="kpi-card mini">
+                <div class="kpi-val" style="font-size:1.5rem; color:${clientData.status === 'DEBT' ? '#ff3333' : '#00cc66'}">${debtFormatted}</div>
+                <div class="kpi-lbl">Deuda Total</div>
+            </div>
+        `;
+    }
+
+    document.getElementById('collectionLog').innerHTML = '<div class="empty-list">Sin gestiones registradas (demo).</div>';
+}
+
+async function saveCollectionAction() {
+    const note = document.getElementById('collectionNote').value;
+    if (!note) return alert('Escribe una nota');
+
+    // Mock save
+    alert('Gestión guardada (simulación)');
+    document.getElementById('collectionNote').value = '';
+}
+
+// 3. HISTORY DRAWER
+async function openHistoryDrawer(id, name) {
+    activeClientId = id;
+    openDrawer('drawer-history');
+
+    const container = document.getElementById('historyList');
+    container.innerHTML = '<div class="loading-small">Cargando historial...</div>';
+
     try {
-        // We reuse the sales endpoint
-        const invoices = await window.fetchApi(`/api/sales/invoices?customer_id=${encodeURIComponent(customerId)}&limit=10`);
-        
+        const invoices = await window.fetchApi(`/api/sales/invoices?customer_id=${encodeURIComponent(id)}&limit=20`);
+
         if (!invoices || invoices.length === 0) {
-            container.innerHTML = '<div class="empty-list">Sin historial reciente.</div>';
+            container.innerHTML = '<div class="empty-list">Sin comprobantes.</div>';
             return;
         }
-        
+
         container.innerHTML = `
-            <table class="simple-table">
+            <table class="erp-table mini">
                 <thead><tr><th>Folio</th><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead>
                 <tbody>
                     ${invoices.map(inv => `
@@ -139,30 +192,18 @@ async function loadClientHistory(customerId) {
     }
 }
 
-async function loadClientRules(customerId) {
-   // This might need a proper endpoint filter. For now, we list all and filter JS side (not efficient but reusing existing endpoints)
-   // Actually endpoint /api/facturacion/ciclos supports listing all.
-   // Let's implement a filter in JS for now or verify if endpoint supports query.
-   // facturacion.py list_rules doesn't seem to take filters.
-   // We skip or implement later.
-   document.getElementById('modalUFRules').innerHTML = '<span style="opacity:0.5; font-size:0.8rem;">(Reglas heredadas del perfil)</span>';
-}
-
+// Actions
 async function generateDraftFromProfile(profileId) {
-    if(!confirm('¿Generar borrador de factura para este perfil?')) return;
-    
+    if (!confirm('¿Generar borrador de factura para este perfil?')) return;
+
     try {
         const res = await window.fetchApi(`/api/facturacion/perfiles/${profileId}/generar`, {
             method: 'POST'
         });
-        
+
         if (res.ok) {
             showToast('Borrador generado exitosamente', 'success');
-            // Refresh history
-            // We need to know the customer ID again, but we are inside a closure or implicit context?
-            // openClientModal sets the modal state. We can refresh the history part if we knew the customerId.
-            // But checking the profile response might give us the invoice.
-            // For now, simple Alert or Toast is enough.
+            closeDrawer('drawer-billing');
         }
     } catch (e) {
         showToast('Error generando borrador', 'error');
@@ -170,16 +211,19 @@ async function generateDraftFromProfile(profileId) {
     }
 }
 
-// Utils
-function formatCurrency(val) {
-    return new Intl.NumberFormat('es-CL', {style:'currency', currency:'CLP', maximumFractionDigits:0}).format(val);
-}
-function formatDateShort(dateStr) {
-    if(!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('es-CL', {day:'2-digit', month:'2-digit'});
+async function createDefaultProfile(customerId) {
+    alert('Esta función abriría el modal de crear perfil (pendiente de implementación)');
 }
 
-// Init
-window.initClientes = function() {
+// Utils
+function formatCurrency(val) {
+    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
+}
+function formatDateShort(dateStr) {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+}
+
+window.initClientes = function () {
     loadClients();
 };

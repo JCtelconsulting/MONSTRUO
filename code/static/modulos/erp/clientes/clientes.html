@@ -1,48 +1,85 @@
 <div class="clientes-layout">
     <div class="filter-bar">
-        <input type="text" id="clientSearch" class="input-dark" placeholder="Buscar cliente..." onkeyup="filterClients()">
+        <input type="text" id="clientSearch" class="input-dark" placeholder="Buscar cliente..."
+            onkeyup="filterClients()">
         <button class="btn-primary" onclick="loadClients()">
             <i class="fas fa-sync"></i>
         </button>
     </div>
 
-    <div id="clientsGrid" class="clients-grid">
-        <!-- Client Cards Injected Here -->
-        <div class="loading-state"><i class="fas fa-circle-notch fa-spin"></i> Cargando clientes...</div>
+    <div class="clients-container">
+        <table class="erp-table">
+            <thead>
+                <tr>
+                    <th>Estado</th>
+                    <th>Cliente / Razón Social</th>
+                    <th>ID Externo</th>
+                    <th>Deuda Total</th>
+                    <th style="text-align:right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="clientsTableBody">
+                <tr>
+                    <td colspan="5" class="loading-state"><i class="fas fa-circle-notch fa-spin"></i> Cargando
+                        clientes...</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
-<!-- Client Detail Modal -->
-<div id="clientModal" class="modal">
-    <div class="modal-content large-modal">
-        <div class="modal-header">
-            <h2 id="modalClientName">Cliente</h2>
-            <button class="close-modal" onclick="closeClientModal()">&times;</button>
+<!-- Drawer: Facturación (Profiles) -->
+<div id="drawer-billing" class="drawer">
+    <div class="drawer-content">
+        <div class="drawer-header">
+            <h3><i class="fas fa-file-invoice-dollar"></i> Reglas de Facturación</h3>
+            <button class="btn-icon" onclick="closeDrawer('drawer-billing')"><i class="fas fa-times"></i></button>
         </div>
-        <div class="modal-body">
-            <div class="modal-cols">
-                <!-- Left: Profiles & Services -->
-                <div class="modal-left">
-                    <h3><i class="fas fa-file-invoice-dollar"></i> Servicios Contratados</h3>
-                    <div id="modalProfilesList" class="profiles-list"></div>
-                </div>
-                
-                <!-- Right: History & Info -->
-                <div class="modal-right">
-                    <div class="info-card">
-                        <h3><i class="fas fa-history"></i> Historial Reciente</h3>
-                        <div id="modalInvoiceHistory" class="invoice-history mini-table"></div>
-                    </div>
-                    
-                    <div class="info-card" style="margin-top:10px;">
-                        <h3><i class="fas fa-sliders-h"></i> Reglas UF</h3>
-                        <div id="modalUFRules" class="uf-rules-display"></div>
-                    </div>
-                </div>
+        <div class="drawer-body">
+            <div class="drawer-section">
+                <p class="text-soft">Configura a quién y cómo se factura.</p>
+                <div id="billingProfilesList" class="profiles-list"></div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn-secondary" onclick="closeClientModal()">Cerrar</button>
+        <div class="drawer-footer">
+            <button class="btn-secondary" onclick="closeDrawer('drawer-billing')">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Drawer: Cobranza (Collection) -->
+<div id="drawer-collection" class="drawer">
+    <div class="drawer-content">
+        <div class="drawer-header">
+            <h3><i class="fas fa-hand-holding-usd"></i> Gestión Cobranza</h3>
+            <button class="btn-icon" onclick="closeDrawer('drawer-collection')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="drawer-body">
+            <div id="collectionStats" style="margin-bottom:20px;"></div>
+            <div class="drawer-section">
+                <h4><i class="fas fa-history"></i> Bitácora de Gestiones</h4>
+                <div id="collectionLog" class="activity-log"></div>
+            </div>
+            <div class="drawer-section" style="margin-top:20px;">
+                <h4><i class="fas fa-plus"></i> Nueva Gestión</h4>
+                <textarea id="collectionNote" class="input-dark" style="width:100%; height:80px;"
+                    placeholder="Resultado del llamado o correo..."></textarea>
+                <button class="btn-primary" style="margin-top:10px; width:100%;"
+                    onclick="saveCollectionAction()">Registrar Gestión</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Drawer: Historial (History) -->
+<div id="drawer-history" class="drawer">
+    <div class="drawer-content">
+        <div class="drawer-header">
+            <h3><i class="fas fa-history"></i> Historial Facturas</h3>
+            <button class="btn-icon" onclick="closeDrawer('drawer-history')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="drawer-body">
+            <div id="historyList" class="history-list"></div>
         </div>
     </div>
 </div>
