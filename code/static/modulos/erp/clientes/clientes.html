@@ -1,0 +1,48 @@
+<div class="clientes-layout">
+    <div class="filter-bar">
+        <input type="text" id="clientSearch" class="input-dark" placeholder="Buscar cliente..." onkeyup="filterClients()">
+        <button class="btn-primary" onclick="loadClients()">
+            <i class="fas fa-sync"></i>
+        </button>
+    </div>
+
+    <div id="clientsGrid" class="clients-grid">
+        <!-- Client Cards Injected Here -->
+        <div class="loading-state"><i class="fas fa-circle-notch fa-spin"></i> Cargando clientes...</div>
+    </div>
+</div>
+
+<!-- Client Detail Modal -->
+<div id="clientModal" class="modal">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <h2 id="modalClientName">Cliente</h2>
+            <button class="close-modal" onclick="closeClientModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-cols">
+                <!-- Left: Profiles & Services -->
+                <div class="modal-left">
+                    <h3><i class="fas fa-file-invoice-dollar"></i> Servicios Contratados</h3>
+                    <div id="modalProfilesList" class="profiles-list"></div>
+                </div>
+                
+                <!-- Right: History & Info -->
+                <div class="modal-right">
+                    <div class="info-card">
+                        <h3><i class="fas fa-history"></i> Historial Reciente</h3>
+                        <div id="modalInvoiceHistory" class="invoice-history mini-table"></div>
+                    </div>
+                    
+                    <div class="info-card" style="margin-top:10px;">
+                        <h3><i class="fas fa-sliders-h"></i> Reglas UF</h3>
+                        <div id="modalUFRules" class="uf-rules-display"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeClientModal()">Cerrar</button>
+        </div>
+    </div>
+</div>

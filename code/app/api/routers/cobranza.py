@@ -111,7 +111,8 @@ async def list_customer_status(
             """
             SELECT
                 COALESCE(NULLIF(TRIM(c.fantasy_name), ''), NULLIF(TRIM(c.name), ''), NULLIF(TRIM(c.rut), ''), TRIM(c.external_id), 'Sin nombre') AS customer_name,
-                COALESCE(SUM(CASE WHEN i.status = 'ISSUED' THEN i.total_final ELSE 0 END), 0) AS total_debt
+                COALESCE(SUM(CASE WHEN i.status = 'ISSUED' THEN i.total_final ELSE 0 END), 0) AS total_debt,
+                c.external_id
             FROM customers c
             LEFT JOIN invoices i
               ON TRIM(i.customer_id) = TRIM(c.external_id)
@@ -125,16 +126,21 @@ async def list_customer_status(
         return [
             {
                 "customer_name": (
-                    row["customer_name"]
+                    row["customer_name"] if isinstance(row, dict) else row[0]
+                ),
+                "customer_id": (
+                    row["external_id"]
                     if isinstance(row, dict)
-                    else row[0]
+                    else row[2]  # Assuming added as 3rd column
                 ),
                 "total_debt": float(
                     (row["total_debt"] if isinstance(row, dict) else row[1]) or 0
                 ),
                 "status": (
                     "DEBT"
-                    if float((row["total_debt"] if isinstance(row, dict) else row[1]) or 0)
+                    if float(
+                        (row["total_debt"] if isinstance(row, dict) else row[1]) or 0
+                    )
                     > 0
                     else "OK"
                 ),

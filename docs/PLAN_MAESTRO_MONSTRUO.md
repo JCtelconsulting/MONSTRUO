@@ -81,29 +81,35 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 - 2026-01-29: Categorías reducidas a EQUIPOS/MATERIALES (base) para consolidación inicial.
 - 2026-01-29: Integración Laudus aplicada a stock (sync + apply_stock) y fuente real en Bodega.
 - 2026-01-29: Refinamiento de Jerarquía: Carpetas "Sin Asignar" ocultas en Equipos/Materiales + Limpieza de duplicados.
+- 2026-02-09: **Infraestructura Profesional (CI/CD)**: Implementación de GitHub Actions con Self-Hosted Runner. Despliegue automático a producción al hacer push a `main`. Servidor protegido (no se edita directo).
+- 2026-02-09: **ERP/Bancos**: Integración real con dispositivo físico (ws-scrcpy), streaming de pantalla funcional y sesión persistente.
+- 2026-02-09: **UI Global**: Estandarización de headers y switcher de ambiente (Lab/Prod) unificado en topbar.
 
 
-0.5 Flujo de Despliegue (CI/CD / GitHub Actions)
+0.5 Flujo de Despliegue (CI/CD / GitHub Actions) ✅ IMPLEMENTADO
 
-El proyecto cuenta con un sistema de despliegue continuo automatizado.
+**PROTOCOLOS OBLIGATORIOS PARA CUALQUIER AGENTE:**
+1.  **NO TOCAR SERVIDORES:** Prohibido entrar por SSH a editar código en producción (`/srv/monstruo`).
+2.  **RAMA MAIN PROTEGIDA:** La rama `main` despliega a producción automágicamente. **NUNCA** hacer push directo a `main` sin autorización explícita.
+3.  **FLUJO DE TRABAJO:**
+    *   Crea una rama `feature/nombre-tarea`.
+    *   Haz tus cambios localmente.
+    *   Push a GitHub: `git push origin feature/nombre-tarea`.
+    *   **Solicita revisión:** El usuario (humano) debe aprobar y hacer el merge a `main` en GitHub.
+    *   Solo tras el merge, el runner de GitHub Actions despliega.
 
-**Regla:** NO se toca el servidor manualmente para actualizar código.
+**Ciclo de Vida:**
+1.  **Local (Dev):** Tu entorno de trabajo (WSL). Aquí rompes y arreglas.
+2.  **Pull Request (Review):** Subes a GitHub. El humano revisa.
+3.  **Producción (Live):** Al mergear a `main`, el runner actualiza el servidor.
 
-El ciclo es:
-1.  **Desarrollo Local:** Trabajas en tu PC/WSL.
-2.  **Commit & Push:** Subes tus cambios a GitHub.
-    *   Ramas feature: `git push origin mi-rama` (No despliega).
-    *   Rama main: `git push origin main` (Despliega automáticamente).
-3.  **GitHub Actions:** Un runner en el servidor detecta el cambio en `main`, baja el código y actualiza containers/servicios.
-
-**Comandos para desplegar a prod:**
+**Comando permitido para Agentes:**
 ```bash
-git checkout main
-git pull origin main
-git merge mi-rama-lista
-git push origin main
+git checkout -b feature/nueva-funcionalidad
+# ... cambios ...
+git push origin feature/nueva-funcionalidad
+# NOTIFICAR AL USUARIO PARA MERGE
 ```
-*(Esperar 2 minutos y verificar cambios en el servidor)*
 
 
 ---
