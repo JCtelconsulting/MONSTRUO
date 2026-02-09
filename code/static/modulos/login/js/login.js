@@ -18,22 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function getPostLoginTarget() {
-    const host = window.location.hostname.toLowerCase();
-    const isProdHost = host.endsWith('.telconsulting.cl');
+    const isProdHost = window.location.hostname.toLowerCase().endsWith('.telconsulting.cl');
     if (!isProdHost) {
       return '/modulos/dashboard/dashboard.html';
     }
-
-    if (host === 'login.telconsulting.cl') {
-      return DOMINIOS.erp;
-    }
-
-    const knownHosts = Object.values(DOMINIOS).map((url) => new URL(url).hostname);
-    if (knownHosts.includes(host)) {
-      return `https://${host}`;
-    }
-
-    return DOMINIOS.erp;
+    return `${DOMINIOS.login}/dashboard`;
   }
 
   // Si ya tiene cookie, redirigir

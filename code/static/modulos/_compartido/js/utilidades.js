@@ -3,7 +3,8 @@
 // ==========================================================================
 
 // --- API CLIENT ---
-const LOGIN_URL = '/login.html';
+const IS_PROD_DOMAIN = window.location.hostname.endsWith('.telconsulting.cl');
+const LOGIN_URL = IS_PROD_DOMAIN ? 'https://login.telconsulting.cl' : '/login.html';
 
 function redirectToLogin() {
   window.location.href = LOGIN_URL;
@@ -30,31 +31,18 @@ async function fetchApi(url, options = {}) {
 
   const resp = await fetch(url, options);
 
-  // Manejo inteligente de 401/403 (evitar bucles si la session esta viva pero falta permiso)
-  if (resp.status === 401 || resp.status === 403) {
-    let authMsg = 'Sesion expirada o permiso denegado';
+  if (resp.status === 401) {
+    redirectToLogin();
+    throw new Error('Sesion expirada');
+  }
 
-    // Verificar si realmente perdio sesion
-    try {
-      const sesCheck = await fetch('/api/sesion', { credentials: 'include' });
-      if (sesCheck.ok) {
-        const sesData = await sesCheck.json();
-        if (sesData.ok) {
-          authMsg = 'Acceso Denegado (Permisos insuficientes)';
-        }
-      }
-    } catch (e) { }
-
+  if (resp.status === 403) {
+    const authMsg = 'Acceso denegado (permisos insuficientes)';
     if (typeof window.showToast === 'function') {
       window.showToast("⚠️ " + authMsg, "warning");
     } else {
       console.warn(authMsg);
     }
-
-    // CRITICAL FIX: NO redirigir automaticamente. 
-    // El usuario pidio explicitamente quedarse en la pagina aunque haya error.
-    // if (typeof window.handleAuthExpired === 'function') { ... } else { redirectToLogin(); }
-
     throw new Error(authMsg);
   }
 
@@ -88,9 +76,7 @@ async function verifySession() {
   try {
     const res = await fetchApi('/api/sesion');
     if (!res.ok) {
-      console.warn("Sesion invalida segun API");
-      // CRITICAL FIX: No redirigir
-      if (typeof window.showToast === 'function') window.showToast("Sesión no válida. Por favor recarga o inicia sesión.", "warning");
+      redirectToLogin();
     } else {
       console.log("Sesion OK:", res.user);
     }

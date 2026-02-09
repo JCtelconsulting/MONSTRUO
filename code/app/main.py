@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response, Cookie
 from fastapi import Query, HTTPException, Header, Depends
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, RedirectResponse, FileResponse, HTMLResponse
+from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 import subprocess
 import os
@@ -509,14 +509,9 @@ from app.api.routers import facturacion as rutas_facturacion
 
 app.include_router(rutas_facturacion.router)
 
-@app.get("/")
-def read_root(request: Request):
-    host = request.headers.get("host", "").split(":")[0]
-    subdomain = host.split(".")[0] if "." in host else ""
 
-    module_path = SUBDOMAIN_MAP.get(subdomain, SUBDOMAIN_MAP["login"])
+def _serve_module_html(module_path: str, fallback_path: str = "/modulos/login/login.html"):
     file_path = static_dir / module_path.lstrip("/")
-
     if file_path.exists():
         html = file_path.read_text(encoding="utf-8")
         module_dir = module_path.rsplit("/", 1)[0] + "/"
@@ -528,7 +523,7 @@ def read_root(request: Request):
                 html = base_tag + html
         return HTMLResponse(content=html)
 
-    fallback = static_dir / "modulos/login/login.html"
+    fallback = static_dir / fallback_path.lstrip("/")
     if fallback.exists():
         html = fallback.read_text(encoding="utf-8")
         base_tag = '<base href="/modulos/login/">'
@@ -540,5 +535,30 @@ def read_root(request: Request):
         return HTMLResponse(content=html)
 
     raise HTTPException(status_code=404, detail="module_not_found")
+
+
+@app.get("/dashboard")
+def dashboard_root(
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
+    access_token: Optional[str] = Cookie(default=None),
+):
+    try:
+        auth_deps.require_session_hybrid(authorization, access_token)
+    except Exception:
+        is_prod_host = request.url.hostname and request.url.hostname.endswith(".telconsulting.cl")
+        login_url = "https://login.telconsulting.cl" if is_prod_host else "/login.html"
+        return RedirectResponse(login_url, status_code=302)
+
+    return _serve_module_html("/modulos/dashboard/dashboard.html")
+
+
+@app.get("/")
+def read_root(request: Request):
+    host = request.headers.get("host", "").split(":")[0]
+    subdomain = host.split(".")[0] if "." in host else ""
+
+    module_path = SUBDOMAIN_MAP.get(subdomain, SUBDOMAIN_MAP["login"])
+    return _serve_module_html(module_path)
 
 app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")

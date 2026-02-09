@@ -14,7 +14,18 @@ document.addEventListener('DOMContentLoaded', () => {
         body.classList.remove('sidebar-collapsed');
     }
 
-    const menuItems = [
+    const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
+    const menuItems = isProdHost ? [
+        { label: 'Dashboard', icon: 'fas fa-chart-pie', link: 'https://login.telconsulting.cl/dashboard', title: 'Dashboard' },
+        { label: 'Proyectos (PMO)', icon: 'fas fa-helmet-safety', link: 'https://pmo.telconsulting.cl', title: 'Oficina Técnica' },
+        { label: 'ERP & Finanzas', icon: 'fas fa-file-invoice-dollar', link: 'https://erp.telconsulting.cl', title: 'ERP & Finanzas' },
+        { label: 'CRM', icon: 'fas fa-id-card', link: 'https://crm.telconsulting.cl', title: 'CRM (Clientes)' },
+        { label: 'Bodega', icon: 'fas fa-warehouse', link: 'https://bodega.telconsulting.cl', title: 'Bodega (WMS)' },
+        { label: 'TKs', icon: 'fas fa-ticket-alt', link: 'https://ticketera.telconsulting.cl', title: 'Ticketera' },
+        { label: 'IA (ULTRON)', icon: 'fas fa-robot', link: 'https://ia.telconsulting.cl', title: 'Asistente IA' },
+        { label: 'Zabbix', icon: 'fas fa-signal', link: 'https://zabbix.telconsulting.cl', title: 'Monitoreo' },
+        { label: 'Configuración', icon: 'fas fa-cog', link: 'https://config.telconsulting.cl', title: 'Configuración' }
+    ] : [
         { label: 'Dashboard', icon: 'fas fa-chart-pie', link: '/modulos/dashboard/dashboard.html', title: 'Dashboard' },
         { label: 'Proyectos (PMO)', icon: 'fas fa-helmet-safety', link: '/modulos/pmo/dashboard.html', title: 'Oficina Técnica' },
         { label: 'ERP & Finanzas', icon: 'fas fa-file-invoice-dollar', link: '/modulos/erp/erp.html', title: 'ERP & Finanzas' },
@@ -27,21 +38,27 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     const currentPath = window.location.pathname;
+    const currentHost = window.location.hostname;
     let html = '';
 
     menuItems.forEach(item => {
-        // Active state logic
         let isActive = false;
-        if (item.link === '/modulos/dashboard/dashboard.html' && (currentPath === '/' || currentPath === '/index.html' || currentPath.includes('dashboard.html') || currentPath.includes('inicio.html'))) {
-            isActive = true;
-        } else if (item.link !== '/modulos/dashboard/dashboard.html' && currentPath.includes(item.link.replace(/\?.*$/, ''))) {
-            isActive = true;
-        }
-        // Special case for Bodega sub-tabs if we use query params or internal navigation
-        if (item.label === 'Bodega' && currentPath.includes('catalogo.html')) {
-            // Si estamos en catalogo.html (legacy) iluminar Bodega? 
-            // O mejor, redirigir user a bodega? Por ahora keep link active.
-            isActive = true;
+        if (isProdHost) {
+            const targetUrl = new URL(item.link);
+            if (item.label === 'Dashboard') {
+                isActive = currentHost === targetUrl.hostname && currentPath.startsWith('/dashboard');
+            } else {
+                isActive = currentHost === targetUrl.hostname;
+            }
+        } else {
+            if (item.link === '/modulos/dashboard/dashboard.html' && (currentPath === '/' || currentPath === '/index.html' || currentPath.includes('dashboard.html') || currentPath.includes('inicio.html'))) {
+                isActive = true;
+            } else if (item.link !== '/modulos/dashboard/dashboard.html' && currentPath.includes(item.link.replace(/\?.*$/, ''))) {
+                isActive = true;
+            }
+            if (item.label === 'Bodega' && currentPath.includes('catalogo.html')) {
+                isActive = true;
+            }
         }
 
         html += `
