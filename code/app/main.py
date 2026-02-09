@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response, Cookie
 from fastapi import Query, HTTPException, Header, Depends
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from pydantic import BaseModel
 import subprocess
 import os
@@ -44,14 +44,14 @@ app = FastAPI(title="Monstruo API", version="2.0")
 SUBDOMAIN_MAP = {
     "login": "/modulos/login/login.html",
     "erp": "/modulos/erp/erp.html",
-    "pmo": "/modulos/pmo/pmo.html",
+    "pmo": "/modulos/pmo/dashboard.html",
     "crm": "/modulos/crm/crm.html",
     "bodega": "/modulos/bodega/bodega.html",
     "ticketera": "/modulos/tks/tks.html",
-    "ia": "/modulos/ia/ia.html",
+    "ia": "/modulos/ultron/ultron.html",
     "zabbix": "/modulos/zabbix/zabbix.html",
     "monitoreo": "/modulos/zabbix/zabbix.html",
-    "config": "/modulos/config/config.html",
+    "config": "/modulos/configuracion/configuracion.html",
 }
 
 app.add_middleware(AuthIdentityMiddleware)
@@ -513,10 +513,17 @@ app.include_router(rutas_facturacion.router)
 def read_root(request: Request):
     host = request.headers.get("host", "").split(":")[0]
     subdomain = host.split(".")[0] if "." in host else ""
-    
-    if subdomain in SUBDOMAIN_MAP:
-        return RedirectResponse(SUBDOMAIN_MAP[subdomain])
-        
-    return RedirectResponse("/modulos/login/login.html")
+
+    module_path = SUBDOMAIN_MAP.get(subdomain, SUBDOMAIN_MAP["login"])
+    file_path = static_dir / module_path.lstrip("/")
+
+    if file_path.exists():
+        return FileResponse(str(file_path))
+
+    fallback = static_dir / "modulos/login/login.html"
+    if fallback.exists():
+        return FileResponse(str(fallback))
+
+    raise HTTPException(status_code=404, detail="module_not_found")
 
 app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
