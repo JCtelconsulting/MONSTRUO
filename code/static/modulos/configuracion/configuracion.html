@@ -33,12 +33,43 @@
         <div class="main-inner">
             <section class="section-block">
                 <div class="section-header">
-                    <h3>Módulo</h3>
-                    <p>Sección en construcción</p>
+                    <h3>Configuración</h3>
+                    <p>Parámetros centrales del sistema</p>
                 </div>
-                <div class="empty-state">
-                    <i class="fas fa-hammer" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
-                    <p>Funcionalidad disponible próximamente.</p>
+
+                <div class="panel" style="padding:20px;">
+                    <h3><i class="fas fa-envelope"></i> Cobranza · Configuración SMTP</h3>
+                    <p style="opacity:0.7; font-size:0.9rem; margin-bottom:15px;">
+                        Esta configuración pertenece al flujo de <strong>Cobranza</strong> (envío de facturas y recordatorios).
+                    </p>
+
+                    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:15px;">
+                        <div>
+                            <label style="display:block; font-size:0.8rem; margin-bottom:5px;">Host SMTP</label>
+                            <input type="text" id="smtpHost" class="input-dark" placeholder="smtp.gmail.com" style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.8rem; margin-bottom:5px;">Puerto</label>
+                            <input type="number" id="smtpPort" class="input-dark" placeholder="587" style="width:100%;">
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:15px;">
+                        <div>
+                            <label style="display:block; font-size:0.8rem; margin-bottom:5px;">Usuario / Correo</label>
+                            <input type="text" id="smtpUser" class="input-dark" placeholder="cobranza@..." style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.8rem; margin-bottom:5px;">Contraseña / App Password</label>
+                            <input type="password" id="smtpPass" class="input-dark" placeholder="********" style="width:100%;">
+                        </div>
+                    </div>
+
+                    <div style="margin-top:15px; text-align:right;">
+                        <button class="btn-primary" id="btnSaveSmtp">
+                            <i class="fas fa-save"></i> Guardar SMTP de Cobranza
+                        </button>
+                    </div>
                 </div>
             </section>
         </div>
@@ -48,13 +79,49 @@
     <script src="/modulos/_compartido/js/admin.js?v=3"></script>
     <!-- NO portal.js here -->
     <script>
+        async function loadSmtpConfig() {
+            try {
+                const data = await window.fetchApi('/api/config/smtp');
+                if (data) {
+                    document.getElementById('smtpHost').value = data.smtp_host || '';
+                    document.getElementById('smtpPort').value = data.smtp_port || '';
+                    document.getElementById('smtpUser').value = data.smtp_user || '';
+                    document.getElementById('smtpPass').value = data.smtp_password || '';
+                }
+            } catch (e) {
+                console.error("Error loading SMTP config", e);
+            }
+        }
+
+        async function saveSmtpConfig() {
+            const host = document.getElementById('smtpHost').value.trim();
+            const port = document.getElementById('smtpPort').value.trim();
+            const user = document.getElementById('smtpUser').value.trim();
+            const pass = document.getElementById('smtpPass').value;
+
+            try {
+                await window.fetchApi('/api/config/smtp', {
+                    method: 'POST',
+                    body: {
+                        smtp_host: host,
+                        smtp_port: port,
+                        smtp_user: user,
+                        smtp_password: pass
+                    }
+                });
+                alert('Configuración SMTP de Cobranza guardada.');
+            } catch (e) {
+                console.error(e);
+                alert('Error al guardar configuración SMTP.');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             if (window.initLogout) window.initLogout();
-            // Set title based on URL
-            const path = window.location.pathname;
-            const name = path.split('/').pop().replace('.html', '').toUpperCase();
-            document.querySelector('.section-header h3').textContent = name;
-            document.title = name + " | Monstruo";
+            document.title = "Configuración | Monstruo";
+            const saveBtn = document.getElementById('btnSaveSmtp');
+            if (saveBtn) saveBtn.addEventListener('click', saveSmtpConfig);
+            loadSmtpConfig();
         });
     </script>
     <script src="/modulos/_compartido/js/sidebar.js?v=6"></script>

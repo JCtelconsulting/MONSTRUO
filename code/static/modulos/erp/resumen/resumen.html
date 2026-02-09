@@ -14,35 +14,12 @@
 </div>
 
 <div class="panel" style="margin-top:20px; padding:20px;">
-    <h3><i class="fas fa-cog"></i> Configuración de Correo (SMTP)</h3>
-    <p style="opacity:0.6; font-size:0.9rem; margin-bottom:15px;">Datos para envío de facturas y cobranza automática.
+    <h3><i class="fas fa-info-circle"></i> Configuración Movida</h3>
+    <p style="opacity:0.8; font-size:0.95rem; margin:0;">
+        La configuración de correo <strong>SMTP</strong> para procesos de <strong>Cobranza</strong> fue movida al módulo
+        <strong>Configuración</strong>.
     </p>
-
-    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:15px;">
-        <div>
-            <label style="display:block; font-size:0.8rem; margin-bottom:5px;">Host SMTP</label>
-            <input type="text" id="smtpHost" class="input-dark" placeholder="smtp.gmail.com" style="width:100%;">
-        </div>
-        <div>
-            <label style="display:block; font-size:0.8rem; margin-bottom:5px;">Puerto</label>
-            <input type="number" id="smtpPort" class="input-dark" placeholder="587" style="width:100%;">
-        </div>
-    </div>
-
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:15px;">
-        <div>
-            <label style="display:block; font-size:0.8rem; margin-bottom:5px;">Usuario / Correo</label>
-            <input type="text" id="smtpUser" class="input-dark" placeholder="cobranza@..." style="width:100%;">
-        </div>
-        <div>
-            <label style="display:block; font-size:0.8rem; margin-bottom:5px;">Contraseña / App Password</label>
-            <input type="password" id="smtpPass" class="input-dark" placeholder="********" style="width:100%;">
-        </div>
-    </div>
-
-    <div style="margin-top:15px; text-align:right;">
-        <button class="btn-primary" onclick="saveSmtpConfig()">
-            <i class="fas fa-save"></i> Guardar Credenciales
-        </button>
-    </div>
+    <p style="opacity:0.6; font-size:0.9rem; margin-top:10px;">
+        Ruta sugerida: Configuración → Cobranza (SMTP).
+    </p>
 </div>
