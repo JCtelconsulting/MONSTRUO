@@ -41,8 +41,19 @@ async def get_uf():
 async def list_rules(sess: dict = Depends(deps.require_permission("invoice:read"))):
     conn = db.get_conn()
     try:
-        rows = conn.execute("SELECT * FROM billing_rules ORDER BY id DESC").fetchall()
-        return rows
+        rows = conn.execute(
+            """
+            SELECT
+                b.*,
+                COALESCE(NULLIF(TRIM(c.fantasy_name), ''), NULLIF(TRIM(c.name), ''), TRIM(c.rut), TRIM(c.external_id), b.customer_id) AS customer_name
+            FROM billing_rules b
+            LEFT JOIN customers c
+              ON TRIM(c.external_id) = TRIM(b.customer_id)
+              OR CAST(c.id AS TEXT) = TRIM(b.customer_id)
+            ORDER BY b.id DESC
+            """
+        ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()
 

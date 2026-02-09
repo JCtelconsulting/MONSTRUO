@@ -54,11 +54,15 @@ async function fetchInvoices() {
                 amountColor = '#ff3333'; // Explicit Red (var(--danger))
             }
 
+            const customerName = inv.customer_name || inv.customer_id || '-';
+            const customerRef = inv.customer_name && inv.customer_id ? `<div style="opacity:0.6; font-size:0.75rem;">${inv.customer_id}</div>` : '';
+
             tr.innerHTML = `
                 <td><b style="color:var(--neon); font-family:monospace;">#${inv.id}</b></td>
                 <td><span style="font-size:0.7rem; opacity:0.7;">${inv.origin || 'Monstruo'}</span></td>
                 <td>
-                    <div style="font-weight:600; font-size:0.95rem;">${inv.customer_id}</div>
+                    <div style="font-weight:600; font-size:0.95rem;">${customerName}</div>
+                    ${customerRef}
                     ${isNC ? '<div style="display:inline-block; margin-top:4px; font-size:0.7rem; color:#fff; background:#ff3333; padding:2px 8px; border-radius:4px; font-weight:700; border:1px solid rgba(255,255,255,0.2);">NOTA CRÉDITO</div>' : ''}
                 </td>
                 <td><span class="pill-status ${statusClass}">${estado}</span></td>
@@ -342,8 +346,13 @@ function renderRulesDrawer(rules) {
             valorStr = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(r.base_amount);
         }
 
+        const customerLabel = r.customer_name || r.customer_id;
+        const customerRef = (r.customer_name && r.customer_name !== r.customer_id)
+            ? `<br><small style="opacity:0.6;">${r.customer_id}</small>`
+            : '';
+
         tr.innerHTML = `
-            <td><b>${r.customer_id}</b></td>
+            <td><b>${customerLabel}</b>${customerRef}</td>
             <td>${r.frequency_months} mes(es)</td>
             <td>${valorStr}</td>
             <td style="text-align:right;">
@@ -397,9 +406,13 @@ async function loadCustomers() {
         select.innerHTML = '<option value="" disabled selected>Seleccione Cliente</option>';
         if (customers && customers.length > 0) {
             customers.forEach(c => {
+                const customerValue = (c.external_id || c.id || '').toString().trim();
+                if (!customerValue) return;
+                const customerName = c.fantasy_name || c.name || c.rut || customerValue;
+                const customerRut = c.rut ? ` (${c.rut})` : '';
                 const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.text = `${c.name} (${c.rut})`;
+                opt.value = customerValue;
+                opt.text = `${customerName}${customerRut}`;
                 select.appendChild(opt);
             });
         }
