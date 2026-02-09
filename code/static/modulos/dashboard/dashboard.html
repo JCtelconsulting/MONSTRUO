@@ -67,6 +67,24 @@
             border: 1px solid rgba(255, 204, 0, 0.5);
             color: #ffcc00;
           }
+
+          #env-indicator .env-short {
+            display: none;
+          }
+
+          body.sidebar-collapsed #env-indicator {
+            padding: 6px 8px;
+            font-size: 0.7rem;
+            text-align: center;
+          }
+
+          body.sidebar-collapsed #env-indicator .env-long {
+            display: none;
+          }
+
+          body.sidebar-collapsed #env-indicator .env-short {
+            display: inline;
+          }
         </style>
         <div class="monstruo-dashboard-grid">
           <div class="card card-terreno" style="cursor: default;">
@@ -118,7 +136,8 @@
 
         indicator.classList.remove('env-prod', 'env-dev');
         indicator.classList.add(isDev ? 'env-dev' : 'env-prod');
-        indicator.textContent = `Modo: ${isDev ? 'DEV' : 'PROD'}`;
+        const envText = isDev ? 'DEV' : 'PROD';
+        indicator.innerHTML = `Modo: <span class="env-long">${envText}</span><span class="env-short">${envText}</span>`;
         btn.innerHTML = isDev
           ? '<i class="fas fa-toggle-off"></i> <span>Ir a PROD</span>'
           : '<i class="fas fa-toggle-on"></i> <span>Ir a DEV</span>';
@@ -127,7 +146,7 @@
           window.location.href = isDev ? '/__env/prod' : '/__env/dev';
         };
       } catch (e) {
-        indicator.textContent = 'Modo: desconocido';
+        indicator.textContent = 'Modo: ?';
       }
     }
 
