@@ -4,20 +4,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- CONFIGURACION DE DOMINIOS ---
   // Reemplaza con los dominios reales de produccion
-  const DESTINOS_PROD = {
-    ADMIN: 'https://erp.telconsulting.cl',
-    GERENCIA: 'https://erp.telconsulting.cl',
-    TERRENO: 'https://erp.telconsulting.cl',
-    SUPERVISOR: 'https://erp.telconsulting.cl',
+  const DOMINIOS = {
+    login: 'https://login.telconsulting.cl',
+    erp: 'https://erp.telconsulting.cl',
+    pmo: 'https://pmo.telconsulting.cl',
+    crm: 'https://crm.telconsulting.cl',
+    bodega: 'https://bodega.telconsulting.cl',
+    ticketera: 'https://ticketera.telconsulting.cl',
+    ia: 'https://ia.telconsulting.cl',
+    zabbix: 'https://zabbix.telconsulting.cl',
+    monitoreo: 'https://monitoreo.telconsulting.cl',
+    config: 'https://config.telconsulting.cl',
   };
 
-  function getTargetByRole(rawRole) {
-    const role = String(rawRole || '').trim().toUpperCase();
-    const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
-    if (isProdHost) {
-      return DESTINOS_PROD[role] || 'https://erp.telconsulting.cl';
+  function getPostLoginTarget() {
+    const host = window.location.hostname.toLowerCase();
+    const isProdHost = host.endsWith('.telconsulting.cl');
+    if (!isProdHost) {
+      return '/modulos/dashboard/dashboard.html';
     }
-    return '/modulos/dashboard/dashboard.html';
+
+    if (host === 'login.telconsulting.cl') {
+      return DOMINIOS.erp;
+    }
+
+    const knownHosts = Object.values(DOMINIOS).map((url) => new URL(url).hostname);
+    if (knownHosts.includes(host)) {
+      return `https://${host}`;
+    }
+
+    return DOMINIOS.erp;
   }
 
   // Si ya tiene cookie, redirigir
@@ -25,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .then((r) => r.json())
     .then((data) => {
       if (data.logged) {
-        const target = getTargetByRole(data.role);
+        const target = getPostLoginTarget();
         console.log('Sesion activa. Redirigiendo a:', target);
         window.location.href = target;
       }
@@ -64,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
       status.textContent = 'Acceso Correcto. Redirigiendo...';
       status.className = 'modal-status success';
 
-      const target = getTargetByRole(data.role);
+      const target = getPostLoginTarget();
 
       // Pequeno delay para feedback visual
       setTimeout(() => {
