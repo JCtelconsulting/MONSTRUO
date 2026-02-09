@@ -57,6 +57,23 @@
     }
 }
 
+@keyframes pulse {
+    0% {
+        opacity: 0.8;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+
+    100% {
+        opacity: 0.8;
+        transform: scale(1);
+    }
+}
+
 /* ERP Table - EXACT from original */
 .erp-table {
     width: 100%;
@@ -219,7 +236,7 @@
     height: 100vh;
     background: var(--bg);
     border-left: 1px solid var(--border);
-    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
     z-index: 1000;
     transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
@@ -242,7 +259,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(255,255,255,0.03);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .drawer-body {
@@ -257,7 +274,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(255,255,255,0.03);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 /* Detail UI in Drawer */

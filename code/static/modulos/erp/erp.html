@@ -42,8 +42,26 @@
                 </div>
             </div>
 
+            <!-- KPIs Globales (Always Visible) -->
+            <div class="kpi-row" style="margin-bottom: 20px; display: flex; gap: 15px;">
+                <div class="kpi-card">
+                    <div class="kpi-val" id="kpi-sales" style="color:var(--neon); animation: pulse 2s infinite;">--
+                    </div>
+                    <div class="kpi-lbl">Facturado (30d)</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-val" id="kpi-debt" style="color:#ff3333;">--</div>
+                    <div class="kpi-lbl">Vencido (>30d)</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-val" id="kpi-cash" style="color:#00cc66;">--</div>
+                    <div class="kpi-lbl">Recaudado (30d)</div>
+                </div>
+            </div>
+
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchTab('resumen')">Resumen</button>
+                <button class="tab-btn active" onclick="switchTab('clientes')"><i class="fas fa-users"></i>
+                    Clientes</button>
                 <button class="tab-btn" onclick="switchTab('facturacion')">Facturación</button>
                 <button class="tab-btn" onclick="switchTab('prefactura')">Pre‑Factura</button>
                 <button class="tab-btn" onclick="switchTab('conciliacion')">Conciliación</button>
@@ -65,11 +83,32 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.initLogout) window.initLogout();
-            switchTab('resumen');
+            loadTopKPIs();
+            switchTab('clientes');
         });
 
         let currentTab = null;
         const loadedResources = new Set();
+
+        async function loadTopKPIs() {
+            try {
+                const data = await window.fetchApi('/api/sales/kpis');
+                if (data) {
+                    const fmt = (n) => `$${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0, notation: "compact" }).format(n)}`;
+
+                    const elSales = document.getElementById('kpi-sales');
+                    if (elSales) elSales.innerText = fmt(data.sales_month);
+
+                    const elDebt = document.getElementById('kpi-debt');
+                    if (elDebt) elDebt.innerText = fmt(data.debt_overdue);
+
+                    const elCash = document.getElementById('kpi-cash');
+                    if (elCash) elCash.innerText = fmt(data.collected_month);
+                }
+            } catch (e) {
+                console.error("Error loading KPIs", e);
+            }
+        }
 
         function switchTab(tabId) {
             // Update active button
@@ -106,52 +145,33 @@
                     loadedResources.add(cssKey);
                 }
 
-                // Load JS if not already loaded
-                // Load JS (Force reload if debugging)
-                const jsKey = `js-${tabName}`;
-                // Always reload JS for now during dev
+                // Load JS (Always reload for dev)
                 const existingScript = document.querySelector(`script[src^="/modulos/erp/${tabName}/${tabName}.js"]`);
                 if (existingScript) existingScript.remove();
 
                 const script = document.createElement('script');
-                script.src = `/modulos/erp/${tabName}/${tabName}.js?v=${Date.now()}_fix4`;
+                script.src = `/modulos/erp/${tabName}/${tabName}.js?v=${Date.now()}`;
+
+                // IMPORTANT: Append to body to execute
                 document.body.appendChild(script);
 
-                // Wait for script
-                await new Promise(resolve => {
+                // Wait for script to load
+                await new Promise((resolve, reject) => {
                     script.onload = resolve;
-                    script.onerror = resolve;
+                    script.onerror = () => resolve(); // Don't crash
                 });
 
-                // Call init functions if they exist
-                if (tabName === 'facturacion' && typeof loadInvoices === 'function') {
-                    loadInvoices();
-                }
-                if (tabName === 'conciliacion' && typeof initBancos === 'function') {
-                    initBancos();
-                }
-                if (tabName === 'bancos' && typeof initBancosModule === 'function') {
-                    initBancosModule();
-                }
-                if (tabName === 'cobranza' && typeof loadDebtors === 'function') {
-                    loadDebtors();
-                }
+                // Call init functions
+                if (tabName === 'clientes' && typeof window.initClientes === 'function') window.initClientes();
+                if (tabName === 'facturacion' && typeof loadInvoices === 'function') loadInvoices();
+                if (tabName === 'conciliacion' && typeof initBancos === 'function') initBancos();
+                if (tabName === 'bancos' && typeof initBancosModule === 'function') initBancosModule();
+                if (tabName === 'cobranza' && typeof loadDebtors === 'function') loadDebtors();
+                if (tabName === 'prefactura' && typeof window.initPrefactura === 'function') window.initPrefactura();
 
-                if (tabName === 'resumen' && typeof window.initResumen === 'function') {
-                    window.initResumen();
-                }
-                if (tabName === 'prefactura' && typeof window.initPrefactura === 'function') {
-                    window.initPrefactura();
-                }
             } catch (e) {
                 console.error(`Error loading tab ${tabName}:`, e);
-                container.innerHTML = `
-                    <div style="text-align:center; padding:4rem; opacity:0.6;">
-                        <i class="fas fa-exclamation-triangle fa-3x" style="margin-bottom:1rem;"></i>
-                        <h3>Error al cargar la pestaña</h3>
-                        <p>${e.message}</p>
-                    </div>
-                `;
+                container.innerHTML = `<div class="error-state">Error cargando ${tabName}: ${e.message}</div>`;
             }
         }
     </script>
