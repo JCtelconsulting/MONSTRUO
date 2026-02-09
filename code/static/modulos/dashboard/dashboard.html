@@ -72,6 +72,10 @@
             display: none;
           }
 
+          #env-indicator .env-prefix {
+            display: inline;
+          }
+
           body.sidebar-collapsed #env-indicator {
             padding: 6px 8px;
             font-size: 0.7rem;
@@ -79,6 +83,10 @@
           }
 
           body.sidebar-collapsed #env-indicator .env-long {
+            display: none;
+          }
+
+          body.sidebar-collapsed #env-indicator .env-prefix {
             display: none;
           }
 
@@ -137,7 +145,7 @@
         indicator.classList.remove('env-prod', 'env-dev');
         indicator.classList.add(isDev ? 'env-dev' : 'env-prod');
         const envText = isDev ? 'DEV' : 'PROD';
-        indicator.innerHTML = `Modo: <span class="env-long">${envText}</span><span class="env-short">${envText}</span>`;
+        indicator.innerHTML = `<span class="env-prefix">Modo:</span> <span class="env-long">${envText}</span><span class="env-short">${envText}</span>`;
         btn.innerHTML = isDev
           ? '<i class="fas fa-toggle-off"></i> <span>Ir a PROD</span>'
           : '<i class="fas fa-toggle-on"></i> <span>Ir a DEV</span>';
