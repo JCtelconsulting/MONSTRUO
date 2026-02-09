@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response, Cookie
 from fastapi import Query, HTTPException, Header, Depends
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse, HTMLResponse
 from pydantic import BaseModel
 import subprocess
 import os
@@ -518,11 +518,26 @@ def read_root(request: Request):
     file_path = static_dir / module_path.lstrip("/")
 
     if file_path.exists():
-        return FileResponse(str(file_path))
+        html = file_path.read_text(encoding="utf-8")
+        module_dir = module_path.rsplit("/", 1)[0] + "/"
+        base_tag = f'<base href="{module_dir}">'
+        if "<base " not in html:
+            if "<head>" in html:
+                html = html.replace("<head>", f"<head>\n    {base_tag}", 1)
+            else:
+                html = base_tag + html
+        return HTMLResponse(content=html)
 
     fallback = static_dir / "modulos/login/login.html"
     if fallback.exists():
-        return FileResponse(str(fallback))
+        html = fallback.read_text(encoding="utf-8")
+        base_tag = '<base href="/modulos/login/">'
+        if "<base " not in html:
+            if "<head>" in html:
+                html = html.replace("<head>", f"<head>\n    {base_tag}", 1)
+            else:
+                html = base_tag + html
+        return HTMLResponse(content=html)
 
     raise HTTPException(status_code=404, detail="module_not_found")
 
