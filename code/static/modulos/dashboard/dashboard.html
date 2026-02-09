@@ -28,6 +28,10 @@
     <div class="header-actions">
       <span id="who" class="pill"
         style="display:block; margin-bottom:10px; font-size:0.8rem; opacity:0.7;">Usuario</span>
+      <div id="env-indicator" class="pill" style="display:block; margin-bottom:10px; font-size:0.75rem;">Modo: ...</div>
+      <button id="btnEnvSwitch" class="btn-account" title="Cambiar entorno">
+        <i class="fas fa-exchange-alt"></i> <span>Cambiar entorno</span>
+      </button>
       <div class="footer-buttons-container">
         <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
           <i class="fas fa-key"></i> <span>Cuenta</span>
@@ -52,6 +56,16 @@
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1.5rem;
             margin-top: 1rem;
+          }
+
+          .env-prod {
+            border: 1px solid rgba(0, 255, 65, 0.4);
+            color: #1ecb6b;
+          }
+
+          .env-dev {
+            border: 1px solid rgba(255, 204, 0, 0.5);
+            color: #ffcc00;
           }
         </style>
         <div class="monstruo-dashboard-grid">
@@ -80,9 +94,42 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       if (window.initLogout) window.initLogout();
+      initEnvSwitch();
       loadDashboard();
       setInterval(loadDashboard, 30000); // 30s auto-refresh
     });
+
+    async function initEnvSwitch() {
+      const indicator = document.getElementById('env-indicator');
+      const btn = document.getElementById('btnEnvSwitch');
+      if (!indicator || !btn) return;
+
+      const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
+      if (!isProdHost) {
+        indicator.textContent = 'Modo: LOCAL';
+        btn.style.display = 'none';
+        return;
+      }
+
+      try {
+        const resp = await fetch('/version', { credentials: 'include' });
+        const info = await resp.json();
+        const isDev = String(info.branch || '').toLowerCase() === 'dev';
+
+        indicator.classList.remove('env-prod', 'env-dev');
+        indicator.classList.add(isDev ? 'env-dev' : 'env-prod');
+        indicator.textContent = `Modo: ${isDev ? 'DEV' : 'PROD'}`;
+        btn.innerHTML = isDev
+          ? '<i class="fas fa-toggle-off"></i> <span>Ir a PROD</span>'
+          : '<i class="fas fa-toggle-on"></i> <span>Ir a DEV</span>';
+
+        btn.onclick = () => {
+          window.location.href = isDev ? '/__env/prod' : '/__env/dev';
+        };
+      } catch (e) {
+        indicator.textContent = 'Modo: desconocido';
+      }
+    }
 
     async function loadDashboard() {
       try {

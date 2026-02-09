@@ -1899,3 +1899,65 @@ Tareas:
 Aceptación:
 - [ ] Los cambios en el CRM se propagan automáticamente a los sistemas satélites en < 5 min
 - [ ] El flujo de facturación no se bloquea por falta de datos mandatarios (validados en CRM)
+
+---
+
+## Bitácora Operativa — 2026-02-09 (DEV/PROD en paralelo sin abrir puertos)
+
+### Contexto
+- Restricción de red: firewall solo permite `80/443`.
+- Decisión: mantener un único entrypoint HTTPS y enrutar a `prod` o `dev` por cookie.
+
+### Arquitectura activa
+- `PROD`:
+  - rama: `main`
+  - backend: `127.0.0.1:9000`
+  - compose project: `monstruo`
+- `DEV`:
+  - rama: `dev`
+  - backend: `127.0.0.1:9001`
+  - compose project: `monstruo-dev`
+
+### Selector de entorno (Nginx en proxy)
+- URL para activar DEV:
+  - `https://login.telconsulting.cl/__env/dev`
+- URL para volver a PROD:
+  - `https://login.telconsulting.cl/__env/prod`
+- Cookie usada:
+  - `monstruo_env=dev` (dominio `.telconsulting.cl`)
+- Header de diagnóstico:
+  - `X-Monstruo-Env: dev|prod`
+
+### Verificación de versión desplegada
+- PROD:
+  - `https://login.telconsulting.cl/version` -> `branch = main`
+- DEV (con cookie dev activa):
+  - `https://login.telconsulting.cl/version` -> `branch = dev`
+
+### CI/CD actualizado
+- Workflow `deploy.yml` ahora despliega por rama:
+  - push a `main` -> deploy entorno productivo (`.env.server`)
+  - push a `dev` -> deploy entorno dev (`.env.server.dev`)
+- Script de deploy soporta:
+  - `DEPLOY_COMPOSE_PROJECT`
+  - `DEPLOY_STACK_NAME`
+  - `HEALTH_URL` por entorno
+
+### Archivos clave agregados/ajustados
+- `.github/workflows/deploy.yml` (deploy por rama)
+- `ops/herramientas/deploy/deploy.sh` (parametrización por stack)
+- `docker-compose.yaml` (`container_name` dinámico por `STACK_NAME`)
+- `.env.server.dev.example` (plantilla para staging interno)
+- `docs/deploy/README.md` (operación de entornos paralelo)
+
+### Operación diaria recomendada
+1. Desarrollar y push en `dev`.
+2. Activar entorno DEV con `/__env/dev`.
+3. Validar cambios funcionales en dominios reales.
+4. Si aprueba: PR `dev -> main`, merge manual.
+5. Volver a PROD con `/__env/prod`.
+
+### Nota importante de autenticación
+- La base de `dev` puede partir sin usuarios.
+- Se sincronizaron usuarios de `prod` a `dev` el 2026-02-09 para igualar credenciales.
+- Si vuelve a pasar “credenciales inválidas” en DEV, revisar tabla `users` del stack `monstruo-dev`.

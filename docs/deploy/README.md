@@ -102,6 +102,23 @@ docker compose --env-file .env.server up -d --build
 
 Prueba de CI/CD: 2026-02-08.
 
+## 6) Entorno DEV paralelo (sin abrir nuevos puertos)
+
+- Crea archivo de entorno DEV en la VM app:
+
+```bash
+cd /srv/monstruo
+cp .env.server.dev.example .env.server.dev
+```
+
+- El workflow deploy usa:
+  - `main` -> stack `monstruo` (`:9000`)
+  - `dev` -> stack `monstruo-dev` (`:9001`)
+
+- En el proxy Nginx (443), selecciona entorno por cookie:
+  - `https://<dominio>/__env/dev` -> enruta a `:9001`
+  - `https://<dominio>/__env/prod` -> enruta a `:9000`
+
 ## 5) Ver versión desplegada
 
 La API expone `GET /version` con metadata del deploy:

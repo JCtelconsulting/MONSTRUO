@@ -4,7 +4,7 @@ volumes:
 services:
   db:
     image: postgres:16
-    container_name: monstruo-postgres
+    container_name: ${STACK_NAME:-monstruo}-postgres
     environment:
       POSTGRES_DB: monstruo
       POSTGRES_USER: monstruo
@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: code/docker/Dockerfile.api
-    container_name: monstruo-api
+    container_name: ${STACK_NAME:-monstruo}-api
     env_file:
       - ${ENV_FILE:-.env}
     ports:
