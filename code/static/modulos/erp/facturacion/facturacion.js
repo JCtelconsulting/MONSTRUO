@@ -1,6 +1,31 @@
 // Facturación - Lógica Unificada (V2)
 const TRADUCCIONES = { 'DRAFT': 'Borrador', 'ISSUED': 'Emitida', 'PAID': 'Pagada', 'VOID': 'Anulada' };
 let allRules = [];
+let _customerNameById = null;
+
+async function loadCustomerMap() {
+    if (_customerNameById) return _customerNameById;
+    _customerNameById = {};
+    try {
+        const customers = await window.fetchApi('/api/crm/customers?limit=1000');
+        if (Array.isArray(customers)) {
+            customers.forEach(c => {
+                const name = c.fantasy_name || c.name || c.legal_name || c.rut || '';
+                const keys = [
+                    c.external_id,
+                    c.id,
+                    c.rut
+                ].map(v => (v || '').toString().trim()).filter(Boolean);
+                keys.forEach(k => {
+                    if (!_customerNameById[k]) _customerNameById[k] = name || k;
+                });
+            });
+        }
+    } catch (e) {
+        console.warn('No se pudo cargar mapa de clientes', e);
+    }
+    return _customerNameById;
+}
 
 // Main Entry Point (Called by erp.html)
 async function initFacturacion() {
@@ -24,6 +49,7 @@ async function fetchInvoices() {
         let url = `/api/sales/invoices?limit=100`;
         if (status && status.value) url += `&status=${status.value}`;
         const data = await window.fetchApi(url);
+        const customerMap = await loadCustomerMap();
 
         tbody.innerHTML = '';
         if (!data || data.length === 0) {
@@ -54,14 +80,17 @@ async function fetchInvoices() {
                 amountColor = '#ff3333'; // Explicit Red (var(--danger))
             }
 
-            const customerName = inv.customer_name || inv.customer_id || '-';
-            const customerRef = inv.customer_name && inv.customer_id ? `<div style="opacity:0.6; font-size:0.75rem;">${inv.customer_id}</div>` : '';
+            const customerId = (inv.customer_id || '').toString().trim();
+            const resolvedName = inv.customer_name || customerMap[customerId] || customerId || '-';
+            const customerRef = resolvedName && customerId && resolvedName !== customerId
+                ? `<div style="opacity:0.6; font-size:0.75rem;">${customerId}</div>`
+                : '';
 
             tr.innerHTML = `
                 <td><b style="color:var(--neon); font-family:monospace;">#${inv.id}</b></td>
                 <td><span style="font-size:0.7rem; opacity:0.7;">${inv.origin || 'Monstruo'}</span></td>
                 <td>
-                    <div style="font-weight:600; font-size:0.95rem;">${customerName}</div>
+                    <div style="font-weight:600; font-size:0.95rem;">${resolvedName}</div>
                     ${customerRef}
                     ${isNC ? '<div style="display:inline-block; margin-top:4px; font-size:0.7rem; color:#fff; background:#ff3333; padding:2px 8px; border-radius:4px; font-weight:700; border:1px solid rgba(255,255,255,0.2);">NOTA CRÉDITO</div>' : ''}
                 </td>
@@ -106,6 +135,9 @@ async function showInvoiceDetail(id) {
     try {
         const inv = await window.fetchApi(`/api/sales/invoices/${id}`);
         if (!inv) throw new Error("No se encontró la factura");
+        const customerMap = await loadCustomerMap();
+        const custId = (inv.customer_id || '').toString().trim();
+        const custName = inv.customer_name || customerMap[custId] || custId || '-';
 
         const fmt = (n) => `$${new Intl.NumberFormat('es-CL').format(n || 0)}`;
 
@@ -114,8 +146,8 @@ async function showInvoiceDetail(id) {
                 <div class="detail-item">
                     <label>Cliente</label>
                     <div class="val" style="font-weight:bold;">
-                        ${inv.customer_name || inv.customer_id}
-                        ${inv.customer_name ? `<br><small style='opacity:0.6'>${inv.customer_id}</small>` : ''}
+                        ${custName}
+                        ${custName && custId && custName !== custId ? `<br><small style='opacity:0.6'>${custId}</small>` : ''}
                     </div>
                 </div>
                 <div class="detail-item">
