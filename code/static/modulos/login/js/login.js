@@ -4,19 +4,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- CONFIGURACION DE DOMINIOS ---
   // Reemplaza con los dominios reales de produccion
-  const DESTINOS = {
-    ADMIN: '/modulos/dashboard/dashboard.html',
-    GERENCIA: '/modulos/dashboard/dashboard.html',
-    TERRENO: '/modulos/dashboard/dashboard.html',
-    SUPERVISOR: '/modulos/dashboard/dashboard.html',
+  const DESTINOS_PROD = {
+    ADMIN: 'https://erp.telconsulting.cl',
+    GERENCIA: 'https://erp.telconsulting.cl',
+    TERRENO: 'https://erp.telconsulting.cl',
+    SUPERVISOR: 'https://erp.telconsulting.cl',
   };
+
+  function getTargetByRole(rawRole) {
+    const role = String(rawRole || '').trim().toUpperCase();
+    const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
+    if (isProdHost) {
+      return DESTINOS_PROD[role] || 'https://erp.telconsulting.cl';
+    }
+    return '/modulos/dashboard/dashboard.html';
+  }
 
   // Si ya tiene cookie, redirigir
   fetch('/api/auth/whoami', { credentials: 'include' })
     .then((r) => r.json())
     .then((data) => {
       if (data.logged) {
-        const target = DESTINOS[data.role] || '/modulos/dashboard/dashboard.html';
+        const target = getTargetByRole(data.role);
         console.log('Sesion activa. Redirigiendo a:', target);
         window.location.href = target;
       }
@@ -55,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
       status.textContent = 'Acceso Correcto. Redirigiendo...';
       status.className = 'modal-status success';
 
-      const target = DESTINOS[data.role] || '/modulos/dashboard/dashboard.html';
+      const target = getTargetByRole(data.role);
 
       // Pequeno delay para feedback visual
       setTimeout(() => {
