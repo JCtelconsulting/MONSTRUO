@@ -1,25 +1,28 @@
-<div class="kpi-row">
-    <div class="kpi-card">
-        <div class="kpi-val" id="kpi-sales" style="color:var(--neon);">$...</div>
-        <div class="kpi-lbl">Facturado (30d)</div>
+<div class="resumen-layout">
+    <div class="resumen-left">
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="kpi-val" id="kpi-sales" style="color:var(--neon);">$...</div>
+                <div class="kpi-lbl">Facturado (30d)</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-val" id="kpi-debt" style="color:#ff3333;">$...</div>
+                <div class="kpi-lbl">Deuda Vencida (>30d)</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-val" id="kpi-cash">$...</div>
+                <div class="kpi-lbl">Cobrado (30d)</div>
+            </div>
+        </div>
     </div>
-    <div class="kpi-card">
-        <div class="kpi-val" id="kpi-debt" style="color:#ff3333;">$...</div>
-        <div class="kpi-lbl">Deuda Vencida (>30d)</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-val" id="kpi-cash">$...</div>
-        <div class="kpi-lbl">Cobrado (30d)</div>
-    </div>
-</div>
 
-<div class="panel" style="margin-top:20px; padding:20px;">
-    <h3><i class="fas fa-info-circle"></i> Configuración Movida</h3>
-    <p style="opacity:0.8; font-size:0.95rem; margin:0;">
-        La configuración de correo <strong>SMTP</strong> para procesos de <strong>Cobranza</strong> fue movida al módulo
-        <strong>Configuración</strong>.
-    </p>
-    <p style="opacity:0.6; font-size:0.9rem; margin-top:10px;">
-        Ruta sugerida: Configuración → Cobranza (SMTP).
-    </p>
+    <div class="panel debt-panel">
+        <div class="debt-header">
+            <h3><i class="fas fa-users"></i> Estado de Clientes</h3>
+            <span class="debt-subtitle">Cobranza</span>
+        </div>
+        <div id="customerDebtList" class="debt-list">
+            <div class="debt-empty">Cargando clientes...</div>
+        </div>
+    </div>
 </div>

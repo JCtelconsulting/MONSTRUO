@@ -101,6 +101,50 @@ async def list_debtors(
         conn.close()
 
 
+@router.get("/customer-status", summary="List customers with debt status")
+async def list_customer_status(
+    limit: int = 120, sess: dict = Depends(deps.require_permission("invoice:read"))
+):
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                COALESCE(NULLIF(TRIM(c.fantasy_name), ''), NULLIF(TRIM(c.name), ''), NULLIF(TRIM(c.rut), ''), TRIM(c.external_id), 'Sin nombre') AS customer_name,
+                COALESCE(SUM(CASE WHEN i.status = 'ISSUED' THEN i.total_final ELSE 0 END), 0) AS total_debt
+            FROM customers c
+            LEFT JOIN invoices i
+              ON TRIM(i.customer_id) = TRIM(c.external_id)
+            GROUP BY c.fantasy_name, c.name, c.rut, c.external_id
+            ORDER BY total_debt DESC, customer_name ASC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+
+        return [
+            {
+                "customer_name": (
+                    row["customer_name"]
+                    if isinstance(row, dict)
+                    else row[0]
+                ),
+                "total_debt": float(
+                    (row["total_debt"] if isinstance(row, dict) else row[1]) or 0
+                ),
+                "status": (
+                    "DEBT"
+                    if float((row["total_debt"] if isinstance(row, dict) else row[1]) or 0)
+                    > 0
+                    else "OK"
+                ),
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
 from app.core import email as email_service
 
 
