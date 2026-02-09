@@ -117,6 +117,42 @@ header h1::before {
   white-space: nowrap;
 }
 
+.env-prod {
+  border: 1px solid rgba(0, 255, 65, 0.4);
+  color: #1ecb6b;
+}
+
+.env-dev {
+  border: 1px solid rgba(255, 204, 0, 0.5);
+  color: #ffcc00;
+}
+
+#env-indicator .env-short {
+  display: none;
+}
+
+#env-indicator .env-prefix {
+  display: inline;
+}
+
+body.sidebar-collapsed #env-indicator {
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+body.sidebar-collapsed #env-indicator .env-long {
+  display: none;
+}
+
+body.sidebar-collapsed #env-indicator .env-prefix {
+  display: none;
+}
+
+body.sidebar-collapsed #env-indicator .env-short {
+  display: inline;
+}
+
 .btn-account,
 .btn-logout {
   text-transform: uppercase;
