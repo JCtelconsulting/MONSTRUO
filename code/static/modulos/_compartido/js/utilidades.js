@@ -289,8 +289,10 @@ function initEnvSwitchGlobal() {
   btn.innerHTML = '<i class="fas fa-exchange-alt"></i> <span>Cambiar entorno</span>';
 
   const footer = header.querySelector('.footer-buttons-container');
-  header.insertBefore(indicator, footer || null);
-  header.insertBefore(btn, footer || null);
+  let insertRef = footer || header.querySelector('button');
+  if (!insertRef) insertRef = null;
+  header.insertBefore(indicator, insertRef);
+  header.insertBefore(btn, insertRef);
 
   const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
   if (!isProdHost) {
