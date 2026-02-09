@@ -39,7 +39,9 @@
                 <!-- Iframe: Point to Native Bridge (ws-scrcpy) on Host Port 8000 -->
                 <!-- Iframe: Point to Native Bridge (ws-scrcpy) on Host Port 9001 -->
                 <iframe id="androidFrame"
-                    src="http://127.0.0.1:9001/#!action=stream&udid=192.168.20.218:41463&player=mse&ws=ws%3A%2F%2F127.0.0.1%3A9001%2F%3Faction%3Dproxy-adb%26remote%3Dtcp%3A8886%26udid%3D192.168.20.218:41463"
+                    data-udid="192.168.20.218:41463"
+                    data-ws-base="/ws-scrcpy"
+                    src="about:blank"
                     class="phone-iframe" style="border:none; overflow:hidden;" scrolling="no"
                     allow="clipboard-read; clipboard-write"></iframe>
             </div>

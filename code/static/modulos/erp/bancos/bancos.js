@@ -4,11 +4,32 @@
 async function initBancosModule() {
     console.log("Bancos Module Loaded");
 
+    // Configure iframe source for current host
+    setAndroidFrameSrc();
+
     // Check Android status (best effort)
     checkAndroidHealth();
 
     // Start Lock heartbeat
     startLockHeartbeat();
+}
+
+function setAndroidFrameSrc() {
+    const frame = document.getElementById('androidFrame');
+    if (!frame) return;
+
+    const udid = frame.getAttribute('data-udid') || '';
+    const wsBase = frame.getAttribute('data-ws-base') || '';
+    if (!udid || !wsBase) return;
+
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+
+    const wsUrl = `${wsProtocol}//${host}${wsBase}/?action=proxy-adb&remote=tcp:8886&udid=${encodeURIComponent(udid)}`;
+    const streamUrl = `${protocol}//${host}${wsBase}/#!action=stream&udid=${encodeURIComponent(udid)}&player=mse&ws=${encodeURIComponent(wsUrl)}`;
+
+    frame.src = streamUrl;
 }
 
 function checkAndroidHealth() {
