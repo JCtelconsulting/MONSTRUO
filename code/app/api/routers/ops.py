@@ -29,8 +29,22 @@ def get_dashboard_stats(
             "SELECT count(*) as cnt, sum(total_final) as total FROM invoices WHERE status='ISSUED' AND issued_at LIKE ?", 
             (f"{today}%",)
         ).fetchone()
-        stats["kpis"]["sales_today_count"] = row["cnt"]
-        stats["kpis"]["sales_today_amount"] = row["total"] or 0.0
+        sales_today_count = row["cnt"] or 0
+        sales_today_amount = row["total"] or 0.0
+        if sales_today_count == 0 and float(sales_today_amount or 0) == 0.0:
+            row_laudus = conn.execute(
+                """
+                SELECT count(*) as cnt, sum(total_amount) as total
+                FROM laudus_invoices
+                WHERE doc_date LIKE ?
+                """,
+                (f"{today}%",),
+            ).fetchone()
+            sales_today_count = row_laudus["cnt"] or 0
+            sales_today_amount = row_laudus["total"] or 0.0
+
+        stats["kpis"]["sales_today_count"] = sales_today_count
+        stats["kpis"]["sales_today_amount"] = sales_today_amount
         
         # 2. TICKETS KPI
         # Open tickets

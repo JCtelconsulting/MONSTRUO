@@ -33,6 +33,22 @@ async def get_kpis(sess: dict = Depends(deps.require_permission("dashboard:read"
         if row_sales:
             val = row_sales["total"] if isinstance(row_sales, dict) else row_sales[0]
             sales_month = float(val or 0)
+        if sales_month <= 0:
+            row_sales_laudus = conn.execute(
+                """
+                SELECT SUM(total_amount) as total
+                FROM laudus_invoices
+                WHERE doc_date >= ?
+            """,
+                (start_date,),
+            ).fetchone()
+            if row_sales_laudus:
+                val = (
+                    row_sales_laudus["total"]
+                    if isinstance(row_sales_laudus, dict)
+                    else row_sales_laudus[0]
+                )
+                sales_month = float(val or 0)
 
         # 2. Deuda Vencida (Issued > 30 days ago and not PAID)
         # This remains the same logic (overdue)
@@ -52,6 +68,28 @@ async def get_kpis(sess: dict = Depends(deps.require_permission("dashboard:read"
         if row_debt:
             val = row_debt["total"] if isinstance(row_debt, dict) else row_debt[0]
             debt_overdue = float(val or 0)
+        if debt_overdue <= 0:
+            row_debt_laudus = conn.execute(
+                """
+                SELECT SUM(
+                    CASE 
+                        WHEN balance > 0 THEN balance 
+                        ELSE total_amount 
+                    END
+                ) as total
+                FROM laudus_invoices
+                WHERE is_paid = 0
+                  AND COALESCE(NULLIF(due_date, ''), doc_date) < ?
+            """,
+                (cutoff_date,),
+            ).fetchone()
+            if row_debt_laudus:
+                val = (
+                    row_debt_laudus["total"]
+                    if isinstance(row_debt_laudus, dict)
+                    else row_debt_laudus[0]
+                )
+                debt_overdue = float(val or 0)
 
         # 3. Cobrado (Last 30 Days)
         # Assuming payment_date is ISO or YYYY-MM-DD
@@ -68,6 +106,27 @@ async def get_kpis(sess: dict = Depends(deps.require_permission("dashboard:read"
         if row_paid:
             val = row_paid["total"] if isinstance(row_paid, dict) else row_paid[0]
             collected_month = float(val or 0)
+        if collected_month <= 0:
+            row_paid_laudus = conn.execute(
+                """
+                SELECT SUM(
+                    CASE 
+                        WHEN total_amount > balance THEN (total_amount - balance)
+                        ELSE 0
+                    END
+                ) as total
+                FROM laudus_invoices
+                WHERE doc_date >= ?
+            """,
+                (start_date,),
+            ).fetchone()
+            if row_paid_laudus:
+                val = (
+                    row_paid_laudus["total"]
+                    if isinstance(row_paid_laudus, dict)
+                    else row_paid_laudus[0]
+                )
+                collected_month = float(val or 0)
 
         return {
             "sales_month": sales_month,
