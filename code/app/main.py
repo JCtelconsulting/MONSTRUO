@@ -50,7 +50,6 @@ SUBDOMAIN_MAP = {
     "ticketera": "/modulos/tks/tks.html",
     "ia": "/modulos/ultron/ultron.html",
     "zabbix": "/modulos/zabbix/zabbix.html",
-    "monitoreo": "/modulos/zabbix/zabbix.html",
     "config": "/modulos/configuracion/configuracion.html",
 }
 

@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ticketera: 'https://ticketera.telconsulting.cl',
     ia: 'https://ia.telconsulting.cl',
     zabbix: 'https://zabbix.telconsulting.cl',
-    monitoreo: 'https://monitoreo.telconsulting.cl',
     config: 'https://config.telconsulting.cl',
   };
 
