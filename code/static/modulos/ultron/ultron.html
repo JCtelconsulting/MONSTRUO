@@ -7,7 +7,7 @@
     <title>ULTRON | Monstruo</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.3" />
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.6" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         .chat-container {
@@ -86,8 +86,16 @@
         <nav id="dynamic-sidebar" class="side-nav">
         </nav>
         <div class="header-actions">
-            <span class="pill">MONSTRUO V1</span>
-            <button id="btnLogout" class="btn-logout"><i class="fas fa-sign-out-alt"></i></button>
+            <span id="who" class="pill"
+                style="display:block; margin-bottom:10px; font-size:0.8rem; opacity:0.7;">Usuario</span>
+            <div class="footer-buttons-container">
+                <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i> <span>Cuenta</span>
+                </button>
+                <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
+            </div>
         </div>
     </header>
 
@@ -198,4 +206,3 @@
       el.style.background = "#dc3545";
   }
 })();
-

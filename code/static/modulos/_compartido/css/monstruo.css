@@ -105,6 +105,32 @@ header h1::before {
   margin-top: auto;
 }
 
+.header-actions #who {
+  order: 1;
+}
+
+#env-indicator {
+  order: 2;
+}
+
+#btnEnvSwitch {
+  order: 3;
+}
+
+.header-actions > .btn-account,
+.header-actions > .btn-logout,
+.footer-buttons-container {
+  order: 4;
+}
+
+.footer-buttons-container .btn-account {
+  order: 1;
+}
+
+.footer-buttons-container .btn-logout {
+  order: 2;
+}
+
 .pill {
   background: rgba(6, 10, 14, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.12);

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.3" />
+  <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#070b11">
@@ -28,10 +28,6 @@
     <div class="header-actions">
       <span id="who" class="pill"
         style="display:block; margin-bottom:10px; font-size:0.8rem; opacity:0.7;">Usuario</span>
-      <div id="env-indicator" class="pill" style="display:block; margin-bottom:10px; font-size:0.75rem;">Modo: ...</div>
-      <button id="btnEnvSwitch" class="btn-account" title="Cambiar entorno">
-        <i class="fas fa-exchange-alt"></i> <span>Cambiar entorno</span>
-      </button>
       <div class="footer-buttons-container">
         <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
           <i class="fas fa-key"></i> <span>Cuenta</span>
@@ -58,41 +54,6 @@
             margin-top: 1rem;
           }
 
-          .env-prod {
-            border: 1px solid rgba(0, 255, 65, 0.4);
-            color: #1ecb6b;
-          }
-
-          .env-dev {
-            border: 1px solid rgba(255, 204, 0, 0.5);
-            color: #ffcc00;
-          }
-
-          #env-indicator .env-short {
-            display: none;
-          }
-
-          #env-indicator .env-prefix {
-            display: inline;
-          }
-
-          body.sidebar-collapsed #env-indicator {
-            padding: 6px 8px;
-            font-size: 0.7rem;
-            text-align: center;
-          }
-
-          body.sidebar-collapsed #env-indicator .env-long {
-            display: none;
-          }
-
-          body.sidebar-collapsed #env-indicator .env-prefix {
-            display: none;
-          }
-
-          body.sidebar-collapsed #env-indicator .env-short {
-            display: inline;
-          }
         </style>
         <div class="monstruo-dashboard-grid">
           <div class="card card-terreno" style="cursor: default;">
@@ -120,43 +81,9 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       if (window.initLogout) window.initLogout();
-      initEnvSwitch();
       loadDashboard();
       setInterval(loadDashboard, 30000); // 30s auto-refresh
     });
-
-    async function initEnvSwitch() {
-      const indicator = document.getElementById('env-indicator');
-      const btn = document.getElementById('btnEnvSwitch');
-      if (!indicator || !btn) return;
-
-      const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
-      if (!isProdHost) {
-        indicator.textContent = 'Modo: LOCAL';
-        btn.style.display = 'none';
-        return;
-      }
-
-      try {
-        const resp = await fetch('/version', { credentials: 'include' });
-        const info = await resp.json();
-        const isDev = String(info.branch || '').toLowerCase() === 'dev';
-
-        indicator.classList.remove('env-prod', 'env-dev');
-        indicator.classList.add(isDev ? 'env-dev' : 'env-prod');
-        const envText = isDev ? 'DEV' : 'PROD';
-        indicator.innerHTML = `<span class="env-prefix">Modo:</span> <span class="env-long">${envText}</span><span class="env-short">${envText}</span>`;
-        btn.innerHTML = isDev
-          ? '<i class="fas fa-toggle-off"></i> <span>Ir a PROD</span>'
-          : '<i class="fas fa-toggle-on"></i> <span>Ir a DEV</span>';
-
-        btn.onclick = () => {
-          window.location.href = isDev ? '/__env/prod' : '/__env/dev';
-        };
-      } catch (e) {
-        indicator.textContent = 'Modo: ?';
-      }
-    }
 
     async function loadDashboard() {
       try {
