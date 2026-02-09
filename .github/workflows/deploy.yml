@@ -3,11 +3,11 @@ name: CI + Deploy
 on:
   pull_request:
   push:
-    branches: ["main"]
+    branches: ["main", "dev"]
   workflow_dispatch:
 
 concurrency:
-  group: deploy-main
+  group: deploy-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -31,18 +31,39 @@ jobs:
 
   deploy:
     needs: tests
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     runs-on: self-hosted
-    environment: production
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Resolve deploy target
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+            echo "env_file=/srv/monstruo/.env.server" >> "$GITHUB_OUTPUT"
+            echo "project=monstruo" >> "$GITHUB_OUTPUT"
+            echo "stack=monstruo" >> "$GITHUB_OUTPUT"
+            echo "health=http://127.0.0.1:9000/health" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=dev" >> "$GITHUB_OUTPUT"
+            echo "env_file=/srv/monstruo/.env.server.dev" >> "$GITHUB_OUTPUT"
+            echo "project=monstruo-dev" >> "$GITHUB_OUTPUT"
+            echo "stack=monstruo-dev" >> "$GITHUB_OUTPUT"
+            echo "health=http://127.0.0.1:9001/health" >> "$GITHUB_OUTPUT"
+          fi
       - name: Deploy to server
         env:
           DEPLOY_PATH: ${{ github.workspace }}
-          DEPLOY_BRANCH: main
-          DEPLOY_ENV_FILE: /srv/monstruo/.env.server
+          DEPLOY_BRANCH: ${{ steps.target.outputs.branch }}
+          DEPLOY_ENV_FILE: ${{ steps.target.outputs.env_file }}
+          DEPLOY_COMPOSE_PROJECT: ${{ steps.target.outputs.project }}
+          DEPLOY_STACK_NAME: ${{ steps.target.outputs.stack }}
+          HEALTH_URL: ${{ steps.target.outputs.health }}
         run: |
           set -euo pipefail
           # Asegurar permisos de ejecución en el script del workspace

@@ -5,6 +5,8 @@ APP_DIR="${DEPLOY_PATH:-/srv/monstruo}"
 BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:9000/health}"
 DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE:-}"
+DEPLOY_COMPOSE_PROJECT="${DEPLOY_COMPOSE_PROJECT:-}"
+DEPLOY_STACK_NAME="${DEPLOY_STACK_NAME:-}"
 
 DEFAULT_COMPOSE_FILE="$APP_DIR/docker-compose.yaml"
 LEGACY_COMPOSE_FILE="$APP_DIR/docs/deploy/docker-compose.yaml"
@@ -35,6 +37,12 @@ if [ ! -f "$DEPLOY_ENV_FILE" ]; then
   exit 1
 fi
 echo "[deploy] env_file=$DEPLOY_ENV_FILE"
+if [ -n "$DEPLOY_COMPOSE_PROJECT" ]; then
+  echo "[deploy] compose_project=$DEPLOY_COMPOSE_PROJECT"
+fi
+if [ -n "$DEPLOY_STACK_NAME" ]; then
+  echo "[deploy] stack_name=$DEPLOY_STACK_NAME"
+fi
 
 if grep -Eq '^DB_URL=.*(localhost|127\.0\.0\.1|::1)' "$DEPLOY_ENV_FILE"; then
   DB_URL='postgresql://monstruo:monstruo@db:5432/monstruo'
@@ -71,6 +79,11 @@ else
   exit 1
 fi
 
+COMPOSE_ARGS=(--env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE")
+if [ -n "$DEPLOY_COMPOSE_PROJECT" ]; then
+  COMPOSE_ARGS+=(-p "$DEPLOY_COMPOSE_PROJECT")
+fi
+
 if [ "$HAS_GIT_REPO" = "1" ]; then
   git config --global --add safe.directory "$APP_DIR" || true
   echo "[deploy] fetch..."
@@ -105,7 +118,7 @@ if [ ! -f "$COMPOSE_FILE" ]; then
 fi
 
 echo "[deploy] version sha=$APP_GIT_SHA branch=$APP_GIT_BRANCH build_time=$APP_BUILD_TIME"
-APP_GIT_SHA="$APP_GIT_SHA" APP_GIT_BRANCH="$APP_GIT_BRANCH" APP_BUILD_TIME="$APP_BUILD_TIME" ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" up -d --build
+APP_GIT_SHA="$APP_GIT_SHA" APP_GIT_BRANCH="$APP_GIT_BRANCH" APP_BUILD_TIME="$APP_BUILD_TIME" ENV_FILE="$DEPLOY_ENV_FILE" STACK_NAME="$DEPLOY_STACK_NAME" "${COMPOSE_BIN[@]}" "${COMPOSE_ARGS[@]}" up -d --build
 
 echo "[deploy] health..."
 for i in {1..60}; do
@@ -117,6 +130,6 @@ for i in {1..60}; do
 done
 
 echo "[deploy] ERROR: healthcheck falló: $HEALTH_URL"
-ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" ps || true
-ENV_FILE="$DEPLOY_ENV_FILE" "${COMPOSE_BIN[@]}" --env-file "$DEPLOY_ENV_FILE" --project-directory "$APP_DIR" -f "$COMPOSE_FILE" logs --tail=120 api || true
+ENV_FILE="$DEPLOY_ENV_FILE" STACK_NAME="$DEPLOY_STACK_NAME" "${COMPOSE_BIN[@]}" "${COMPOSE_ARGS[@]}" ps || true
+ENV_FILE="$DEPLOY_ENV_FILE" STACK_NAME="$DEPLOY_STACK_NAME" "${COMPOSE_BIN[@]}" "${COMPOSE_ARGS[@]}" logs --tail=120 api || true
 exit 1
