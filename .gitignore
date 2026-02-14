@@ -14,10 +14,6 @@ venv.bak/
 # Environment variables
 .env
 .env.*
-!.env.example
-!.env.local.example
-!.env.server.example
-!.env.server.dev.example
 code/.env
 ops/guardian/config/entorno_guardian.env
 
