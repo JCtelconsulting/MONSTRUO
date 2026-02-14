@@ -7,7 +7,7 @@
 - **Entregable**:
   - Agregado `AGENTS.md` en la raiz para obligar bootstrap de reglas en agentes compatibles.
   - Creado archivo canonico: `.agent/rules/monstruo-dev-reglas.md`.
-  - Archivo legado convertido a puente: `.agent/rules/monstruo-reglas.md` (deprecado, redirige al nuevo).
+  - Regla legacy eliminada para evitar ambiguedad; queda un unico archivo canonico de reglas en DEV.
   - Plan Maestro actualizado con seccion de gobernanza obligatoria para agentes (`0.7`) y prioridad de EPIC 11 para reemplazo de mesa externa.
   - Criterio explicito: no se abre desarrollo neto de EPIC 12+ hasta cerrar EPIC 11 con Go/No-Go profesional.
 - **Estado**: CERRADO.

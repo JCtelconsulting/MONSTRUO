@@ -136,9 +136,8 @@ Archivo canonico de reglas para agentes en DEV:
 - `.agent/rules/monstruo-dev-reglas.md`
 - `AGENTS.md` (bootstrap para agentes compatibles)
 
-Compatibilidad:
-- `.agent/rules/monstruo-reglas.md` queda como archivo puente/deprecado.
-- Si existe conflicto entre ambos, manda `monstruo-dev-reglas.md`.
+Estandar unico:
+- Se elimina la regla legacy y queda un solo archivo canonico de reglas.
 
 Regla operativa:
 - Ningun agente ejecuta cambios sin haber cargado `monstruo-dev-reglas.md`.
