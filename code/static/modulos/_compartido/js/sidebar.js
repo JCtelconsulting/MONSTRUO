@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: `https://config.telconsulting.cl${envPrefix}/`, title: 'Configuración' }
     ] : [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', link: '/modulos/dashboard/dashboard.html', title: 'Dashboard' },
-        { id: 'pmo', label: 'Proyectos (PMO)', icon: 'fas fa-helmet-safety', link: '/modulos/pmo/dashboard.html', title: 'Oficina Técnica' },
+        { id: 'pmo', label: 'Proyectos (PMO)', icon: 'fas fa-helmet-safety', link: '/modulos/pmo/pmo.html', title: 'Oficina Técnica' },
         { id: 'erp', label: 'ERP & Finanzas', icon: 'fas fa-file-invoice-dollar', link: '/modulos/erp/erp.html', title: 'ERP & Finanzas' },
         { id: 'crm', label: 'CRM', icon: 'fas fa-id-card', link: '/modulos/crm/crm.html', title: 'CRM (Clientes)' },
         { id: 'bodega', label: 'Bodega', icon: 'fas fa-warehouse', link: '/modulos/bodega/bodega.html', title: 'Bodega (WMS)' },

@@ -25,7 +25,7 @@ from app.core.middleware import AuthIdentityMiddleware
 
 from app.api.routers import ia as rutas_ia
 from app.api.routers import zabbix as rutas_zabbix
-from app.api.routers import audit as rutas_audit
+from app.api.routers import audit_router as rutas_audit
 from app.api.routers import jobs as rutas_jobs
 from app.api.routers import tks as rutas_tks
 from app.api.routers import bodega as rutas_bodega
@@ -43,7 +43,7 @@ app = FastAPI(title="Monstruo API", version="2.0")
 SUBDOMAIN_MAP = {
     "login": "/modulos/login/login.html",
     "erp": "/modulos/erp/erp.html",
-    "pmo": "/modulos/pmo/dashboard.html",
+    "pmo": "/modulos/pmo/pmo.html",
     "crm": "/modulos/crm/crm.html",
     "bodega": "/modulos/bodega/bodega.html",
     "ticketera": "/modulos/tks/tks.html",
@@ -183,7 +183,7 @@ except ImportError:
     pass
 
 try:
-    from app.api.routers import bridge as rutas_bridge
+    from app.api.routers import bridge_router as rutas_bridge
     app.include_router(rutas_bridge.router)
 except ImportError:
     pass
@@ -225,7 +225,7 @@ except ImportError:
     pass
 
 try:
-    from app.api.routers import config as rutas_config
+    from app.api.routers import config_router as rutas_config
     app.include_router(rutas_config.router)
 except ImportError:
     pass

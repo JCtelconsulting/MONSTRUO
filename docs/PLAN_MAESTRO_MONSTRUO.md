@@ -1248,6 +1248,7 @@ Arquitectura de Carpetas
 - **Nivel máximo:** Evitar anidación profunda (> 4 niveles)
 - **Código vs Operación:** Todo lo que es la aplicación viva va en `code/app`. Todo lo que es mantenimiento del servidor va en `ops/`
 - **🆕 FRONTEND MODULAR:** Cada pestaña/submódulo debe tener su propio `.html`, `.css`, `.js` en carpeta separada
+- **Nombres sin ambigüedad:** Si dos archivos tienen funciones distintas, deben tener nombres distintos (evitar duplicados como `dashboard.html` en módulos diferentes).
 
 **Árbol Oficial:**
 
