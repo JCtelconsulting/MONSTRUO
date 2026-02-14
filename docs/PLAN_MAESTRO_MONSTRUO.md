@@ -1894,8 +1894,8 @@ Tareas:
 - [ ] Worker real para escalamiento WhatsApp/3CX (hoy se agenda en DB, falta ejecutor de canal)
 - [ ] Auto-respuesta configurable de recepción de correo (actualmente desactivada)
 - [x] Baseline de pruebas E2E profesionalizadas (`tests/e2e_ticketera.py`, `tests/e2e_api_full.py`, `tests/verify_hardening.py`)
-- [ ] Suite de tests E2E ticketera (`create -> reply -> dedupe -> incoming thread match`)
-- [ ] Checklist técnico anti-cruce DEV/PROD para Ticketera (SMTP, base URL, credenciales y jobs)
+- [x] Suite de tests E2E ticketera (`create -> reply -> dedupe -> incoming thread match`)
+- [x] Checklist técnico anti-cruce DEV/PROD para Ticketera (SMTP, base URL, credenciales y jobs)
 
 Aceptación:
 - [x] Crear ticket no cae en 500 por fallas no críticas de auto-asignación/notificaciones
@@ -1903,7 +1903,7 @@ Aceptación:
 - [x] Reintento/doble envío en ventana corta no duplica correo saliente
 - [x] Código de ticket usa formato `TK-DD-MM-YYYY-NNNN` en creación nueva
 - [ ] Adjuntar archivos en respuesta por correo operativo de punta a punta
-- [ ] Validación automatizada de separación DEV/PROD para flujo de correo y jobs
+- [x] Validación automatizada de separación DEV/PROD para flujo de correo y jobs
 - [ ] EPIC 11 certificado para reemplazo de mesa externa (Go/No-Go profesional firmado)
 
 
