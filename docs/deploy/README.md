@@ -30,7 +30,7 @@ Usar plantilla de servidor y completar secretos:
 
 ```bash
 cd /srv/monstruo
-cp .env.server.example .env.server
+cp docs/deploy/plantillas_env/env.server.example .env.server
 ```
 
 Claves recomendadas para PROD:
@@ -93,14 +93,15 @@ Pasos:
 ## Nota: flujo seguro de variables por entorno
 - No subir `.env*` al repo (ya ignorado por `.gitignore`).
 - Plantillas versionadas:
-  - `.env.local.example`
-  - `.env.server.example`
-  - `.env.example` (base genérica)
+  - `docs/deploy/plantillas_env/env.local.example`
+  - `docs/deploy/plantillas_env/env.server.example`
+  - `docs/deploy/plantillas_env/env.server.dev.example`
+  - `docs/deploy/plantillas_env/env.base.example` (base genérica)
 - Local recomendado:
 
 ```bash
 cd /srv/monstruo
-cp .env.local.example .env.local
+cp docs/deploy/plantillas_env/env.local.example .env.local
 docker compose --env-file .env.local up -d
 ```
 
@@ -108,7 +109,7 @@ docker compose --env-file .env.local up -d
 
 ```bash
 cd /srv/monstruo
-cp .env.server.example .env.server
+cp docs/deploy/plantillas_env/env.server.example .env.server
 docker compose --env-file .env.server up -d --build
 ```
 
@@ -120,7 +121,7 @@ Prueba de CI/CD: 2026-02-08.
 
 ```bash
 cd /srv/monstruo
-cp .env.server.dev.example .env.server.dev
+cp docs/deploy/plantillas_env/env.server.dev.example .env.server.dev
 ```
 
 - El workflow deploy usa:

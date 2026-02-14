@@ -2,6 +2,19 @@
 **Fecha de actualizacion:** 14 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-14 16:20 - Limpieza de raiz: plantillas .env centralizadas
+- **Solicitud**: Reducir ruido por exceso de archivos `.env*` en la raiz del repositorio.
+- **Entregable**:
+  - Plantillas movidas desde raiz a `docs/deploy/plantillas_env/`:
+    - `env.base.example`
+    - `env.local.example`
+    - `env.server.example`
+    - `env.server.dev.example`
+  - Documentación de deploy actualizada para usar rutas nuevas de plantillas.
+  - `.gitignore` simplificado (sin excepciones de `.env.*` versionados en raiz).
+  - Raiz queda enfocada en archivos operativos reales (`.env`, `.env.server`, `.env.server.dev`) y no plantillas.
+- **Estado**: CERRADO.
+
 ## HITO: 2026-02-14 19:05 - Gobernanza de Agentes DEV + Prioridad EPIC 11
 - **Solicitud**: Subir Plan Maestro actualizado y formalizar reglas de agentes para entorno DEV, dejando obligatorio el uso de `monstruo-dev-reglas.md`.
 - **Entregable**:

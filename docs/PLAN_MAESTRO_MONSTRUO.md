@@ -2005,7 +2005,7 @@ Aceptación:
 - `.github/workflows/deploy.yml` (deploy por rama)
 - `ops/herramientas/deploy/deploy.sh` (parametrización por stack)
 - `docker-compose.yaml` (`container_name` dinámico por `STACK_NAME`)
-- `.env.server.dev.example` (plantilla para staging interno)
+- `docs/deploy/plantillas_env/env.server.dev.example` (plantilla para staging interno)
 - `docs/deploy/README.md` (operación de entornos paralelo)
 
 ### Operación diaria recomendada
