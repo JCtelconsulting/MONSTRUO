@@ -179,14 +179,40 @@ def api_checks(args: argparse.Namespace) -> List[str]:
     return errors
 
 
+def check_deploy_workflow() -> List[str]:
+    """Valida que .github/workflows/deploy.yml tenga la configuración correcta para DEV."""
+    errors = []
+    deploy_yml = PROJECT_ROOT / ".github/workflows/deploy.yml"
+    if not deploy_yml.exists():
+        return [f"No existe {deploy_yml}"]
+
+    content = read_text(deploy_yml)
+    
+    # Validaciones específicas para rama DEV
+    checks = [
+        (r'echo\s+"env_file=/srv/monstruo_dev/\.env\.server\.dev"', "DEV debe usar .env.server.dev"),
+        (r'echo\s+"project=monstruo_dev"', "DEV debe usar project=monstruo_dev"),
+        (r'echo\s+"health=http://127\.0\.0\.1:9001/health"', "DEV debe chequear health en puerto 9001"),
+        (r'echo\s+"deploy_path=/srv/monstruo_dev"', "DEV debe deployar en /srv/monstruo_dev"),
+    ]
+
+    for pattern, msg in checks:
+        if not re.search(pattern, content):
+            errors.append(f"Deploy workflow FAIL: {msg}")
+
+    return errors
+
+
 def main() -> int:
     args = parse_args()
     repo_errors = repo_checks()
+    deploy_errors = check_deploy_workflow()
+    
     api_errors: List[str] = []
     if args.check_api:
         api_errors = api_checks(args)
 
-    all_errors = repo_errors + api_errors
+    all_errors = repo_errors + deploy_errors + api_errors
     if all_errors:
         print("[FAIL] Hardening check")
         for err in all_errors:

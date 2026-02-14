@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Iterable
 
 THIS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = THIS_DIR.parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
@@ -120,12 +122,95 @@ def main() -> int:
             return fail(f"Dedupe no activo: {second_payload}")
         print(f"[OK] Dedupe activo: {second_payload.get('message', 'sin mensaje')}")
 
-        emails_resp = session.get(f"{base_url}/api/tks/tickets/{ticket_id}/emails", timeout=args.timeout)
-        ensure_200("Historial de correos", emails_resp.status_code, emails_resp.text)
-        items = as_json(emails_resp).get("items", [])
-        if not items:
-            return fail("Historial de correos vacio")
+        # --- 4. Incoming Thread Match (Simulado via Docker) ---
+        # Capturamos el message_id del primer envío para simular una respuesta.
+        last_msg_id = first_payload.get("message_id")
+        if not last_msg_id:
+            print("[WARN] No se capturó message_id en el reply saliente. Intentando obtenerlo del ticket...")
+            # Fallback: consultar el ticket para ver si tiene email_thread_id
+            t_resp = session.get(f"{base_url}/api/tks/tickets/{ticket_id}", timeout=args.timeout)
+            if t_resp.status_code == 200:
+                last_msg_id = t_resp.json().get("email_thread_id")
 
+        if not last_msg_id:
+            return fail("No se pudo obtener message_id para probar threading (incoming match).")
+
+        print(f"[INFO] Thread ID capturado: {last_msg_id}")
+
+        # Script python a ejecutar DENTRO del contenedor API
+        # Nota: Usamos 'app.core.tickets_service' directamente
+        inner_script = f"""
+import sys
+import logging
+# Configurar logging basico para ver errores
+logging.basicConfig(level=logging.INFO)
+from app.core import tickets_service
+
+payload = {{
+    'subject': 'Re: E2E Ticketera Reply',
+    'sender': 'cliente.e2e@example.com',
+    'body': 'Esta es una respuesta simulada del cliente que DEBE agruparse.',
+    'message_id': '<incoming-test-{int(time.time())}@example.com>',
+    'in_reply_to': '{last_msg_id}',
+    'references': '{last_msg_id}'
+}}
+
+print(f"Simulando incoming email para thread: {{payload['in_reply_to']}}")
+try:
+    tickets_service.handle_incoming_email(payload)
+    print("SUCCESS")
+except Exception as e:
+    print(f"ERROR: {{e}}")
+    sys.exit(1)
+"""
+        # Ejecutar docker exec
+        # Asumimos que el contenedor se llama 'monstruo_dev-api-1' o similar, pero mejor usar docker compose si es posible.
+        # Sin embargo, desde el host 'monstruo_dev' es el prefijo.
+        # Intentaremos identificar el contenedor o usar docker compose exec.
+        # El usuario pidió: docker compose --env-file .env.server.dev exec -T api python ...
+        
+        cmd = [
+            "docker", "compose", "--env-file", ".env.server.dev", 
+            "exec", "-T", "api", "python3", "-c", inner_script
+        ]
+        
+        print("[INFO] Ejecutando simulación de correo entrante en contenedor API...")
+        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
+        
+        if proc.returncode != 0:
+            print(f"[FAIL] Falló ejecución docker: {proc.stderr}")
+            return fail("Error simulando incoming email")
+        
+        if "SUCCESS" not in proc.stdout:
+            print(f"[FAIL] Script interno falló: {proc.stdout} // {proc.stderr}")
+            return fail("Simulación incoming email no reportó SUCCESS")
+
+        print("[OK] Simulación incoming ejecutada.")
+
+        # --- Verificación ---
+        # Consultar historial nuevamente para ver si apareció el correo entrante
+        time.sleep(2) # Breve espera extra
+        emails_resp = session.get(f"{base_url}/api/tks/tickets/{ticket_id}/emails", timeout=args.timeout)
+        ensure_200("Historial de correos (post-incoming)", emails_resp.status_code, emails_resp.text)
+        items = as_json(emails_resp).get("items", [])
+        
+        incoming_found = False
+        for email in items:
+            # Case insensitive check or just match what we sent
+            if email.get("direction") == "incoming" and "respuesta simulada" in str(email.get("body_html", "")).lower():
+                incoming_found = True
+                break
+        
+        if not incoming_found:
+            return fail(f"No se encontró el correo entrante agrupado en el ticket {ticket_id}.")
+
+        print("[OK] Incoming Thread Match VERIFICADO (Correo entrante apareció en el historial).")
+
+        # --- Fin Verificación ---
+
+        # Reset items variable for attachment check (which was original code)
+        # We can re-use 'items' from the latest fetch which is more complete
+        
         found_attachment = False
         for email in items:
             if str(email.get("direction", "")).lower() != "outgoing":
@@ -140,7 +225,7 @@ def main() -> int:
         if not found_attachment:
             return fail(f"No se encontro adjunto '{attachment_name}' en historial")
 
-        print(f"[OK] Historial validado. Correos totales: {len(items)}")
+        print(f"[OK] Historial validado (Outgoing + Incoming). Correos totales: {len(items)}")
         print("[SUCCESS] E2E Ticketera PASS")
         return 0
     except Exception as exc:
