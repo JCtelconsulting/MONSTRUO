@@ -18,8 +18,28 @@ else
   COMPOSE_FILE="$LEGACY_COMPOSE_FILE"
 fi
 
+
+# Capture Origin URL from current (runner) workspace before switching context
+REPO_URL="$(git remote get-url origin || echo '')"
+
 echo "[deploy] dir=$APP_DIR branch=$BRANCH"
+
+# Ensure target dir exists
+if [ ! -d "$APP_DIR" ]; then
+  echo "[deploy] Creating $APP_DIR..."
+  mkdir -p "$APP_DIR"
+fi
+
 cd "$APP_DIR"
+
+# Initialize git if missing
+if [ ! -d ".git" ] && [ -n "$REPO_URL" ]; then
+  echo "[deploy] Initializing git repo from $REPO_URL..."
+  git init
+  git remote add origin "$REPO_URL"
+  git fetch origin "$BRANCH"
+  git checkout -f "$BRANCH"
+fi
 
 if [ -z "$DEPLOY_ENV_FILE" ]; then
   if [ -f "$APP_DIR/.env.server" ]; then

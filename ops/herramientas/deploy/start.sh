@@ -1,6 +1,6 @@
 #!/bin/bash
 export PORT=9000
-cd /srv/monstruo/code
+cd /srv/monstruo_dev/code
 # Activar venv si existe (prioridad: local > root)
 if [ -d "venv" ]; then
     source venv/bin/activate

@@ -24,11 +24,11 @@ from typing import Dict, Iterable, Optional
 
 import pandas as pd
 
-DEFAULT_INPUT = "/srv/monstruo/data/files/BD Telecomunicaciones.xlsx"
-DEFAULT_OUTPUT = "/srv/monstruo/data/files/BD Telecomunicaciones.enriquecido.xlsx"
-DEFAULT_CACHE_DIR = "/srv/monstruo/data/files/sources"
-DEFAULT_LOG = "/srv/monstruo/data/logs/telco_ingest.log"
-DEFAULT_CONFIG = "/srv/monstruo/data/files/telco_ingest_sources.json"
+DEFAULT_INPUT = "/srv/monstruo_dev/data/files/BD Telecomunicaciones.xlsx"
+DEFAULT_OUTPUT = "/srv/monstruo_dev/data/files/BD Telecomunicaciones.enriquecido.xlsx"
+DEFAULT_CACHE_DIR = "/srv/monstruo_dev/data/files/sources"
+DEFAULT_LOG = "/srv/monstruo_dev/data/logs/telco_ingest.log"
+DEFAULT_CONFIG = "/srv/monstruo_dev/data/files/telco_ingest_sources.json"
 
 SUBTEL_ANTENNAS_URL = (
     "https://datos.gob.cl/uploads/recursos/"
@@ -200,7 +200,7 @@ def backup_file(path: str) -> str:
     if not os.path.exists(path):
         return ""
     ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = "/srv/monstruo/data/backups/telco"
+    backup_dir = "/srv/monstruo_dev/data/backups/telco"
     os.makedirs(backup_dir, exist_ok=True)
     dest = os.path.join(backup_dir, f"BD_Telecomunicaciones_{ts}.xlsx")
     with open(path, "rb") as src, open(dest, "wb") as dst:

@@ -26,9 +26,6 @@ def require_session_hybrid(
     authorization: Optional[str] = Header(default=None),
     access_token: Optional[str] = Cookie(default=None)
 ) -> Dict[str, Any]:
-    # Debug logging
-    print(f"DEBUG AUTH: auth_header={authorization}, cookie={access_token}")
-    
     token = _bearer_token(authorization)
     if not token and access_token:
         if access_token.startswith("Bearer ") or access_token.startswith("bearer "):
@@ -37,12 +34,10 @@ def require_session_hybrid(
             token = access_token.strip()
 
     if not token:
-        print("DEBUG AUTH: No token found in header or cookie")
         raise HTTPException(status_code=401, detail="missing_auth")
 
     payload = security.verify_token(token)
     if not payload:
-        print(f"DEBUG AUTH: Token verification failed for token: {token[:15]}...")
         raise HTTPException(status_code=401, detail="invalid_token")
 
     return {

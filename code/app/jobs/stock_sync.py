@@ -103,8 +103,9 @@ def sync_stock(payload: dict = None):
                 
                 # Buscamos si ya existe un ticket abierto con este título
                 existing = tickets_service.list_tickets(q=ticket_title, estado="abierto")
-                
-                if not existing:
+                existing_items = existing.get("items", []) if isinstance(existing, dict) else existing
+
+                if not existing_items:
                     desc = (
                         f"Se detectó diferencia de inventario.\n"
                         f"Laudus (Oficial): {remote_stock}\n"

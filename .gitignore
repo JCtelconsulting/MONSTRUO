@@ -68,3 +68,6 @@ runner/
 # Security keys
 *.pem
 *.key
+
+# Local secrets (machine-specific)
+.secrets/

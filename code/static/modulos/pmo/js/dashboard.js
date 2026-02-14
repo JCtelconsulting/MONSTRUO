@@ -42,12 +42,10 @@ export class PMODashboard {
         };
 
         try {
-            const res = await fetch('/api/pmo/proyectos', {
+            const json = await window.fetchApi('/api/pmo/proyectos', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: payload
             });
-            const json = await res.json();
             if (json.ok) {
                 document.getElementById('modal-create-project').close();
                 this.loadProjects();
@@ -91,12 +89,10 @@ export class PMODashboard {
         };
 
         try {
-            const res = await fetch(`/api/pmo/proyectos/${id}`, {
+            const json = await window.fetchApi(`/api/pmo/proyectos/${id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: payload
             });
-            const json = await res.json();
             if (json.ok) {
                 // Feedback fluido: No recargar todo para no cerrar el acordeón
                 // 1. Validar inputs visuales
@@ -152,12 +148,10 @@ export class PMODashboard {
         btn.disabled = true;
 
         try {
-            const res = await fetch('/api/pmo/bitacora/ingesta', {
+            const json = await window.fetchApi('/api/pmo/bitacora/ingesta', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contenido_raw: content, origen: 'dashboard_manual' })
+                body: { contenido_raw: content, origen: 'dashboard_manual' }
             });
-            const json = await res.json();
 
             if (json.ok) {
                 const resultDiv = document.getElementById('ia-result');
@@ -201,8 +195,7 @@ export class PMODashboard {
         container.innerHTML = '<div style="text-align:center; padding:2rem; opacity:0.5;">Cargando proyectos...</div>';
 
         try {
-            const res = await fetch('/api/pmo/proyectos');
-            const data = await res.json();
+            const data = await window.fetchApi('/api/pmo/proyectos');
 
             container.innerHTML = '';
             if (data.length === 0) {

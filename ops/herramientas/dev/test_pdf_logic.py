@@ -2,10 +2,10 @@ import sys
 import os
 
 # Ensure we can import app
-sys.path.append("/srv/monstruo/code")
+sys.path.append("/srv/monstruo_dev/code")
 
 # Mock current working dir so .env loads if needed (though we might have issues with dotenv)
-os.chdir("/srv/monstruo/code")
+os.chdir("/srv/monstruo_dev/code")
 
 try:
     from app.core import db

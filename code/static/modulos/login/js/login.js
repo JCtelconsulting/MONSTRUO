@@ -16,17 +16,22 @@ document.addEventListener('DOMContentLoaded', () => {
     config: 'https://config.telconsulting.cl',
   };
 
+  // --- API BASE URL ---
+  const IS_DEV = window.location.pathname.startsWith('/dev');
+  const API_BASE = IS_DEV ? '/dev' : '';
+
   function getPostLoginTarget() {
     const isProdHost = window.location.hostname.toLowerCase().endsWith('.telconsulting.cl');
     if (!isProdHost) {
       return '/modulos/dashboard/dashboard.html';
     }
-    return `${DOMINIOS.login}/dashboard`;
+    // Detectar si estamos en /dev/ o /prod/ y mantener el prefijo
+    const prefix = window.location.pathname.startsWith('/dev') ? '/dev' : '/prod';
+    return `${prefix}/dashboard`;
   }
 
   // Si ya tiene cookie, redirigir
-  fetch('/api/auth/whoami', { credentials: 'include' })
-    .then((r) => r.json())
+  window.fetchApi('/api/auth/whoami')
     .then((data) => {
       if (data.logged) {
         const target = getPostLoginTarget();
@@ -53,16 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
 
-      const response = await fetch('/api/auth/login', {
+      await window.fetchApi('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) throw new Error(data.detail || 'Credenciales incorrectas');
 
       // Exito
       status.textContent = 'Acceso Correcto. Redirigiendo...';

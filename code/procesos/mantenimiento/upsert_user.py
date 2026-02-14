@@ -5,8 +5,8 @@ import argparse
 from pathlib import Path
 
 # Adjust path to import nucleo
-# script location: /srv/monstruo/code/procesos/mantenimiento/upsert_user.py
-# nucleo location: /srv/monstruo/code/app/nucleo.py
+# script location: /srv/monstruo_dev/code/procesos/mantenimiento/upsert_user.py
+# nucleo location: /srv/monstruo_dev/code/app/nucleo.py
 # relative: ../../
 
 current_dir = Path(__file__).resolve().parent

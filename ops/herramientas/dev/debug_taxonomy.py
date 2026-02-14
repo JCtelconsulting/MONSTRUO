@@ -5,8 +5,8 @@ import json
 import logging
 
 # Add code dir to path
-sys.path.append("/srv/monstruo/code")
-sys.path.append("/srv/monstruo/code/sistema_gestion")
+sys.path.append("/srv/monstruo_dev/code")
+sys.path.append("/srv/monstruo_dev/code/sistema_gestion")
 
 from sistema_gestion import catalogo_seed_ai
 from sistema_gestion import ai_local_openai_compat, nucleo

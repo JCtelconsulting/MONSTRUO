@@ -124,3 +124,87 @@ async def worker_loop():
         except Exception as e:
             print(f"[JobEngine] Loop error: {e}")
             await asyncio.sleep(POLL_INTERVAL)
+
+# ==========================================================================
+# EMAIL JOBS IMPL
+# ==========================================================================
+async def poll_email_job(payload: dict):
+    from app.core import email_integration, tickets_service
+    
+    print("[JobEngine] Polling emails...")
+    processor = email_integration.EmailProcessor()
+    try:
+        processor.connect()
+        emails = processor.fetch_unread()
+        print(f"[JobEngine] Found {len(emails)} unread emails.")
+        
+        for email_data in emails:
+            try:
+                tickets_service.handle_incoming_email(email_data)
+            except Exception as e:
+                print(f"[JobEngine] Error handling email {email_data.get('message_id')}: {e}")
+                
+    except Exception as e:
+        print(f"[JobEngine] Email polling error: {e}")
+    finally:
+        processor.close()
+
+    # Re-schedule self
+    interval = int(processor.config.get('email_polling_interval', 60)) if processor.config else 60
+    await enqueue_job("EMAIL_POLLING", {}, max_retries=0)
+    # Note: enqueue_job sets run_at=now. Ideally we want delay.
+    # Hack: Update next_run_at manually or sleep? 
+    # Better: Update the just-inserted job to delay
+    conn = db.get_conn()
+    try:
+        next_run = (datetime.utcnow() + timedelta(seconds=interval)).isoformat()
+        # Get last inserted ID? Or just trust the queue. 
+        # A bit hacky to re-enqueue immediately. Let's stick to simple loop for now.
+        # However, enqueue_job sets status=PENDING and next_run=now.
+        # We need a proper scheduling mechanism. 
+        # For MVP: Update the job we just inserted (highest ID)
+        conn.execute("UPDATE sys_jobs SET next_run_at = ? WHERE id = (SELECT MAX(id) FROM sys_jobs WHERE job_type='EMAIL_POLLING')", (next_run,))
+        conn.commit()
+    finally:
+        conn.close()
+
+async def send_auto_response_job(payload: dict):
+    from app.core import email, tickets_service
+    
+    ticket_id = payload.get("ticket_id")
+    to_email = payload.get("email")
+    nombre = payload.get("nombre")
+    asignado_a = payload.get("asignado_a")
+    ticket_code = None
+    try:
+        tk = tickets_service.get_ticket(int(ticket_id)) if ticket_id is not None else None
+        ticket_code = tk.get("codigo") if tk else None
+    except Exception:
+        ticket_code = None
+
+    code = ticket_code or f"TK-{ticket_id}"
+    subject = f"Re: {code} - Comprobante de Recepción"
+    
+    body = f"""
+    <p>Hola {nombre},</p>
+    <p>Hemos recibido su solicitud y se ha generado el ticket <strong>{code}</strong>.</p>
+    """
+    
+    if asignado_a == "mesa_ayuda":
+        body += "<p>Su caso está siendo revisado por nuestra <strong>Mesa de Ayuda</strong> para ser derivado al área correspondiente.</p>"
+    else:
+        body += f"<p>Su caso ha sido asignado al especialista: <strong>{asignado_a}</strong>, quien revisará los antecedentes a la brevedad.</p>"
+        
+    body += "<p>Responderemos a este correo con actualizaciones.</p>"
+    
+    print(f"[JobEngine] Sending auto-response to {to_email} for {code}")
+    try:
+        email.send_email(to_email, subject, body)
+    except Exception as e:
+        print(f"[JobEngine] Failed to send auto-response: {e}")
+        # Job engine will retry automatically
+        raise e
+
+# Register default jobs
+register_job("EMAIL_POLLING", poll_email_job)
+register_job("SEND_AUTO_RESPONSE", send_auto_response_job)

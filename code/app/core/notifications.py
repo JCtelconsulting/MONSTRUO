@@ -1,9 +1,12 @@
 from datetime import datetime
 from app.core import db
 
+from pathlib import Path
+
 # In a real system, this would integrate with SMTP or Slack API.
 # For now, we simulate by writing to a dedicated log file.
-LOG_FILE = "/srv/monstruo/notifications.log"
+# code/app/core/notifications.py -> parents[3] = root
+LOG_FILE = Path(__file__).resolve().parents[3] / "notifications.log"
 
 def send_notification(user_id: str, message: str, severity: str = "INFO"):
     """

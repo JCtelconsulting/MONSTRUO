@@ -7,7 +7,7 @@ import argparse
 import re
 from typing import List, Dict, Tuple
 
-CANONICAL_RULES = "/srv/monstruo/docs/estructura_repo.json"
+CANONICAL_RULES = "/srv/monstruo_dev/docs/estructura_repo.json"
 
 def load_rules():
     try:

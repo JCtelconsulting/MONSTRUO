@@ -74,6 +74,10 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-02-14: Ticketera: respuesta por correo desde detalle de ticket, con intento de mantener hilo (headers `In-Reply-To`/`References`) y registro de salida/entrada en historial.
+- 2026-02-14: Ticketera: control anti-duplicado de correos salientes por reintentos de UI (ventana de dedupe + marcador `outgoing_pending`).
+- 2026-02-14: Ticketera: formato de código actualizado a `TK-DD-MM-YYYY-NNNN` con compatibilidad de parser para formatos previos en correo entrante.
+- 2026-02-14: Entorno DEV: limpieza total de ticketera para partir de cero (`tickets`, `ticket_comments`, `ticket_notifications`, `ticket_emails`, `ticket_attachments`) y reset de `current_load` en `user_specialties`.
 - 2026-02-01: Bodega UX afinada: rutas de categorías homogéneas en inventario (sin duplicar padres), catálogo con selección múltiple + asignación masiva, búsqueda y conteos de árbol corregidos.
 - 2026-01-29: Bodega/Catálogo con multi-categoría (tabla `cat_item_categories`) y filtro por categoría que incluye subcategorías.
 - 2026-01-29: UI Bodega: búsqueda case-insensitive en inventario, Kardex en drawer derecho, sidebar persistente entre módulos.
@@ -1214,7 +1218,7 @@ Arquitectura de Carpetas
 **Árbol Oficial:**
 
 ```text
-/srv/monstruo/
+/srv/monstruo_dev/
 ├── code/
 │   ├── app/                 # [CORE] Backend FastAPI (CANÓNICO)
 │   │   ├── api/             # Routers y Pydantic Schemas
@@ -1683,25 +1687,34 @@ IA no ejecuta masivo sin revisión humana (cumplido: flujo `resolver_duplicado` 
 
 ---
 
-EPIC 11 — Ticketera v1 [COMPLETADO]
+EPIC 11 — Ticke-Tera (Ticketera) [V1 COMPLETADO + FASE 2 EN CURSO]
 
 Tareas:
-- [x] CRUD ticket (API /api/tickets + RBAC)
-- [x] estados y SLA (Job automático + Notifications Module /notifications.log)
-- [x] comentario (API threading)
-- [x] Timeline Unificado (Audit + Comments + Attachments)
-- [x] Adjuntos (Upload /api/tickets/{id}/attachments)
-- [x] Fix SLA Postgres (queries por nombre + no duplicar job)
+- [x] CRUD ticket (API `/api/tks/tickets` + RBAC)
+- [x] Estados y SLA (cálculo por severidad + notificaciones in-app)
+- [x] Comentarios y timeline base por eventos (`ticket_comments`)
+- [x] UI Ticketera V3: Resumen (KPIs + Pivot), Lista, Kanban y detalle
+- [x] Responder por correo desde detalle (`POST /api/tks/tickets/{ticket_id}/reply-email`)
+- [x] Mantención de hilo de correo (`In-Reply-To` / `References` + `email_thread_id`)
+- [x] Anti-duplicado de correos salientes (`outgoing_pending` + dedupe por ventana corta)
+- [x] Parser de correo entrante por hilo y asunto (actual + formatos legacy)
+- [x] Formato de código actualizado a `TK-DD-MM-YYYY-NNNN`
+- [x] Hardening create_ticket (fail-safe en auto-asignación/notificaciones + validación de ID post-INSERT)
+- [x] Fix de fluidez UI (AbortController + cancelación de requests + cache TTL)
+- [ ] Adjuntos en respuesta por correo (UI + backend real sobre `attachments_json`)
+- [ ] Historial de correos completo en detalle (entrada/salida con payload legible)
+- [ ] Worker real para escalamiento WhatsApp/3CX (hoy se agenda en DB, falta ejecutor de canal)
+- [ ] Auto-respuesta configurable de recepción de correo (actualmente desactivada)
+- [ ] Suite de tests E2E ticketera (`create -> reply -> dedupe -> incoming thread match`)
+- [ ] Checklist técnico anti-cruce DEV/PROD para Ticketera (SMTP, base URL, credenciales y jobs)
 
 Aceptación:
-- [x] Backend listo para integración UI
-- [x] UI: Vista Resumen (KPIs + Pivot), Lista y Placeholder Reportes
-- [x] Fix: Job SLA actualizado a esquema Español
-
-
-Aceptación:
-
-usable por operación
+- [x] Crear ticket no cae en 500 por fallas no críticas de auto-asignación/notificaciones
+- [x] Respuesta por correo se envía desde el detalle y registra evento en timeline
+- [x] Reintento/doble envío en ventana corta no duplica correo saliente
+- [x] Código de ticket usa formato `TK-DD-MM-YYYY-NNNN` en creación nueva
+- [ ] Adjuntar archivos en respuesta por correo operativo de punta a punta
+- [ ] Validación automatizada de separación DEV/PROD para flujo de correo y jobs
 
 
 ---

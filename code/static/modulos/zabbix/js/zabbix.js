@@ -1,15 +1,9 @@
 async function _fetchJson(url) {
   try {
-    const r = await fetch(url);
-    const txt = await r.text();
-    let data = null;
-    try {
-      data = JSON.parse(txt);
-    } catch (_) {
-      data = null;
-    }
-    return { ok: r.ok, status: r.status, data };
+    const data = await window.fetchApi(url);
+    return { ok: true, status: 200, data };
   } catch (e) {
+    console.error("Zabbix fetch error:", e);
     return { ok: false, status: 0, data: null };
   }
 }

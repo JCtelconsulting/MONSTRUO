@@ -20,11 +20,15 @@ services:
     container_name: ${STACK_NAME:-monstruo}-api
     env_file:
       - ${ENV_FILE:-.env}
+    volumes:
+      - ./code:/app/code
+      - ./data/tickets:/srv/monstruo/data/tickets
     ports:
       - "${PORT:-9000}:9000"
     environment:
+      - PYTHONPATH=/app/code
       - PORT=${PORT:-9000}
-      - DB_URL=${DB_URL:-postgresql://monstruo:monstruo@db:5432/monstruo}
+      - DB_URL=postgresql://monstruo:monstruo@db:5432/monstruo
       - SECRET_KEY=${SECRET_KEY:-CAMBIAME_ESTO_ES_INSEGURO_F8A9}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-0}

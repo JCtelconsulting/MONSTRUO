@@ -9,8 +9,8 @@ import random
 import os
 
 # Configuración
-INPUT_FILE = '/srv/monstruo/data/Base_Preventa_Telecomunicaciones.xlsx'
-OUTPUT_FILE = '/srv/monstruo/data/Base_Preventa_Enriquecida_Pilot.xlsx'
+INPUT_FILE = '/srv/monstruo_dev/data/Base_Preventa_Telecomunicaciones.xlsx'
+OUTPUT_FILE = '/srv/monstruo_dev/data/Base_Preventa_Enriquecida_Pilot.xlsx'
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 
 # --- ZONA "GUIÑO GUIÑO" ---
@@ -23,7 +23,7 @@ from duckduckgo_search import DDGS
 from fake_useragent import UserAgent
 
 # --- CONFIGURACIÓN DE PROXIES ---
-PROXY_FILE = '/srv/monstruo/proxies.txt'
+PROXY_FILE = '/srv/monstruo_dev/proxies.txt'
 
 def load_proxies():
     if not os.path.exists(PROXY_FILE):

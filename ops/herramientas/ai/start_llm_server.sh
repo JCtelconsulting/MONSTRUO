@@ -8,7 +8,7 @@ if pgrep -x "ollama" > /dev/null; then
     echo "Ollama is already running."
 else
     echo "Starting Ollama..."
-    nohup ollama serve > /srv/monstruo/data/ollama.log 2>&1 &
+    nohup ollama serve > /srv/monstruo_dev/data/ollama.log 2>&1 &
     sleep 5
 fi
 

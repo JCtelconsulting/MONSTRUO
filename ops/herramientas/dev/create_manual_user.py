@@ -3,7 +3,7 @@ import sys
 import os
 
 # Add code/sistema_gestion to path
-sys.path.append("/srv/monstruo/code/sistema_gestion")
+sys.path.append("/srv/monstruo_dev/code/sistema_gestion")
 
 import nucleo
 

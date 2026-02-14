@@ -1,5 +1,5 @@
 {
-  "backups_root": "/srv/monstruo/backups",
+  "backups_root": "/srv/monstruo_dev/backups",
   "excluir": [
     ".git",
     "__pycache__",
@@ -12,7 +12,7 @@
       "mtime_utc": "2026-01-25T15:11:50Z",
       "nombre": "diagnostico_final_parrotfy.py",
       "patron": "_final",
-      "ruta": "/srv/monstruo/ops/diagnostico_final_parrotfy.py",
+      "ruta": "/srv/monstruo_dev/ops/diagnostico_final_parrotfy.py",
       "tamano": 2291
     },
     {
@@ -20,7 +20,7 @@
       "mtime_utc": "2026-01-27T19:45:09Z",
       "nombre": "limpiador_backups.py",
       "patron": "_backup",
-      "ruta": "/srv/monstruo/ops/guardian/limpiador_backups.py",
+      "ruta": "/srv/monstruo_dev/ops/guardian/limpiador_backups.py",
       "tamano": 5179
     },
     {
@@ -28,7 +28,7 @@
       "mtime_utc": "2026-01-25T18:12:52Z",
       "nombre": "db_migrate_tks_v2.py",
       "patron": "_v2",
-      "ruta": "/srv/monstruo/ops/scripts/db_migrate_tks_v2.py",
+      "ruta": "/srv/monstruo_dev/ops/scripts/db_migrate_tks_v2.py",
       "tamano": 1860
     },
     {
@@ -36,7 +36,7 @@
       "mtime_utc": "2026-01-25T18:11:00Z",
       "nombre": "db_migrate_catalogo_v2.py",
       "patron": "_v2",
-      "ruta": "/srv/monstruo/ops/scripts/db_migrate_catalogo_v2.py",
+      "ruta": "/srv/monstruo_dev/ops/scripts/db_migrate_catalogo_v2.py",
       "tamano": 3799
     },
     {
@@ -44,7 +44,7 @@
       "mtime_utc": "2026-01-25T09:30:45Z",
       "nombre": "refine_history_v2.py",
       "patron": "_v2",
-      "ruta": "/srv/monstruo/ops/scripts/refine_history_v2.py",
+      "ruta": "/srv/monstruo_dev/ops/scripts/refine_history_v2.py",
       "tamano": 2617
     }
   ],

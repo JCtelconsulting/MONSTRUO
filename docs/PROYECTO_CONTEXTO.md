@@ -1,6 +1,18 @@
 # PROYECTO CONTEXTO: MONSTRUO
-**Fecha de actualizacion:** 05 Febrero 2026
+**Fecha de actualizacion:** 14 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
+
+## HITO: 2026-02-14 15:40 - Ticketera Correo en Hilo + Reset DEV
+- **Solicitud**: Responder correos desde el detalle del ticket, mantener cadena de correo y dejar ticketera en cero para partir limpio en dev.
+- **Entregable**:
+  - Endpoint nuevo `POST /api/tks/tickets/{ticket_id}/reply-email`.
+  - UI de respuesta por correo en detalle de ticket (textarea + envío).
+  - Envío con headers de hilo (`In-Reply-To`, `References`) y actualización de `email_thread_id`.
+  - Protección anti-duplicado de envíos por reintento (dedupe por ventana corta + marcador `outgoing_pending`).
+  - Parser de correo entrante mejorado: match por hilo y por código en asunto.
+  - Formato de código de ticket actualizado a `TK-DD-MM-YYYY-NNNN` (compatibilidad con formato anterior).
+  - Limpieza total de ticketera en entorno dev (`tickets`, `ticket_comments`, `ticket_notifications`, `ticket_emails`, `ticket_attachments`) + reset de `current_load`.
+- **Estado**: CERRADO.
 
 ## HITO: 2026-02-08 08:35 - Configuración Flujo Git/GitHub Automático
 - **Solicitud**: Configurar despliegue automático desde GitHub (Push-to-Deploy) compatible con firewall estricto.
@@ -9,7 +21,7 @@
   - Autorización SSH (Deploy Key "SERVIDOR").
   - Workflow `deploy_monstruo.yml` para Self-Hosted Runner.
   - Documentación `README.md` creada.
-  - **Fix Runner:** Reconfigurado servicio systemd para ejecutar como usuario `juan` y movido a `/srv/monstruo/runner` (Solución a Permission Denied).
+  - **Fix Runner:** Reconfigurado servicio systemd para ejecutar como usuario `juan` y movido a `/srv/monstruo_dev/runner` (Solución a Permission Denied).
 - **Estado**: CERRADO.
 
 ## HITO: 2026-02-07 19:59 - Diagnóstico y Corrección de Permisos Git/Sistema

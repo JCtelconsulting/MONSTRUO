@@ -13,9 +13,9 @@
   },
   "proyecto_raiz": "/srv/monstruo",
   "rutas": {
-    "bd_eventos": "/srv/monstruo/ops/guardian/guardian.sqlite",
-    "carpeta_backups": "/srv/monstruo/backups",
-    "docs_contexto": "/srv/monstruo/docs/PROYECTO_CONTEXTO.md",
+    "bd_eventos": "/srv/monstruo_dev/ops/guardian/guardian.sqlite",
+    "carpeta_backups": "/srv/monstruo_dev/backups",
+    "docs_contexto": "/srv/monstruo_dev/docs/PROYECTO_CONTEXTO.md",
     "raiz_proyecto": "/srv/monstruo"
   },
   "severidades": {

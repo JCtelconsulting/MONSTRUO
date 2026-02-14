@@ -75,7 +75,7 @@ def marcar_paquete_enviado(con: sqlite3.Connection, paquete_id: int) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="/srv/monstruo/ops/guardian/configuracion_guardian.json")
+    ap.add_argument("--config", default="/srv/monstruo_dev/ops/guardian/configuracion_guardian.json")
     ap.add_argument("--limite", type=int, default=10)
     ap.add_argument("--timeout", type=float, default=5.0)
     ap.add_argument("--once", action="store_true")

@@ -137,11 +137,11 @@
 ### Preparar Data de Ejemplo
 ```bash
 # Asegurar que hay casos activos
-sqlite3 /srv/monstruo/data/db/monstruo.db "SELECT COUNT(*) FROM cases WHERE status='open';"
+sqlite3 /srv/monstruo_dev/data/db/monstruo.db "SELECT COUNT(*) FROM cases WHERE status='open';"
 # Mínimo 3-5 casos
 
 # Asegurar recomendaciones IA
-sqlite3 /srv/monstruo/data/db/monstruo.db "SELECT COUNT(*) FROM ai_recommendations WHERE status='pending';"
+sqlite3 /srv/monstruo_dev/data/db/monstruo.db "SELECT COUNT(*) FROM ai_recommendations WHERE status='pending';"
 # Mínimo 1 recomendación
 ```
 

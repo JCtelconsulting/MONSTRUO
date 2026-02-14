@@ -12,15 +12,19 @@ def admin_chat(body: dict = Body(...)):
     # body: { message: str, context: object }
     user_msg = body.get("message")
     
+    # Dynamic root path resolution
+    from pathlib import Path
+    root_dir = Path(__file__).resolve().parents[4]
+
     # 1. Load Admin Prompt
     try:
-        with open("/srv/monstruo/prompts/admin_rules.txt", "r") as f:
+        with open(root_dir / "prompts/admin_rules.txt", "r") as f:
             admin_prompt = f.read()
     except:
         admin_prompt = "You are the system admin."
         
     try:
-        with open("/srv/monstruo/prompts/global_context.txt", "r") as f:
+        with open(root_dir / "prompts/global_context.txt", "r") as f:
             global_context = f.read()
     except:
         global_context = ""
@@ -80,9 +84,9 @@ BEST PRACTICE:
 
                      # Resolve Path
                      if fname.endswith(".js"):
-                         path = f"/srv/monstruo/code/static/js/{fname.split('/')[-1]}"
+                         path = root_dir / f"code/static/js/{fname.split('/')[-1]}"
                      else:
-                         path = f"/srv/monstruo/prompts/{fname}"
+                         path = root_dir / f"prompts/{fname}"
                      
                      if name == "read_prompt_file":
                          try:

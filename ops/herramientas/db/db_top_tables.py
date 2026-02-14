@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-DB_PATH = "/srv/monstruo/data/db/monstruo.db"
+DB_PATH = "/srv/monstruo_dev/data/db/monstruo.db"
 
 def main():
     if not os.path.exists(DB_PATH):

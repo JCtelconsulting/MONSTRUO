@@ -2,8 +2,8 @@ import sys
 import os
 from pathlib import Path
 
-# Script location: /srv/monstruo/code/scripts/fix_pmo_db.py
-# We need to add /srv/monstruo/code to path to import 'app'
+# Script location: /srv/monstruo_dev/code/scripts/fix_pmo_db.py
+# We need to add /srv/monstruo_dev/code to path to import 'app'
 # This is parent directory of 'scripts'
 CODE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(CODE_DIR))

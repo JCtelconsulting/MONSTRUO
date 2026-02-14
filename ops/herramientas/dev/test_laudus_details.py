@@ -14,7 +14,7 @@ try:
     print("LaudusClient imported.")
 except ImportError as e:
     print(f"Error importing LaudusClient: {e}")
-    sys.path.append("/srv/monstruo/code")
+    sys.path.append("/srv/monstruo_dev/code")
     from app.integraciones.laudus import LaudusClient
 
     print("LaudusClient imported after path fix.")
