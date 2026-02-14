@@ -2,7 +2,7 @@ PLAN MAESTRO MONSTRUO
 
 Proyecto: MONSTRUO (Telconsulting)
 Versión: v1.1
-Fecha: 2026-02-01
+Fecha: 2026-02-14
 Autoría: Juan + IA (plan operativo y arquitectura)
 Propósito del documento: ser la única guía oficial de construcción. Si el agente propone algo que no calza con esto, se rechaza.
 
@@ -114,6 +114,39 @@ git checkout -b feature/nueva-funcionalidad
 git push origin feature/nueva-funcionalidad
 # NOTIFICAR AL USUARIO PARA MERGE
 ```
+
+0.6 Prioridad Operativa Vigente (desde 2026-02-14)
+
+**MANDATO DE NEGOCIO:**
+- **EPIC 11 (Ticke-Tera) pasa a Prioridad Máxima Absoluta.**
+- Objetivo: **reemplazar la mesa externa actualmente contratada** por una solución interna de nivel profesional.
+- Hasta cerrar EPIC 11 en estándar productivo, **no se abre desarrollo neto** de EPIC 12+ (excepto incidentes críticos o bloqueos técnicos de infraestructura/seguridad).
+
+**Definición de "100% profesional" para dar por cerrado EPIC 11 (Go/No-Go):**
+- Estabilidad: 0 errores 500 en flujos críticos (`crear`, `asignar`, `responder`, `listar`, `detalle`).
+- Correo operacional completo: reply en hilo + adjuntos + historial legible entrada/salida.
+- Anti-duplicado robusto: reintentos de UI/API no generan doble envío.
+- Separación DEV/PROD validada y automatizada (SMTP, credenciales, jobs, URLs base).
+- Suite E2E ticketera verde en CI (`create -> reply -> dedupe -> incoming thread match`).
+- UX de operación fluida (sin bloqueos perceptibles en navegación y cambio de vistas).
+
+0.7 Gobernanza de Agentes (obligatoria desde 2026-02-14)
+
+Archivo canonico de reglas para agentes en DEV:
+- `.agent/rules/monstruo-dev-reglas.md`
+- `AGENTS.md` (bootstrap para agentes compatibles)
+
+Compatibilidad:
+- `.agent/rules/monstruo-reglas.md` queda como archivo puente/deprecado.
+- Si existe conflicto entre ambos, manda `monstruo-dev-reglas.md`.
+
+Regla operativa:
+- Ningun agente ejecuta cambios sin haber cargado `monstruo-dev-reglas.md`.
+- Ninguna entrega se considera valida si contradice ese archivo, el Plan Maestro o el Proyecto Contexto.
+
+Efecto en el trabajo diario:
+- Se fuerza foco en EPIC 11 (Ticketera) hasta cumplir Go/No-Go profesional.
+- Se evita cruce DEV/PROD por norma explicita para ramas, env files, jobs y credenciales.
 
 
 ---
@@ -1157,6 +1190,8 @@ Triggers desde ERP/CRM/Bodega
 
 Integración Jira POC
 
+**Prioridad vigente:** cierre total de EPIC 11 antes de expandir alcance a EPIC 12+.
+
 
 ---
 GATE E — Proyectos + Preventa
@@ -1687,7 +1722,11 @@ IA no ejecuta masivo sin revisión humana (cumplido: flujo `resolver_duplicado` 
 
 ---
 
-EPIC 11 — Ticke-Tera (Ticketera) [V1 COMPLETADO + FASE 2 EN CURSO]
+EPIC 11 — Ticke-Tera (Ticketera) [PRIORIDAD MÁXIMA - REEMPLAZO MESA EXTERNA]
+
+Objetivo de negocio:
+- Reemplazar la mesa externa contratada por la empresa con una mesa interna de estándar productivo profesional.
+- Criterio de avance: no basta "funciona en dev"; debe quedar apta para operación diaria real sin regresiones de flujo.
 
 Tareas:
 - [x] CRUD ticket (API `/api/tks/tickets` + RBAC)
@@ -1715,6 +1754,7 @@ Aceptación:
 - [x] Código de ticket usa formato `TK-DD-MM-YYYY-NNNN` en creación nueva
 - [ ] Adjuntar archivos en respuesta por correo operativo de punta a punta
 - [ ] Validación automatizada de separación DEV/PROD para flujo de correo y jobs
+- [ ] EPIC 11 certificado para reemplazo de mesa externa (Go/No-Go profesional firmado)
 
 
 ---
@@ -1935,7 +1975,7 @@ Aceptación:
 - `DEV`:
   - rama: `dev`
   - backend: `127.0.0.1:9001`
-  - compose project: `monstruo-dev`
+  - compose project: `monstruo_dev`
 
 ### Selector de entorno (Nginx en proxy)
 - URL para activar DEV:
