@@ -62,7 +62,19 @@ Luego habilita TLS (ej con certbot) y recarga Nginx.
 Workflow: `.github/workflows/deploy.yml`
 
 Este flujo corre tests en GitHub y despliega desde un runner self-hosted en la VM de la app.
-El deploy está configurado para usar explícitamente `DEPLOY_ENV_FILE=/srv/monstruo_dev/.env.server`.
+El deploy está configurado por rama:
+- `main` -> `DEPLOY_ENV_FILE=/srv/monstruo/.env.server`
+- `dev` -> `DEPLOY_ENV_FILE=/srv/monstruo_dev/.env.server.dev`
+
+Metodo correcto (evita conflicto "container name already in use"):
+- Diferenciar `project` de Docker Compose vs `stack` (nombre visible del contenedor).
+- `project` debe ser estable en el tiempo por ambiente:
+  - `main`: `monstruo`
+  - `dev`: `monstruo_dev`
+- `stack` puede mantener guiones para nombres humanos:
+  - `main`: `monstruo`
+  - `dev`: `monstruo-dev`
+- No alternar `monstruo-dev` y `monstruo_dev` en `project`; eso rompe ownership de Compose aunque el `container_name` sea el mismo.
 
 Pasos:
 - En GitHub → Settings → Actions → Runners, agrega un runner self-hosted para este repo y ejecútalo en `192.168.60.5` (puedes usar `/srv/monstruo_dev/runner`).
@@ -112,8 +124,8 @@ cp .env.server.dev.example .env.server.dev
 ```
 
 - El workflow deploy usa:
-  - `main` -> stack `monstruo` (`:9000`)
-  - `dev` -> stack `monstruo-dev` (`:9001`)
+  - `main` -> project `monstruo`, stack `monstruo` (`:9000`)
+  - `dev` -> project `monstruo_dev`, stack `monstruo-dev` (`:9001`)
 
 - En el proxy Nginx (443), selecciona entorno por cookie:
   - `https://<dominio>/__env/dev` -> enruta a `:9001`

@@ -2,6 +2,20 @@
 **Fecha de actualizacion:** 14 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-14 18:05 - Fix CI/CD Deploy DEV (tests OK, deploy fail)
+- **Incidente**: GitHub Actions mostraba `tests` OK pero `deploy` fallaba en rama `dev`.
+- **Causa raiz**: Drift entre `project` de Docker Compose (`monstruo-dev` vs `monstruo_dev`) con `container_name` fijo; Compose detectaba conflicto de ownership y abortaba con "container name already in use".
+- **Corrección aplicada**:
+  - Workflow actualizado en `.github/workflows/deploy.yml`:
+    - `dev` ahora usa `project=monstruo_dev` (estable).
+    - `dev` mantiene `stack=monstruo-dev` (nombre legible de contenedores).
+  - Método operativo documentado en `docs/deploy/README.md` (separación correcta `project` vs `stack` y regla de estabilidad).
+- **Método correcto (estándar)**:
+  - `main`: `project=monstruo`, `stack=monstruo`.
+  - `dev`: `project=monstruo_dev`, `stack=monstruo-dev`.
+  - Nunca alternar guion/guion_bajo en `project` una vez creado el ambiente.
+- **Estado**: CERRADO.
+
 ## HITO: 2026-02-14 15:40 - Ticketera Correo en Hilo + Reset DEV
 - **Solicitud**: Responder correos desde el detalle del ticket, mantener cadena de correo y dejar ticketera en cero para partir limpio en dev.
 - **Entregable**:

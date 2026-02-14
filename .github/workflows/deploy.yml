@@ -53,7 +53,8 @@ jobs:
           else
             echo "branch=dev" >> "$GITHUB_OUTPUT"
             echo "env_file=/srv/monstruo_dev/.env.server.dev" >> "$GITHUB_OUTPUT"
-            echo "project=monstruo-dev" >> "$GITHUB_OUTPUT"
+            # Mantener project estable evita conflictos de labels/ownership en contenedores existentes.
+            echo "project=monstruo_dev" >> "$GITHUB_OUTPUT"
             echo "stack=monstruo-dev" >> "$GITHUB_OUTPUT"
             echo "health=http://127.0.0.1:9001/health" >> "$GITHUB_OUTPUT"
             echo "deploy_path=/srv/monstruo_dev" >> "$GITHUB_OUTPUT"
