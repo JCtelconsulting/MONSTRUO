@@ -1,6 +1,6 @@
 # Validación E2E Ticketera - DEV
-**Fecha:** sáb 14 feb 2026 18:59:43 -03
-**Commit:** 7626681
+**Fecha:** sáb 14 feb 2026 19:19:18 -03
+**Commit:** 1ad1ce1
 
 ## Ejecución de Pruebas
 
@@ -23,7 +23,7 @@
 ```
 [OK] Login: juan.lopez@telconsulting.cl
 [OK] whoami
-[OK] Ticket creado: TK-14-02-2026-0022 (id=22)
+[OK] Ticket creado: TK-14-02-2026-0026 (id=26)
 [OK] Detalle ticket
 [OK] Evento agregado
 [OK] Timeline con 3 eventos
@@ -37,10 +37,10 @@
 ### 4. e2e_ticketera.py (Incoming Match)
 ```
 [OK] Login: juan.lopez@telconsulting.cl
-[OK] Ticket creado: TK-14-02-2026-0023 (id=23)
+[OK] Ticket creado: TK-14-02-2026-0027 (id=27)
 [OK] Primer reply enviado
 [OK] Dedupe activo: Se evitó un envío duplicado (correo ya enviado recientemente).
-[INFO] Thread ID capturado: mock-1771106387@monstruo.dev
+[INFO] Thread ID capturado: mock-1771107561@monstruo.dev
 [INFO] Ejecutando simulación de correo entrante en contenedor API...
 [OK] Simulación incoming ejecutada.
 [OK] Incoming Thread Match VERIFICADO (Correo entrante apareció en el historial).
