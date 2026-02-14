@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="${DEPLOY_PATH:-/srv/monstruo}"
-BRANCH="${DEPLOY_BRANCH:-main}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+APP_DIR="${DEPLOY_PATH:-$PROJECT_ROOT}"
+BRANCH="${DEPLOY_BRANCH:-dev}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:9000/health}"
 DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE:-}"
 DEPLOY_COMPOSE_PROJECT="${DEPLOY_COMPOSE_PROJECT:-}"

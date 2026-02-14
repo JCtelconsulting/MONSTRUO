@@ -1,11 +1,19 @@
 #!/bin/bash
+set -euo pipefail
 # ops/guardian/scripts/install_hooks.sh
 # Instala el pre-commit hook para asegurar el orden del repo.
 
-HOOK_PATH=".git/hooks/pre-commit"
-GUARDIAN_SCRIPT="/srv/monstruo_dev/ops/guardian/scripts/orden_guardian.py"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+HOOK_PATH="$PROJECT_ROOT/.git/hooks/pre-commit"
+GUARDIAN_SCRIPT="$PROJECT_ROOT/ops/guardian/scripts/orden_guardian.py"
 
 echo "--- Instalando Guardian Git Hook ---"
+
+if [ ! -d "$PROJECT_ROOT/.git" ]; then
+    echo "ERROR: No se encontro .git en $PROJECT_ROOT"
+    exit 1
+fi
 
 if [ ! -f "$GUARDIAN_SCRIPT" ]; then
     echo "ERROR: No se encuentra orden_guardian.py en $GUARDIAN_SCRIPT"
@@ -17,19 +25,19 @@ cat <<EOF > "$HOOK_PATH"
 # Monstruo Guardian Pre-Commit Hook
 # Creado automaticamente por install_hooks.sh
 
-echo "🔍 Guardian del Orden: Validando cambios..."
+echo "[guardian] Validando estructura..."
 
 # Validar solo lo que esta en stage (cached)
 if git diff --cached | python3 "$GUARDIAN_SCRIPT" --check-patch -; then
-    echo "✅ Estructura Aprobada."
+    echo "[guardian] Estructura aprobada."
     exit 0
 else
-    echo "❌ BLOQUEADO: Tu commit viola las reglas de estructura (EPIC 01)."
+    echo "[guardian] BLOQUEADO: Tu commit viola las reglas de estructura (EPIC 01)."
     echo "   Consulta docs/estructura_repo.json o contacta al Arquitecto."
     exit 1
 fi
 EOF
 
 chmod +x "$HOOK_PATH"
-echo "✅ Hook instalado en $HOOK_PATH"
+echo "Hook instalado en $HOOK_PATH"
 echo "Prueba: Intenta comitear algo fuera de lugar y veras el error."

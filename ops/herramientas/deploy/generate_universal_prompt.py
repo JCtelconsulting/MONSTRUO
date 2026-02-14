@@ -1,95 +1,98 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 
-CTX_FILE = "/srv/monstruo_dev/docs/PROYECTO_CONTEXTO.md"
-OUT_FILE = "/srv/monstruo_dev/docs/PROMPT_CHAT_UNIVERSAL.md"
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[3]))
+CTX_FILE = PROJECT_ROOT / "docs" / "PROYECTO_CONTEXTO.md"
+OUT_FILE = PROJECT_ROOT / "docs" / "PROMPT_CHAT_UNIVERSAL.md"
 
-def get_section_text(content, header_pattern):
-    # Search for header line
-    # Match header line, then capture everything non-greedy until:
-    # 1. Next Header (# Digit.)
-    # 2. History Separator (===)
-    # 3. End of string
-    regex = re.compile(rf"^{header_pattern}.*?\n(.*?)(?=\n# \d|\n===|\Z)", re.DOTALL | re.MULTILINE)
-    match = regex.search(content)
-    if match:
-        return match.group(1).strip()
-    return ""
 
-def main():
-    if not os.path.exists(CTX_FILE):
-        print("Error: Context file not found")
-        return
+def latest_hito(ctx_content: str) -> str:
+    match = re.search(r"^## HITO:\s*(.+)$", ctx_content, flags=re.MULTILINE)
+    return match.group(1).strip() if match else "Sin hito detectado"
 
-    with open(CTX_FILE, "r", encoding="utf-8") as f:
-        content = f.read()
 
-    stack = get_section_text(content, r"# 1\.")
-    state = get_section_text(content, r"# 4\.")
-    history = get_section_text(content, r"# 6\.")
-    roadmap = get_section_text(content, r"# 7\.")
-
-    universal_prompt = f"""
-# PROMPT DE CONTEXTO UNIVERSAL: PROYECTO MONSTRUO
-**Fecha Generación:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
-**Objetivo:** Restaurar contexto inmediato en una nueva sesión de IA.
+def build_prompt(project_root: Path, hito: str) -> str:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    return f"""# PROMPT DE CONTEXTO UNIVERSAL: MONSTRUO (DEV)
+**Fecha Generacion:** {now}
+**Objetivo:** Bootstrap operativo para iniciar agentes sin perder contexto ni cruzar DEV/PROD.
 
 ---
 
-## 1. RESUMEN EJECUTIVO
-Estás trabajando en **MONSTRUO**, un middleware de integración ERP para Telconsulting.
-Tu rol es: **Developer Senior Fullstack (Python/FastAPI) + DevOps**.
-**Regla de Oro:** Todo cambio se registra en `docs/PROYECTO_CONTEXTO.md`.
-**Idioma:** Híbrido Español/Inglés (Spanish/English) en artefactos y explicaciones para fines educativos.
+## 1. Mandato de este archivo
+Este archivo es solo un **bootstrap**. No reemplaza la documentacion canonica.
 
-## 2. STACK TÉCNICO
-{stack}
+Orden de autoridad obligatorio:
+1. `docs/PLAN_MAESTRO_MONSTRUO.md`
+2. `docs/PROYECTO_CONTEXTO.md`
+3. `.agent/rules/monstruo-dev-reglas.md`
+4. `docs/ESTANDARES.md`
+5. Instruccion puntual del usuario (si no contradice 1-4)
 
-## ENTORNO DE EJECUCION Y ACCESO (IMPORTANTE)
-
-### Estado actual (Laboratorio)
-- MONSTRUO esta corriendo en mi PC como entorno de laboratorio.
-- Acceso: actualmente soy el unico usuario con acceso (no hay otros clientes/usuarios concurrentes).
-- Implicancia: problemas de cache de assets, concurrencia multiusuario y efectos "clientes con JS viejo" NO aplican en esta fase (solo yo consumo la UI/API).
-
-### Estado futuro (Servidor / Produccion)
-- Al migrar al servidor, habra multiples usuarios accediendo al sistema.
-- Implicancia: antes del pase a servidor se debe ejecutar hardening para multiusuario:
-  - Control de cache/versionado de assets (cache-bust o versionado de static) para evitar clientes desfasados.
-  - Autenticacion/autorizacion consistente en endpoints criticos.
-  - Observabilidad (logs/metricas) y alertas para errores 4xx/5xx.
-  - Procedimiento de despliegue con rollback + verificacion (systemd + curls + DB backup).
-
-Regla: cualquier decision que dependa de multiples clientes (cache-bust, sesiones, rate limits, locks) se evalua y se activa obligatoriamente en la etapa "Servidor/Produccion", no en laboratorio local.
-
-## 3. ESTADO ACTUAL DEL PROYECTO
-{state}
-
-## 4. BITÁCORA RECIENTE (Hitos Críticos)
-{history}
-
-## 5. ROADMAP INMEDIATO (Lo que sigue)
-{roadmap}
-
-## 6. COMANDOS OPERATIVOS CLAVE
-*   **Root:** `/srv/monstruo`
-*   **Run Backend:** `sudo systemctl start monstruo-api`
-*   **Run Pipeline:** `cd code && ./scripts/integracion/run_pipeline.sh`
-*   **Logs:** `journalctl -u monstruo-api -f`
-*   **Regenerar este Prompt:** `python3 ops/herramientas/generate_universal_prompt.py`
+Hito mas reciente detectado:
+- `{hito}`
 
 ---
-**INSTRUCCIÓN PARA EL AGENTE:**
-1.  Asume el rol técnico descrito.
-2.  Analiza el ESTADO y ROADMAP para situarte.
-3.  Tu primera respuesta debe ser un breve acuse de recibo confirmando el último hito y el siguiente paso pendiente.
+
+## 2. Carga obligatoria al iniciar
+Antes de proponer o ejecutar cambios, el agente debe cargar:
+- `docs/PLAN_MAESTRO_MONSTRUO.md`
+- `docs/PROYECTO_CONTEXTO.md`
+- `.agent/rules/monstruo-dev-reglas.md`
+- `docs/ESTANDARES.md`
+- `docs/.README.md`
+- `.README.md` de cada carpeta que vaya a tocar (allowlist local)
+
+Frase de control recomendada:
+`Contexto cargado: Plan + Contexto + Reglas DEV + Estandares + Allowlists`.
+
+---
+
+## 3. Separacion DEV/PROD (no negociable)
+| Campo | DEV | PROD |
+|---|---|---|
+| Rama base | `dev` | `main` |
+| Ruta servidor | `/srv/monstruo_dev` | `/srv/monstruo` |
+| Env file | `.env.server.dev` | `.env.server` |
+| Compose project | `monstruo_dev` | `monstruo` |
+| Stack visible | `monstruo-dev` | `monstruo` |
+| Puerto API interno | `9001` | `9000` |
+
+Reglas duras:
+- Prohibido mezclar `project` (`monstruo-dev` vs `monstruo_dev`).
+- Prohibido usar env de PROD en tareas DEV.
+- Prohibido desplegar a `main` sin autorizacion explicita del usuario.
+
+---
+
+## 4. Comandos de referencia vigentes
+- Root: `{project_root}`
+- Regenerar prompt universal:
+```bash
+python3 ops/herramientas/deploy/generate_universal_prompt.py
+```
+- Verificar estructura:
+```bash
+python3 ops/herramientas/deploy/verify_structure.py --root {project_root}
+```
 """
 
-    with open(OUT_FILE, "w", encoding="utf-8") as f:
-        f.write(universal_prompt.strip())
-    
-    print(f"✅ Prompt Universal generado en: {OUT_FILE}")
+
+def main() -> None:
+    if not CTX_FILE.exists():
+        raise SystemExit(f"Error: no existe {CTX_FILE}")
+
+    ctx_content = CTX_FILE.read_text(encoding="utf-8", errors="replace")
+    prompt = build_prompt(PROJECT_ROOT, latest_hito(ctx_content))
+
+    OUT_FILE.write_text(prompt.strip() + "\n", encoding="utf-8")
+    print(f"Prompt universal generado en: {OUT_FILE}")
+
 
 if __name__ == "__main__":
     main()

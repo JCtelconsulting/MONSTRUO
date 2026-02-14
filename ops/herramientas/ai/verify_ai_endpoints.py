@@ -4,9 +4,11 @@ import sqlite3
 import json
 import sys
 import os
+from pathlib import Path
 
-BASE_URL = "http://127.0.0.1:9000"
-DB_PATH = "/srv/monstruo_dev/data/db/monstruo.db"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+BASE_URL = os.getenv("VERIFY_BASE_URL", "http://127.0.0.1:9000")
+DB_PATH = os.getenv("VERIFY_DB_PATH", str(PROJECT_ROOT / "data/db/monstruo.db"))
 
 def get_db_conn():
     return sqlite3.connect(DB_PATH)

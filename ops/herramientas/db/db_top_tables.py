@@ -1,7 +1,9 @@
 import sqlite3
 import os
+from pathlib import Path
 
-DB_PATH = "/srv/monstruo_dev/data/db/monstruo.db"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DB_PATH = os.getenv("DB_TOP_TABLES_PATH", str(PROJECT_ROOT / "data/db/monstruo.db"))
 
 def main():
     if not os.path.exists(DB_PATH):

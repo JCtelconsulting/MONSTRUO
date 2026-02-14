@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/srv/monstruo
+WorkingDirectory=/srv/monstruo_dev
 Environment=PYTHONUNBUFFERED=1
-EnvironmentFile=-/srv/monstruo_dev/ops/guardian/entorno_guardian.env
-ExecStart=/srv/monstruo_dev/venv/bin/python /srv/monstruo_dev/ops/guardian/enviar_a_ia_local.py --config /srv/monstruo_dev/ops/guardian/configuracion_guardian.json --once --limite 10 --timeout 3
+EnvironmentFile=-/srv/monstruo_dev/ops/guardian/config/entorno_guardian.env
+ExecStart=/usr/bin/python3 /srv/monstruo_dev/ops/guardian/scripts/enviar_a_ia_local.py --config /srv/monstruo_dev/ops/guardian/config/configuracion_guardian.json --once --limite 10 --timeout 3

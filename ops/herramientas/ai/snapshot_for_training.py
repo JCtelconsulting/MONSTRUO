@@ -2,12 +2,16 @@ import os
 import re
 import json
 from datetime import datetime
+from pathlib import Path
 
 # CONFIGURACIÓN
-PROJECT_ROOT = "/srv/monstruo"
+PROJECT_ROOT = os.environ.get(
+    "PROJECT_ROOT",
+    str(Path(__file__).resolve().parents[3]),
+)
 CTX_FILE = os.path.join(PROJECT_ROOT, "docs/PROYECTO_CONTEXTO.md")
 UNIVERSAL_PROMPT_FILE = os.path.join(PROJECT_ROOT, "docs/PROMPT_CHAT_UNIVERSAL.md")
-AI_REPO = "/srv/inteligencia_artificial"
+AI_REPO = os.environ.get("AI_REPO", "/srv/inteligencia_artificial")
 DATASET_FILE = os.path.join(AI_REPO, "datos/fine_tuning/global_dataset.jsonl")
 PROMPTS_HISTORY_DIR = os.path.join(AI_REPO, "prompts/history")
 
@@ -54,15 +58,17 @@ def main():
     # Por ahora, capturamos la INTENCIÓN y el RESULTADO descritos.
 
     # 4. Guardar en Dataset Central
+    os.makedirs(os.path.dirname(DATASET_FILE), exist_ok=True)
     with open(DATASET_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(training_entry, ensure_ascii=False) + "\n")
-    print(f"💾 Guardado en Dataset: {DATASET_FILE}")
+    print(f"Guardado en Dataset: {DATASET_FILE}")
 
     # 5. Snapshot del Prompt Universal (Contexto del momento)
     if os.path.exists(UNIVERSAL_PROMPT_FILE):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         snapshot_name = f"PROMPT_MONSTRUO_{timestamp}_{topic.replace(' ', '_')}.md"
         snapshot_path = os.path.join(PROMPTS_HISTORY_DIR, snapshot_name)
+        os.makedirs(PROMPTS_HISTORY_DIR, exist_ok=True)
         
         with open(UNIVERSAL_PROMPT_FILE, "r", encoding="utf-8") as src:
             prompt_content = src.read()
@@ -70,9 +76,9 @@ def main():
         with open(snapshot_path, "w", encoding="utf-8") as dst:
             dst.write(prompt_content)
             
-        print(f"📸 Snapshot de Contexto: {snapshot_path}")
+        print(f"Snapshot de contexto: {snapshot_path}")
     else:
-        print("⚠️ No se encontró PROMPT_CHAT_UNIVERSAL.md para snapshot.")
+        print("No se encontro PROMPT_CHAT_UNIVERSAL.md para snapshot.")
 
 if __name__ == "__main__":
     main()

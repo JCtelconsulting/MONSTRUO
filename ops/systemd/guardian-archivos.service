@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/srv/monstruo
+WorkingDirectory=/srv/monstruo_dev
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/srv/monstruo_dev/venv/bin/python /srv/monstruo_dev/ops/guardian/vigilante_archivos.py --config /srv/monstruo_dev/ops/guardian/configuracion_guardian.json
+ExecStart=/usr/bin/python3 /srv/monstruo_dev/ops/guardian/scripts/vigilante_archivos.py --config /srv/monstruo_dev/ops/guardian/config/configuracion_guardian.json
 Restart=always
 RestartSec=2
 

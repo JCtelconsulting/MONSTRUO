@@ -9,6 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CONFIG = PROJECT_ROOT / "ops/guardian/config/configuracion_guardian.json"
+DEFAULT_DB = PROJECT_ROOT / "ops/guardian/guardian.sqlite"
+DEFAULT_BACKUPS = PROJECT_ROOT / "backups"
+
 def ahora_utc_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -69,15 +74,15 @@ def iterar_archivos(base: Path, excluir_dirs: Set[str]) -> List[Path]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="/srv/monstruo_dev/ops/guardian/configuracion_guardian.json")
-    ap.add_argument("--db", default="/srv/monstruo_dev/ops/guardian/guardian.sqlite")
+    ap.add_argument("--config", default=str(DEFAULT_CONFIG))
+    ap.add_argument("--db", default=str(DEFAULT_DB))
     ap.add_argument("--salida", required=True)
     args = ap.parse_args()
 
     cfg = cargar_json(args.config)
     rutas = cfg.get("rutas", {})
-    raiz = Path(rutas.get("raiz_proyecto", "/srv/monstruo"))
-    backups_root = Path(rutas.get("carpeta_backups", "/srv/monstruo_dev/backups"))
+    raiz = Path(rutas.get("raiz_proyecto", str(PROJECT_ROOT)))
+    backups_root = Path(rutas.get("carpeta_backups", str(DEFAULT_BACKUPS)))
 
     vig = cfg.get("vigilante_archivos", {}) or {}
     excluir = set(vig.get("excluir_subrutas", ["backups", "venv", ".git", "__pycache__"]))

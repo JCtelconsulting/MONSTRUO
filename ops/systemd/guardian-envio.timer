@@ -6,7 +6,7 @@ OnBootSec=15s
 OnUnitActiveSec=10s
 AccuracySec=1s
 Persistent=true
-Unit=monstruo-guardian-envio.service
+Unit=guardian-envio.service
 
 [Install]
 WantedBy=timers.target
