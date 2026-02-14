@@ -1,12 +1,9 @@
 import sys
-import os
 from pathlib import Path
 
-# Script location: /srv/monstruo_dev/code/scripts/fix_pmo_db.py
-# We need to add /srv/monstruo_dev/code to path to import 'app'
-# This is parent directory of 'scripts'
-CODE_DIR = Path(__file__).resolve().parent.parent
-sys.path.append(str(CODE_DIR))
+CODE_DIR = Path(__file__).resolve().parents[2]
+if str(CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_DIR))
 
 from app.core import db
 

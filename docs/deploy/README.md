@@ -52,8 +52,8 @@ Cuando tengas DNS:
 - `erp.telconsulting.cl` → `192.168.60.6`
 
 Usa las plantillas:
-- `docs/deploy/nginx/login.telconsulting.cl.conf`
-- `docs/deploy/nginx/erp.telconsulting.cl.conf`
+- `docs/deploy/nginx/login.telconsulting.cl.md`
+- `docs/deploy/nginx/erp.telconsulting.cl.md`
 
 Luego habilita TLS (ej con certbot) y recarga Nginx.
 
@@ -65,6 +65,27 @@ Este flujo corre tests en GitHub y despliega desde un runner self-hosted en la V
 El deploy está configurado por rama:
 - `main` -> `DEPLOY_ENV_FILE=/srv/monstruo/.env.server`
 - `dev` -> `DEPLOY_ENV_FILE=/srv/monstruo_dev/.env.server.dev`
+
+Matriz anti-cruce (obligatoria):
+- PROD:
+  - branch: `main`
+  - path: `/srv/monstruo`
+  - env: `.env.server`
+  - compose project: `monstruo`
+  - stack: `monstruo`
+  - puerto app: `9000`
+- DEV:
+  - branch: `dev`
+  - path: `/srv/monstruo_dev`
+  - env: `.env.server.dev`
+  - compose project: `monstruo_dev`
+  - stack: `monstruo-dev`
+  - puerto app: `9001`
+
+Regla dura:
+- Nunca reutilizar `project` cruzado entre entornos.
+- Nunca ejecutar deploy DEV con `.env.server` de PROD.
+- Nunca ejecutar deploy PROD con `.env.server.dev` de DEV.
 
 Metodo correcto (evita conflicto "container name already in use"):
 - Diferenciar `project` de Docker Compose vs `stack` (nombre visible del contenedor).

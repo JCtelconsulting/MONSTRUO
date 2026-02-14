@@ -74,6 +74,7 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-02-14: Gobernanza documental reforzada: `PROMPT_CHAT_UNIVERSAL.md` actualizado a versión vigente (bootstrap + matriz anti-cruce DEV/PROD + carga obligatoria de `ESTANDARES.md` y allowlists `.README.md`).
 - 2026-02-14: Ticketera: respuesta por correo desde detalle de ticket, con intento de mantener hilo (headers `In-Reply-To`/`References`) y registro de salida/entrada en historial.
 - 2026-02-14: Ticketera: control anti-duplicado de correos salientes por reintentos de UI (ventana de dedupe + marcador `outgoing_pending`).
 - 2026-02-14: Ticketera: formato de código actualizado a `TK-DD-MM-YYYY-NNNN` con compatibilidad de parser para formatos previos en correo entrante.
@@ -1234,7 +1235,7 @@ Te dejo un backlog por épicas. Cada épica está pensada para convertirse en mu
 2. **Unicidad:** No puede haber dos EPICs con el mismo número. Si se inserta uno nuevo, se desplazan los siguientes.
 3. **Correspondencia:** El número del EPIC en este Plan Maestro es la VERDAD. `task.md` y otros docs deben alinearse a este ID.
 
-EPIC 01 — Reorganización de Repositorio ✅ BACKEND COMPLETADO / ✅ FRONTEND COMPLETADO (2026-02-01)
+EPIC 01 — Reorganización de Repositorio ✅ BACKEND COMPLETADO / ✅ FRONTEND COMPLETADO / ✅ ORDEN CANÓNICO ACTUALIZADO (2026-02-14)
 
  Objetivo
 Que el repo sea navegable y la IA no "rompa cosas" por desorden.
@@ -1243,81 +1244,125 @@ Que el repo sea navegable y la IA no "rompa cosas" por desorden.
 
 Arquitectura de Carpetas
 
-**Reglas Generales:**
-- **Idioma:** Preferencia ESPAÑOL para carpetas funcionales (`integraciones`, `servicios`), salvo términos técnicos estándar (`api`, `core`, `utils`, `static`, `templates`)
-- **Nivel máximo:** Evitar anidación profunda (> 4 niveles)
-- **Código vs Operación:** Todo lo que es la aplicación viva va en `code/app`. Todo lo que es mantenimiento del servidor va en `ops/`
-- **🆕 FRONTEND MODULAR:** Cada pestaña/submódulo debe tener su propio `.html`, `.css`, `.js` en carpeta separada
-- **Nombres sin ambigüedad:** Si dos archivos tienen funciones distintas, deben tener nombres distintos (evitar duplicados como `dashboard.html` en módulos diferentes).
+**Reglas Generales (CANÓNICO 2026-02-14):**
+- **Idioma:** Preferencia ESPAÑOL para carpetas funcionales (`integraciones`, `servicios`, `procesos`), salvo términos técnicos estándar (`api`, `core`, `utils`, `static`, `scripts`).
+- **Nivel máximo:** Evitar anidación profunda (> 4 niveles) salvo frontend modular.
+- **Separación fuerte:** Runtime de app en `code/app`; procesos de negocio batch en `code/procesos`; utilidades manuales en `code/scripts`; operación de servidor en `ops/`.
+- **Raíz de `code` limpia:** Permitido solo directorios funcionales + `requirements.txt`. Prohibido `.py` sueltos.
+- **Frontend modular:** Cada módulo mantiene nombres únicos y explícitos (`pmo.html`, `dashboard.html`, etc.).
 
-**Árbol Oficial:**
+**Árbol Oficial (vigente):**
 
 ```text
 /srv/monstruo_dev/
 ├── code/
-│   ├── app/                 # [CORE] Backend FastAPI (CANÓNICO)
-│   │   ├── api/             # Routers y Pydantic Schemas
-│   │   ├── core/            # Configuración, DB connection (db.py), Security (deps.py)
-│   │   │   └── ai/          # Lógica interna IA, Políticas y Prompts
-│   │   ├── domain/          # Lógica de Negocio pura (Bodega, ERP, CRM)
-│   │   ├── integraciones/   # Connectors (Laudus, Parrotfy) y Pipelines
-│   │   ├── servicios/       # Servicios transversales (Email, PDF)
-│   │   ├── utils/           # Helpers genéricos
-│   │   └── main.py          # Entrypoint de la aplicación (uvicorn app.main:app)
-│   │
-│   ├── static/              # Frontend (MPA Component-Based)
-│   │   ├── modulos/         # Funcionalidades (cada una con css/, js/ internos)
-│   │   │   ├── _compartido/ # Recursos globales (CSS base, JS utils, Img)
-│   │   │   ├── login/, dashboard/, bodega/, ia/, zabbix/, ultron/
-│   │   │   ├── tks/, crm/, configuracion/, reportes/, conciliacion/, catalogo/
-│   │   │   └── erp/         # 🆕 ESTRUCTURA NUEVA (ver abajo)
-│   │   │       ├── facturacion/
-│   │   │       │   ├── facturacion.html
-│   │   │       │   ├── facturacion.css
-│   │   │       │   └── facturacion.js
-│   │   │       ├── conciliacion/
-│   │   │       │   ├── conciliacion.html
-│   │   │       │   ├── conciliacion.css
-│   │   │       │   └── conciliacion.js
-│   │   │       ├── cobranza/
-│   │   │       │   ├── cobranza.html
-│   │   │       │   ├── cobranza.css
-│   │   │       │   └── cobranza.js
-│   │   │       └── erp.html  # Shell principal que carga tabs
-│   │   ├── manifest.json    # [PWA] Identidad de App
-│   │   └── service-worker.js # [PWA] Motor Offline
-│   │
-│   ├── procesos/            # [NEGOCIO] Scripts de aplicación
-│   │   ├── integracion/     # Jobs de sincronización
-│   │   ├── mantenimiento/   # Fixes de datos
-│   │   └── ai/              # Workers IA (5 scripts)
-│   │
-│   └── venv/                # [ÚNICO] Virtual Environment (Python 3.12)
-│
-├── docs/                    # Documentación Oficial (Fuente de Verdad)
-│   ├── PLAN_MAESTRO_MONSTRUO, PROYECTO_CONTEXTO.md, ESTANDARES.md
-│   ├── PROMPT_CHAT_UNIVERSAL.md
-│   ├── apis/                # OpenAPI specs
-│   ├── demo/                # Escenarios, guiones, KPIs
-│   └── playbooks/           # Runbooks operativos
-│
-├── ops/                     # Operaciones de Sistema
-│   ├── systemd/             # Servicios systemd (8 archivos)
-│   ├── guardian/            # Sistema de monitoreo
-│   │   ├── scripts/         # Vigilantes y supervisores (5)
-│   │   ├── config/          # Configuraciones (2)
-│   │   ├── data/            # DB guardian.sqlite + estados
-│   │   └── reportes/
-│   └── herramientas/        # Utilidades operativas
-│       ├── db/              # Migraciones (5)
-│       ├── ai/              # Verify, snapshots (3)
-│       ├── dev/             # Debug, refine (4)
-│       └── deploy/          # Scripts deployment (4)
-│
-└── data/                    # Persistencia (Fuera del control de versión)
-    ├── db/                  # SQLite (monstruo.db)
-    ├── logs/                # Logs de aplicación
-    └── files/               # Archivos de usuario (Excel, CSV)
+│   ├── app/                         # Backend FastAPI (runtime principal)
+│   │   ├── api/
+│   │   │   ├── .README.md
+│   │   │   └── routers/             # Endpoints por módulo (admin, tks, crm, bodega, erp, pmo, zabbix, etc.)
+│   │   ├── core/
+│   │   │   ├── db.py, deps.py, security.py, middleware.py
+│   │   │   ├── tickets_service.py, jobs_engine.py, notifications.py
+│   │   │   └── ai/                  # Inicialización y bridge de IA
+│   │   ├── domain/                  # Dominio puro (catálogo y reglas de negocio)
+│   │   ├── integraciones/           # Adaptadores externos (Laudus, Parrotfy)
+│   │   ├── jobs/                    # Tareas programadas ligadas al backend
+│   │   ├── servicios/               # Servicios de negocio reutilizables
+│   │   ├── utils/                   # Helpers internos y compatibilidad legacy
+│   │   ├── workers/                 # Workers de soporte (ej: integrations_worker.py)
+│   │   ├── workflows/               # Motor de workflow y persistencia asociada
+│   │   ├── procesos/                # Proceso legado específico del backend
+│   │   ├── main.py                  # Entrypoint (uvicorn app.main:app)
+│   │   └── workflow_db_legacy.py
+│   ├── static/                      # Frontend modular
+│   │   ├── .README.md
+│   │   ├── index.html
+│   │   ├── manifest.json
+│   │   ├── service-worker.js
+│   │   └── modulos/
+│   │       ├── _compartido/         # Base CSS/JS global
+│   │       ├── login/
+│   │       ├── dashboard/
+│   │       ├── crm/
+│   │       ├── configuracion/
+│   │       ├── pmo/
+│   │       ├── tks/                 # css/, js/, tks.html
+│   │       ├── bodega/              # inventario/, catalogo/, pendientes/, analisis/, js/, css/
+│   │       ├── erp/                 # resumen/, facturacion/, conciliacion/, cobranza/, ciclos/, bancos/, clientes/, prefactura/, css/, erp.html
+│   │       ├── ultron/
+│   │       └── zabbix/
+│   ├── procesos/                    # Jobs batch de negocio (fuera del ciclo HTTP)
+│   │   ├── integracion/
+│   │   ├── mantenimiento/
+│   │   └── ai/
+│   ├── scripts/                     # Scripts manuales operativos (ordenados por propósito)
+│   │   ├── README.md
+│   │   ├── debug/
+│   │   ├── migrations/
+│   │   ├── maintenance/
+│   │   └── seed/
+│   ├── ops/                         # Artefactos operativos internos de code
+│   │   ├── docker/
+│   │   │   └── Dockerfile.api
+│   │   └── herramientas/
+│   │       └── dev/                 # verify_crm.py, verify_discrepancy.py
+│   ├── tools/
+│   │   └── ws-scrcpy/
+│   └── requirements.txt
+├── data/                            # Persistencia y archivos runtime de DEV
+│   ├── tickets/                     # Adjuntos de ticketera (runtime)
+│   │   └── <ticket_id>/
+│   │       └── attachments/
+│   │           └── <archivo_adjunto>
+│   └── cartola_sintetica.csv        # Fixture de pruebas/validación local
+├── docs/                            # Documentación oficial del proyecto
+│   ├── .README.md
+│   ├── PLAN_MAESTRO_MONSTRUO.md     # Guía maestra de construcción y prioridades
+│   ├── PROYECTO_CONTEXTO.md         # Contexto operativo y estado del proyecto
+│   ├── PROMPT_CHAT_UNIVERSAL.md     # Prompt base para agentes
+│   ├── ESTANDARES.md                # Estándares de implementación
+│   ├── estructura_repo.json
+│   ├── apis/                        # Contratos de APIs externas
+│   │   ├── laudus_openapi.json
+│   │   └── parrotfy_openapi.yaml
+│   ├── demo/                        # Material de demo y métricas
+│   │   ├── escenarios.md
+│   │   ├── guion_demo.md
+│   │   └── kpis.md
+│   ├── deploy/                      # Guías y plantillas de despliegue
+│   │   ├── README.md
+│   │   ├── nginx/
+│   │   │   ├── erp.telconsulting.cl.md
+│   │   │   └── login.telconsulting.cl.md
+│   │   └── plantillas_env/
+│   │       ├── README.md
+│   │       ├── env.base.example
+│   │       ├── env.local.example
+│   │       ├── env.server.dev.example
+│   │       └── env.server.example
+│   ├── ia/                          # Políticas y prompts de IA
+│   │   ├── politicas_central.json
+│   │   └── prompts/
+│   │       ├── admin_rules.txt
+│   │       ├── auto_resolve_rules.txt
+│   │       ├── categ_rules.txt
+│   │       ├── duplicates_rules.txt
+│   │       ├── global_context.txt
+│   │       └── instructor_rules.txt
+│   ├── playbooks/                   # Runbooks de incidentes/integraciones
+│   │   ├── generic.md
+│   │   ├── integration_parrotfy_payments_api_500.md
+│   │   └── parrotfy_missing_invoice.md
+│   ├── sql/
+│   │   └── pmo_v1.sql.txt
+│   └── windows/
+│       ├── install_shortcut.ps1.txt
+│       ├── monstruo_silent.vbs.txt
+│       └── monstruo_start.bat.txt
+├── ops/                             # Se detalla en fase siguiente
+├── tests/                           # Se detalla en fase siguiente
+├── docker-compose.yaml
+└── AGENTS.md
 ```
 
 ---
@@ -1329,12 +1374,10 @@ Arquitectura de Carpetas
 | **Backend** | `code/backend` | `code/app` | Estándar FastAPI |
 | **Integraciones** | `integrations` | `integraciones` | Consistencia español |
 | **Procesos** | Mezclado con ops | `code/procesos` separado | Lógica negocio vs infraestructura |
-| **Políticas IA** | Dispersas | `code/app/core/ai` | Centralización |
-| **Frontend** | Archivos sueltos | `static/modulos/` | Component-Based |
-| **🆕 Pestañas ERP** | Todo en 1 HTML | Carpetas separadas | Reducir blast radius |
-| **Docs** | 15 archivos | 4 principales + 3 carpetas | Consolidación |
-| **Ops** | Mezclado | `systemd/`, `guardian/`, `herramientas/` | Categorización |
-| **Raíz** | 9 archivos sueltos | Solo config + 4 carpetas | Limpieza |
+| **Scripts manuales** | `.py` sueltos en `code/` y `code/scripts/` | `code/scripts/{debug,migrations,maintenance,seed}` | Menor riesgo operativo y mayor mantenibilidad |
+| **Frontend** | Archivos sueltos por módulo | `static/modulos/` por contexto | Component-Based y cambios aislados |
+| **Docker app** | `code/docker/` | `code/ops/docker/` | Agrupar artefactos operativos dentro de `code/ops` |
+| **Raíz de `code`** | Scripts mezclados con runtime | Solo carpetas funcionales + `requirements.txt` | Navegación y auditoría rápida |
 | **Auth** | Session opaca (DB) | **JWT Stateless** | Escalabilidad/Seguridad (EPIC 02) |
 
 ---
@@ -1347,10 +1390,12 @@ Arquitectura de Carpetas
 - [x] Consolidación `data/` (backups rotativos, eliminado cache/import)
 - [x] Limpieza `docs/` (12 archivos eliminados, estándares unificados)
 - [x] Reorganización `ops/` (systemd, guardian, herramientas categorizados)
-- [x] Limpieza raíz (solo config + 4 carpetas principales)
+- [x] Limpieza raíz de `code` (sin `.py` sueltos; solo directorios funcionales + `requirements.txt`)
 - [x] Implementación **Manifiestos Estrictos** (`.README.md` con allowlists)
 - [x] Script de auditoría (`ops/herramientas/deploy/verify_structure.py`)
 - [x] Renombre scripts a Español (`trabajador_asistente_ia.py`, etc.)
+- [x] Estandarización de scripts operativos en `code/scripts/{debug,migrations,maintenance,seed}`
+- [x] Eliminación de artefactos runtime versionados (`code/server.log`)
 
 ---
 
@@ -1402,6 +1447,18 @@ Arquitectura de Carpetas
 ✅ **Estructura verificada** - `verify_structure.py` reporta OK  
 ✅ **Frontend modular** - Cada pestaña en carpeta propia (html+css+js)
 ✅ **Cambios aislados** - Modificar 1 pestaña no afecta otras
+✅ **Code limpio** - No existen scripts `.py` sueltos en `code/`
+✅ **Scripts ordenados** - Todo script manual está en `code/scripts/*` según tipo
+
+### Verificación Rápida de Orden (operativo)
+
+```bash
+# Debe salir VACÍO (sin .py sueltos en code/)
+find code -maxdepth 1 -type f -name '*.py'
+
+# Debe listar solo categorías válidas bajo code/scripts
+find code/scripts -maxdepth 2 -type f | sort
+```
   
 
 ---

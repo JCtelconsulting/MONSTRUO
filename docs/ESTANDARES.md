@@ -37,7 +37,7 @@ Los contextos de LLM se degradan con el tiempo. Para mitigar esto, usamos **Rele
 3. **Cambio de Fase:** Al terminar un módulo grande
 
 **¿Cómo Rotar?**
-1. En el Chat Viejo: Actualizar `docs/PROYECTO_CONTEXTO.md` y ejecutar `python3 ops/herramientas/generate_universal_prompt.py`
+1. En el Chat Viejo: Actualizar `docs/PROYECTO_CONTEXTO.md` y ejecutar `python3 ops/herramientas/deploy/generate_universal_prompt.py`
 2. En el Chat Nuevo: Pegar contenido de `docs/PROMPT_CHAT_UNIVERSAL.md`
 
 ### Reglas de Seguridad & Operación
@@ -131,7 +131,7 @@ Los contextos de LLM se degradan con el tiempo. Para mitigar esto, usamos **Rele
 ### Estructura de Proyecto Estándar
 Cualquier nuevo proyecto debe tener al menos:
 - `/srv/[proyecto]/docs/PROYECTO_CONTEXTO.md` (Bitácora)
-- `/srv/[proyecto]/ops/herramientas/generate_universal_prompt.py` (Script Relevo)
+- `/srv/[proyecto]/ops/herramientas/deploy/generate_universal_prompt.py` (Script Relevo)
 
 ### Actualización de Estándares
 Cuando se necesite agregar nuevo término o política:

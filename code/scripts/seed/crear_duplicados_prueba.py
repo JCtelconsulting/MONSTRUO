@@ -1,9 +1,9 @@
 import sys
-import os
-import json
+from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, "/srv/monstruo_dev/code")
+CODE_DIR = Path(__file__).resolve().parents[2]
+if str(CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_DIR))
 
 from app.core import db
 

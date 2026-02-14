@@ -1,10 +1,9 @@
-
 import sys
-import os
 from pathlib import Path
 
-# Add project root to path
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+CODE_DIR = Path(__file__).resolve().parents[2]
+if str(CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_DIR))
 
 from app.core import db, auth_service
 

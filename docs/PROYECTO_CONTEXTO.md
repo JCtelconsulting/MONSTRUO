@@ -2,6 +2,17 @@
 **Fecha de actualizacion:** 14 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-14 19:40 - Hardening documental anti-cruce DEV/PROD
+- **Solicitud**: Actualizar Prompt Universal y reforzar reglas para evitar mezcla entre DEV y PROD.
+- **Entregable**:
+  - `docs/PROMPT_CHAT_UNIVERSAL.md` reescrito como bootstrap vigente (orden de autoridad, carga obligatoria de `ESTANDARES.md`, uso obligatorio de allowlists `.README.md`, matriz DEV/PROD y checklist anti-cruce).
+  - `docs/ESTANDARES.md` corregido con ruta real del generador de prompt:
+    - `ops/herramientas/deploy/generate_universal_prompt.py`
+  - `docs/deploy/README.md` corregido para usar nombres reales de plantillas Nginx (`.md`).
+  - `docs/.README.md` actualizado para reflejar allowlist vigente (`deploy/`, `ia/`, `sql/`, `windows/`) y nombre correcto `PLAN_MAESTRO_MONSTRUO.md`.
+  - Permisos de documentación normalizados (sin bit ejecutable en `.md`).
+- **Estado**: CERRADO.
+
 ## HITO: 2026-02-14 17:10 - Desambiguación de nombres (PMO/routers/wrappers legacy)
 - **Solicitud**: Evitar archivos con el mismo nombre cuando representan funciones distintas.
 - **Entregable**:
