@@ -1,126 +1,124 @@
-import requests
-import time
-import os
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
 import sys
+import time
+from pathlib import Path
 
-# Configuration
-API_URL = "http://localhost:9001/api"
-COOKIES = {}
-USERNAME = "juan.lopez@telconsulting.cl"
-PASSWORD = "Monstruo2024!"
+THIS_DIR = Path(__file__).resolve().parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(THIS_DIR))
 
-def login():
-    global COOKIES
-    print("[1] Logging in...")
-    resp = requests.post(f"{API_URL}/auth/login", json={"email": USERNAME, "password": PASSWORD})
-    if resp.status_code != 200:
-        print(f"FAILED LOGIN: {resp.text}")
-        sys.exit(1)
-    # The API sets cookies. We need to capture them.
-    # Actually, the response returns {access_token: ...} but requests Session can also handle cookies.
-    # Let's use a Session object generally.
-    return resp.json()
+from _helpers import as_json, build_session, env_str, guard_prod_target, require_credentials
 
-session = requests.Session()
 
-def run_test():
-    # 1. Login
-    login_resp = login()
-    token = login_resp["token"]
-    # Manually set cookie if not automatically handled, though Session should. 
-    # But API expects cookie 'access_token' mainly.
-    session.cookies.set("access_token", token)
-    print(f"[OK] Logged in as {login_resp['name']}")
+def parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(description="E2E API full smoke")
+    ap.add_argument(
+        "--base-url",
+        default=env_str("MONSTRUO_TEST_BASE_URL", "http://127.0.0.1:9001"),
+        help="URL base del API, ejemplo: http://127.0.0.1:9001",
+    )
+    ap.add_argument("--user", default=env_str("MONSTRUO_TEST_USER"))
+    ap.add_argument("--password", default=env_str("MONSTRUO_TEST_PASSWORD"))
+    ap.add_argument("--timeout", type=int, default=int(env_str("MONSTRUO_TEST_TIMEOUT", "15") or "15"))
+    ap.add_argument("--allow-prod", action="store_true", help="Permite ejecutar si la URL parece PROD")
+    return ap.parse_args()
 
-    # 2. Create Ticket
-    print("\n[2] Creating Ticket...")
-    ticket_data = {
-        "titulo": "E2E Test Attachments & Dedupe",
-        "descripcion": "Probando flujo completo con adjuntos y deduplicación.",
-        "tipo": "incidencia",
-        "severidad": "media",
-        "origen_email": "cliente.e2e@example.com",
-        "cliente_nombre": "Cliente E2E"
-    }
-    resp = session.post(f"{API_URL}/tks/tickets", json=ticket_data)
-    if resp.status_code != 200:
-        print(f"FAILED CREATE TICKET: {resp.text}")
-        sys.exit(1)
-    
-    ticket = resp.json()
-    ticket_id = ticket["id"]
-    print(f"[OK] Ticket Created: #{ticket_id} {ticket['codigo']}")
 
-    # 3. Reply with Attachment
-    print("\n[3] Replying with Attachment...")
-    # Create dummy file
-    with open("test_attachment.txt", "w") as f:
-        f.write("Este es un archivo de prueba para el E2E.")
-    
-    with open("test_attachment.txt", "rb") as f:
-        files = {'files': ('test_attachment.txt', f, 'text/plain')}
-        data = {'mensaje': 'Hola, adjunto archivo de prueba.', 'asunto': 'Re: Prueba E2E'}
-        resp = session.post(f"{API_URL}/tks/tickets/{ticket_id}/reply-email", files=files, data=data)
-    
-    if resp.status_code != 200:
-        print(f"FAILED REPLY TICKET: {resp.text}")
-        sys.exit(1)
-    
-    print(f"[OK] Reply Sent: {resp.json()}")
+def fail(message: str) -> int:
+    print(f"[FAIL] {message}")
+    return 1
 
-    # 4. Test Dedupe (Resend same request)
-    print("\n[4] Testing Dedupe (Resending same reply)...")
-    time.sleep(1) # Ensure we are within the dedupe window (3 mins)
-    with open("test_attachment.txt", "rb") as f:
-        files = {'files': ('test_attachment.txt', f, 'text/plain')}
-        data = {'mensaje': 'Hola, adjunto archivo de prueba.', 'asunto': 'Re: Prueba E2E'}
-        resp = session.post(f"{API_URL}/tks/tickets/{ticket_id}/reply-email", files=files, data=data)
-    
-    if resp.status_code != 200:
-        print(f"FAILED DEDUPE REQUEST: {resp.text}")
-        sys.exit(1)
-    
-    result = resp.json()
-    if result.get("duplicate_skipped") is True:
-        print(f"[OK] Dedupe worked: {result['message']}")
-    else:
-        print(f"[FAIL] Dedupe NOT triggered: {result}")
-        sys.exit(1)
 
-    # 5. Verify Email History & Attachments
-    print("\n[5] Verifying Email History...")
-    resp = session.get(f"{API_URL}/tks/tickets/{ticket_id}/emails")
-    if resp.status_code != 200:
-        print(f"FAILED GET EMAILS: {resp.text}")
-        sys.exit(1)
-    
-    emails = resp.json()["items"]
-    # We expect at least:
-    # 1. Incoming (if auto-created? No, we created via API manual)
-    # Wait, we created via API, so no initial email log unless generic.
-    # We sent 1 reply. So at least 1 outgoing.
-    
-    found_outgoing = False
-    for email in emails:
-        if email["direction"] == "outgoing" and "test_attachment.txt" in email["attachments_json"]:
-            print(f"[OK] Found outgoing email with attachment: {email['attachments_json']}")
-            found_outgoing = True
-            break
-    
-    if not found_outgoing:
-        print(f"[FAIL] Outgoing email with attachment NOT found in history. History: {emails}")
-        sys.exit(1)
+def ensure_200(label: str, status_code: int, body: str) -> None:
+    if status_code != 200:
+        raise RuntimeError(f"{label}: HTTP {status_code} -> {body}")
 
-    # 6. Verify File on Disk (Remote check via docker exec usually, but here we can check if running locally or trust API)
-    # Since we are running outside container but mounting /srv/monstruo/data, let's check config path.
-    # We set TICKET_ATTACHMENTS_DIR = "/srv/monstruo/data/tickets" in config.py
-    # If we are running this script from the host, and the app is in docker mounting /srv/monstruo, it should be visible.
-    
-    print("\n[6] Cleanup...")
-    if os.path.exists("test_attachment.txt"):
-        os.remove("test_attachment.txt")
-    
-    print("\n=== E2E SUCCESS ===")
+
+def main() -> int:
+    args = parse_args()
+    base_url = args.base_url.rstrip("/")
+    try:
+        guard_prod_target(base_url, allow_prod=args.allow_prod)
+        require_credentials(args.user, args.password)
+        auth = build_session(base_url, args.user, args.password, timeout=args.timeout)
+    except Exception as exc:
+        return fail(str(exc))
+
+    session = auth["session"]
+    print(f"[OK] Login: {auth['login'].get('name', args.user)}")
+
+    try:
+        who = session.get(f"{base_url}/api/auth/whoami", timeout=args.timeout)
+        ensure_200("whoami", who.status_code, who.text)
+        who_data = as_json(who)
+        if not who_data.get("logged"):
+            return fail(f"Sesion no activa: {who_data}")
+        print("[OK] whoami")
+
+        ticket_payload = {
+            "titulo": f"E2E API Full {int(time.time())}",
+            "descripcion": "Smoke E2E API completa",
+            "tipo": "incidencia",
+            "severidad": "media",
+            "categoria": "sistemas",
+        }
+        create = session.post(f"{base_url}/api/tks/tickets", json=ticket_payload, timeout=args.timeout)
+        ensure_200("Crear ticket", create.status_code, create.text)
+        ticket = as_json(create)
+        ticket_id = ticket["id"]
+        ticket_code = ticket.get("codigo")
+        print(f"[OK] Ticket creado: {ticket_code} (id={ticket_id})")
+
+        detail = session.get(f"{base_url}/api/tks/tickets/{ticket_id}", timeout=args.timeout)
+        ensure_200("Detalle ticket", detail.status_code, detail.text)
+        print("[OK] Detalle ticket")
+
+        add_event = session.post(
+            f"{base_url}/api/tks/tickets/{ticket_id}/eventos",
+            json={"evento": "comentario", "detalle": "Comentario E2E API full"},
+            timeout=args.timeout,
+        )
+        ensure_200("Agregar evento", add_event.status_code, add_event.text)
+        print("[OK] Evento agregado")
+
+        timeline = session.get(f"{base_url}/api/tks/tickets/{ticket_id}/eventos", timeout=args.timeout)
+        ensure_200("Timeline", timeline.status_code, timeline.text)
+        timeline_items = as_json(timeline).get("items", [])
+        if not timeline_items:
+            return fail("Timeline vacio")
+        print(f"[OK] Timeline con {len(timeline_items)} eventos")
+
+        patch = session.patch(
+            f"{base_url}/api/tks/tickets/{ticket_id}",
+            json={"estado": "en_progreso"},
+            timeout=args.timeout,
+        )
+        ensure_200("Actualizar ticket", patch.status_code, patch.text)
+        print("[OK] Estado actualizado a en_progreso")
+
+        stats = session.get(f"{base_url}/api/tks/stats", timeout=args.timeout)
+        ensure_200("Stats", stats.status_code, stats.text)
+        print("[OK] Stats")
+
+        listing = session.get(
+            f"{base_url}/api/tks/tickets",
+            params={"q": ticket_code, "limit": 20},
+            timeout=args.timeout,
+        )
+        ensure_200("Listado", listing.status_code, listing.text)
+        items = as_json(listing).get("items", [])
+        if not any(int(row.get("id", -1)) == int(ticket_id) for row in items):
+            return fail(f"Ticket {ticket_id} no encontrado en listado filtrado")
+        print("[OK] Listado filtrado")
+
+        print("[SUCCESS] E2E API full PASS")
+        return 0
+    except Exception as exc:
+        return fail(str(exc))
+
 
 if __name__ == "__main__":
-    run_test()
+    raise SystemExit(main())

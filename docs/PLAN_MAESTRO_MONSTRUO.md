@@ -1376,7 +1376,7 @@ Arquitectura de Carpetas
 │   │   │   └── configuracion_guardian.json
 │   │   ├── estado_supervisor.json
 │   │   ├── reportes/
-│   │   │   └── reporte_nombres_prohibidos__2026-01-27__172848.json
+│   │   │   └── .gitkeep
 │   │   └── scripts/
 │   │       ├── enviar_a_ia_local.py
 │   │       ├── install_hooks.sh
@@ -1446,7 +1446,12 @@ Arquitectura de Carpetas
 │       ├── guardian-limpieza.timer
 │       ├── guardian-registros.service
 │       └── guardian-supervisor.service
-├── tests/                           # Se detalla en fase siguiente
+├── tests/                           # Validacion E2E y hardening operativo
+│   ├── .README.md
+│   ├── _helpers.py
+│   ├── e2e_api_full.py
+│   ├── e2e_ticketera.py
+│   └── verify_hardening.py
 ├── docker-compose.yaml
 └── AGENTS.md
 ```
@@ -1482,6 +1487,7 @@ Arquitectura de Carpetas
 - [x] Renombre scripts a Español (`trabajador_asistente_ia.py`, etc.)
 - [x] Estandarización de scripts operativos en `code/scripts/{debug,migrations,maintenance,seed}`
 - [x] Eliminación de artefactos runtime versionados (`code/server.log`)
+- [x] Profesionalización de `tests/` (helper común, credenciales por ENV, guardas anti-PROD y `.README.md` con allowlist)
 
 ---
 
@@ -1887,6 +1893,7 @@ Tareas:
 - [ ] Historial de correos completo en detalle (entrada/salida con payload legible)
 - [ ] Worker real para escalamiento WhatsApp/3CX (hoy se agenda en DB, falta ejecutor de canal)
 - [ ] Auto-respuesta configurable de recepción de correo (actualmente desactivada)
+- [x] Baseline de pruebas E2E profesionalizadas (`tests/e2e_ticketera.py`, `tests/e2e_api_full.py`, `tests/verify_hardening.py`)
 - [ ] Suite de tests E2E ticketera (`create -> reply -> dedupe -> incoming thread match`)
 - [ ] Checklist técnico anti-cruce DEV/PROD para Ticketera (SMTP, base URL, credenciales y jobs)
 
