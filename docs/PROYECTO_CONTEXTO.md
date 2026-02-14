@@ -2,6 +2,16 @@
 **Fecha de actualizacion:** 14 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-14 19:05 - Gobernanza de Agentes DEV + Prioridad EPIC 11
+- **Solicitud**: Subir Plan Maestro actualizado y formalizar reglas de agentes para entorno DEV, dejando obligatorio el uso de `monstruo-dev-reglas.md`.
+- **Entregable**:
+  - Agregado `AGENTS.md` en la raiz para obligar bootstrap de reglas en agentes compatibles.
+  - Creado archivo canonico: `.agent/rules/monstruo-dev-reglas.md`.
+  - Archivo legado convertido a puente: `.agent/rules/monstruo-reglas.md` (deprecado, redirige al nuevo).
+  - Plan Maestro actualizado con seccion de gobernanza obligatoria para agentes (`0.7`) y prioridad de EPIC 11 para reemplazo de mesa externa.
+  - Criterio explicito: no se abre desarrollo neto de EPIC 12+ hasta cerrar EPIC 11 con Go/No-Go profesional.
+- **Estado**: CERRADO.
+
 ## HITO: 2026-02-14 18:05 - Fix CI/CD Deploy DEV (tests OK, deploy fail)
 - **Incidente**: GitHub Actions mostraba `tests` OK pero `deploy` fallaba en rama `dev`.
 - **Causa raiz**: Drift entre `project` de Docker Compose (`monstruo-dev` vs `monstruo_dev`) con `container_name` fijo; Compose detectaba conflicto de ownership y abortaba con "container name already in use".
