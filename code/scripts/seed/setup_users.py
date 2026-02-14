@@ -7,15 +7,27 @@ if str(CODE_DIR) not in sys.path:
 
 from app.core import db, auth_service
 
+import os
+
 def setup_users():
     print("--- Seeding Users ---")
     
+    # Obtener contraseñas de variables de entorno (FAIL-FAST)
+    pass_redes = os.getenv("SEED_PASS_REDES")
+    pass_sistemas = os.getenv("SEED_PASS_SISTEMAS")
+    pass_implementaciones = os.getenv("SEED_PASS_IMPLEMENTACIONES")
+    pass_admin = os.getenv("SEED_PASS_ADMIN")
+    
+    if not all([pass_redes, pass_sistemas, pass_implementaciones, pass_admin]):
+        print("ERROR: Faltan variables de entorno para contraseñas (SEED_PASS_*).")
+        sys.exit(1)
+
     users_to_create = [
         # (username, password, role)
-        ("fabian.correa@telconsulting.cl", "Telco2024!", "redes"),
-        ("lukas.moyano@telconsulting.cl", "Telco2024!", "sistemas"),
-        ("juan.hormazabal@telconsulting.cl", "Telco2024!", "implementaciones"),
-        ("juan.lopez@telconsulting.cl", "Monstruo2024!", "admin"),
+        ("fabian.correa@telconsulting.cl", pass_redes, "redes"),
+        ("lukas.moyano@telconsulting.cl", pass_sistemas, "sistemas"),
+        ("juan.hormazabal@telconsulting.cl", pass_implementaciones, "implementaciones"),
+        ("juan.lopez@telconsulting.cl", pass_admin, "admin"),
     ]
 
     conn = db.get_conn()
