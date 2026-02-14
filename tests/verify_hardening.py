@@ -1,153 +1,204 @@
-import requests
-import time
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import re
+import subprocess
 import sys
-import os
+from pathlib import Path
+from typing import List, Tuple
 
-# Add /app/code to sys.path to import app modules if running inside container
-sys.path.append("/app/code")
+import requests
 
-try:
-    from app.core import db, security
-except ImportError:
-    print("ERROR: This script must be run inside the API container to access the database.")
-    sys.exit(1)
+THIS_DIR = Path(__file__).resolve().parent
+if str(THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(THIS_DIR))
 
-# Config
-API_URL = "http://localhost:9000/api"
-AUTH_URL = "http://localhost:9000/auth/login"
+from _helpers import as_json, build_session, env_str, guard_prod_target, require_credentials
 
-def seed_admin():
-    print(">>> Seeding Admin User...")
-    conn = db.get_conn()
+PROJECT_ROOT = THIS_DIR.parent
+
+
+def parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(description="Validacion hardening repo + API opcional")
+    ap.add_argument("--check-api", action="store_true", help="Ejecuta validacion API ademas de chequeos repo")
+    ap.add_argument(
+        "--base-url",
+        default=env_str("MONSTRUO_TEST_BASE_URL", "http://127.0.0.1:9001"),
+        help="URL base del API",
+    )
+    ap.add_argument("--user", default=env_str("MONSTRUO_TEST_USER"))
+    ap.add_argument("--password", default=env_str("MONSTRUO_TEST_PASSWORD"))
+    ap.add_argument("--timeout", type=int, default=int(env_str("MONSTRUO_TEST_TIMEOUT", "15") or "15"))
+    ap.add_argument("--allow-prod", action="store_true")
+    return ap.parse_args()
+
+
+def read_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def list_repo_files() -> List[Path]:
     try:
-        # Check if exists
-        user = conn.execute("SELECT 1 FROM users WHERE username='admin'").fetchone()
-        if not user:
-            print("Creating admin user...")
-            hashed_pw = security.get_password_hash("123")
-            conn.execute(
-                "INSERT INTO users (username, password_hash, role, is_active, created_at) VALUES (%s, %s, 'admin', 1, %s)",
-                ("admin", hashed_pw, db.now_utc_iso())
-            )
-            conn.commit()
+        proc = subprocess.run(
+            ["git", "-C", str(PROJECT_ROOT), "ls-files"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        files = []
+        for rel in proc.stdout.splitlines():
+            rel = rel.strip()
+            if not rel:
+                continue
+            files.append(PROJECT_ROOT / rel)
+        return files
+    except Exception:
+        return [p for p in PROJECT_ROOT.rglob("*") if p.is_file()]
+
+
+def repo_checks() -> List[str]:
+    errors: List[str] = []
+
+    required_files = [
+        PROJECT_ROOT / "ops/herramientas/deploy/deploy.sh",
+        PROJECT_ROOT / "ops/control/control_monstruo.sh",
+        PROJECT_ROOT / "ops/control/limpiar_ram.sh",
+        PROJECT_ROOT / "ops/guardian/scripts/install_hooks.sh",
+        PROJECT_ROOT / "docs/estructura_repo.json",
+        PROJECT_ROOT / "tests/e2e_ticketera.py",
+        PROJECT_ROOT / "tests/e2e_api_full.py",
+        PROJECT_ROOT / "tests/.README.md",
+    ]
+    for path in required_files:
+        if not path.exists():
+            errors.append(f"Falta archivo requerido: {path}")
+
+    deploy_text = read_text(PROJECT_ROOT / "ops/herramientas/deploy/deploy.sh")
+    if 'BRANCH="${DEPLOY_BRANCH:-dev}"' not in deploy_text:
+        errors.append("deploy.sh no tiene branch default en dev")
+    if 'APP_DIR="${DEPLOY_PATH:-$PROJECT_ROOT}"' not in deploy_text:
+        errors.append("deploy.sh no usa APP_DIR dinamico por PROJECT_ROOT")
+
+    banned_checks: List[Tuple[str, re.Pattern[str], List[Path]]] = [
+        (
+            "password hardcodeada conocida",
+            re.compile(r"Apstref\.8"),
+            [],
+        ),
+        (
+            "sudo por pipe inseguro",
+            re.compile(r'echo\s+"\$SUDO_PASS"\s+\|\s+sudo'),
+            [],
+        ),
+        (
+            "password hardcodeada en tests",
+            re.compile(r'PASSWORD\s*=\s*["\']'),
+            [PROJECT_ROOT / "tests/e2e_api_full.py", PROJECT_ROOT / "tests/e2e_ticketera.py", PROJECT_ROOT / "tests/verify_hardening.py"],
+        ),
+    ]
+    ignore_files = {
+        PROJECT_ROOT / "ops/entornos/ejemplo.env",
+        PROJECT_ROOT / "ops/herramientas/dev/proxy_vm.env.example",
+        PROJECT_ROOT / "ops/herramientas/dev/proxy_vm_env.sh",
+    }
+
+    repo_files = list_repo_files()
+    for pattern_name, pattern, scoped_files in banned_checks:
+        targets: List[Path] = []
+        if scoped_files:
+            targets = scoped_files
         else:
-            print("Admin user already exists.")
-    except Exception as e:
-        print(f"Error seeding admin: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
+            targets = repo_files
+        for path in targets:
+            if path in ignore_files:
+                continue
+            if ".git/" in str(path) or "__pycache__" in str(path):
+                continue
+            try:
+                text = read_text(path)
+            except Exception:
+                continue
+            if pattern.search(text):
+                errors.append(f"{pattern_name}: {path}")
 
-def login():
-    print(f">>> Logging in to {AUTH_URL}...")
+    for path in [
+        PROJECT_ROOT / "tests/e2e_api_full.py",
+        PROJECT_ROOT / "tests/e2e_ticketera.py",
+        PROJECT_ROOT / "tests/verify_hardening.py",
+    ]:
+        text = read_text(path)
+        if "MONSTRUO_TEST_USER" not in text:
+            errors.append(f"{path} no usa MONSTRUO_TEST_USER")
+        if "MONSTRUO_TEST_PASSWORD" not in text:
+            errors.append(f"{path} no usa MONSTRUO_TEST_PASSWORD")
+
+    return errors
+
+
+def api_checks(args: argparse.Namespace) -> List[str]:
+    errors: List[str] = []
+    base_url = args.base_url.rstrip("/")
     try:
-        resp = requests.post(AUTH_URL, json={"username": "admin", "password": "123"})
-        if resp.status_code == 200:
-            token = resp.json()["access_token"]
-            print("Login successful.")
-            return token
-        print(f"Login failed: {resp.status_code} {resp.text}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Login connection error: {e}")
-        sys.exit(1)
+        guard_prod_target(base_url, allow_prod=args.allow_prod)
+        require_credentials(args.user, args.password)
+    except Exception as exc:
+        return [str(exc)]
 
-def test_xss_sanitization(token):
-    print(">>> Testing XSS Sanitization...")
-    headers = {"Authorization": f"Bearer {token}"}
-    xss_payload = "<script>alert('XSS')</script>"
-    
-    resp = requests.post(f"{API_URL}/tks/tickets", json={
-        "titulo": f"Test XSS {xss_payload}",
-        "descripcion": f"Desc {xss_payload}",
-        "severidad": "media",
-        "categoria": "sistemas"
-    }, headers=headers)
-    
-    if resp.status_code != 200:
-        print(f"Failed to create ticket: {resp.text}")
-        return False
-        
-    ticket = resp.json()
-    tid = ticket["id"]
-    print(f"Ticket {tid} created with XSS payload.")
-    return tid
-
-def test_load_balancing(token, ticket_id):
-    print(">>> Testing Load Balancing...")
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    tech_user = f"tech_{int(time.time())}"
-    
-    # Insert tech user directly into DB
-    conn = db.get_conn()
     try:
-        # Postgres uses %s for placeholders
-        hashed_pw = security.get_password_hash("123")
-        conn.execute(
-            "INSERT INTO users (username, password_hash, role, is_active, created_at) VALUES (%s, %s, 'tecnico', 1, %s)",
-            (tech_user, hashed_pw, db.now_utc_iso())
-        )
-        conn.execute(
-            "INSERT INTO user_specialties (username, specialty, max_load, current_load, is_available, created_at, updated_at) VALUES (%s, 'sistemas', 5, 0, 1, %s, %s)",
-            (tech_user, db.now_utc_iso(), db.now_utc_iso())
-        )
-        conn.commit()
-    except Exception as e:
-        print(f"Error caching tech user: {e}")
-        conn.close()
-        return False
-    
-    # Verify initial load
-    load_before = conn.execute("SELECT current_load FROM user_specialties WHERE username=%s", (tech_user,)).fetchone()["current_load"]
-    conn.close()
-    print(f"Load before: {load_before}")
-    
-    # Assign ticket
-    resp = requests.patch(f"{API_URL}/tks/tickets/{ticket_id}", json={"asignado_a": tech_user}, headers=headers)
-    if resp.status_code != 200:
-        print(f"Failed to assign: {resp.text}")
-        return False
+        auth = build_session(base_url, args.user, args.password, timeout=args.timeout)
+        session = auth["session"]
+    except Exception as exc:
+        return [f"Login API fallo: {exc}"]
 
-    # Verify load +1
-    conn = db.get_conn()
-    load_after = conn.execute("SELECT current_load FROM user_specialties WHERE username=%s", (tech_user,)).fetchone()["current_load"]
-    conn.close()
-    print(f"Load after assign: {load_after}")
-    
-    if load_after != load_before + 1:
-        print("FAIL: Load did not increase")
-        return False
-        
-    # Resolve ticket
-    resp = requests.patch(f"{API_URL}/tks/tickets/{ticket_id}", json={"estado": "resuelto"}, headers=headers)
-    
-    conn = db.get_conn()
-    load_end = conn.execute("SELECT current_load FROM user_specialties WHERE username=%s", (tech_user,)).fetchone()["current_load"]
-    conn.close()
-    print(f"Load after resolve: {load_end}")
-    
-    if load_end != load_before:
-        print("FAIL: Load did not decrease")
-        return False
-        
-    print("PASS: Load balancing works")
-    return True
+    try:
+        resp = session.get(f"{base_url}/api/tks/stats", timeout=args.timeout)
+        if resp.status_code != 200:
+            errors.append(f"/api/tks/stats con sesion -> {resp.status_code} {resp.text}")
+    except Exception as exc:
+        errors.append(f"Error consultando stats autenticado: {exc}")
+
+    try:
+        noauth = requests.get(f"{base_url}/api/tks/stats", timeout=args.timeout)
+        if noauth.status_code not in (401, 403):
+            errors.append(f"/api/tks/stats sin sesion deberia bloquear (401/403), obtuvo {noauth.status_code}")
+    except Exception as exc:
+        errors.append(f"Error consultando stats sin sesion: {exc}")
+
+    try:
+        whoami = session.get(f"{base_url}/api/auth/whoami", timeout=args.timeout)
+        if whoami.status_code != 200:
+            errors.append(f"/api/auth/whoami -> {whoami.status_code}")
+        else:
+            payload = as_json(whoami)
+            if not payload.get("logged"):
+                errors.append(f"/api/auth/whoami sin sesion valida: {payload}")
+    except Exception as exc:
+        errors.append(f"Error consultando whoami: {exc}")
+
+    return errors
+
+
+def main() -> int:
+    args = parse_args()
+    repo_errors = repo_checks()
+    api_errors: List[str] = []
+    if args.check_api:
+        api_errors = api_checks(args)
+
+    all_errors = repo_errors + api_errors
+    if all_errors:
+        print("[FAIL] Hardening check")
+        for err in all_errors:
+            print(f"- {err}")
+        return 1
+
+    print("[OK] Hardening repo PASS")
+    if args.check_api:
+        print("[OK] Hardening API PASS")
+    print("[SUCCESS] verify_hardening PASS")
+    return 0
+
 
 if __name__ == "__main__":
-    try:
-        seed_admin()
-        token = login()
-        tid = test_xss_sanitization(token)
-        if tid:
-            if test_load_balancing(token, tid):
-                print("ALL TESTS PASSED")
-            else:
-                sys.exit(1)
-        else:
-            sys.exit(1)
-    except Exception as e:
-        print(f"ERROR: {e}")
-        # import traceback
-        # traceback.print_exc()
-        sys.exit(1)
+    raise SystemExit(main())

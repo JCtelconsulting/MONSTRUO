@@ -47,6 +47,23 @@
   - Raiz queda enfocada en archivos operativos reales (`.env`, `.env.server`, `.env.server.dev`) y no plantillas.
 - **Estado**: CERRADO.
 
+## HITO: 2026-02-14 20:20 - Hardening OPS subido a `dev` + Profesionalización carpeta `tests/`
+- **Solicitud**: Subir hardening operativo a GitHub (`dev`) y dejar `tests/` en estándar profesional con registro oficial.
+- **Entregable**:
+  - Push confirmado a `origin/dev` del hardening OPS (`commit: 2a04e5b`).
+  - `tests/` estandarizado:
+    - Nuevo helper común: `tests/_helpers.py`.
+    - Scripts sin credenciales hardcodeadas y parametrizados por ENV/CLI:
+      - `tests/e2e_api_full.py`
+      - `tests/e2e_ticketera.py`
+      - `tests/verify_hardening.py`
+    - Guardas anti-PROD por defecto (`--allow-prod` explícito para bypass controlado).
+    - Nuevo manifiesto local: `tests/.README.md` (allowlist + política operativa).
+  - Gobernanza de estructura actualizada:
+    - `docs/estructura_repo.json` ahora incluye raíz `tests` y regla de extensiones.
+    - Árbol oficial detallado en `docs/PLAN_MAESTRO_MONSTRUO.md` actualizado para `tests/`.
+- **Estado**: CERRADO.
+
 ## HITO: 2026-02-14 19:05 - Gobernanza de Agentes DEV + Prioridad EPIC 11
 - **Solicitud**: Subir Plan Maestro actualizado y formalizar reglas de agentes para entorno DEV, dejando obligatorio el uso de `monstruo-dev-reglas.md`.
 - **Entregable**:
