@@ -71,3 +71,6 @@ runner/
 
 # Local secrets (machine-specific)
 .secrets/
+
+# Runtime ticket attachments
+data/tickets/
