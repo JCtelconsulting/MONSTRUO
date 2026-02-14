@@ -3,7 +3,7 @@
 # Instala el pre-commit hook para asegurar el orden del repo.
 
 HOOK_PATH=".git/hooks/pre-commit"
-GUARDIAN_SCRIPT="/srv/monstruo/ops/guardian/scripts/orden_guardian.py"
+GUARDIAN_SCRIPT="/srv/monstruo_dev/ops/guardian/scripts/orden_guardian.py"
 
 echo "--- Instalando Guardian Git Hook ---"
 

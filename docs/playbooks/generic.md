@@ -63,7 +63,7 @@ if "critical" in kind or "error" in kind:
 
 ### Para Errores de Integración
 1. Verificar conectividad: `curl <ENDPOINT>`
-2. Revisar logs: `tail -100 /srv/monstruo/data/logs/<service>.log`
+2. Revisar logs: `tail -100 /srv/monstruo_dev/data/logs/<service>.log`
 3. Verificar credenciales: revisar `.env`
 4. Probar endpoint manualmente
 
@@ -107,7 +107,7 @@ Descripción:
   2. <ACTION_2>
   3. <ACTION_3>
   
-  Logs: /srv/monstruo/data/logs/<service>.log
+  Logs: /srv/monstruo_dev/data/logs/<service>.log
 ```
 
 ## Mapeo Rol por Tipo

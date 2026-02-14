@@ -2,7 +2,7 @@
 import sys
 import unittest
 from unittest.mock import MagicMock
-sys.path.append("/srv/monstruo/code")
+sys.path.append("/srv/monstruo_dev/code")
 
 # Mock LaudusClient before importing sync logic
 sys.modules["app.integraciones.laudus"] = MagicMock()
@@ -47,7 +47,8 @@ class TestDiscrepancy(unittest.TestCase):
         
         # 4. Verify Ticket Created
         print("Verifying Ticket...")
-        tickets = tickets_service.list_tickets(q="TEST-IPHONE")
+        result = tickets_service.list_tickets(q="TEST-IPHONE")
+        tickets = result.get("items", []) if isinstance(result, dict) else result
         self.assertTrue(len(tickets) > 0, "No se creó el ticket!")
         
         ticket = tickets[0]

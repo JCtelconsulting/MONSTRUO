@@ -139,8 +139,8 @@ def leer_eventos_nuevos(con: sqlite3.Connection, ultimo_id: int, max_eventos: in
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="/srv/monstruo/ops/guardian/configuracion_guardian.json")
-    ap.add_argument("--estado", default="/srv/monstruo/ops/guardian/estado_supervisor.json")
+    ap.add_argument("--config", default="/srv/monstruo_dev/ops/guardian/configuracion_guardian.json")
+    ap.add_argument("--estado", default="/srv/monstruo_dev/ops/guardian/estado_supervisor.json")
     ap.add_argument("--intervalo", type=float, default=3.0)
     ap.add_argument("--max_eventos", type=int, default=200)
     ap.add_argument("--once", action="store_true")

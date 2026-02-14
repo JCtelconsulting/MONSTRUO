@@ -6,7 +6,7 @@ import sys
 import os
 
 BASE_URL = "http://127.0.0.1:9000"
-DB_PATH = "/srv/monstruo/data/db/monstruo.db"
+DB_PATH = "/srv/monstruo_dev/data/db/monstruo.db"
 
 def get_db_conn():
     return sqlite3.connect(DB_PATH)

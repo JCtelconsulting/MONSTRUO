@@ -1,7 +1,7 @@
 import sys
 import os
 
-sys.path.append("/srv/monstruo/code")
+sys.path.append("/srv/monstruo_dev/code")
 
 # Mock environment if needed, or rely on .env loading within db
 from app.core import db

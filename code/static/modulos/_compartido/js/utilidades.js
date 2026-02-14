@@ -3,72 +3,148 @@
 // ==========================================================================
 
 // --- API CLIENT ---
+// --- API CLIENT ---
 const IS_PROD_DOMAIN = window.location.hostname.endsWith('.telconsulting.cl');
-const LOGIN_URL = IS_PROD_DOMAIN ? 'https://login.telconsulting.cl' : '/login.html';
+
+/**
+ * Determines the API base URL based on the current environment.
+ * @returns {string} The base URL for API requests (e.g., '/api', '/dev/api', '/prod/api').
+ */
+function getApiBase() {
+  // 1. Path prefix has priority when running behind reverse proxy.
+  // This avoids crossing environments if someone opens http://127.0.0.1/dev/... manually.
+  const isDev = window.location.pathname.startsWith('/dev');
+  const isProd = window.location.pathname.startsWith('/prod');
+  if (isDev) return '/dev/api';
+  if (isProd) return '/prod/api';
+
+  // 2. Local Development (no prefix)
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return '/api';
+  }
+
+  // 3. Server default
+  return '/prod/api';
+}
+
+// Expose global for legacy/other modules
+window.getApiBase = getApiBase;
+
+const LOGIN_URL = IS_PROD_DOMAIN ? `https://login.telconsulting.cl${window.location.pathname.startsWith('/dev') ? '/dev' : '/prod'}/` : '/login.html';
 
 function redirectToLogin() {
   window.location.href = LOGIN_URL;
 }
 
 async function fetchApi(url, options = {}) {
-  // Normalizar URL
-  if (typeof url === 'string' && url.startsWith('/') && !url.startsWith('/api')) {
-    url = '/api' + url;
-  }
-  options.credentials = 'include';
-  options.headers = options.headers || {};
+  const reqOptions = { ...options };
+  const timeoutMs = Number.isFinite(reqOptions.timeoutMs) ? reqOptions.timeoutMs : 12000;
+  delete reqOptions.timeoutMs;
 
-  if (options.body) {
-    if (typeof options.body !== 'string' && !(options.body instanceof FormData)) {
-      options.headers['Content-Type'] = 'application/json';
-      options.body = JSON.stringify(options.body);
-    } else if (typeof options.body === 'string' && !options.headers['Content-Type']) {
-      // Assume JSON if string and no header set, or let user set it.
-      // Better safe: user sets header if manually stringifying.
-      options.headers['Content-Type'] = 'application/json';
+  let timeoutId = null;
+  let timedOut = false;
+  let timeoutController = null;
+  const externalSignal = reqOptions.signal;
+  let externalAbortHandler = null;
+
+  if (timeoutMs > 0) {
+    timeoutController = new AbortController();
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        timeoutController.abort();
+      } else {
+        externalAbortHandler = () => timeoutController.abort();
+        externalSignal.addEventListener('abort', externalAbortHandler, { once: true });
+      }
+    }
+    timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      timeoutController.abort();
+    }, timeoutMs);
+    reqOptions.signal = timeoutController.signal;
+  }
+
+  // Normalize URL using central getApiBase logic
+  if (url.startsWith('/api')) {
+    // Replace /api with the correct environment prefix
+    // E.g. /api/users -> /dev/api/users OR /prod/api/users
+    const base = getApiBase(); // e.g. '/dev/api'
+    url = url.replace('/api', base);
+  } else if (url.startsWith('/') && !url.startsWith('/dev') && !url.startsWith('/prod')) {
+    // Relative path without prefix, assume API call if not static
+    // Prefer explicit /api usage in calls, but handle fallback
+    const base = getApiBase();
+    url = `${base}${url}`;
+  }
+
+  reqOptions.credentials = 'include';
+  reqOptions.headers = reqOptions.headers || {};
+
+  if (reqOptions.body) {
+    if (typeof reqOptions.body !== 'string' && !(reqOptions.body instanceof FormData)) {
+      reqOptions.headers['Content-Type'] = 'application/json';
+      reqOptions.body = JSON.stringify(reqOptions.body);
+    } else if (typeof reqOptions.body === 'string' && !reqOptions.headers['Content-Type']) {
+      reqOptions.headers['Content-Type'] = 'application/json';
     }
   }
-
-  const resp = await fetch(url, options);
-
-  if (resp.status === 401) {
-    redirectToLogin();
-    throw new Error('Sesion expirada');
-  }
-
-  if (resp.status === 403) {
-    const authMsg = 'Acceso denegado (permisos insuficientes)';
-    if (typeof window.showToast === 'function') {
-      window.showToast("⚠️ " + authMsg, "warning");
-    } else {
-      console.warn(authMsg);
-    }
-    throw new Error(authMsg);
-  }
-
-  if (!resp.ok) {
-    let msg = `Error ${resp.status}`;
-    try {
-      const d = await resp.json();
-      // Try to find a human readable message
-      if (typeof d === 'string') msg = d;
-      else if (d.detail) msg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
-      else if (d.message) msg = d.message;
-      else if (d.error) msg = d.error;
-      else msg = JSON.stringify(d);
-    } catch (e) {
-      // If json parse fails, use text or status text
-      const t = await resp.text().catch(() => '');
-      if (t) msg = t;
-    }
-    throw new Error(msg);
-  }
-  const text = await resp.text();
   try {
-    return text ? JSON.parse(text) : {};
-  } catch (e) {
-    console.warn("API response was not JSON:", text);
-    return { raw: text };
+    const resp = await fetch(url, reqOptions);
+
+    if (resp.status === 401) {
+      redirectToLogin();
+      throw new Error('Sesion expirada');
+    }
+
+    if (resp.status === 403) {
+      const authMsg = 'Acceso denegado (permisos insuficientes)';
+      if (typeof window.showToast === 'function') {
+        window.showToast("⚠️ " + authMsg, "warning");
+      } else {
+        console.warn(authMsg);
+      }
+      throw new Error(authMsg);
+    }
+
+    try {
+      if (!resp.ok) {
+        let msg = `Error ${resp.status}`;
+        try {
+          const d = await resp.json();
+          if (typeof d === 'string') msg = d;
+          else if (d.detail) msg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
+          else if (d.message) msg = d.message;
+          else if (d.error) msg = d.error;
+          else msg = JSON.stringify(d);
+        } catch (e) {
+          const t = await resp.text().catch(() => '');
+          if (t) msg = t;
+        }
+        throw new Error(msg);
+      }
+
+      const text = await resp.text();
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch (e) {
+        console.warn("API response was not JSON:", text);
+        return { raw: text };
+      }
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      if (externalSignal && externalAbortHandler) {
+        externalSignal.removeEventListener('abort', externalAbortHandler);
+      }
+    }
+  } catch (err) {
+    if (timeoutId) window.clearTimeout(timeoutId);
+    if (externalSignal && externalAbortHandler) {
+      externalSignal.removeEventListener('abort', externalAbortHandler);
+    }
+    if (timedOut) {
+      throw new Error(`Timeout de red (${timeoutMs}ms)`);
+    }
+    throw err;
   }
 }
 

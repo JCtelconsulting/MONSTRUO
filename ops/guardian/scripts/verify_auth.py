@@ -3,7 +3,7 @@ import sys
 import os
 
 # Add code to path
-sys.path.insert(0, "/srv/monstruo/code")
+sys.path.insert(0, "/srv/monstruo_dev/code")
 
 try:
     from app.core import auth_service, security, db

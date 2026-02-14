@@ -23,7 +23,7 @@ def create_user(username: str, password: str, role: str) -> None:
     # Validacion basica
     username = username.strip()
     role = role.strip()
-    if role not in ("admin", "finance", "ops", "warehouse"):
+    if role not in ("admin", "finance", "ops", "warehouse", "redes", "sistemas", "implementaciones", "gerencia"):
         raise ValueError("Role invalido")
 
     hashed_pw = security.get_password_hash(password)

@@ -4,307 +4,24 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ticketera | Monstruo</title>
+    <title>Mesa de Ayuda | Monstruo</title>
+    <meta name="description" content="Sistema profesional de Mesa de Ayuda - TelConsulting" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.6" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        .tks-grid {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 1rem;
-            height: calc(100vh - 140px);
-        }
-
-        .tks-list-panel {
-            background: rgba(10, 16, 24, 0.55);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .tks-detail-panel {
-            background: rgba(10, 16, 24, 0.55);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 1rem;
-            overflow-y: auto;
-        }
-
-        .tks-item {
-            padding: 0.8rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .tks-item:hover,
-        .tks-item.active {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .tks-status {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-
-        .status-abierto {
-            background: rgba(0, 200, 255, 0.2);
-            color: #00c8ff;
-        }
-
-        .status-cerrado {
-            background: rgba(0, 255, 0, 0.2);
-            color: #00ff00;
-        }
-
-        .status-en_progreso {
-            background: rgba(255, 200, 0, 0.2);
-            color: #ffc800;
-        }
-
-        .status-resuelto {
-            background: rgba(255, 100, 255, 0.2);
-            color: #ff64ff;
-        }
-
-        .tks-meta {
-            font-size: 0.8rem;
-            opacity: 0.7;
-            margin-top: 4px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .event-log {
-            border-left: 2px solid rgba(255, 255, 255, 0.1);
-            padding-left: 1rem;
-            margin-top: 1rem;
-        }
-
-        .event-item {
-            margin-bottom: 1rem;
-        }
-
-        .event-time {
-            font-size: 0.75rem;
-            opacity: 0.6;
-        }
-
-        .tks-toolbar {
-            padding: 0.8rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        input,
-        select,
-        textarea {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #fff;
-            padding: 6px;
-            border-radius: 4px;
-        }
-
-        .btn-primary {
-            background: #007bff;
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            display: none;
-        }
-
-        .modal.open {
-            display: flex;
-        }
-
-        .modal-content {
-            background: #1a1a1a;
-            padding: 2rem;
-            border-radius: 8px;
-            width: 500px;
-            border: 1px solid #333;
-        }
-
-        .tab-bar {
-            display: flex;
-            gap: 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .tab-btn {
-            background: transparent;
-            border: none;
-            color: #aaa;
-            cursor: pointer;
-            padding: 0.5rem;
-        }
-
-        .tab-btn.active {
-            color: #fff;
-            border-bottom: 2px solid #007bff;
-        }
-
-        /* Kanban */
-        .kanban-board {
-            display: flex;
-            gap: 1rem;
-            height: 100%;
-            overflow-x: auto;
-        }
-
-        .kanban-col {
-            min-width: 250px;
-            background: rgba(255, 255, 255, 0.02);
-            border-radius: 8px;
-            padding: 0.5rem;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .kanban-col h4 {
-            margin: 0 0 1rem 0;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            text-transform: uppercase;
-            font-size: 0.8rem;
-            letter-spacing: 1px;
-        }
-
-        .kanban-card {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 0.8rem;
-            border-radius: 4px;
-            margin-bottom: 0.5rem;
-            cursor: pointer;
-            border-left: 3px solid transparent;
-        }
-
-        .kanban-card:hover {
-            background: rgba(255, 255, 255, 0.08);
-        }
-
-        .prio-1 {
-            border-left-color: #dc3545;
-        }
-
-        /* Critical */
-        .prio-2 {
-            border-left-color: #ffc107;
-        }
-
-        /* High */
-        .prio-3 {
-            border-left-color: #17a2b8;
-        }
-
-        /* Medium */
-        .prio-4 {
-            border-left-color: #28a745;
-        }
-
-        /* Low */
-        .sla-bad {
-            color: #dc3545;
-            font-weight: bold;
-        }
-
-        /* Dashboard Styles */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stats-card {
-            background-color: #0b1118;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .stats-card h4 {
-            margin: 0;
-            opacity: 0.7;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 0.5rem;
-        }
-
-        .stats-card .number {
-            font-size: 3rem;
-            font-weight: 700;
-            line-height: 1;
-        }
-
-        .pivot-container {
-            background: rgba(10, 16, 24, 0.55);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 1.5rem;
-        }
-
-        .pivot-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .pivot-table th,
-        .pivot-table td {
-            text-align: left;
-            padding: 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .pivot-table th {
-            color: #aaa;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.8rem;
-        }
-
-        .td-num {
-            text-align: right !important;
-        }
-    </style>
+    <link rel="stylesheet" href="/modulos/tks/css/tks.css?v=2" />
 </head>
 
 <body class="sidebar-collapsed">
     <header id="app-header">
         <div class="header-top">
             <h1>MONSTRUO</h1>
-            <button id="sidebar-toggle" class="btn-icon"><i class="fas fa-bars"></i></button>
+            <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
         <nav id="dynamic-sidebar" class="side-nav">
         </nav>
@@ -324,395 +41,110 @@
 
     <main>
         <div class="main-inner">
-            <section class="section-block" style="height: 100%;">
-                <div class="section-header">
-                    <h3>Ticketera Central (v2)</h3>
-                    <p>Gestión de incidencias, SLA y disparadores</p>
-                </div>
-
-                <div class="tab-bar">
-                    <button class="tab-btn active" onclick="switchView('resumen')" id="btn-resumen">Resumen</button>
-                    <button class="tab-btn" onclick="switchView('list')" id="btn-list">Lista</button>
-                    <button class="tab-btn" onclick="switchView('reports')" id="btn-reports">Reportes</button>
-                </div>
-
-                <!-- VIEW: LIST -->
-                <div id="view-list" class="tks-grid">
-                    <!-- Lista -->
-                    <div class="tks-list-panel">
-                        <div class="tks-toolbar">
-                            <input type="text" id="searchInput" placeholder="Buscar..." style="flex:1">
-                            <button class="btn-primary" onclick="openNewTicketModal()"><i
-                                    class="fas fa-plus"></i></button>
+            <section class="section-block">
+                <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <h3>🎫 Mesa de Ayuda</h3>
+                        <p>Sistema profesional de tickets — TelConsulting</p>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:1rem;">
+                        <div class="tks-notif-bell" onclick="TksMain.loadTab('lista')" title="Notificaciones">
+                            <i class="fas fa-bell" style="font-size:1.2rem;color:var(--tks-text-muted);"></i>
+                            <span class="tks-notif-count" id="tks-notif-badge" style="display:none;">0</span>
                         </div>
-                        <div id="ticketsList" style="flex:1; overflow-y: auto;">
-                            <!-- Items injected here -->
-                            <div style="padding:1rem; opacity:0.5;">Cargando...</div>
-                        </div>
-                    </div>
-
-                    <!-- Detalle -->
-                    <div class="tks-detail-panel" id="detailPanel">
-                        <div
-                            style="opacity:0.5; display:flex; height:100%; align-items:center; justify-content:center;">
-                            Selecciona un ticket
-                        </div>
+                        <button class="tks-btn tks-btn-primary" onclick="TksMain.openCreateModal()">
+                            <i class="fas fa-plus"></i> Nuevo Ticket
+                        </button>
                     </div>
                 </div>
 
-                <!-- VIEW: BOARD -->
-                <div id="view-board" style="display:none; height: calc(100vh - 200px);">
-                    <div class="kanban-board" id="kanbanContainer">
-                        <div>Cargando tablero...</div>
-                    </div>
+                <!-- TAB BAR -->
+                <div class="tks-tab-bar">
+                    <button class="tks-tab-btn active" data-tab="dashboard">
+                        <i class="fas fa-chart-bar"></i> Resumen
+                    </button>
+                    <button class="tks-tab-btn" data-tab="lista">
+                        <i class="fas fa-list"></i> Lista
+                    </button>
+                    <button class="tks-tab-btn" data-tab="kanban">
+                        <i class="fas fa-columns"></i> Kanban
+                    </button>
                 </div>
 
-                <!-- VIEW: RESUMEN (Antes Dashboard) -->
-                <div id="view-resumen" style="display:block; height: calc(100vh - 200px); overflow-y:auto;">
-                    <!-- Top Cards -->
-                    <div class="stats-grid" id="statsCards">
-                        <!-- Injected by JS -->
-                    </div>
-
-                    <!-- Pivot Table -->
-                    <div class="pivot-container">
-                        <h4 style="margin-top:0; margin-bottom:1rem; opacity:0.8;">Carga de Trabajo por Asignación
-                        </h4>
-                        <table class="pivot-table">
-                            <thead>
-                                <tr>
-                                    <th>Asignado a</th>
-                                    <th class="td-num">Abierto</th>
-                                    <th class="td-num">En Progreso</th>
-                                    <th class="td-num">Resuelto</th>
-                                    <th class="td-num">Cerrado</th>
-                                    <th class="td-num">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pivotBody">
-                                <!-- Injected -->
-                            </tbody>
-                        </table>
-                    </div>
+                <!-- CONTENIDO DINÁMICO -->
+                <div class="tks-container" id="tks-content">
+                    <!-- Cargado dinámicamente por JS -->
                 </div>
-
-                <!-- VIEW: REPORTES (Placeholder) -->
-                <div id="view-reports" style="display:none; padding:2rem;">
-                    <h3 style="opacity:0.5;">Reportes en construcción...</h3>
-                </div>
-
             </section>
         </div>
     </main>
 
-    <!-- Modal Nuevo Ticket -->
-    <div id="newTicketModal" class="modal">
-        <div class="modal-content">
-            <h3>Nuevo Ticket</h3>
-            <div style="display:grid; gap:1rem; margin-top:1rem;">
-                <input id="newTitle" placeholder="Título corto">
-                <div style="display:flex; gap:1rem;">
-                    <select id="newType" style="flex:1">
-                        <option value="incidencia">Incidencia</option>
-                        <option value="requerimiento">Requerimiento</option>
-                        <option value="discrepancia">Discrepancia Manual</option>
-                    </select>
-                    <select id="newSev" style="flex:1">
-                        <option value="media" selected>Media (72h)</option>
-                        <option value="baja">Baja (168h)</option>
-                        <option value="alta">Alta (24h)</option>
-                        <option value="critica">Critica (4h)</option>
-                    </select>
+    <!-- MODAL CREAR TICKET (siempre en el DOM) -->
+    <div class="tks-modal-overlay" id="tks-create-modal">
+        <div class="tks-modal">
+            <div class="tks-modal-header">
+                <h3><i class="fas fa-plus-circle"></i> Nuevo Ticket</h3>
+                <button class="tks-modal-close" onclick="TksMain.closeCreateModal()">&times;</button>
+            </div>
+            <div class="tks-modal-body">
+                <div class="tks-form-group">
+                    <label>Título</label>
+                    <input type="text" class="tks-input" id="tks-new-titulo"
+                        placeholder="Describe el problema brevemente...">
                 </div>
-                <textarea id="newDesc" rows="4" placeholder="Descripción detallada"></textarea>
-                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
-                    <button onclick="closeModal()"
-                        style="background:transparent; border:1px solid #555; color:#fff; padding:6px 12px; border-radius:4px; cursor:pointer;">Cancelar</button>
-                    <button class="btn-primary" onclick="createTicket()">Crear</button>
+                <div class="tks-form-group">
+                    <label>Descripción</label>
+                    <textarea class="tks-textarea" id="tks-new-desc" rows="4"
+                        placeholder="Detalla el problema, síntomas, qué se intentó..."></textarea>
                 </div>
+                <div class="tks-form-row">
+                    <div class="tks-form-group">
+                        <label>Severidad</label>
+                        <select class="tks-select" id="tks-new-sev">
+                            <option value="baja">🟢 Baja</option>
+                            <option value="media" selected>🔵 Media</option>
+                            <option value="alta">🟠 Alta</option>
+                            <option value="critica">🔴 Crítica</option>
+                        </select>
+                    </div>
+                    <div class="tks-form-group">
+                        <label>Categoría</label>
+                        <select class="tks-select" id="tks-new-cat">
+                            <option value="">🤖 Auto-detectar</option>
+                            <option value="redes">🌐 Redes</option>
+                            <option value="sistemas">💻 Sistemas</option>
+                            <option value="ejecucion">🔧 Ejecución</option>
+                            <option value="admin">📋 Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="tks-form-row">
+                    <div class="tks-form-group">
+                        <label>Email Cliente (opcional)</label>
+                        <input type="email" class="tks-input" id="tks-new-email" placeholder="cliente@empresa.cl">
+                    </div>
+                    <div class="tks-form-group">
+                        <label>Nombre Cliente (opcional)</label>
+                        <input type="text" class="tks-input" id="tks-new-cliente" placeholder="Nombre del cliente">
+                    </div>
+                </div>
+            </div>
+            <div class="tks-modal-footer">
+                <button class="tks-btn tks-btn-ghost" onclick="TksMain.closeCreateModal()">Cancelar</button>
+                <button class="tks-btn tks-btn-primary" onclick="TksMain.submitCreate()">
+                    <i class="fas fa-ticket-alt"></i> Crear Ticket
+                </button>
             </div>
         </div>
     </div>
 
-    <script src="/modulos/_compartido/js/utilidades.js?v=203"></script>
-    <script src="/modulos/_compartido/js/admin.js?v=4"></script>
-    <script>
-        let currentTicketId = null;
-
-        function switchView(view) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-' + view).classList.add('active');
-
-            document.getElementById('view-list').style.display = view === 'list' ? 'grid' : 'none';
-            document.getElementById('view-resumen').style.display = view === 'resumen' ? 'block' : 'none';
-            document.getElementById('view-reports').style.display = view === 'reports' ? 'block' : 'none';
-
-            if (view === 'list') loadTickets();
-            if (view === 'resumen') loadResumen();
-        }
-
-        async function loadResumen() {
-            const cardsContainer = document.getElementById('statsCards');
-            const pivotBody = document.getElementById('pivotBody');
-
-            try {
-                const res = await window.fetchApi('/api/tks/stats');
-
-                // 1. Render Cards
-                // Needed: Total Open, Total Critical, Unassigned, Compliance Rate (simulated)
-                const totalOpen = (res.by_status.abierto || 0) + (res.by_status.en_progreso || 0);
-                const totalCritical = (res.by_prio.alta || 0) + (res.by_prio.critica || 0);
-                const totalClosed = (res.by_status.resuelto || 0) + (res.by_status.cerrado || 0);
-
-                // Card Config
-                const cards = [
-                    { label: 'Pendientes Totales', val: totalOpen, color: '#00c8ff' },
-                    { label: 'Casos Críticos', val: totalCritical, color: '#dc3545' },
-                    { label: 'Resueltos/Cerrados', val: totalClosed, color: '#28a745' },
-                    { label: 'Tickets Totales', val: (totalOpen + totalClosed), color: '#aaa' }
-                ];
-
-                cardsContainer.innerHTML = cards.map(c => `
-                    <div class="stats-card" style="border-top: 3px solid ${c.color}">
-                        <h4>${c.label}</h4>
-                        <div class="number" style="color:${c.color}">${c.val}</div>
-                    </div>
-                `).join('');
-
-                // 2. Render Pivot
-                pivotBody.innerHTML = '';
-                const assignees = Object.keys(res.pivot_assignee).sort();
-
-                if (assignees.length === 0) {
-                    pivotBody.innerHTML = '<tr><td colspan="6" style="text-align:center; opacity:0.5;">Sin datos</td></tr>';
-                    return;
-                }
-
-                assignees.forEach(user => {
-                    const row = res.pivot_assignee[user];
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td style="font-weight:500; color:#fff;">${user}</td>
-                        <td class="td-num">${row.abierto || 0}</td>
-                        <td class="td-num">${row.en_progreso || 0}</td>
-                        <td class="td-num">${row.resuelto || 0}</td>
-                        <td class="td-num">${row.cerrado || 0}</td>
-                        <td class="td-num" style="font-weight:bold;">${row.total}</td>
-                    `;
-                    pivotBody.appendChild(tr);
-                });
-
-            } catch (e) {
-                console.error(e);
-                cardsContainer.innerHTML = '<div style="color:red">Error cargando dashboard</div>';
-            }
-        }
-
-        async function loadTickets() {
-            const container = document.getElementById('ticketsList');
-            const q = document.getElementById('searchInput').value;
-            try {
-                const res = await window.fetchApi(`/api/tks/tickets?limit=50&q=${encodeURIComponent(q)}`);
-                container.innerHTML = '';
-
-                if (!res.items || res.items.length === 0) {
-                    container.innerHTML = '<div style="padding:1rem; opacity:0.5;">No hay tickets recientes</div>';
-                    return;
-                }
-
-                res.items.forEach(t => {
-                    const el = document.createElement('div');
-                    el.className = 'tks-item';
-                    if (t.id === currentTicketId) el.classList.add('active');
-                    el.onclick = () => selectTicket(t);
-                    el.innerHTML = `
-                        <div style="font-weight:600; color:#fff;">${t.titulo}</div>
-                        <div class="tks-meta">
-                            <span>${t.codigo}</span>
-                            <span class="tks-status status-${t.estado}">${t.estado}</span>
-                        </div>
-                    `;
-                    container.appendChild(el);
-                });
-            } catch (e) {
-                container.innerHTML = `<div style="padding:1rem; color:red;">Error: ${e.message}</div>`;
-            }
-        }
-
-        async function selectTicket(ticket) {
-            currentTicketId = ticket.id;
-            // if in list mode refresh active
-            const items = document.querySelectorAll('.tks-item');
-            items.forEach(i => i.classList.remove('active'));
-            // simple hack, reload list to set active class properly or just render detail
-
-            const panel = document.getElementById('detailPanel');
-            panel.innerHTML = 'Cargando detalle...';
-
-            try {
-                // Fetch events
-                const eventsRes = await window.fetchApi(`/api/tks/tickets/${ticket.id}/eventos`);
-
-                // Calculate time remaining
-                let venceMsg = "Sin vencimiento";
-                if (ticket.vence_at) {
-                    const diff = new Date(ticket.vence_at) - new Date();
-                    const hours = Math.round(diff / 3600000);
-                    if (hours < 0) venceMsg = `<span class="sla-bad">Venció hace ${Math.abs(hours)}h</span>`;
-                    else venceMsg = `Vence en ${hours}h`;
-                }
-
-                panel.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:start;">
-                        <h2 style="margin:0; font-size:1.5rem;">${ticket.titulo}</h2>
-                        <span class="tks-status status-${ticket.estado}" style="font-size:1rem; padding:4px 8px;">${ticket.estado}</span>
-                    </div>
-                    <div style="margin-top:0.5rem; opacity:0.7;">
-                        ${ticket.codigo} | ${ticket.tipo} | Sev: <b>${ticket.severidad}</b> | ${venceMsg}
-                    </div>
-                    <div style="margin-top:1rem; padding:1rem; background:rgba(0,0,0,0.2); border-radius:4px;">
-                        ${ticket.descripcion || 'Sin descripción'}
-                    </div>
-                    
-                    <h4 style="margin-top:2rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:0.5rem;">Registro de Eventos</h4>
-                    <div class="event-log">
-                        ${eventsRes.items.map(ev => `
-                            <div class="event-item">
-                                <div class="event-time">${new Date(ev.creado_at).toLocaleString()}</div>
-                                <div style="font-weight:bold; color:#aaffaa;">${ev.evento}</div>
-                                <div>${ev.detalle}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-
-                    <div style="margin-top:1rem; display:flex; gap:0.5rem;">
-                         <button class="btn-primary" onclick="addNote(${ticket.id})">Agregar Nota</button>
-                         ${ticket.estado !== 'cerrado' ? `<button class="btn-primary" style="background:#444;" onclick="changeStatus(${ticket.id}, 'cerrado')">Cerrar Ticket</button>` : ''}
-                         ${ticket.estado === 'abierto' ? `<button class="btn-primary" style="background:#e0a800;" onclick="changeStatus(${ticket.id}, 'en_progreso')">En Progreso</button>` : ''}
-                         ${ticket.estado === 'en_progreso' ? `<button class="btn-primary" style="background:#28a745;" onclick="changeStatus(${ticket.id}, 'resuelto')">Resolver</button>` : ''}
-                    </div>
-                `;
-            } catch (e) {
-                panel.innerHTML = `Error cargando detalle: ${e.message}`;
-            }
-        }
-
-        async function loadKanban() {
-            const container = document.getElementById('kanbanContainer');
-            container.innerHTML = 'Cargando...';
-            try {
-                const res = await window.fetchApi('/api/tks/tablero');
-                container.innerHTML = '';
-
-                const columns = ['abierto', 'en_progreso', 'resuelto', 'cerrado'];
-
-                columns.forEach(colName => {
-                    const colDiv = document.createElement('div');
-                    colDiv.className = 'kanban-col';
-                    colDiv.innerHTML = `<h4>${colName.replace('_', ' ')}</h4>`;
-
-                    const items = res.kanban[colName] || [];
-                    items.forEach(t => {
-                        let vence = "";
-                        if (t.vence_at) {
-                            const h = Math.round((new Date(t.vence_at) - new Date()) / 3600000);
-                            vence = h < 0 ? `${Math.abs(h)}h VENCIDO` : `${h}h`;
-                        }
-
-                        const card = document.createElement('div');
-                        card.className = `kanban-card prio-${t.prioridad}`;
-                        card.onclick = () => {
-                            switchView('list');
-                            selectTicket(t); // will fetch full details
-                        };
-                        card.innerHTML = `
-                            <div style="font-weight:bold;">${t.codigo}</div>
-                            <div style="font-size:0.9rem; margin:4px 0;">${t.titulo}</div>
-                            <div style="font-size:0.75rem; opacity:0.7; display:flex; justify-content:space-between;">
-                                <span>${t.severidad}</span>
-                                <span style="${vence.includes('VENCIDO') ? 'color:red' : ''}">${vence}</span>
-                            </div>
-                        `;
-                        colDiv.appendChild(card);
-                    });
-
-                    container.appendChild(colDiv);
-                });
-
-            } catch (e) { container.innerHTML = "Error: " + e.message; }
-        }
-
-        async function createTicket() {
-            const title = document.getElementById('newTitle').value;
-            const type = document.getElementById('newType').value;
-            const sev = document.getElementById('newSev').value;
-            const desc = document.getElementById('newDesc').value;
-
-            if (!title) return alert("El título es obligatorio");
-
-            try {
-                const res = await window.fetchApi('/api/tks/tickets', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        titulo: title,
-                        tipo: type,
-                        descripcion: desc,
-                        origen: 'manual',
-                        severidad: sev
-                    })
-                });
-                if (res.id) {
-                    closeModal();
-                    document.getElementById('newTitle').value = '';
-                    document.getElementById('newDesc').value = '';
-                    loadTickets();
-                }
-            } catch (e) {
-                alert("Error al crear ticket: " + e.message);
-            }
-        }
-
-        async function changeStatus(id, status) {
-            if (!confirm("¿Cambiar estado a " + status + "?")) return;
-            try {
-                await window.fetchApi(`/api/tks/tickets/${id}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ estado: status })
-                });
-                // Reload current ticket
-                const t = await window.fetchApi(`/api/tks/tickets/${id}`);
-                selectTicket(t);
-                if (document.getElementById('view-list').style.display !== 'none') loadTickets();
-            } catch (e) {
-                alert("Error: " + e.message);
-            }
-        }
-
-        async function addNote(id) {
-            const txt = prompt("Ingresa la nota:");
-            if (!txt) return;
-            try {
-                await window.fetchApi(`/api/tks/tickets/${id}/eventos`, {
-                    method: 'POST',
-                    body: JSON.stringify({ evento: 'nota_manual', detalle: txt })
-                });
-                const t = await window.fetchApi(`/api/tks/tickets/${id}`);
-                selectTicket(t);
-            } catch (e) {
-                alert("Error: " + e.message);
-            }
-        }
-
-        function openNewTicketModal() { document.getElementById('newTicketModal').classList.add('open'); }
-        function closeModal() { document.getElementById('newTicketModal').classList.remove('open'); }
-
-        document.getElementById('searchInput').addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') loadTickets();
-        });
-
-        loadResumen();
-    </script>
-    <script src="/modulos/_compartido/js/sidebar.js?v=6"></script>
+    <!-- Scripts -->
+    <script src="/modulos/_compartido/js/utilidades.js?v=204"></script>
+    <script src="/modulos/_compartido/js/admin.js?v=3"></script>
+    <script src="js/tks_api.js?v=6"></script>
+    <script src="js/tks_ui.js?v=4"></script>
+    <script src="js/tks_main.js?v=8"></script>
+    <script src="/modulos/_compartido/js/sidebar.js?v=9"></script>
 </body>
 
 </html>

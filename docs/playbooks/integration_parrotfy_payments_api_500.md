@@ -74,10 +74,10 @@ curl "https://api.parrotfy.com/api/v1/inventory" -H "Authorization: Bearer <TOKE
 ### Paso 4: Revisar Evidencia Local
 ```bash
 # Ver logs de sync
-tail -100 /srv/monstruo/data/logs/sync_parrotfy_payments.log
+tail -100 /srv/monstruo_dev/data/logs/sync_parrotfy_payments.log
 
 # Ver intentos recientes
-sqlite3 /srv/monstruo/data/db/monstruo.db \
+sqlite3 /srv/monstruo_dev/data/db/monstruo.db \
   "SELECT * FROM import_runs WHERE source='parrotfy_payments' ORDER BY started_at DESC LIMIT 5;"
 ```
 

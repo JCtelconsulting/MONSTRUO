@@ -3,8 +3,8 @@ import pandas as pd
 import os
 
 # Configuración de rutas
-INPUT_FILE = '/srv/monstruo/BD Telecomunicaciones.xlsx'
-OUTPUT_FILE = '/srv/monstruo/data/Base_Preventa_Telecomunicaciones.xlsx'
+INPUT_FILE = '/srv/monstruo_dev/BD Telecomunicaciones.xlsx'
+OUTPUT_FILE = '/srv/monstruo_dev/data/Base_Preventa_Telecomunicaciones.xlsx'
 
 # Asegurar que el directorio de salida existe
 os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)

@@ -62,10 +62,10 @@ Luego habilita TLS (ej con certbot) y recarga Nginx.
 Workflow: `.github/workflows/deploy.yml`
 
 Este flujo corre tests en GitHub y despliega desde un runner self-hosted en la VM de la app.
-El deploy está configurado para usar explícitamente `DEPLOY_ENV_FILE=/srv/monstruo/.env.server`.
+El deploy está configurado para usar explícitamente `DEPLOY_ENV_FILE=/srv/monstruo_dev/.env.server`.
 
 Pasos:
-- En GitHub → Settings → Actions → Runners, agrega un runner self-hosted para este repo y ejecútalo en `192.168.60.5` (puedes usar `/srv/monstruo/runner`).
+- En GitHub → Settings → Actions → Runners, agrega un runner self-hosted para este repo y ejecútalo en `192.168.60.5` (puedes usar `/srv/monstruo_dev/runner`).
 - Asegura que el usuario del runner tenga acceso a Docker (`docker` group).
 - En GitHub → Settings → Environments, crea el entorno `production` y configura "Required reviewers" para aprobar el deploy.
 

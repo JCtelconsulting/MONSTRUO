@@ -49,16 +49,18 @@ jobs:
             echo "project=monstruo" >> "$GITHUB_OUTPUT"
             echo "stack=monstruo" >> "$GITHUB_OUTPUT"
             echo "health=http://127.0.0.1:9000/health" >> "$GITHUB_OUTPUT"
+            echo "deploy_path=/srv/monstruo" >> "$GITHUB_OUTPUT"
           else
             echo "branch=dev" >> "$GITHUB_OUTPUT"
-            echo "env_file=/srv/monstruo/.env.server.dev" >> "$GITHUB_OUTPUT"
+            echo "env_file=/srv/monstruo_dev/.env.server.dev" >> "$GITHUB_OUTPUT"
             echo "project=monstruo-dev" >> "$GITHUB_OUTPUT"
             echo "stack=monstruo-dev" >> "$GITHUB_OUTPUT"
             echo "health=http://127.0.0.1:9001/health" >> "$GITHUB_OUTPUT"
+            echo "deploy_path=/srv/monstruo_dev" >> "$GITHUB_OUTPUT"
           fi
       - name: Deploy to server
         env:
-          DEPLOY_PATH: ${{ github.workspace }}
+          DEPLOY_PATH: ${{ steps.target.outputs.deploy_path }}
           DEPLOY_BRANCH: ${{ steps.target.outputs.branch }}
           DEPLOY_ENV_FILE: ${{ steps.target.outputs.env_file }}
           DEPLOY_COMPOSE_PROJECT: ${{ steps.target.outputs.project }}

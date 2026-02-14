@@ -18,11 +18,14 @@
 <body class="sidebar-collapsed">
   <header id="app-header">
     <div class="header-top">
-      <h1>MONSTRUO</h1>
+      <h1>MONSTRUO <span
+          style="background: #ff4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7em; margin-left: 10px; vertical-align: middle;">DEV</span>
+      </h1>
       <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
         <i class="fas fa-bars"></i>
       </button>
     </div>
+
     <nav id="dynamic-sidebar" class="side-nav">
     </nav>
     <div class="header-actions">
@@ -87,9 +90,7 @@
 
     async function loadDashboard() {
       try {
-        const res = await fetch('/api/ops/dashboard');
-        if (!res.ok) throw new Error('Failed to load stats');
-        const data = await res.json();
+        const data = await window.fetchApi('/api/ops/dashboard');
 
         // Render KPIs
         const kpis = data.kpis;
@@ -158,7 +159,7 @@
       }
     }
   </script>
-  <script src="/modulos/_compartido/js/sidebar.js?v=6"></script>
+  <script src="/modulos/_compartido/js/sidebar.js?v=8"></script>
 </body>
 
 </html>

@@ -2,8 +2,8 @@ import os
 import re
 from datetime import datetime
 
-CTX_FILE = "/srv/monstruo/docs/PROYECTO_CONTEXTO.md"
-OUT_FILE = "/srv/monstruo/docs/PROMPT_CHAT_UNIVERSAL.md"
+CTX_FILE = "/srv/monstruo_dev/docs/PROYECTO_CONTEXTO.md"
+OUT_FILE = "/srv/monstruo_dev/docs/PROMPT_CHAT_UNIVERSAL.md"
 
 def get_section_text(content, header_pattern):
     # Search for header line

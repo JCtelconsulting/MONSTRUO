@@ -6,11 +6,11 @@ from pydantic import BaseModel
 from app.core import db
 
 try:
-    # Prefer import de paquete (ejecución desde /srv/monstruo/code)
+    # Prefer import de paquete (ejecución desde /srv/monstruo_dev/code)
     from sistema_gestion.dependencias import require_role, require_session
 except Exception:
     try:
-        # Compat: ejecución desde dentro de /srv/monstruo/code/sistema_gestion
+        # Compat: ejecución desde dentro de /srv/monstruo_dev/code/sistema_gestion
         from dependencias import require_role, require_session
     except Exception:
         def require_role(*roles):

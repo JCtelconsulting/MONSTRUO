@@ -69,15 +69,15 @@ def iterar_archivos(base: Path, excluir_dirs: Set[str]) -> List[Path]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="/srv/monstruo/ops/guardian/configuracion_guardian.json")
-    ap.add_argument("--db", default="/srv/monstruo/ops/guardian/guardian.sqlite")
+    ap.add_argument("--config", default="/srv/monstruo_dev/ops/guardian/configuracion_guardian.json")
+    ap.add_argument("--db", default="/srv/monstruo_dev/ops/guardian/guardian.sqlite")
     ap.add_argument("--salida", required=True)
     args = ap.parse_args()
 
     cfg = cargar_json(args.config)
     rutas = cfg.get("rutas", {})
     raiz = Path(rutas.get("raiz_proyecto", "/srv/monstruo"))
-    backups_root = Path(rutas.get("carpeta_backups", "/srv/monstruo/backups"))
+    backups_root = Path(rutas.get("carpeta_backups", "/srv/monstruo_dev/backups"))
 
     vig = cfg.get("vigilante_archivos", {}) or {}
     excluir = set(vig.get("excluir_subrutas", ["backups", "venv", ".git", "__pycache__"]))

@@ -200,10 +200,42 @@ def init_db() -> None:
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'ops',  -- admin|finance|ops|warehouse
             is_active INTEGER NOT NULL DEFAULT 1,
+            allowed_modules TEXT DEFAULT '[]',
+            phone_number TEXT,
             created_at TEXT DEFAULT ''
         );
         """)
+        
+        # MIGRATION: Ensure allowed_modules and phone_number exist (for existing DBs)
+        try:
+            if is_postgres():
+                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT DEFAULT '[]'")
+                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number TEXT")
+            else:
+                # SQLite fallback
+                try:
+                    conn.execute("ALTER TABLE users ADD COLUMN allowed_modules TEXT DEFAULT '[]'")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"Warning migrating users columns: {e}")
+
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
+
+        # System Settings (EPIC Config)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            group_name TEXT DEFAULT 'general',
+            is_sensitive BOOLEAN DEFAULT 0,
+            updated_at TEXT
+        );
+        """)
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
@@ -320,6 +352,119 @@ def init_db() -> None:
         """)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_attach_ticket ON ticket_attachments(ticket_id);"
+        )
+
+        # --- Ticketera V3: Columnas extras en tickets (migración individual) ---
+        _v3_columns = [
+            ("codigo",          "TEXT",                True),
+            ("categoria",       "TEXT DEFAULT 'general'", True),
+            ("origen_email",    "TEXT",                True),
+            ("cliente_nombre",  "TEXT",                True),
+            ("prioridad",       "INTEGER DEFAULT 3",   True),
+            ("sla_horas",       "INTEGER DEFAULT 72",  True),
+            ("email_thread_id", "TEXT",                False),
+            ("resolucion",      "TEXT",                False),
+        ]
+        for col_name, col_def, is_critical in _v3_columns:
+            try:
+                conn.execute(f"ALTER TABLE tickets ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
+            except Exception as _e:
+                if is_critical:
+                    # FAIL-FAST: Si es columna crítica para V3, no permitir arranque a medias
+                    err_msg = f"[DB-MIGRATION] CRITICAL ERROR: No se pudo crear columna '{col_name}' necesaria para V3. Detalle: {_e}"
+                    print(err_msg)
+                    raise RuntimeError(err_msg) from _e
+                else:
+                    print(f"[DB-MIGRATION] WARN columna '{col_name}' ya existe o no se pudo crear: {_e}")
+
+        # Validar existencia de columnas críticas (Safety Check final)
+        # Esto cubre el caso donde "ADD COLUMN IF NOT EXISTS" no falla pero la columna igual no está accesible por alguna razón rara
+        try:
+            # Intentar leer un ticket dummy o solo verificar schema
+            # En SQLite pragma table_info, en PG information_schema. 
+            # Para ser agnóstico, hacemos un SELECT dummy
+            conn.execute("SELECT codigo, categoria, prioridad, origen_email, cliente_nombre, sla_horas FROM tickets LIMIT 0")
+        except Exception as _e:
+             raise RuntimeError(f"[DB-MIGRATION] FATAL: Las columnas críticas de V3 no son accesibles tras migración. {_e}")
+
+        for idx_sql in [
+            "CREATE INDEX IF NOT EXISTS idx_tickets_codigo ON tickets(codigo);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_categoria ON tickets(categoria);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_prioridad ON tickets(prioridad);",
+        ]:
+            try:
+                conn.execute(idx_sql)
+            except Exception as _e:
+                print(f"[DB-MIGRATION] WARN índice: {_e}")
+
+        # --- Ticketera V3: Especialidades de Usuarios ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_specialties (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            specialty TEXT NOT NULL,
+            is_available INTEGER DEFAULT 1,
+            current_load INTEGER DEFAULT 0,
+            max_load INTEGER DEFAULT 10,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(username, specialty)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_spec_user ON user_specialties(username);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_spec_specialty ON user_specialties(specialty);"
+        )
+
+        # --- Ticketera V3: Notificaciones Escalonadas ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            channel TEXT NOT NULL DEFAULT 'app',
+            status TEXT NOT NULL DEFAULT 'pending',
+            escalation_level INTEGER DEFAULT 1,
+            scheduled_at TEXT NOT NULL,
+            sent_at TEXT,
+            seen_at TEXT,
+            error TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(ticket_id) REFERENCES tickets(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_ticket ON ticket_notifications(ticket_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_user ON ticket_notifications(user_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status ON ticket_notifications(status);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_sched ON ticket_notifications(scheduled_at);"
+        )
+
+        # --- Ticketera V3: Historial de Emails ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            direction TEXT NOT NULL,
+            from_addr TEXT,
+            to_addr TEXT,
+            subject TEXT,
+            body_html TEXT,
+            attachments_json TEXT DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(ticket_id) REFERENCES tickets(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_emails_ticket ON ticket_emails(ticket_id);"
         )
 
         # Sales ERP (EPIC 05)

@@ -651,25 +651,10 @@ window.emitInvoice = async function () {
     };
 
     try {
-        // Prepare Headers
-        const token = localStorage.getItem("monstruo_token");
-        const headers = {
-            "Content-Type": "application/json"
-        };
-        if (token) headers["Authorization"] = "Bearer " + token;
-
-        const res = await fetch('/api/sales/invoices', {
+        const data = await window.fetchApi('/api/sales/invoices', {
             method: 'POST',
-            headers: headers,
-            body: JSON.stringify(payload)
+            body: payload
         });
-
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || "Error al emitir");
-        }
-
-        const data = await res.json();
 
         alert(`Borrador generado: ID #${data.id}`);
 

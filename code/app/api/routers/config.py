@@ -5,6 +5,21 @@ from app.core import db, deps
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
+
+@router.get("/users", summary="List users for dropdowns")
+async def list_users(
+    sess: dict = Depends(deps.require_permission("admin.settings"))
+):
+    """Lista de usuarios para selects de asignación."""
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT username, role, is_active FROM users ORDER BY username"
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
 @router.get("/smtp", summary="Get SMTP Config")
 async def get_smtp_config(
     sess: dict = Depends(deps.require_permission("admin.settings"))

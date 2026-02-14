@@ -1,7 +1,7 @@
 import re
 import os
 
-FILE_PATH = "/srv/monstruo/docs/PROYECTO_CONTEXTO.md"
+FILE_PATH = "/srv/monstruo_dev/docs/PROYECTO_CONTEXTO.md"
 MARKER = "=== HISTORIAL CRUDO DE CHATGPT ==="
 
 def clean_history():

@@ -3,7 +3,7 @@ import os
 import json
 
 # Add project root to path
-sys.path.insert(0, "/srv/monstruo/code")
+sys.path.insert(0, "/srv/monstruo_dev/code")
 
 from app.core import db
 

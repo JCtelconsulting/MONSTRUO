@@ -5,8 +5,12 @@ import requests
 from typing import List, Dict, Optional, Any
 from dotenv import load_dotenv
 
+from pathlib import Path
+
 # Load Env
-load_dotenv("/srv/monstruo/.env")
+# code/app/core/ai/ai_local_openai_compat.py -> parents[4] = root
+env_path = Path(__file__).resolve().parents[4] / ".env"
+load_dotenv(env_path)
 
 # Configure simple ascii logger
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)

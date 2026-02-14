@@ -9,9 +9,9 @@ echo "=========================================="
 echo ""
 
 # 0. Cargar credenciales para modo desatendido
-if [ -f /srv/monstruo/.env ]; then
+if [ -f /srv/monstruo_dev/.env ]; then
     set -o allexport
-    source /srv/monstruo/.env
+    source /srv/monstruo_dev/.env
     set +o allexport
 fi
 : ${SUDO_PASS:="Apstref.8"} # Fallback

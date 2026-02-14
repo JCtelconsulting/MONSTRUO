@@ -1,6 +1,6 @@
 import sys
 
-sys.path.append("/srv/monstruo/code")
+sys.path.append("/srv/monstruo_dev/code")
 
 from app.core import sales_service
 

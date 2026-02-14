@@ -6,4 +6,4 @@ After=network.target
 Type=oneshot
 WorkingDirectory=/srv/monstruo
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/srv/monstruo/venv/bin/python /srv/monstruo/ops/guardian/limpiador_backups.py --config /srv/monstruo/ops/guardian/configuracion_guardian.json --once
+ExecStart=/srv/monstruo_dev/venv/bin/python /srv/monstruo_dev/ops/guardian/limpiador_backups.py --config /srv/monstruo_dev/ops/guardian/configuracion_guardian.json --once
