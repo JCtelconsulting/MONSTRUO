@@ -3,14 +3,20 @@
 Reasigna tickets con asignado_a huérfano (usuario eliminado).
 
 Uso:
-  PYTHONPATH=code python3 code/scripts/reassign_orphan_tickets.py --dry-run
-  PYTHONPATH=code python3 code/scripts/reassign_orphan_tickets.py --apply
+  python3 code/scripts/maintenance/reassign_orphan_tickets.py --dry-run
+  python3 code/scripts/maintenance/reassign_orphan_tickets.py --apply
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
 from typing import Dict, List, Optional
+
+CODE_DIR = Path(__file__).resolve().parents[2]
+if str(CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_DIR))
 
 from app.core import db, tickets_service
 

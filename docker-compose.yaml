@@ -16,7 +16,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: code/docker/Dockerfile.api
+      dockerfile: code/ops/docker/Dockerfile.api
     container_name: ${STACK_NAME:-monstruo}-api
     env_file:
       - ${ENV_FILE:-.env}
