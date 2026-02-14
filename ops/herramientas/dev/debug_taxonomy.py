@@ -1,60 +1,51 @@
 #!/usr/bin/env python3
-import sys
-import os
+from __future__ import annotations
+
+import argparse
 import json
-import logging
+import sys
+from pathlib import Path
 
-# Add code dir to path
-sys.path.append("/srv/monstruo_dev/code")
-sys.path.append("/srv/monstruo_dev/code/sistema_gestion")
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+CODE_DIR = PROJECT_ROOT / "code"
+if str(CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_DIR))
 
-from sistema_gestion import catalogo_seed_ai
-from sistema_gestion import ai_local_openai_compat, nucleo
+from app.core.ai import ai_local_openai_compat
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 
-def test_classify():
-    print("--- DEBUG TAXONOMY ---")
-    
-    # 1. Check Status
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Preflight de IA para taxonomia/catalogo")
+    parser.add_argument(
+        "--chat",
+        action="store_true",
+        help="Ademas del status, intenta una llamada simple de chat",
+    )
+    args = parser.parse_args()
+
     status = ai_local_openai_compat.check_status()
-    print(f"Ai Status: {status}")
-    
-    if not status.get("ok"):
-        print("ERROR: AI Module not OK")
-        return
+    print("AI status:")
+    print(json.dumps(status, ensure_ascii=False, indent=2))
 
-    # 2. Test Items
-    items = [
-        {"raw_nombre": "Switch Mikrotik 24p", "raw_marca": "Mikrotik", "raw_sku": "RB1100AHx4"},
-        {"raw_nombre": "Router Cisco 48 Puertos", "raw_marca": "Cisco", "raw_sku": "ISR4331"},
-        {"raw_nombre": "Cable UTP Cat6 Exterior", "raw_marca": "", "raw_sku": ""},
-        {"raw_nombre": "Caja Tornillos 1 pulgada", "raw_marca": "", "raw_sku": ""}
-    ]
-    
-    print(f"\nSending {len(items)} items to AI...")
-    
-    # 3. Call Classify
-    # Mock connection not needed for basic test unless few-shot fails
-    # But let's pass None for conn to skip few-shot for now to isolate prompt
-    results = catalogo_seed_ai.ai_classify_batch(items, ai_local_openai_compat, conn=None)
-    
-    print("\n--- RESULTS ---")
-    print(json.dumps(results, indent=2))
-    
-    # 4. Verify against Expected
-    print("\n--- VERIFICATION ---")
-    for i, res in enumerate(results):
-        ruta = res.get("ruta", [])
-        print(f"Item: {items[i]['raw_nombre']}")
-        print(f"  -> Path: {ruta}")
-        
-        if "Switch" in items[i]["raw_nombre"]:
-            if "24 Puertos" in ruta:
-                print("  [OK] Detected 24 Ports")
-            else:
-                print("  [FAIL] Did NOT detect 24 Ports")
+    if not args.chat:
+        return 0
+
+    reply = ai_local_openai_compat.chat(
+        [
+            {"role": "system", "content": "Responde en una linea."},
+            {"role": "user", "content": "Prueba de conectividad para catalogo"},
+        ],
+        temperature=0.0,
+    )
+
+    if reply is None:
+        print("Chat de prueba: FAIL")
+        return 2
+
+    print("Chat de prueba: OK")
+    print(reply)
+    return 0
+
 
 if __name__ == "__main__":
-    test_classify()
+    raise SystemExit(main())

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import sys
 import os
+from pathlib import Path
 
-# Add code to path
-sys.path.insert(0, "/srv/monstruo_dev/code")
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+CODE_DIR = PROJECT_ROOT / "code"
+sys.path.insert(0, str(CODE_DIR))
 
 try:
     from app.core import auth_service, security, db

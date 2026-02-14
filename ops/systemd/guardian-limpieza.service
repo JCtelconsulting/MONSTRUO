@@ -4,6 +4,6 @@ After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/srv/monstruo
+WorkingDirectory=/srv/monstruo_dev
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/srv/monstruo_dev/venv/bin/python /srv/monstruo_dev/ops/guardian/limpiador_backups.py --config /srv/monstruo_dev/ops/guardian/configuracion_guardian.json --once
+ExecStart=/usr/bin/python3 /srv/monstruo_dev/ops/guardian/scripts/saneador_nombres_prohibidos.py --config /srv/monstruo_dev/ops/guardian/config/configuracion_guardian.json --db /srv/monstruo_dev/ops/guardian/guardian.sqlite --salida /srv/monstruo_dev/ops/guardian/reportes/reporte_nombres_prohibidos__latest.json

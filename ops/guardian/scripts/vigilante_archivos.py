@@ -205,7 +205,7 @@ def escanear(
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Vigilante de archivos (MONSTRUO)")
-    ap.add_argument("--config", default="/srv/monstruo_dev/ops/guardian/configuracion_guardian.json")
+    ap.add_argument("--config", default="/srv/monstruo_dev/ops/guardian/config/configuracion_guardian.json")
     ap.add_argument("--intervalo", type=float, default=2.0)
     ap.add_argument("--once", action="store_true")
     args = ap.parse_args()

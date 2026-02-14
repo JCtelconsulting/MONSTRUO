@@ -1,9 +1,17 @@
 #!/bin/bash
 # limpiar_ram.sh
-SUDO_PASS="Apstref.8"
+set -euo pipefail
+
+run_sudo() {
+    if [ -n "${SUDO_PASS:-}" ]; then
+        printf '%s\n' "$SUDO_PASS" | sudo -S "$@"
+    else
+        sudo "$@"
+    fi
+}
 
 echo "Limpiando caches de memoria en WSL..."
-echo $SUDO_PASS | sudo -S sysctl -w vm.drop_caches=3
+run_sudo sysctl -w vm.drop_caches=3
 
 echo "Memoria despues de la limpieza:"
 free -h

@@ -1,29 +1,39 @@
 #!/bin/bash
+set -euo pipefail
 # Script Maestro para Iniciar Entorno Local (Monstruo + Terreneitor)
 # Autor: Antigravity
 # Fecha: 2026-01-26
 
 echo "=========================================="
-echo "🚀 INICIANDO ENTORNO LOCAL DE TELCONSULTING"
+echo "INICIANDO ENTORNO LOCAL DE TELCONSULTING"
 echo "=========================================="
 echo ""
 
+PROJECT_ROOT="${PROJECT_ROOT:-/srv/monstruo_dev}"
+
+run_sudo() {
+    if [ -n "${SUDO_PASS:-}" ]; then
+        printf '%s\n' "$SUDO_PASS" | sudo -S "$@"
+    else
+        sudo "$@"
+    fi
+}
+
 # 0. Cargar credenciales para modo desatendido
-if [ -f /srv/monstruo_dev/.env ]; then
+if [ -f "$PROJECT_ROOT/.env" ]; then
     set -o allexport
-    source /srv/monstruo_dev/.env
+    source "$PROJECT_ROOT/.env"
     set +o allexport
 fi
-: ${SUDO_PASS:="Apstref.8"} # Fallback
 
 # 1. Monstruo (Systemd Service)
 echo "[1/2] Iniciando MONSTRUO (Puerto 9000)..."
-echo "$SUDO_PASS" | sudo -S systemctl restart monstruo-api
+run_sudo systemctl restart monstruo-api
 
 if systemctl is-active --quiet monstruo-api; then
     echo "✅ MONSTRUO: ONLINE"
 else
-    echo "❌ MONSTRUO: FALLA"
+    echo "MONSTRUO: FALLA"
 fi
 
 echo ""
@@ -36,7 +46,7 @@ if [ -d "/srv/terreneitor" ]; then
     nohup ./start.sh > logs/terreneitor_launcher.log 2>&1 &
     echo "✅ TERRENEITOR: INICIADO (Background)"
 else
-    echo "⚠️  No se encontró /srv/terreneitor"
+    echo "No se encontro /srv/terreneitor"
 fi
 
 # Pausa breve para asegurar init

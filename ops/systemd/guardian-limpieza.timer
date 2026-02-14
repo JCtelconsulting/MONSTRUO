@@ -5,7 +5,7 @@ Description=MONSTRUO Guardian - Limpieza de backups (timer)
 OnCalendar=*-*-* 03:25:00
 RandomizedDelaySec=30s
 Persistent=true
-Unit=monstruo-guardian-limpieza-backups.service
+Unit=guardian-limpieza.service
 
 [Install]
 WantedBy=timers.target

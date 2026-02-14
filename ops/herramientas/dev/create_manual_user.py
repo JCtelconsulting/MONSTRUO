@@ -1,22 +1,52 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
 import sys
-import os
+from pathlib import Path
 
-# Add code/sistema_gestion to path
-sys.path.append("/srv/monstruo_dev/code/sistema_gestion")
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+CODE_DIR = PROJECT_ROOT / "code"
+if str(CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_DIR))
 
-import nucleo
+from app.core import auth_service, db, security
 
-def main():
-    username = "admin_test"
-    password = "test1234"
-    role = "admin"
-    print(f"Creating user {username}...")
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Crea o actualiza un usuario manualmente")
+    parser.add_argument("--username", default="admin_test")
+    parser.add_argument("--password", default="test1234")
+    parser.add_argument("--role", default="admin")
+    parser.add_argument("--upsert", action="store_true", help="Si existe, actualiza password/role")
+    args = parser.parse_args()
+
+    conn = db.get_conn()
     try:
-        nucleo.create_user(username, password, role)
-        print("User created successfully.")
-    except Exception as e:
-        print(f"Error creating user: {e}")
+        existing = conn.execute(
+            "SELECT username FROM users WHERE username=?", (args.username.strip(),)
+        ).fetchone()
+
+        if existing and not args.upsert:
+            print(f"Usuario ya existe: {args.username}. Usa --upsert para actualizar.")
+            return 0
+
+        if existing and args.upsert:
+            hashed = security.get_password_hash(args.password)
+            conn.execute(
+                "UPDATE users SET role=?, password_hash=? WHERE username=?",
+                (args.role.strip(), hashed, args.username.strip()),
+            )
+            conn.commit()
+            print(f"Usuario actualizado: {args.username}")
+            return 0
+
+        auth_service.create_user(args.username, args.password, args.role)
+        print(f"Usuario creado: {args.username}")
+        return 0
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

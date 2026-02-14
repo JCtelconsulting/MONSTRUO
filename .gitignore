@@ -70,3 +70,6 @@ runner/
 
 # Runtime ticket attachments
 data/tickets/
+
+# Guardian runtime reports
+ops/guardian/reportes/*.json

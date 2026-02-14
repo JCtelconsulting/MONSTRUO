@@ -111,7 +111,7 @@ def leer_journalctl_unidad(unidad: str, seguir: bool) -> subprocess.Popen:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="/srv/monstruo_dev/ops/guardian/configuracion_guardian.json")
+    ap.add_argument("--config", default="/srv/monstruo_dev/ops/guardian/config/configuracion_guardian.json")
     ap.add_argument("--modo", choices=["archivo", "journalctl"], default=None)
     ap.add_argument("--archivo", default=None)
     ap.add_argument("--once", action="store_true")

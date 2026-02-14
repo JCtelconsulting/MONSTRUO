@@ -11,12 +11,12 @@
     "borrar_carpetas_vacias_mayores_a_dias": 30,
     "max_por_item": 5
   },
-  "proyecto_raiz": "/srv/monstruo",
+  "proyecto_raiz": "/srv/monstruo_dev",
   "rutas": {
     "bd_eventos": "/srv/monstruo_dev/ops/guardian/guardian.sqlite",
     "carpeta_backups": "/srv/monstruo_dev/backups",
     "docs_contexto": "/srv/monstruo_dev/docs/PROYECTO_CONTEXTO.md",
-    "raiz_proyecto": "/srv/monstruo"
+    "raiz_proyecto": "/srv/monstruo_dev"
   },
   "severidades": {
     "critical": "CRITICAL",
@@ -48,7 +48,7 @@
       ".sql"
     ],
     "incluir": [
-      "/srv/monstruo"
+      "/srv/monstruo_dev"
     ],
     "patrones_prohibidos": [
       ".bak",
