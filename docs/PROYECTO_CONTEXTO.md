@@ -2,6 +2,11 @@
 **Fecha de actualizacion:** 14 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-14 23:00 - Cierre Definitivo Gobernanza (EPIC 11)
+- **Acción**: Eliminación total de secretos hardcodeados en scripts de seed (`setup_users.py`).
+- **Validación**: Barrido de seguridad (grep) limpio y re-ejecución exitosa de suite E2E.
+- **Estado**: GOBERNANZA CUMPLIDA. Repositorio en regla.
+
 ## HITO: 2026-02-14 22:00 - Cierre Técnico E2E Ticketera (DEV)
 - **Solicitud**: Completar E2E con prueba de `incoming thread match` y hardening de deploy.
 - **Entregable**:
