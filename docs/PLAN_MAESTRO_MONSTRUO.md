@@ -1359,7 +1359,93 @@ Arquitectura de Carpetas
 │       ├── install_shortcut.ps1.txt
 │       ├── monstruo_silent.vbs.txt
 │       └── monstruo_start.bat.txt
-├── ops/                             # Se detalla en fase siguiente
+├── ops/                             # Operación y mantenimiento del sistema
+│   ├── .README.md
+│   ├── compose/
+│   │   └── docker-compose.yml.md
+│   ├── control/                     # Scripts de control operativo local
+│   │   ├── control_ia.sh
+│   │   ├── control_monstruo.sh
+│   │   ├── control_terreneitor.sh
+│   │   └── limpiar_ram.sh
+│   ├── entornos/
+│   │   └── ejemplo.env
+│   ├── guardian/                    # Monitoreo y vigilancia de integridad
+│   │   ├── .README.md
+│   │   ├── config/
+│   │   │   └── configuracion_guardian.json
+│   │   ├── estado_supervisor.json
+│   │   ├── reportes/
+│   │   │   └── reporte_nombres_prohibidos__2026-01-27__172848.json
+│   │   └── scripts/
+│   │       ├── enviar_a_ia_local.py
+│   │       ├── install_hooks.sh
+│   │       ├── orden_guardian.py
+│   │       ├── saneador_nombres_prohibidos.py
+│   │       ├── supervisor_eventos.py
+│   │       ├── verify_auth.py
+│   │       ├── vigilante_archivos.py
+│   │       └── vigilante_registros.py
+│   ├── herramientas/                # Utilidades de soporte técnico
+│   │   ├── .README.md
+│   │   ├── add_postgres_constraints.py
+│   │   ├── migrate_categories_mirror.py
+│   │   ├── migrate_sqlite_to_postgres.py
+│   │   ├── ai/
+│   │   │   ├── snapshot_for_training.py
+│   │   │   ├── start_llm_server.sh
+│   │   │   └── verify_ai_endpoints.py
+│   │   ├── db/                      # Migraciones/fixes de base de datos
+│   │   │   ├── categorize_laudus_data.py
+│   │   │   ├── categorize_orphans.py
+│   │   │   ├── db_migrate_catalogo_v2.py
+│   │   │   ├── db_migrate_ticketera_catalogo.py
+│   │   │   ├── db_migrate_tks_v2.py
+│   │   │   ├── db_top_tables.py
+│   │   │   ├── fix_bodega_hierarchy.py
+│   │   │   ├── fix_postgres_catalogo.py
+│   │   │   ├── migrate_hidden_categories.py
+│   │   │   ├── seed_catalogo_base.py
+│   │   │   └── sync_m2m_categories.py
+│   │   ├── deploy/                  # Scripts de arranque/deploy/validación
+│   │   │   ├── deploy.sh
+│   │   │   ├── generate_universal_prompt.py
+│   │   │   ├── iniciar_todo.sh
+│   │   │   ├── start.sh
+│   │   │   └── verify_structure.py
+│   │   └── dev/                     # Debug y utilidades de desarrollo
+│   │       ├── create_manual_user.py
+│   │       ├── debug_bank_lines.py
+│   │       ├── debug_db.py
+│   │       ├── debug_invoice_service.py
+│   │       ├── debug_invoices.py
+│   │       ├── debug_matching.py
+│   │       ├── debug_no_matches.py
+│   │       ├── debug_sales.py
+│   │       ├── debug_sync.py
+│   │       ├── debug_taxonomy.py
+│   │       ├── fix_schema_constraints.py
+│   │       ├── format_contexto.py
+│   │       ├── generate_fake_csv.py
+│   │       ├── get_laudus_codes.py
+│   │       ├── probe_laudus_journal.py
+│   │       ├── probe_laudus_ledger.py
+│   │       ├── proxy_vm.env.example
+│   │       ├── proxy_vm_env.sh
+│   │       ├── refine_history.py
+│   │       ├── test_laudus_details.py
+│   │       ├── test_pdf_logic.py
+│   │       └── test_upload_parse.py
+│   └── systemd/                     # Unidades de servicio legacy/infra
+│       ├── .README.md
+│       ├── api.service
+│       ├── guardian-archivos.service
+│       ├── guardian-envio.service
+│       ├── guardian-envio.timer
+│       ├── guardian-limpieza.service
+│       ├── guardian-limpieza.timer
+│       ├── guardian-registros.service
+│       └── guardian-supervisor.service
 ├── tests/                           # Se detalla en fase siguiente
 ├── docker-compose.yaml
 └── AGENTS.md
