@@ -2,6 +2,27 @@
 **Fecha de actualizacion:** 14 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-14 17:10 - Desambiguación de nombres (PMO/routers/wrappers legacy)
+- **Solicitud**: Evitar archivos con el mismo nombre cuando representan funciones distintas.
+- **Entregable**:
+  - PMO renombrado para claridad:
+    - `code/static/modulos/pmo/dashboard.html` -> `code/static/modulos/pmo/pmo.html`
+    - referencias actualizadas en `main.py` y `sidebar.js`.
+  - Routers API renombrados para evitar ambigüedad con capa core:
+    - `audit.py` -> `audit_router.py`
+    - `bridge.py` -> `bridge_router.py`
+    - `config.py` -> `config_router.py`
+  - Wrappers legacy renombrados explícitamente:
+    - `code/app/workflow_db.py` -> `code/app/workflow_db_legacy.py`
+    - `code/app/utils/ai_init.py` -> `code/app/utils/ai_init_legacy.py`
+    - `code/app/utils/ai_local_openai_compat.py` -> `code/app/utils/ai_local_openai_compat_legacy.py`
+  - Smoke validado:
+    - `docker compose config` DEV y PROD OK.
+    - Healthcheck `:9001` y `:9000` OK.
+    - Ruta nueva PMO (`/modulos/pmo/pmo.html`) OK.
+    - Ruta antigua PMO (`/modulos/pmo/dashboard.html`) responde 404 esperado.
+- **Estado**: CERRADO.
+
 ## HITO: 2026-02-14 16:20 - Limpieza de raiz: plantillas .env centralizadas
 - **Solicitud**: Reducir ruido por exceso de archivos `.env*` en la raiz del repositorio.
 - **Entregable**:
