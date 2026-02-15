@@ -18,7 +18,15 @@ env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=env_path)
 from app.core import db, security, auth_service, audit, jobs_engine
 from app.api.routers import bancos
-from app.jobs import ticket_sla, crm_sync, stock_sync, invoice_sync, services_sync, compliance_jobs
+from app.jobs import (
+    ticket_sla,
+    crm_sync,
+    stock_sync,
+    invoice_sync,
+    services_sync,
+    compliance_jobs,
+    jira_parallel_jobs,
+)
 from app.procesos import facturacion_job
 from app.core import deps as auth_deps
 from app.core.middleware import AuthIdentityMiddleware
@@ -107,6 +115,7 @@ def register_all_jobs():
     jobs_engine.register_job("SYNC_SERVICES_LAUDUS", services_sync.sync_services_from_laudus)
     jobs_engine.register_job("COMPLIANCE_EXPORT_DAILY", compliance_jobs.compliance_export_daily)
     jobs_engine.register_job("COMPLIANCE_PURGE_DAILY", compliance_jobs.compliance_purge_daily)
+    jobs_engine.register_job("JIRA_DELTA_SYNC_DAILY", jira_parallel_jobs.jira_delta_sync_daily)
 
     # Nuevos Jobs de Integración (EPIC 11)
     from app.workers import integrations_worker
@@ -163,6 +172,9 @@ async def start_background_workers():
     )
     await jobs_engine.enqueue_job(
         "COMPLIANCE_PURGE_DAILY", payload={"recurring": True}, max_retries=1
+    )
+    await jobs_engine.enqueue_job(
+        "JIRA_DELTA_SYNC_DAILY", payload={"recurring": True}, max_retries=1
     )
 
     print(f"[Startup] Billing, SLA and Email jobs scheduled")

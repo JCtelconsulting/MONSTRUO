@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     
     # Configuración de Ticketera y Entorno
     TICKET_AUTO_REPLY_ENABLED: bool = False
+    TICKET_AUTO_REPLY_DELAY_MINUTES: int = 15
+    TICKET_AUTO_REPLY_ALLOWLIST_EMAILS: str = ""
+    TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS: str = ""
+    TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST: bool = True
+    TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS: str = "noreply,no-reply,mailer-daemon,postmaster"
     ENV_TYPE: str = "dev"  # dev, prod, staging
     COMPLIANCE_EXPORT_DIR: str = ""
     COMPLIANCE_TZ: str = "America/Santiago"
@@ -22,6 +27,25 @@ class Settings(BaseSettings):
     TICKET_RETENTION_PUBLIC_DAYS: int = 365
     TICKET_RETENTION_INTERNAL_DAYS: int = 1095
     TICKET_RETENTION_RESTRICTED_DAYS: int = 1825
+    CHANNELS_ENABLED: bool = False
+    WHATSAPP_ADAPTER_MODE: str = "disabled"  # disabled | dry_run | live
+    THREECX_ADAPTER_MODE: str = "disabled"  # disabled | dry_run | live
+    WHATSAPP_BASE_URL: str = ""
+    WHATSAPP_AUTH_TOKEN: str = ""
+    WHATSAPP_TIMEOUT_SECONDS: int = 10
+    THREECX_BASE_URL: str = ""
+    THREECX_AUTH_TOKEN: str = ""
+    THREECX_TIMEOUT_SECONDS: int = 10
+    CHANNELS_MAX_ATTEMPTS: int = 3
+    CHANNELS_RETRY_BASE_SECONDS: int = 60
+    CHANNELS_RETRY_MAX_SECONDS: int = 900
+    JIRA_BASE_URL: str = ""
+    JIRA_USER: str = ""
+    JIRA_API_TOKEN: str = ""
+    JIRA_PROJECT_KEYS: str = ""
+    JIRA_SYNC_ENABLED: bool = False
+    JIRA_SYNC_DAILY_HOUR: int = 3
+    JIRA_SYNC_TZ: str = "America/Santiago"
     TICKET_SLA_MODE: str = "24x7"  # 24x7 | business_hours
     TICKET_SLA_BUSINESS_TZ_OFFSET: str = "-03:00"  # Formato ±HH:MM
     TICKET_SLA_BUSINESS_DAYS: str = "0,1,2,3,4"  # 0=lunes ... 6=domingo

@@ -2,6 +2,87 @@
 **Fecha de actualizacion:** 15 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-15 08:40 - EPIC 11 Auto-Respuesta Segura v1 (allowlist + antiloop + hilo completo)
+- **Solicitud**: Implementar auto-respuesta de recepción sin riesgo operacional y sin romper el flujo actual de Ticketera.
+- **Entregable**:
+  - Configuración nueva por entorno:
+    - `TICKET_AUTO_REPLY_DELAY_MINUTES`
+    - `TICKET_AUTO_REPLY_ALLOWLIST_EMAILS`
+    - `TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS`
+    - `TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST`
+    - `TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS`
+  - Persistencia y threading:
+    - `tickets.email_references` incorporado a creación de ticket y match por hilo.
+    - `In-Reply-To`/`References` acumulados y acotados para evitar conversaciones partidas.
+  - Motor de decisión:
+    - evaluación determinística `enabled -> email válido -> blocklist -> allowlist -> one-shot`.
+    - fail-closed por defecto (`require_allowlist=true`).
+  - Programación/ejecución:
+    - agenda de auto-reply con delay configurable (default 15m) e idempotencia estable por `ticket_id+destinatario`.
+    - registro de trazabilidad en `ticket_emails` con direcciones `auto_reply_pending`, `auto_reply`, `auto_reply_skipped`.
+    - job `SEND_AUTO_RESPONSE` endurecido con lock por ticket, dedupe final, envío avanzado con headers de hilo y actualización de metadata de thread.
+  - Validación:
+    - `tests/e2e_ticketera.py` extendido con bloque de auto-reply seguro (allowlist, blocklist, one-shot, thread chain).
+    - `tests/verify_hardening.py` extendido para exigir variables `TICKET_AUTO_REPLY_*` en config y plantillas.
+    - Validación ejecutada en DEV:
+      - `python3 tests/verify_hardening.py` PASS
+      - Smoke técnico en contenedor API (`db.init_db` + flujo auto-reply con lock/idempotencia/hilo) PASS.
+      - `python3 tests/verify_hardening.py --check-api` PASS (usuario admin temporal de prueba).
+      - `python3 tests/e2e_ticketera.py` PASS end-to-end.
+    - Observación operativa:
+      - Si el contenedor API no se reinicia tras deploy, `tickets.email_references` puede faltar hasta ejecutar migración (`db.init_db`).
+  - Ajuste adicional de estabilidad E2E:
+    - `JiraIssueIn` amplía contrato con `updated_at/updated` para conservar idempotencia real en `delta-sync` por payload.
+- **Estado**: CERRADO (implementación y validación completa en DEV).
+
+## HITO: 2026-02-15 06:10 - EPIC 11 fase técnica paralelo Jira+MONSTRUO + Go/No-Go
+- **Solicitud**: Implementar siguiente fase EPIC 11 para paralelo Jira+MONSTRUO (8 semanas), con sincronización controlada, KPI diario y registro formal Go/No-Go.
+- **Entregable**:
+  - APIs nuevas protegidas por `tickets:compliance`:
+    - `POST /api/tks/migration/jira/bootstrap-open`
+    - `POST /api/tks/migration/jira/delta-sync/run`
+    - `GET /api/tks/migration/jira/runs`
+    - `GET /api/tks/migration/jira/reconciliation/daily`
+    - `GET /api/tks/parallel/kpi/daily`
+    - `POST /api/tks/parallel/go-no-go`
+  - Persistencia Jira/paralelo:
+    - tablas `jira_issue_map`, `jira_sync_runs`, `jira_sync_cursor`, `parallel_kpi_daily`, `parallel_decisions`.
+    - índices de consulta para issue key, estado de run y snapshots diarios.
+  - Motor de sincronización:
+    - `bootstrap` y `delta` idempotentes por `jira_issue_key + jira_updated_at`.
+    - cursor incremental para delta diario.
+    - reconciliación y snapshot KPI diario con evidencia ISO.
+  - Job recurrente:
+    - `JIRA_DELTA_SYNC_DAILY` registrado en worker con reencolado anti-duplicado.
+  - Gobernanza documental:
+    - reconstruido `docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md` como fuente oficial activa.
+    - creado `docs/playbooks/paralelo_jira_monstruo.md` para operación semanal y cierre.
+  - Configuración:
+    - variables `JIRA_*` añadidas a `config.py` y plantillas env (`.env.example`, `.env.local.example`, `docs/deploy/plantillas_env/*`).
+- **Estado**: CERRADO PARCIAL (base técnica + gobernanza listas en DEV; pendiente ejecución operativa de 8 semanas en entorno productivo controlado).
+
+## HITO: 2026-02-15 05:05 - Worker real de canales EPIC 11 (WhatsApp + 3CX prelisto)
+- **Solicitud**: Implementar fase de escalamiento real por canales con activación controlada y separación DEV/PROD.
+- **Entregable**:
+  - State machine de notificaciones robusta en `ticket_notifications`:
+    - estados operativos `pending`, `dispatching`, `sent`, `failed`, `cancelled`.
+    - nuevos campos de entrega/reintento (`provider`, `provider_ref`, `last_error`, `attempt_count`, `max_attempts`, `next_retry_at`, `locked_at`, `updated_at`) + índices compuestos.
+    - tabla nueva `ticket_notification_attempts` para trazabilidad por intento e idempotencia de retry manual.
+  - Worker de integración real:
+    - `code/app/workers/integrations_worker.py` reescrito con adapters HTTP agnósticos.
+    - modos por canal `disabled|dry_run|live` + manejo de credenciales faltantes sin 500.
+    - backoff exponencial acotado y corte por `max_attempts`.
+  - API operativa mínima (RBAC `tickets:compliance`):
+    - `GET /api/tks/channels/status`
+    - `GET /api/tks/channels/notifications`
+    - `POST /api/tks/channels/notifications/{notification_id}/retry` (idempotencia opcional por `Idempotency-Key`).
+  - Configuración por entorno:
+    - nuevas `CHANNELS_*`, `WHATSAPP_*`, `THREECX_*` en `config.py` y plantillas de entorno.
+  - Tests:
+    - `tests/e2e_ticketera.py` extendido con bloque de canales (dry_run, fallo controlado live sin credenciales, retry manual idempotente).
+    - `tests/verify_hardening.py` extendido para rutas/variables de canales.
+- **Estado**: CERRADO (fase técnica completada en DEV; activación live queda para siguiente fase con secretos por entorno).
+
 ## HITO: 2026-02-15 03:10 - Compliance Core EPIC 11 (inmutabilidad + export + retención/purga)
 - **Solicitud**: Implementar cierre operativo de compliance en Ticketera para operación auditable (base ISO/IEC 27001).
 - **Entregable**:

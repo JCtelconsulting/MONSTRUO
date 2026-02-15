@@ -48,3 +48,18 @@
 [SUCCESS] E2E Ticketera PASS
 [PASS] e2e_ticketera.py
 ```
+
+## Parámetros Operacionales Auto-Respuesta Segura v1
+
+Variables requeridas por entorno:
+- `TICKET_AUTO_REPLY_ENABLED` (`true|false`)
+- `TICKET_AUTO_REPLY_DELAY_MINUTES` (default `15`)
+- `TICKET_AUTO_REPLY_ALLOWLIST_EMAILS` (CSV emails exactos)
+- `TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS` (CSV dominios, opcional con o sin `@`)
+- `TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST` (default `true`, fail-closed)
+- `TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS` (default `noreply,no-reply,mailer-daemon,postmaster`)
+
+Reglas operativas:
+- Precedencia: `blocklist > allowlist`.
+- One-shot: máximo 1 auto-respuesta por `ticket_id + destinatario`.
+- Threading: usar siempre `In-Reply-To` + `References` con cadena acumulada (`tickets.email_references`).
