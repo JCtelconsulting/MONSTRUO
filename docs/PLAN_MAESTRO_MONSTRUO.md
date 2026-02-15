@@ -74,6 +74,10 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-02-15: EPIC 11 Ticketera: fase técnica del paralelo Jira+MONSTRUO completada (tablas `jira_issue_map/jira_sync_runs/jira_sync_cursor/parallel_kpi_daily/parallel_decisions`, sync `bootstrap-open` + `delta-sync`, reconciliación/KPI diario, endpoint formal de decisión Go/No-Go y job recurrente `JIRA_DELTA_SYNC_DAILY`).
+- 2026-02-15: EPIC 11 Ticketera: Auto-Respuesta Segura v1 implementada (`allowlist` por ENV + `blocklist` localpart + delay configurable de 15m + one-shot por `ticket_id+destinatario` + idempotencia en job + threading robusto con cadena `email_references`).
+- 2026-02-15: EPIC 11 Ticketera: validación final DEV en verde (`verify_hardening --check-api` + `e2e_ticketera` completos). Ajuste API Jira (`updated_at/updated` en `JiraIssueIn`) para mantener idempotencia en `delta-sync` por payload.
+- 2026-02-15: EPIC 11 Ticketera: Worker real de canales implementado con adapters HTTP (WhatsApp + 3CX) en modo controlado (`disabled|dry_run|live`), state machine robusta en `ticket_notifications` (`pending -> dispatching -> sent/failed/cancelled`), retries con backoff, endpoints operativos (`/api/tks/channels/status`, `/channels/notifications`, `/channels/notifications/{id}/retry`) y protección RBAC `tickets:compliance`.
 - 2026-02-15: Estabilización de navegación DEV: fix de lentitud intermitente al cargar `/dev` (proxy Nginx ajustado para reescritura solo HTML, evitando buffering de CSS/JS) + polling IMAP movido a hilo en `jobs_engine` con timeout para evitar bloqueos del loop del API.
 - 2026-02-15: EPIC 11 Ticketera: SLA extendido con soporte de horario hábil/calendario y ventanas de escalamiento configurables por entorno (`TICKET_SLA_MODE`, `TICKET_SLA_BUSINESS_*`, `TICKET_SLA_ESCALATION_WINDOWS_PCT`) manteniendo compatibilidad 24x7 por defecto.
 - 2026-02-15: EPIC 11 Ticketera: cierre técnico del bloque `Workflow + SLA` (workflow por tipo con `estado+subestado`, doble aprobación de cambios, endpoints de transiciones/aprobaciones/workflow, SLA 24x7 con FRT/TTR/Aging/Breach e idempotencia en rutas críticas). E2E y hardening API en verde.
@@ -1919,9 +1923,10 @@ Tareas:
 - [x] Operación compliance cerrada (bitácora inmutable, exportes de auditoría, retención/borrado por clase)
 - [x] Compliance API operativo (`/api/tks/compliance/legal-holds`, `/exports/run`, `/purge/dry-run`, `/purge/run`, `/hash-chain/verify`)
 - [x] Scheduler compliance (`COMPLIANCE_EXPORT_DAILY` 02:00 y `COMPLIANCE_PURGE_DAILY` 02:20, zona `America/Santiago`)
-- [ ] Worker real para escalamiento WhatsApp/3CX (hoy se agenda en DB, falta ejecutor de canal)
-- [ ] Auto-respuesta configurable de recepción de correo (actualmente desactivada)
-- [ ] Operación en paralelo Jira+MONSTRUO 4-8 semanas con comparativa diaria KPI/SLA
+- [x] Worker real para escalamiento WhatsApp/3CX (adapters HTTP + modos `disabled|dry_run|live`, retries/backoff y observabilidad mínima por API)
+- [x] Auto-respuesta segura v1 (`allowlist` + `blocklist` + one-shot + delay configurable + headers de hilo + registro `auto_reply_pending/auto_reply`)
+- [x] Base técnica de paralelo Jira+MONSTRUO (APIs `bootstrap-open`, `delta-sync/run`, `runs`, `reconciliation/daily`, `parallel/kpi/daily`, `parallel/go-no-go` + job diario `JIRA_DELTA_SYNC_DAILY`)
+- [ ] Operación en paralelo Jira+MONSTRUO 4-8 semanas con comparativa diaria KPI/SLA (ejecución real)
 - [ ] Acta Go/No-Go de apagado Jira + hypercare 30 días
 - [x] Baseline de pruebas E2E profesionalizadas (`tests/e2e_ticketera.py`, `tests/e2e_api_full.py`, `tests/verify_hardening.py`)
 - [x] Suite de tests E2E ticketera (`create -> reply -> dedupe -> incoming thread match`)
@@ -1935,6 +1940,7 @@ Aceptación:
 - [x] Código de ticket usa formato `TK-DD-MM-YYYY-NNNN` en creación nueva
 - [x] API de adjuntos e historial legible disponibles para operación y auditoría
 - [x] Validación automatizada de separación DEV/PROD para flujo de correo y jobs
+- [x] Auto-respuesta restringida a allowlist con anti-loop y dedupe one-shot por ticket/hilo
 - [x] Workflow por tipo + doble aprobación de cambios operativo y validado por E2E
 - [x] Métricas SLA/API con FRT/TTR/Aging/Breach validadas (`/api/tks/sla/metrics`, `/api/tks/sla/breaches`)
 - [x] SLA configurable por entorno: modo `24x7` o `business_hours` + ventanas de escalamiento por porcentaje

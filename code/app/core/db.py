@@ -183,6 +183,37 @@ def _create_append_only_triggers(conn, table_name: str) -> None:
     )
 
 
+def _has_append_only_triggers(conn, table_name: str) -> bool:
+    trg_upd = f"trg_{table_name}_no_update"
+    trg_del = f"trg_{table_name}_no_delete"
+    row = conn.execute(
+        """SELECT 1
+           FROM pg_trigger t
+           JOIN pg_class c ON c.oid = t.tgrelid
+           WHERE c.relname = ?
+             AND NOT t.tgisinternal
+             AND t.tgname IN (?, ?)
+           LIMIT 1""",
+        (table_name, trg_upd, trg_del),
+    ).fetchone()
+    return bool(row)
+
+
+def _run_guarded_pg_section(conn, section_name: str, fn) -> None:
+    sp_name = f"sp_{section_name}".replace("-", "_")
+    conn.execute(f"SAVEPOINT {sp_name}")
+    try:
+        fn()
+        conn.execute(f"RELEASE SAVEPOINT {sp_name}")
+    except Exception as e:
+        try:
+            conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
+            conn.execute(f"RELEASE SAVEPOINT {sp_name}")
+        except Exception:
+            pass
+        print(f"[DB-MIGRATION] WARN {section_name}: {e}")
+
+
 def init_db() -> None:
     conn = get_conn()
     try:
@@ -458,6 +489,7 @@ def init_db() -> None:
             ("prioridad",       "INTEGER DEFAULT 3",   True),
             ("sla_horas",       "INTEGER DEFAULT 72",  True),
             ("email_thread_id", "TEXT",                False),
+            ("email_references", "TEXT DEFAULT ''",    False),
             ("resolucion",      "TEXT",                False),
             ("ticket_security_class", "TEXT DEFAULT 'internal'", False),
             ("retention_until", "TEXT",                False),
@@ -598,10 +630,32 @@ def init_db() -> None:
             sent_at TEXT,
             seen_at TEXT,
             error TEXT DEFAULT '',
+            provider TEXT DEFAULT '',
+            provider_ref TEXT DEFAULT '',
+            last_error TEXT DEFAULT '',
+            attempt_count INTEGER DEFAULT 0,
+            max_attempts INTEGER DEFAULT 3,
+            next_retry_at TEXT,
+            locked_at TEXT,
+            updated_at TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY(ticket_id) REFERENCES tickets(id)
         );
         """)
+        for col_name, col_def in [
+            ("provider", "TEXT DEFAULT ''"),
+            ("provider_ref", "TEXT DEFAULT ''"),
+            ("last_error", "TEXT DEFAULT ''"),
+            ("attempt_count", "INTEGER DEFAULT 0"),
+            ("max_attempts", "INTEGER DEFAULT 3"),
+            ("next_retry_at", "TEXT"),
+            ("locked_at", "TEXT"),
+            ("updated_at", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE ticket_notifications ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
+            except Exception as _e:
+                print(f"[DB-MIGRATION] WARN columna ticket_notifications.{col_name}: {_e}")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_tk_notif_ticket ON ticket_notifications(ticket_id);"
         )
@@ -613,6 +667,66 @@ def init_db() -> None:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_tk_notif_sched ON ticket_notifications(scheduled_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status_sched ON ticket_notifications(status, scheduled_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status_retry ON ticket_notifications(status, next_retry_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_channel_status ON ticket_notifications(channel, status);"
+        )
+
+        try:
+            conn.execute(
+                f"""UPDATE ticket_notifications
+                    SET attempt_count = COALESCE(attempt_count, 0),
+                        max_attempts = CASE
+                            WHEN COALESCE(max_attempts, 0) <= 0 THEN {_env_int('CHANNELS_MAX_ATTEMPTS', 3, 1, 20)}
+                            ELSE max_attempts
+                        END,
+                        next_retry_at = COALESCE(next_retry_at, scheduled_at),
+                        updated_at = COALESCE(updated_at, created_at),
+                        last_error = COALESCE(NULLIF(last_error, ''), COALESCE(error, '')),
+                        provider = COALESCE(provider, ''),
+                        provider_ref = COALESCE(provider_ref, '')"""
+            )
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN backfill ticket_notifications: {_e}")
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_notification_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            notification_id INTEGER NOT NULL,
+            attempt_no INTEGER NOT NULL DEFAULT 0,
+            attempt_type TEXT NOT NULL DEFAULT 'dispatch',
+            channel TEXT NOT NULL,
+            provider TEXT DEFAULT '',
+            adapter_mode TEXT DEFAULT '',
+            status TEXT NOT NULL,
+            provider_ref TEXT DEFAULT '',
+            http_status INTEGER,
+            latency_ms INTEGER,
+            error TEXT DEFAULT '',
+            idempotency_key TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(notification_id) REFERENCES ticket_notifications(id) ON DELETE CASCADE
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_notif ON ticket_notification_attempts(notification_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_created ON ticket_notification_attempts(created_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_status ON ticket_notification_attempts(status);"
+        )
+        conn.execute(
+            """CREATE UNIQUE INDEX IF NOT EXISTS idx_tk_notif_attempts_idem
+               ON ticket_notification_attempts(notification_id, attempt_type, idempotency_key)
+               WHERE idempotency_key <> ''"""
         )
 
         # --- Ticketera V3: Historial de Emails ---
@@ -819,41 +933,50 @@ def init_db() -> None:
         )
 
         # Backfill hash-chain previo a activar triggers append-only.
-        try:
-            _backfill_chain_table(
-                conn,
-                "audit_logs",
-                (
-                    "timestamp",
-                    "actor",
-                    "action",
-                    "target",
-                    "ip_address",
-                    "severity",
-                    "metadata_json",
-                ),
-            )
-            _backfill_chain_table(
-                conn,
-                "evidence_events",
-                (
-                    "control_id",
-                    "artifact_ref",
-                    "owner",
-                    "integrity_hash",
-                    "metadata_json",
-                    "created_at",
-                ),
-            )
-        except Exception as _e:
-            print(f"[DB-MIGRATION] WARN hash-chain backfill: {_e}")
+        def _chain_backfill_section() -> None:
+            if _has_append_only_triggers(conn, "audit_logs"):
+                print("[DB-MIGRATION] INFO skip hash-chain backfill audit_logs (append-only activo)")
+            else:
+                _backfill_chain_table(
+                    conn,
+                    "audit_logs",
+                    (
+                        "timestamp",
+                        "actor",
+                        "action",
+                        "target",
+                        "ip_address",
+                        "severity",
+                        "metadata_json",
+                    ),
+                )
+            if _has_append_only_triggers(conn, "evidence_events"):
+                print("[DB-MIGRATION] INFO skip hash-chain backfill evidence_events (append-only activo)")
+            else:
+                _backfill_chain_table(
+                    conn,
+                    "evidence_events",
+                    (
+                        "control_id",
+                        "artifact_ref",
+                        "owner",
+                        "integrity_hash",
+                        "metadata_json",
+                        "created_at",
+                    ),
+                )
+
+        _run_guarded_pg_section(conn, "hash_chain_backfill", _chain_backfill_section)
 
         # Inmutabilidad en PostgreSQL: bloquear UPDATE/DELETE.
-        try:
-            _create_append_only_triggers(conn, "audit_logs")
-            _create_append_only_triggers(conn, "evidence_events")
-        except Exception as _e:
-            print(f"[DB-MIGRATION] WARN append-only triggers: {_e}")
+        _run_guarded_pg_section(
+            conn,
+            "append_only_triggers",
+            lambda: (
+                _create_append_only_triggers(conn, "audit_logs"),
+                _create_append_only_triggers(conn, "evidence_events"),
+            ),
+        )
 
         # --- Importaciones Jira para trazabilidad de migración ---
         conn.execute("""
@@ -865,6 +988,116 @@ def init_db() -> None:
             created_at TEXT NOT NULL
         );
         """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_import_runs_created ON jira_import_runs(created_at);"
+        )
+
+        # --- Paralelo Jira + MONSTRUO ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS jira_issue_map (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            jira_issue_key TEXT NOT NULL UNIQUE,
+            jira_updated_at TEXT NOT NULL,
+            monstruo_ticket_id INTEGER NOT NULL,
+            sync_status TEXT NOT NULL DEFAULT 'synced',
+            last_sync_at TEXT NOT NULL,
+            last_error TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(monstruo_ticket_id) REFERENCES tickets(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_ticket ON jira_issue_map(monstruo_ticket_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_status ON jira_issue_map(sync_status);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_key_updated ON jira_issue_map(jira_issue_key, jira_updated_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_sync_at ON jira_issue_map(last_sync_at);"
+        )
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS jira_sync_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_type TEXT NOT NULL, -- bootstrap | delta
+            actor TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running', -- running | completed | failed | completed_with_errors
+            context_json TEXT NOT NULL DEFAULT '{}',
+            counts_json TEXT NOT NULL DEFAULT '{}',
+            error_summary TEXT DEFAULT '',
+            cursor_before TEXT DEFAULT '',
+            cursor_after TEXT DEFAULT '',
+            started_at TEXT NOT NULL,
+            ended_at TEXT,
+            created_at TEXT NOT NULL
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_type_started ON jira_sync_runs(run_type, started_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_status ON jira_sync_runs(status);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_created ON jira_sync_runs(created_at);"
+        )
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS jira_sync_cursor (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cursor_name TEXT NOT NULL UNIQUE,
+            cursor_value TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jira_sync_cursor_name ON jira_sync_cursor(cursor_name);"
+        )
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS parallel_kpi_daily (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            snapshot_date TEXT NOT NULL UNIQUE,
+            source TEXT NOT NULL DEFAULT 'parallel_daily',
+            total_jira_open INTEGER NOT NULL DEFAULT 0,
+            total_monstruo_open INTEGER NOT NULL DEFAULT 0,
+            sev1_open INTEGER NOT NULL DEFAULT 0,
+            sla_compliance_pct REAL NOT NULL DEFAULT 0,
+            mismatch_count INTEGER NOT NULL DEFAULT 0,
+            duplicate_count INTEGER NOT NULL DEFAULT 0,
+            failed_sync_runs INTEGER NOT NULL DEFAULT 0,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_parallel_kpi_date ON parallel_kpi_daily(snapshot_date);"
+        )
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS parallel_decisions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            decision TEXT NOT NULL, -- go | no_go
+            decided_at TEXT NOT NULL,
+            decided_by TEXT NOT NULL,
+            signers_json TEXT NOT NULL DEFAULT '[]',
+            rationale TEXT NOT NULL DEFAULT '',
+            evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+            metrics_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_parallel_decisions_at ON parallel_decisions(decided_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_parallel_decisions_decision ON parallel_decisions(decision);"
+        )
 
         # Sales ERP (EPIC 05)
         conn.execute("""
