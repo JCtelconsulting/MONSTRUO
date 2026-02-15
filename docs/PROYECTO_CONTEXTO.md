@@ -1,6 +1,104 @@
 # PROYECTO CONTEXTO: MONSTRUO
-**Fecha de actualizacion:** 14 Febrero 2026
+**Fecha de actualizacion:** 15 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
+
+## HITO: 2026-02-15 03:10 - Compliance Core EPIC 11 (inmutabilidad + export + retención/purga)
+- **Solicitud**: Implementar cierre operativo de compliance en Ticketera para operación auditable (base ISO/IEC 27001).
+- **Entregable**:
+  - DB/migraciones:
+    - `audit_logs` y `evidence_events` con hash-chain (`chain_prev_hash`, `chain_hash`, `chain_algo`, `chain_version`).
+    - Backfill de cadena histórica y triggers append-only (`UPDATE/DELETE` bloqueados) para ambas bitácoras.
+    - Nuevas tablas: `ticket_legal_holds`, `compliance_export_runs`, `compliance_purge_runs`.
+    - `tickets.retention_days_snapshot` + backfill de `retention_until` para cerrados/resueltos.
+  - Backend/API compliance:
+    - Legal hold: `POST /api/tks/compliance/legal-holds`, `POST /api/tks/compliance/legal-holds/{hold_id}/release`, `GET /api/tks/compliance/legal-holds`.
+    - Exportes: `POST /api/tks/compliance/exports/run` (idempotente), `GET /api/tks/compliance/exports/runs`.
+    - Purga: `POST /api/tks/compliance/purge/dry-run`, `POST /api/tks/compliance/purge/run` (idempotente), `GET /api/tks/compliance/purge/runs`.
+    - Integridad: `GET /api/tks/compliance/hash-chain/verify`.
+  - Scheduling:
+    - Jobs nuevos `COMPLIANCE_EXPORT_DAILY` (02:00) y `COMPLIANCE_PURGE_DAILY` (02:20) en `America/Santiago`.
+  - Seguridad/RBAC:
+    - Nuevo permiso `tickets:compliance` habilitado para rol `gerencia` (admin queda cubierto por wildcard).
+  - Configuración/entorno:
+    - Variables nuevas `COMPLIANCE_*` y `TICKET_RETENTION_*` en plantillas de entorno.
+    - `.gitignore` actualizado para excluir `data/compliance/`.
+- **Validación**:
+  - `python3 tests/verify_hardening.py` PASS
+  - `python3 tests/verify_hardening.py --check-api` PASS
+  - `python3 tests/e2e_api_full.py` PASS
+  - `python3 tests/e2e_ticketera.py` PASS (incluye bloque compliance: retención, legal hold, export idempotente, hash-chain verify, purge dry-run y purge run controlado)
+- **Estado**: CERRADO (Compliance Core implementado en DEV; pendiente continuidad del programa Jira paralelo + evidencias ISO Stage 1/2).
+
+## HITO: 2026-02-15 02:45 - Fix lentitud intermitente al cambiar a `/dev`
+- **Solicitud**: Diagnosticar por qué a veces el entorno DEV cargaba lento o se quedaba pegado.
+- **Causa observada**:
+  - En proxy Nginx, el rewrite de prefijo estaba aplicando `sub_filter` también a CSS/JS, provocando buffering en disco (evidencia en `error.log`) y latencias variables.
+  - El job de polling de correo corría trabajo IMAP en el loop async principal, pudiendo generar bloqueos puntuales del API.
+- **Corrección aplicada**:
+  - Proxy VM (`192.168.60.6`): `monstruo_prod_locations.conf` y `monstruo_dev_locations.conf` ajustados para reescritura de prefijo solo en HTML (sin filtro en CSS/JS) y recarga de Nginx validada (`nginx -t` + reload).
+  - Backend: `poll_email_job` movido a ejecución en hilo (`asyncio.to_thread`) + timeout IMAP explícito en `EmailProcessor.connect`.
+  - Frontend: botón de cambio de entorno del sidebar unificado a ruta canónica `__env` para evitar rutas ambiguas.
+- **Validación**:
+  - Pruebas en DEV:
+    - `tests/verify_hardening.py --check-api` PASS
+    - `tests/e2e_ticketera.py` PASS
+  - Muestreo repetido de `https://login.telconsulting.cl/dev/` sin errores, con latencia estable (sin timeouts en la corrida final).
+- **Estado**: CERRADO.
+
+## HITO: 2026-02-15 02:20 - SLA horario hábil + escalamiento por ventana (EPIC 11)
+- **Solicitud**: Avanzar con pendientes de Ticketera y verificar estabilidad completa de la app.
+- **Entregable**:
+  - Se incorpora configuración SLA por entorno:
+    - `TICKET_SLA_MODE` (`24x7` | `business_hours`)
+    - `TICKET_SLA_BUSINESS_TZ_OFFSET`
+    - `TICKET_SLA_BUSINESS_DAYS`
+    - `TICKET_SLA_BUSINESS_START_HOUR`
+    - `TICKET_SLA_BUSINESS_END_HOUR`
+    - `TICKET_SLA_ESCALATION_WINDOWS_PCT`
+  - Motor SLA actualizado:
+    - cálculo de `frt_due_at` y `ttr_due_at` compatible con calendario hábil;
+    - alertas por ventanas de porcentaje configurables (dedupe por prefijo de evento);
+    - métricas SLA enriquecidas con `sla_mode`, `business_hours` y `escalation_windows_pct`.
+  - Hardening/E2E actualizados para contrato SLA extendido.
+  - Verificación funcional ejecutada en DEV:
+    - `tests/verify_hardening.py --check-api` PASS
+    - `tests/e2e_api_full.py` PASS
+    - `tests/e2e_ticketera.py` PASS
+- **Estado**: CERRADO (SLA con calendario y escalamiento implementado; modo por defecto sigue en 24x7 para compatibilidad hasta activación operacional por entorno).
+
+## HITO: 2026-02-15 01:10 - Cierre Bloque Workflow + SLA (EPIC 11) en DEV
+- **Solicitud**: Implementar cierre técnico-operativo del bloque pendiente `Workflow + SLA` de EPIC 11 sin romper compatibilidad.
+- **Entregable**:
+  - Backend Ticketera ampliado con workflow formal por tipo (`incidencia`, `requerimiento`, `cambio`) usando `estado` + `subestado`.
+  - Nuevos endpoints:
+    - `GET /api/tks/tickets/{ticket_id}/workflow`
+    - `POST /api/tks/tickets/{ticket_id}/transitions`
+    - `POST /api/tks/tickets/{ticket_id}/approvals`
+    - `GET /api/tks/tickets/{ticket_id}/approvals`
+  - Doble aprobación para `cambio` operativa (paso 1 + paso 2) con bloqueo de ejecución sin ambas aprobaciones.
+  - SLA 24x7 formalizado con `first_response_at`, `frt_due_at`, `ttr_due_at`, `resolved_at`, `frt_breached_at`, `ttr_breached_at`, `aging_minutes_open` y endpoints SLA extendidos.
+  - Idempotencia reforzada en transiciones/aprobaciones (dedupe real en reintentos con `Idempotency-Key`).
+  - Frontend Ticketera actualizado con selector de tipo, panel de workflow/aprobaciones e indicadores SLA.
+  - Migraciones y backfill aplicados para nuevas columnas/tablas (`ticket_transitions`, `ticket_approvals` + índices).
+  - Pruebas actualizadas y en verde:
+    - `tests/e2e_ticketera.py` PASS
+    - `tests/e2e_api_full.py` PASS
+    - `tests/verify_hardening.py --check-api` PASS
+- **Estado**: CERRADO (fase Workflow + SLA base 24x7 completada en DEV; pendiente fase de horario hábil/calendario y escalamiento por ventana).
+
+## HITO: 2026-02-14 23:50 - Activacion Programa Reemplazo Jira + ISO/IEC 27001 (12 meses)
+- **Solicitud**: Implementar plan maestro de reemplazo Jira y certificacion ISO/IEC 27001 con foco operativo en EPIC 11.
+- **Entregable**:
+  - Documento canonico creado: `docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md` con cronograma, criterios de salida, controles y entregables de auditoria.
+  - `PLAN_MAESTRO_MONSTRUO.md` actualizado con:
+    - nueva seccion `0.8` (programa activo),
+    - backlog EPIC 11 alineado a reemplazo Jira + SGSI.
+  - Backend Ticketera extendido para soporte del plan:
+    - APIs nuevas: adjuntos por ticket, emails `format=human`, SLA metrics/breaches, automations rules, migration Jira import, evidencia ISO.
+    - Tipo `ticket_security_class` y tabla `evidence_events`.
+    - Convencion `Idempotency-Key` aplicada a reply-email.
+    - Hardening: eventos de evidencia quedan `best-effort` para evitar 500 post-accion real.
+- **Estado**: EN CURSO (programa activado y baseline tecnico implementado en DEV; pendientes cierre operativo y auditoria externa).
 
 ## HITO: 2026-02-14 23:00 - Cierre Definitivo Gobernanza (EPIC 11)
 - **Acción**: Eliminación total de secretos hardcodeados en scripts de seed (`setup_users.py`).

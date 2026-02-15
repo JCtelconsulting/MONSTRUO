@@ -14,6 +14,20 @@ class Settings(BaseSettings):
     # Configuración de Ticketera y Entorno
     TICKET_AUTO_REPLY_ENABLED: bool = False
     ENV_TYPE: str = "dev"  # dev, prod, staging
+    COMPLIANCE_EXPORT_DIR: str = ""
+    COMPLIANCE_TZ: str = "America/Santiago"
+    COMPLIANCE_EXPORT_HOUR: int = 2
+    COMPLIANCE_PURGE_HOUR: int = 2
+    COMPLIANCE_PURGE_GRACE_DAYS: int = 30
+    TICKET_RETENTION_PUBLIC_DAYS: int = 365
+    TICKET_RETENTION_INTERNAL_DAYS: int = 1095
+    TICKET_RETENTION_RESTRICTED_DAYS: int = 1825
+    TICKET_SLA_MODE: str = "24x7"  # 24x7 | business_hours
+    TICKET_SLA_BUSINESS_TZ_OFFSET: str = "-03:00"  # Formato ±HH:MM
+    TICKET_SLA_BUSINESS_DAYS: str = "0,1,2,3,4"  # 0=lunes ... 6=domingo
+    TICKET_SLA_BUSINESS_START_HOUR: int = 9
+    TICKET_SLA_BUSINESS_END_HOUR: int = 18
+    TICKET_SLA_ESCALATION_WINDOWS_PCT: str = "80,100"  # Ej: 50,80,100
     
     # Ticketera Attachments
     TICKET_ATTACHMENTS_DIR: str = "/srv/monstruo/data/tickets"
@@ -56,6 +70,7 @@ class Settings(BaseSettings):
         "gerencia": [
             "dashboard:read", 
             "tickets:read", 
+            "tickets:compliance",
             "pmo:read", 
             "finanzas:read", 
             "audit:read",

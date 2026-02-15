@@ -5,6 +5,7 @@ import argparse
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import List, Tuple
 
@@ -66,6 +67,7 @@ def repo_checks() -> List[str]:
         PROJECT_ROOT / "ops/control/limpiar_ram.sh",
         PROJECT_ROOT / "ops/guardian/scripts/install_hooks.sh",
         PROJECT_ROOT / "docs/estructura_repo.json",
+        PROJECT_ROOT / "code/app/jobs/compliance_jobs.py",
         PROJECT_ROOT / "tests/e2e_ticketera.py",
         PROJECT_ROOT / "tests/e2e_api_full.py",
         PROJECT_ROOT / "tests/.README.md",
@@ -79,6 +81,14 @@ def repo_checks() -> List[str]:
         errors.append("deploy.sh no tiene branch default en dev")
     if 'APP_DIR="${DEPLOY_PATH:-$PROJECT_ROOT}"' not in deploy_text:
         errors.append("deploy.sh no usa APP_DIR dinamico por PROJECT_ROOT")
+
+    gitignore_text = read_text(PROJECT_ROOT / ".gitignore")
+    if "data/compliance/" not in gitignore_text:
+        errors.append(".gitignore debe excluir data/compliance/")
+
+    config_text = read_text(PROJECT_ROOT / "code/app/core/config.py")
+    if "tickets:compliance" not in config_text:
+        errors.append("RBAC sin permiso tickets:compliance")
 
     banned_checks: List[Tuple[str, re.Pattern[str], List[Path]]] = [
         (
@@ -175,6 +185,124 @@ def api_checks(args: argparse.Namespace) -> List[str]:
                 errors.append(f"/api/auth/whoami sin sesion valida: {payload}")
     except Exception as exc:
         errors.append(f"Error consultando whoami: {exc}")
+
+    try:
+        sla_metrics = session.get(f"{base_url}/api/tks/sla/metrics", timeout=args.timeout)
+        if sla_metrics.status_code != 200:
+            errors.append(f"/api/tks/sla/metrics -> {sla_metrics.status_code} {sla_metrics.text}")
+        else:
+            payload = as_json(sla_metrics)
+            for key in ("sla_mode", "escalation_windows_pct", "business_hours"):
+                if key not in payload:
+                    errors.append(f"/api/tks/sla/metrics no contiene '{key}'")
+    except Exception as exc:
+        errors.append(f"Error consultando /api/tks/sla/metrics: {exc}")
+
+    try:
+        chain_verify = session.get(
+            f"{base_url}/api/tks/compliance/hash-chain/verify?stream=evidence",
+            timeout=args.timeout,
+        )
+        if chain_verify.status_code != 200:
+            errors.append(f"/api/tks/compliance/hash-chain/verify -> {chain_verify.status_code} {chain_verify.text}")
+    except Exception as exc:
+        errors.append(f"Error consultando hash-chain verify: {exc}")
+
+    protected_cases = [
+        ("GET", f"{base_url}/api/tks/tickets/1/workflow", None),
+        ("POST", f"{base_url}/api/tks/tickets/1/transitions", {"to_subestado": "en_analisis", "motivo": "hardening"}),
+        ("POST", f"{base_url}/api/tks/tickets/1/approvals", {"step": 1, "decision": "approved", "decision_note": "hardening"}),
+        ("GET", f"{base_url}/api/tks/tickets/1/approvals", None),
+        ("GET", f"{base_url}/api/tks/compliance/hash-chain/verify?stream=audit", None),
+        ("GET", f"{base_url}/api/tks/compliance/exports/runs", None),
+        ("GET", f"{base_url}/api/tks/compliance/purge/runs", None),
+        ("GET", f"{base_url}/api/tks/compliance/legal-holds", None),
+    ]
+    for method, url, body in protected_cases:
+        try:
+            if method == "GET":
+                resp = requests.get(url, timeout=args.timeout)
+            else:
+                resp = requests.post(url, json=body, timeout=args.timeout)
+            if resp.status_code not in (401, 403):
+                errors.append(f"Ruta protegida sin bloqueo ({method} {url}) -> {resp.status_code}")
+        except Exception as exc:
+            errors.append(f"Error validando protección de ruta ({method} {url}): {exc}")
+
+    # Validación mínima de idempotencia para endpoints nuevos de workflow/aprobaciones
+    try:
+        create_resp = session.post(
+            f"{base_url}/api/tks/tickets",
+            json={
+                "titulo": f"Hardening Workflow {int(time.time())}",
+                "descripcion": "Validación de idempotencia",
+                "tipo": "cambio",
+                "severidad": "media",
+                "categoria": "sistemas",
+            },
+            timeout=args.timeout,
+        )
+        if create_resp.status_code != 200:
+            errors.append(f"No se pudo crear ticket de hardening ({create_resp.status_code}): {create_resp.text}")
+            return errors
+
+        ticket_id = as_json(create_resp).get("id")
+        if not ticket_id:
+            errors.append(f"Ticket de hardening sin ID: {create_resp.text}")
+            return errors
+
+        transition_idem = f"hardening-transition-{ticket_id}-{int(time.time() * 1000)}"
+        t1 = session.post(
+            f"{base_url}/api/tks/tickets/{ticket_id}/transitions",
+            json={"to_subestado": "en_analisis", "motivo": "idempotencia"},
+            headers={"Idempotency-Key": transition_idem},
+            timeout=args.timeout,
+        )
+        if t1.status_code != 200:
+            errors.append(f"Transition idempotente (primera) falló: {t1.status_code} {t1.text}")
+            return errors
+
+        t2 = session.post(
+            f"{base_url}/api/tks/tickets/{ticket_id}/transitions",
+            json={"to_subestado": "en_analisis", "motivo": "idempotencia"},
+            headers={"Idempotency-Key": transition_idem},
+            timeout=args.timeout,
+        )
+        if t2.status_code != 200 or not as_json(t2).get("duplicate_skipped"):
+            errors.append(f"Transition idempotente (duplicada) no deduplicó: {t2.status_code} {t2.text}")
+            return errors
+
+        p1 = session.post(
+            f"{base_url}/api/tks/tickets/{ticket_id}/transitions",
+            json={"to_subestado": "pendiente_aprobacion_1", "motivo": "paso a aprobación"},
+            headers={"Idempotency-Key": f"{transition_idem}-p1"},
+            timeout=args.timeout,
+        )
+        if p1.status_code != 200:
+            errors.append(f"Transition a pendiente_aprobacion_1 falló: {p1.status_code} {p1.text}")
+            return errors
+
+        approval_idem = f"hardening-approval-{ticket_id}-{int(time.time() * 1000)}"
+        a1 = session.post(
+            f"{base_url}/api/tks/tickets/{ticket_id}/approvals",
+            json={"step": 1, "decision": "approved", "decision_note": "hardening"},
+            headers={"Idempotency-Key": approval_idem},
+            timeout=args.timeout,
+        )
+        if a1.status_code != 200:
+            errors.append(f"Approval idempotente (primera) falló: {a1.status_code} {a1.text}")
+            return errors
+
+        a2 = session.post(
+            f"{base_url}/api/tks/tickets/{ticket_id}/approvals",
+            json={"step": 1, "decision": "approved", "decision_note": "hardening-dup"},
+            headers={"Idempotency-Key": approval_idem},
+            timeout=args.timeout,
+        )
+        if a2.status_code != 200 or not as_json(a2).get("duplicate_skipped"):
+            errors.append(f"Approval idempotente (duplicada) no deduplicó: {a2.status_code} {a2.text}")
+    except Exception as exc:
+        errors.append(f"Error validando idempotencia workflow/aprobaciones: {exc}")
 
     return errors
 

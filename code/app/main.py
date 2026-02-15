@@ -18,7 +18,7 @@ env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=env_path)
 from app.core import db, security, auth_service, audit, jobs_engine
 from app.api.routers import bancos
-from app.jobs import ticket_sla, crm_sync, stock_sync, invoice_sync, services_sync
+from app.jobs import ticket_sla, crm_sync, stock_sync, invoice_sync, services_sync, compliance_jobs
 from app.procesos import facturacion_job
 from app.core import deps as auth_deps
 from app.core.middleware import AuthIdentityMiddleware
@@ -105,6 +105,8 @@ def register_all_jobs():
     jobs_engine.register_job("SYNC_BILLING_CYCLES", facturacion_job.run_billing_cycles)
     jobs_engine.register_job("SYNC_INVOICE_PAYMENTS", invoice_sync.sync_invoice_payments)
     jobs_engine.register_job("SYNC_SERVICES_LAUDUS", services_sync.sync_services_from_laudus)
+    jobs_engine.register_job("COMPLIANCE_EXPORT_DAILY", compliance_jobs.compliance_export_daily)
+    jobs_engine.register_job("COMPLIANCE_PURGE_DAILY", compliance_jobs.compliance_purge_daily)
 
     # Nuevos Jobs de Integración (EPIC 11)
     from app.workers import integrations_worker
@@ -155,6 +157,12 @@ async def start_background_workers():
     # Por ahora lo lanzamos una vez y deberíamos re-agendarlo igual que email polling
     await jobs_engine.enqueue_job(
         "PROCESS_NOTIFICATIONS", payload={"recurring": True}, max_retries=0
+    )
+    await jobs_engine.enqueue_job(
+        "COMPLIANCE_EXPORT_DAILY", payload={"recurring": True}, max_retries=1
+    )
+    await jobs_engine.enqueue_job(
+        "COMPLIANCE_PURGE_DAILY", payload={"recurring": True}, max_retries=1
     )
 
     print(f"[Startup] Billing, SLA and Email jobs scheduled")

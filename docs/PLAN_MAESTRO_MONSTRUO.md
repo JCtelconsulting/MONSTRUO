@@ -74,6 +74,10 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-02-15: Estabilización de navegación DEV: fix de lentitud intermitente al cargar `/dev` (proxy Nginx ajustado para reescritura solo HTML, evitando buffering de CSS/JS) + polling IMAP movido a hilo en `jobs_engine` con timeout para evitar bloqueos del loop del API.
+- 2026-02-15: EPIC 11 Ticketera: SLA extendido con soporte de horario hábil/calendario y ventanas de escalamiento configurables por entorno (`TICKET_SLA_MODE`, `TICKET_SLA_BUSINESS_*`, `TICKET_SLA_ESCALATION_WINDOWS_PCT`) manteniendo compatibilidad 24x7 por defecto.
+- 2026-02-15: EPIC 11 Ticketera: cierre técnico del bloque `Workflow + SLA` (workflow por tipo con `estado+subestado`, doble aprobación de cambios, endpoints de transiciones/aprobaciones/workflow, SLA 24x7 con FRT/TTR/Aging/Breach e idempotencia en rutas críticas). E2E y hardening API en verde.
+- 2026-02-14: Se activa oficialmente el programa de reemplazo Jira + certificacion ISO/IEC 27001 (12 meses) con cronograma, entregables y governance en `docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md`.
 - 2026-02-14: Gobernanza documental reforzada: `PROMPT_CHAT_UNIVERSAL.md` actualizado a versión vigente (bootstrap + matriz anti-cruce DEV/PROD + carga obligatoria de `ESTANDARES.md` y allowlists `.README.md`).
 - 2026-02-14: Ticketera: respuesta por correo desde detalle de ticket, con intento de mantener hilo (headers `In-Reply-To`/`References`) y registro de salida/entrada en historial.
 - 2026-02-14: Ticketera: control anti-duplicado de correos salientes por reintentos de UI (ventana de dedupe + marcador `outgoing_pending`).
@@ -147,6 +151,17 @@ Regla operativa:
 Efecto en el trabajo diario:
 - Se fuerza foco en EPIC 11 (Ticketera) hasta cumplir Go/No-Go profesional.
 - Se evita cruce DEV/PROD por norma explicita para ramas, env files, jobs y credenciales.
+
+0.8 Programa Maestro Reemplazo Jira + ISO/IEC 27001 (12 meses) [ACTIVO]
+
+Documento canonico del programa:
+- `docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md`
+
+Mandatos operativos:
+- Alcance SGSI objetivo: todo MONSTRUO (app, integraciones, datos, operacion, soporte, cambios, continuidad y terceros criticos).
+- Estrategia de reemplazo Jira: operacion en paralelo Jira+MONSTRUO entre 4 y 8 semanas, con Go/No-Go formal.
+- Criterio de cierre del programa: Jira fuera de operacion diaria + Stage 1 y Stage 2 ISO/IEC 27001 aprobados sin NC mayores abiertas.
+- Definicion de done por control: implementado + evidenciado + operado (no solo documentado).
 
 
 ---
@@ -1876,6 +1891,7 @@ EPIC 11 — Ticke-Tera (Ticketera) [PRIORIDAD MÁXIMA - REEMPLAZO MESA EXTERNA]
 Objetivo de negocio:
 - Reemplazar la mesa externa contratada por la empresa con una mesa interna de estándar productivo profesional.
 - Criterio de avance: no basta "funciona en dev"; debe quedar apta para operación diaria real sin regresiones de flujo.
+- Plan operativo del programa (12 meses): `docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md`.
 
 Tareas:
 - [x] CRUD ticket (API `/api/tks/tickets` + RBAC)
@@ -1889,25 +1905,58 @@ Tareas:
 - [x] Formato de código actualizado a `TK-DD-MM-YYYY-NNNN`
 - [x] Hardening create_ticket (fail-safe en auto-asignación/notificaciones + validación de ID post-INSERT)
 - [x] Fix de fluidez UI (AbortController + cancelación de requests + cache TTL)
-- [ ] Adjuntos en respuesta por correo (UI + backend real sobre `attachments_json`)
-- [ ] Historial de correos completo en detalle (entrada/salida con payload legible)
+- [x] API adjuntos por ticket (`POST/GET /api/tks/tickets/{ticket_id}/attachments`) con `sha256` y `size_bytes`
+- [x] Historial de correos legible (`GET /api/tks/tickets/{ticket_id}/emails?format=human`)
+- [x] SLA operacional API (`GET /api/tks/sla/metrics` y `GET /api/tks/sla/breaches`)
+- [x] Reglas de automatización API (`POST/GET /api/tks/automations/rules`)
+- [x] Migración Jira API (`POST /api/tks/migration/jira/import`)
+- [x] Evidencia ISO API (`POST/GET /api/tks/evidence/events`)
+- [x] Clasificación de seguridad en ticket (`ticket_security_class`: `public/internal/restricted`)
+- [x] Convención de idempotencia en reply email (`Idempotency-Key`)
+- [x] Workflow profesional por tipo (Incidente/Requerimiento/Cambio) con transiciones y aprobaciones
+- [x] SLA formal 24x7 con FRT/TTR/Aging/Breach por severidad (base enterprise)
+- [x] SLA con horario hábil/calendario operativo y escalamiento por ventana (configurable por ENV, compatible con 24x7)
+- [x] Operación compliance cerrada (bitácora inmutable, exportes de auditoría, retención/borrado por clase)
+- [x] Compliance API operativo (`/api/tks/compliance/legal-holds`, `/exports/run`, `/purge/dry-run`, `/purge/run`, `/hash-chain/verify`)
+- [x] Scheduler compliance (`COMPLIANCE_EXPORT_DAILY` 02:00 y `COMPLIANCE_PURGE_DAILY` 02:20, zona `America/Santiago`)
 - [ ] Worker real para escalamiento WhatsApp/3CX (hoy se agenda en DB, falta ejecutor de canal)
 - [ ] Auto-respuesta configurable de recepción de correo (actualmente desactivada)
+- [ ] Operación en paralelo Jira+MONSTRUO 4-8 semanas con comparativa diaria KPI/SLA
+- [ ] Acta Go/No-Go de apagado Jira + hypercare 30 días
 - [x] Baseline de pruebas E2E profesionalizadas (`tests/e2e_ticketera.py`, `tests/e2e_api_full.py`, `tests/verify_hardening.py`)
 - [x] Suite de tests E2E ticketera (`create -> reply -> dedupe -> incoming thread match`)
 - [x] Checklist técnico anti-cruce DEV/PROD para Ticketera (SMTP, base URL, credenciales y jobs)
+- [ ] Evidencia automatizada por control ISO 27001 (SoA + matriz de riesgos + revisión por dirección)
 
 Aceptación:
 - [x] Crear ticket no cae en 500 por fallas no críticas de auto-asignación/notificaciones
 - [x] Respuesta por correo se envía desde el detalle y registra evento en timeline
 - [x] Reintento/doble envío en ventana corta no duplica correo saliente
 - [x] Código de ticket usa formato `TK-DD-MM-YYYY-NNNN` en creación nueva
-- [ ] Adjuntar archivos en respuesta por correo operativo de punta a punta
+- [x] API de adjuntos e historial legible disponibles para operación y auditoría
 - [x] Validación automatizada de separación DEV/PROD para flujo de correo y jobs
+- [x] Workflow por tipo + doble aprobación de cambios operativo y validado por E2E
+- [x] Métricas SLA/API con FRT/TTR/Aging/Breach validadas (`/api/tks/sla/metrics`, `/api/tks/sla/breaches`)
+- [x] SLA configurable por entorno: modo `24x7` o `business_hours` + ventanas de escalamiento por porcentaje
+- [x] Hash-chain verificable y append-only activo en `audit_logs` + `evidence_events`
+- [ ] Sin Sev1 durante paralelo Jira+MONSTRUO y `>=95%` de SLA objetivo
+- [ ] Stage 1 y Stage 2 ISO/IEC 27001 aprobados sin NC mayores abiertas
 - [ ] EPIC 11 certificado para reemplazo de mesa externa (Go/No-Go profesional firmado)
 
 
+
+
+
+
+
+
 ---
+
+
+
+
+
+
 
 EPIC 12 — Módulo Jefe de Proyectos (PMO) [ESTADO: IMPLEMENTADO FASE 1]
 
