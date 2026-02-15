@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import secrets
 import re
+import json
 from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, Tuple
@@ -32,6 +33,22 @@ load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DB_URL = os.getenv("DB_URL", "").strip()
+CHAIN_ALGO = "sha256"
+CHAIN_VERSION = 1
+
+
+def _env_int(name: str, default: int, min_value: int, max_value: int) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except Exception:
+        value = default
+    return max(min_value, min(max_value, value))
+
+
+RETENTION_PUBLIC_DAYS = _env_int("TICKET_RETENTION_PUBLIC_DAYS", 365, 1, 36500)
+RETENTION_INTERNAL_DAYS = _env_int("TICKET_RETENTION_INTERNAL_DAYS", 1095, 1, 36500)
+RETENTION_RESTRICTED_DAYS = _env_int("TICKET_RETENTION_RESTRICTED_DAYS", 1825, 1, 36500)
 
 
 def _is_postgres() -> bool:
@@ -106,6 +123,64 @@ def get_conn():
 
 def now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _stable_json_for_chain(payload: Dict[str, Any]) -> str:
+    return json.dumps(payload or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _build_chain_hash(prev_hash: str, payload: Dict[str, Any]) -> str:
+    raw = f"{prev_hash or ''}|{_stable_json_for_chain(payload)}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _backfill_chain_table(conn, table_name: str, payload_fields: Tuple[str, ...]) -> None:
+    select_fields = ", ".join(["id", *payload_fields, "chain_prev_hash", "chain_hash"])
+    rows = conn.execute(
+        f"SELECT {select_fields} FROM {table_name} ORDER BY id ASC"
+    ).fetchall()
+    prev_hash = ""
+    for row in rows:
+        record = dict(row)
+        payload = {field: (record.get(field) if record.get(field) is not None else "") for field in payload_fields}
+        expected_hash = _build_chain_hash(prev_hash, payload)
+        current_prev = (record.get("chain_prev_hash") or "")
+        current_hash = (record.get("chain_hash") or "")
+        if current_prev != prev_hash or current_hash != expected_hash:
+            conn.execute(
+                f"""UPDATE {table_name}
+                    SET chain_prev_hash = ?, chain_hash = ?, chain_algo = ?, chain_version = ?
+                    WHERE id = ?""",
+                (prev_hash, expected_hash, CHAIN_ALGO, CHAIN_VERSION, record["id"]),
+            )
+        prev_hash = expected_hash
+
+
+def _create_append_only_triggers(conn, table_name: str) -> None:
+    fn_name = f"{table_name}_append_only_guard"
+    trg_upd = f"trg_{table_name}_no_update"
+    trg_del = f"trg_{table_name}_no_delete"
+    conn.execute(
+        f"""
+        CREATE OR REPLACE FUNCTION {fn_name}() RETURNS trigger AS $$
+        BEGIN
+            RAISE EXCEPTION '{table_name} is append-only';
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )
+    conn.execute(f"DROP TRIGGER IF EXISTS {trg_upd} ON {table_name};")
+    conn.execute(f"DROP TRIGGER IF EXISTS {trg_del} ON {table_name};")
+    conn.execute(
+        f"""CREATE TRIGGER {trg_upd}
+            BEFORE UPDATE ON {table_name}
+            FOR EACH ROW EXECUTE FUNCTION {fn_name}();"""
+    )
+    conn.execute(
+        f"""CREATE TRIGGER {trg_del}
+            BEFORE DELETE ON {table_name}
+            FOR EACH ROW EXECUTE FUNCTION {fn_name}();"""
+    )
 
 
 def init_db() -> None:
@@ -269,17 +344,22 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs(timestamp);"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor);")
-        if is_postgres():
-            conn.execute(
-                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'info'"
-            )
-        else:
-            try:
-                conn.execute(
-                    "ALTER TABLE audit_logs ADD COLUMN severity TEXT DEFAULT 'info'"
-                )
-            except Exception:
-                pass
+        conn.execute(
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'info'"
+        )
+        conn.execute(
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_prev_hash TEXT DEFAULT ''"
+        )
+        conn.execute(
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_hash TEXT DEFAULT ''"
+        )
+        conn.execute(
+            f"ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_algo TEXT DEFAULT '{CHAIN_ALGO}'"
+        )
+        conn.execute(
+            f"ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_version INTEGER DEFAULT {CHAIN_VERSION}"
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_chain_hash ON audit_logs(chain_hash);")
 
         # Jobs Engine (EPIC 04)
         conn.execute("""
@@ -354,6 +434,21 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_attach_ticket ON ticket_attachments(ticket_id);"
         )
 
+        # --- Ticketera: metadata adicional de adjuntos ---
+        for col_name, col_def in [
+            ("size_bytes", "INTEGER"),
+            ("content_type", "TEXT"),
+            ("sha256", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE ticket_attachments ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
+            except Exception as _e:
+                print(f"[DB-MIGRATION] WARN columna ticket_attachments.{col_name}: {_e}")
+        try:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_attach_sha256 ON ticket_attachments(sha256);")
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN índice idx_attach_sha256: {_e}")
+
         # --- Ticketera V3: Columnas extras en tickets (migración individual) ---
         _v3_columns = [
             ("codigo",          "TEXT",                True),
@@ -364,6 +459,16 @@ def init_db() -> None:
             ("sla_horas",       "INTEGER DEFAULT 72",  True),
             ("email_thread_id", "TEXT",                False),
             ("resolucion",      "TEXT",                False),
+            ("ticket_security_class", "TEXT DEFAULT 'internal'", False),
+            ("retention_until", "TEXT",                False),
+            ("retention_days_snapshot", "INTEGER DEFAULT 1095", False),
+            ("subestado", "TEXT DEFAULT 'nuevo'", False),
+            ("first_response_at", "TEXT", False),
+            ("frt_due_at", "TEXT", False),
+            ("ttr_due_at", "TEXT", False),
+            ("resolved_at", "TEXT", False),
+            ("frt_breached_at", "TEXT", False),
+            ("ttr_breached_at", "TEXT", False),
         ]
         for col_name, col_def, is_critical in _v3_columns:
             try:
@@ -391,11 +496,73 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_tickets_codigo ON tickets(codigo);",
             "CREATE INDEX IF NOT EXISTS idx_tickets_categoria ON tickets(categoria);",
             "CREATE INDEX IF NOT EXISTS idx_tickets_prioridad ON tickets(prioridad);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_security_class ON tickets(ticket_security_class);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_subestado ON tickets(subestado);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_frt_due ON tickets(frt_due_at);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_ttr_due ON tickets(ttr_due_at);",
         ]:
             try:
                 conn.execute(idx_sql)
             except Exception as _e:
                 print(f"[DB-MIGRATION] WARN índice: {_e}")
+
+        # --- Backfill de columnas Workflow/SLA para registros existentes ---
+        try:
+            conn.execute(
+                """UPDATE tickets
+                   SET subestado = CASE
+                       WHEN estado = 'en_progreso' THEN 'en_progreso'
+                       WHEN estado = 'resuelto' THEN 'resuelto'
+                       WHEN estado = 'cerrado' THEN 'cerrado'
+                       ELSE 'nuevo'
+                   END
+                   WHERE COALESCE(subestado, '') = ''"""
+            )
+            conn.execute(
+                "UPDATE tickets SET ttr_due_at = COALESCE(ttr_due_at, vence_at) WHERE ttr_due_at IS NULL"
+            )
+            conn.execute(
+                "UPDATE tickets SET resolved_at = COALESCE(resolved_at, updated_at) WHERE estado IN ('resuelto', 'cerrado') AND resolved_at IS NULL"
+            )
+            conn.execute(
+                """UPDATE tickets
+                   SET frt_due_at = CASE
+                       WHEN severidad = 'critica' THEN (created_at::timestamptz + INTERVAL '15 minutes')::text
+                       WHEN severidad = 'alta' THEN (created_at::timestamptz + INTERVAL '30 minutes')::text
+                       WHEN severidad = 'media' THEN (created_at::timestamptz + INTERVAL '2 hours')::text
+                       ELSE (created_at::timestamptz + INTERVAL '8 hours')::text
+                   END
+                   WHERE frt_due_at IS NULL"""
+            )
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN backfill workflow/sla: {_e}")
+
+        # --- Backfill retención por clase de seguridad ---
+        try:
+            conn.execute(
+                f"""UPDATE tickets
+                    SET retention_days_snapshot = CASE
+                        WHEN COALESCE(ticket_security_class, 'internal') = 'public' THEN {RETENTION_PUBLIC_DAYS}
+                        WHEN COALESCE(ticket_security_class, 'internal') = 'restricted' THEN {RETENTION_RESTRICTED_DAYS}
+                        ELSE {RETENTION_INTERNAL_DAYS}
+                    END
+                    WHERE retention_days_snapshot IS NULL OR retention_days_snapshot <= 0"""
+            )
+            conn.execute(
+                f"""UPDATE tickets
+                    SET retention_until = (
+                        COALESCE(resolved_at, updated_at)::timestamptz +
+                        make_interval(days => CASE
+                            WHEN COALESCE(ticket_security_class, 'internal') = 'public' THEN {RETENTION_PUBLIC_DAYS}
+                            WHEN COALESCE(ticket_security_class, 'internal') = 'restricted' THEN {RETENTION_RESTRICTED_DAYS}
+                            ELSE {RETENTION_INTERNAL_DAYS}
+                        END)
+                    )::text
+                    WHERE estado IN ('resuelto', 'cerrado')
+                      AND retention_until IS NULL"""
+            )
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN backfill retention: {_e}")
 
         # --- Ticketera V3: Especialidades de Usuarios ---
         conn.execute("""
@@ -466,6 +633,238 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_tk_emails_ticket ON ticket_emails(ticket_id);"
         )
+        try:
+            conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS idempotency_key TEXT;")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_tk_emails_idempotency ON ticket_emails(idempotency_key);")
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN ticket_emails.idempotency_key: {_e}")
+
+        # --- Workflow de transiciones por ticket ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_transitions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            from_subestado TEXT,
+            to_subestado TEXT NOT NULL,
+            actor TEXT NOT NULL,
+            reason TEXT DEFAULT '',
+            idempotency_key TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(ticket_id) REFERENCES tickets(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_ticket ON ticket_transitions(ticket_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_created ON ticket_transitions(created_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_idem ON ticket_transitions(idempotency_key);"
+        )
+
+        # --- Aprobaciones de cambios ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_approvals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            step INTEGER NOT NULL,
+            approver TEXT NOT NULL,
+            decision TEXT NOT NULL,
+            decision_note TEXT DEFAULT '',
+            idempotency_key TEXT,
+            decided_at TEXT NOT NULL,
+            FOREIGN KEY(ticket_id) REFERENCES tickets(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_ticket ON ticket_approvals(ticket_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_step ON ticket_approvals(step);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_decided ON ticket_approvals(decided_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_idem ON ticket_approvals(idempotency_key);"
+        )
+
+        # --- Reglas de automatización Ticketera ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_automation_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            is_active INTEGER DEFAULT 1,
+            match_json TEXT NOT NULL DEFAULT '{}',
+            action_json TEXT NOT NULL DEFAULT '{}',
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_auto_rules_active ON ticket_automation_rules(is_active);"
+        )
+
+        # --- Evidencias para trazabilidad ISO ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS evidence_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            control_id TEXT NOT NULL,
+            artifact_ref TEXT NOT NULL,
+            owner TEXT NOT NULL,
+            integrity_hash TEXT DEFAULT '',
+            metadata_json TEXT DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_evidence_control ON evidence_events(control_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_evidence_created ON evidence_events(created_at);"
+        )
+        conn.execute(
+            "ALTER TABLE evidence_events ADD COLUMN IF NOT EXISTS chain_prev_hash TEXT DEFAULT ''"
+        )
+        conn.execute(
+            "ALTER TABLE evidence_events ADD COLUMN IF NOT EXISTS chain_hash TEXT DEFAULT ''"
+        )
+        conn.execute(
+            f"ALTER TABLE evidence_events ADD COLUMN IF NOT EXISTS chain_algo TEXT DEFAULT '{CHAIN_ALGO}'"
+        )
+        conn.execute(
+            f"ALTER TABLE evidence_events ADD COLUMN IF NOT EXISTS chain_version INTEGER DEFAULT {CHAIN_VERSION}"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_evidence_chain_hash ON evidence_events(chain_hash);"
+        )
+
+        # --- Compliance Core ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_legal_holds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            reason TEXT NOT NULL,
+            case_ref TEXT DEFAULT '',
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            released_by TEXT DEFAULT '',
+            released_at TEXT,
+            release_note TEXT DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY(ticket_id) REFERENCES tickets(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_legal_holds_ticket ON ticket_legal_holds(ticket_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_legal_holds_active ON ticket_legal_holds(is_active);"
+        )
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS compliance_export_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope TEXT NOT NULL DEFAULT 'both',
+            from_ts TEXT,
+            to_ts TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            actor TEXT NOT NULL,
+            idempotency_key TEXT DEFAULT '',
+            artifact_dir TEXT DEFAULT '',
+            manifest_path TEXT DEFAULT '',
+            artifact_hash TEXT DEFAULT '',
+            counts_json TEXT DEFAULT '{}',
+            error TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            completed_at TEXT
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_compliance_export_status ON compliance_export_runs(status);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_compliance_export_created ON compliance_export_runs(created_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_compliance_export_idem ON compliance_export_runs(idempotency_key);"
+        )
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS compliance_purge_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dry_run INTEGER NOT NULL DEFAULT 0,
+            as_of TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            actor TEXT NOT NULL,
+            idempotency_key TEXT DEFAULT '',
+            summary_json TEXT DEFAULT '{}',
+            error TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            completed_at TEXT
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_status ON compliance_purge_runs(status);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_created ON compliance_purge_runs(created_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_idem ON compliance_purge_runs(idempotency_key);"
+        )
+
+        # Backfill hash-chain previo a activar triggers append-only.
+        try:
+            _backfill_chain_table(
+                conn,
+                "audit_logs",
+                (
+                    "timestamp",
+                    "actor",
+                    "action",
+                    "target",
+                    "ip_address",
+                    "severity",
+                    "metadata_json",
+                ),
+            )
+            _backfill_chain_table(
+                conn,
+                "evidence_events",
+                (
+                    "control_id",
+                    "artifact_ref",
+                    "owner",
+                    "integrity_hash",
+                    "metadata_json",
+                    "created_at",
+                ),
+            )
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN hash-chain backfill: {_e}")
+
+        # Inmutabilidad en PostgreSQL: bloquear UPDATE/DELETE.
+        try:
+            _create_append_only_triggers(conn, "audit_logs")
+            _create_append_only_triggers(conn, "evidence_events")
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN append-only triggers: {_e}")
+
+        # --- Importaciones Jira para trazabilidad de migración ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS jira_import_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            imported_by TEXT NOT NULL,
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            result_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+        """)
 
         # Sales ERP (EPIC 05)
         conn.execute("""
