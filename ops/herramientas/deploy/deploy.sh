@@ -112,7 +112,7 @@ if [ "$HAS_GIT_REPO" = "1" ]; then
   git fetch origin "$BRANCH" --prune
 
   echo "[deploy] checkout/reset..."
-  git checkout -q "$BRANCH"
+  git checkout -f "$BRANCH"
   git reset --hard "origin/$BRANCH"
   APP_GIT_SHA="$(git rev-parse --short HEAD)"
 
