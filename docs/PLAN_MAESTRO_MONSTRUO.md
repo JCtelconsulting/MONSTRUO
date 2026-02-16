@@ -74,6 +74,7 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-02-15: EPIC 11 Ticketera: implementado plan de estabilización operativa (cola jobs con dedupe fuerte + recuperación de stale segura con índices parciales, cleanup de `sys_jobs`, eliminación de side effects en GET críticos `/tickets` y `/sla/metrics`, durabilidad compliance con verificación de artefacto/hash e idempotencia de rerun cuando falta evidencia, endpoint de descarga de adjuntos por ticket, endpoint `ops/queue-health`, endpoint `jobs/recover-stale`, y UI `Ops` mínima para operación Jira/Canales/Compliance). Validación DEV en verde: `verify_hardening --check-api`, `e2e_api_full`, `e2e_ticketera`.
 - 2026-02-15: EPIC 11 Ticketera: fase técnica del paralelo Jira+MONSTRUO completada (tablas `jira_issue_map/jira_sync_runs/jira_sync_cursor/parallel_kpi_daily/parallel_decisions`, sync `bootstrap-open` + `delta-sync`, reconciliación/KPI diario, endpoint formal de decisión Go/No-Go y job recurrente `JIRA_DELTA_SYNC_DAILY`).
 - 2026-02-15: EPIC 11 Ticketera: Auto-Respuesta Segura v1 implementada (`allowlist` por ENV + `blocklist` localpart + delay configurable de 15m + one-shot por `ticket_id+destinatario` + idempotencia en job + threading robusto con cadena `email_references`).
 - 2026-02-15: EPIC 11 Ticketera: validación final DEV en verde (`verify_hardening --check-api` + `e2e_ticketera` completos). Ajuste API Jira (`updated_at/updated` en `JiraIssueIn`) para mantener idempotencia en `delta-sync` por payload.
@@ -1902,6 +1903,7 @@ Tareas:
 - [x] Estados y SLA (cálculo por severidad + notificaciones in-app)
 - [x] Comentarios y timeline base por eventos (`ticket_comments`)
 - [x] UI Ticketera V3: Resumen (KPIs + Pivot), Lista, Kanban y detalle
+- [x] Vista 360 Cliente en Detalle Ticket (Deuda, Pagos, Info)
 - [x] Responder por correo desde detalle (`POST /api/tks/tickets/{ticket_id}/reply-email`)
 - [x] Mantención de hilo de correo (`In-Reply-To` / `References` + `email_thread_id`)
 - [x] Anti-duplicado de correos salientes (`outgoing_pending` + dedupe por ventana corta)

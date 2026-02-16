@@ -66,3 +66,15 @@ async def trigger_manual_job(
         return {"status": "enqueued", "job": job_type}
     finally:
         conn.close()
+
+
+@router.post("/recover-stale")
+async def recover_stale_jobs(
+    stale_minutes: int = 20,
+    sess: dict = Depends(deps.require_permission("tickets:compliance"))
+):
+    try:
+        recovered = jobs_engine.recover_stale_running_jobs(stale_minutes=stale_minutes)
+        return {"ok": True, "recovered": recovered}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

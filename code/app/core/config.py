@@ -52,9 +52,13 @@ class Settings(BaseSettings):
     TICKET_SLA_BUSINESS_START_HOUR: int = 9
     TICKET_SLA_BUSINESS_END_HOUR: int = 18
     TICKET_SLA_ESCALATION_WINDOWS_PCT: str = "80,100"  # Ej: 50,80,100
+    JOBS_STALE_RUNNING_MINUTES: int = 20
+    SYS_JOBS_RETENTION_DAYS: int = 14
+    TKS_SLA_EVAL_LIMIT: int = 500
     
     # Ticketera Attachments
-    TICKET_ATTACHMENTS_DIR: str = "/srv/monstruo/data/tickets"
+    # Mantener vacío permite fallback automático por entorno en tickets_service.
+    TICKET_ATTACHMENTS_DIR: str = ""
     TICKET_MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10 MB
     TICKET_ALLOWED_EXTENSIONS: List[str] = [
         ".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".csv", ".zip"

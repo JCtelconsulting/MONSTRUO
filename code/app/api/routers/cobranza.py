@@ -316,3 +316,30 @@ Saludos cordiales,
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+
+@router.post("/payment-link", summary="Generate payment link (Placeholder)")
+async def generate_payment_link(
+    payload: dict, sess: dict = Depends(deps.require_permission("invoice:read"))
+):
+    """
+    Generates a payment link for a customer.
+    Payload: {"customer_id": "CYG", "amount": 1000}
+    """
+    # Mock implementation for now
+    customer_id = payload.get("customer_id")
+    amount = payload.get("amount")
+    
+    if not customer_id or not amount:
+         raise HTTPException(status_code=400, detail="Missing customer_id or amount")
+
+    # In a real implementation, this would call a payment gateway API (Stripe, MercadoPago, etc.)
+    # For now, we return a dummy link.
+    import uuid
+    token = str(uuid.uuid4())
+    
+    return {
+        "payment_url": f"https://pagos.monstruo.cl/pay/{token}?cid={customer_id}&amt={amount}",
+        "token": token,
+        "expires_at": db.now_plus_delta_iso(hours=24)
+    }

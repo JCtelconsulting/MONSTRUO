@@ -24,6 +24,7 @@ const TksMain = (() => {
     const cache = {
         dashboard: null,
         kanban: null,
+        ops: null,
         list: new Map(),
     };
 
@@ -35,6 +36,7 @@ const TksMain = (() => {
     function clearDataCache() {
         cache.dashboard = null;
         cache.kanban = null;
+        cache.ops = null;
         cache.list.clear();
     }
 
@@ -106,6 +108,7 @@ const TksMain = (() => {
         if (tab === 'dashboard') loadDashboard(content, token);
         else if (tab === 'lista') loadList(content, token);
         else if (tab === 'kanban') loadKanban(content, token);
+        else if (tab === 'ops') loadOps(content, token);
     }
 
     // ---- DASHBOARD ----
@@ -139,31 +142,35 @@ const TksMain = (() => {
         if (!container) return;
         container.innerHTML = `
         <div class="tks-list-layout">
+            <div class="tks-detail-backdrop" id="tks-detail-backdrop" onclick="TksMain.closeDetail()"></div>
             <div class="tks-list-panel">
                 <div class="tks-toolbar">
-                    <input class="tks-search" id="tks-search-input" placeholder="🔍 Buscar tickets..." value="${filters.q}">
-                    <button class="tks-btn tks-btn-primary tks-btn-icon" onclick="TksMain.openCreateModal()" title="Nuevo Ticket"><i class="fas fa-plus"></i></button>
+                    <input class="tks-search" id="tks-search-input" placeholder="🔍 Buscar tickets por título, código o cliente..." value="${filters.q}">
+                    <button class="tks-btn tks-btn-ghost tks-btn-icon" onclick="TksMain.refreshList()" title="Recargar"><i class="fas fa-sync-alt"></i></button>
                 </div>
-                <div class="tks-filter-row" id="tks-filters">
+                <!-- Filters Row (Status) -->
+                <div class="tks-filter-row" id="tks-filters" style="padding-top:0.8rem">
                     <button class="tks-filter-chip ${!filters.status ? 'active' : ''}" data-filter-status="">Todos</button>
-                    <button class="tks-filter-chip ${filters.status === 'abierto' ? 'active' : ''}" data-filter-status="abierto">Abierto</button>
+                    <button class="tks-filter-chip ${filters.status === 'abierto' ? 'active' : ''}" data-filter-status="abierto">Abiertos</button>
                     <button class="tks-filter-chip ${filters.status === 'en_progreso' ? 'active' : ''}" data-filter-status="en_progreso">En Progreso</button>
-                    <button class="tks-filter-chip ${filters.status === 'resuelto' ? 'active' : ''}" data-filter-status="resuelto">Resuelto</button>
-                    <button class="tks-filter-chip ${filters.status === 'cerrado' ? 'active' : ''}" data-filter-status="cerrado">Cerrado</button>
+                    <button class="tks-filter-chip ${filters.status === 'resuelto' ? 'active' : ''}" data-filter-status="resuelto">Resueltos</button>
                 </div>
+                 <!-- Filters Row (Category) -->
                 <div class="tks-filter-row" id="tks-cat-filters">
-                    <button class="tks-filter-chip ${!filters.categoria ? 'active' : ''}" data-filter-cat="">Todas</button>
+                    <button class="tks-filter-chip ${!filters.categoria ? 'active' : ''}" data-filter-cat="">Todas las áreas</button>
                     <button class="tks-filter-chip ${filters.categoria === 'redes' ? 'active' : ''}" data-filter-cat="redes">🌐 Redes</button>
                     <button class="tks-filter-chip ${filters.categoria === 'sistemas' ? 'active' : ''}" data-filter-cat="sistemas">💻 Sistemas</button>
                     <button class="tks-filter-chip ${filters.categoria === 'ejecucion' ? 'active' : ''}" data-filter-cat="ejecucion">🔧 Ejecución</button>
                     <button class="tks-filter-chip ${filters.categoria === 'admin' ? 'active' : ''}" data-filter-cat="admin">📋 Admin</button>
                 </div>
                 <div class="tks-items-list" id="tks-items-list">
-                    <div class="tks-skeleton" style="height:60px;margin:0.5rem"></div>
-                    <div class="tks-skeleton" style="height:60px;margin:0.5rem"></div>
-                    <div class="tks-skeleton" style="height:60px;margin:0.5rem"></div>
+                    <div class="tks-skeleton" style="height:60px;margin:1rem"></div>
+                    <div class="tks-skeleton" style="height:60px;margin:1rem"></div>
+                    <div class="tks-skeleton" style="height:60px;margin:1rem"></div>
                 </div>
             </div>
+            
+            <!-- DRAWER DETALLE -->
             <div class="tks-detail-panel" id="tks-detail-panel">
                 <div class="tks-detail-empty"><span>Selecciona un ticket</span></div>
             </div>
@@ -208,18 +215,23 @@ const TksMain = (() => {
             return;
         }
 
-        listEl.innerHTML = items.map(t => TksUI.renderTicketItem(t)).join('');
+        // Usamos renderTicketTable en lugar de map(renderTicketItem)
+        listEl.innerHTML = TksUI.renderTicketTable(items);
 
-        listEl.querySelectorAll('.tks-item').forEach(item => {
-            item.addEventListener('click', () => {
-                listEl.querySelectorAll('.tks-item').forEach(i => i.classList.remove('active'));
-                item.classList.add('active');
-                openDetail(parseInt(item.dataset.id));
+        // Bind events to table rows
+        listEl.querySelectorAll('.tks-row').forEach(row => {
+            row.addEventListener('click', (e) => {
+                // Evitar si click en botón de acción (si hubiera)
+                if (e.target.closest('button')) return;
+
+                listEl.querySelectorAll('.tks-row').forEach(r => r.classList.remove('active'));
+                row.classList.add('active');
+                openDetail(parseInt(row.dataset.id));
             });
         });
 
         if (selectedTicketId) {
-            const sel = listEl.querySelector(`.tks-item[data-id="${selectedTicketId}"]`);
+            const sel = listEl.querySelector(`.tks-row[data-id="${selectedTicketId}"]`);
             if (sel) sel.classList.add('active');
         }
     }
@@ -264,29 +276,78 @@ const TksMain = (() => {
     }
 
     // ---- DETAIL ----
+    function closeDetail() {
+        const panel = el('tks-detail-panel');
+        const backdrop = el('tks-detail-backdrop');
+        if (panel) panel.classList.remove('open');
+        if (backdrop) backdrop.classList.remove('visible');
+
+        // Deseleccionar
+        document.querySelectorAll('.tks-row.active').forEach(r => r.classList.remove('active'));
+        selectedTicketId = null;
+    }
+
     async function openDetail(ticketId) {
         selectedTicketId = ticketId;
         const reqToken = ++detailRequestToken;
         const panel = el('tks-detail-panel');
+        const backdrop = el('tks-detail-backdrop');
         if (!panel) return;
+
+        // Show drawer immediately (loading state)
+        panel.classList.add('open');
+        if (backdrop) backdrop.classList.add('visible');
+
         if (detailAbortController) detailAbortController.abort();
         const controller = new AbortController();
         detailAbortController = controller;
 
-        panel.classList.add('open');
-        panel.innerHTML = '<div class="tks-detail-empty"><div class="tks-skeleton" style="height:200px;width:80%;margin:2rem auto"></div></div>';
+        panel.innerHTML = `
+            <div class="tks-detail-header">
+                <button class="tks-btn-icon-sm" onclick="TksMain.closeDetail()" style="float:right"><i class="fas fa-times"></i></button>
+                <div class="tks-skeleton" style="height:30px;width:60%"></div>
+            </div>
+            <div style="padding:2rem"><div class="tks-loading-spinner">Cargando ticket...</div></div>
+        `;
 
         try {
-            const [ticket, eventosData, emailsData] = await Promise.all([
+            const [ticket, eventosData, emailsData, attachmentsData] = await Promise.all([
                 TksApi.getTicket(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 TksApi.getEventos(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 TksApi.getTicketEmails(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
+                TksApi.getTicketAttachments(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
             ]);
-            if (reqToken !== detailRequestToken || selectedTicketId !== ticketId || currentTab !== 'lista') return;
-            panel.innerHTML = TksUI.renderDetail(ticket, eventosData.items || [], emailsData.items || []);
+            if (reqToken !== detailRequestToken || selectedTicketId !== ticketId) return;
+
+            // Render detail but inject CLOSE BUTTON
+            const html = TksUI.renderDetail(
+                ticket,
+                eventosData.items || [],
+                emailsData.items || [],
+                attachmentsData.items || []
+            );
+
+            // Hacky string injection to add Close Button to header if not present (TksUI could be updated, but this works for now)
+            // or better: TksUI.renderDetail could accept a "closeAction"
+            // Let's update TksUI.renderDetail signature or just prepend the button in the header.
+            panel.innerHTML = html;
+
+            // Add Close Button to header manually
+            const header = panel.querySelector('.tks-detail-header');
+            if (header) {
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'tks-btn-icon-sm';
+                closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                closeBtn.title = 'Cerrar pasarela';
+                closeBtn.style.float = 'right';
+                closeBtn.style.fontSize = '1.2rem';
+                closeBtn.onclick = closeDetail;
+                header.prepend(closeBtn);
+            }
+
         } catch (e) {
             if (e?.name === 'AbortError') return;
-            if (reqToken !== detailRequestToken || selectedTicketId !== ticketId || currentTab !== 'lista') return;
+            if (reqToken !== detailRequestToken || selectedTicketId !== ticketId) return;
             panel.innerHTML = `<div class="tks-detail-empty"><span style="color:red">Error: ${e.message}</span></div>`;
         } finally {
             if (detailAbortController === controller) {
@@ -427,6 +488,89 @@ const TksMain = (() => {
         }
     }
 
+    // ---- OPS ----
+    async function loadOps(container, token) {
+        const renderOpsContainer = (data) => `
+            <div style="display:flex;justify-content:flex-end;gap:.5rem;margin:.5rem 0 1rem 0;">
+                <button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="TksMain.recoverStaleJobs()">Recuperar huérfanos</button>
+                <button class="tks-btn tks-btn-primary tks-btn-sm" onclick="TksMain.refreshOps()">Actualizar</button>
+            </div>
+            ${TksUI.renderOps(data)}
+        `;
+        if (!container) return;
+        if (isFresh(cache.ops)) {
+            container.innerHTML = renderOpsContainer(cache.ops.data);
+            return;
+        }
+        const controller = new AbortController();
+        panelAbortController = controller;
+        container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:220px;margin:1.5rem"></div></div>';
+        try {
+            const settled = await Promise.allSettled([
+                TksApi.getQueueHealth({ signal: controller.signal, timeoutMs: 12000 }),
+                TksApi.getChannelsStatus({ signal: controller.signal, timeoutMs: 12000 }),
+                TksApi.listChannelNotifications({ limit: 20 }, { signal: controller.signal, timeoutMs: 12000 }),
+                TksApi.listJiraRuns({ limit: 10 }, { signal: controller.signal, timeoutMs: 12000 }),
+                TksApi.getJiraReconciliationDaily({ signal: controller.signal, timeoutMs: 12000 }),
+                TksApi.listParallelKpiDaily({ signal: controller.signal, timeoutMs: 12000 }),
+                TksApi.listComplianceExportRuns({ signal: controller.signal, timeoutMs: 12000 }),
+            ]);
+            if (token !== tabRequestToken || currentTab !== 'ops') return;
+
+            const data = {
+                queue: settled[0]?.status === 'fulfilled' ? settled[0].value : {},
+                channels: settled[1]?.status === 'fulfilled' ? settled[1].value : {},
+                channelNotifications: settled[2]?.status === 'fulfilled' ? settled[2].value : { items: [] },
+                jiraRuns: settled[3]?.status === 'fulfilled' ? settled[3].value : { items: [] },
+                reconciliation: settled[4]?.status === 'fulfilled' ? settled[4].value : {},
+                parallelKpi: settled[5]?.status === 'fulfilled' ? settled[5].value : { items: [] },
+                complianceExportRuns: settled[6]?.status === 'fulfilled' ? settled[6].value : { items: [] },
+            };
+            cache.ops = { data, ts: Date.now() };
+            container.innerHTML = renderOpsContainer(data);
+        } catch (e) {
+            if (e?.name === 'AbortError') return;
+            if (token !== tabRequestToken || currentTab !== 'ops') return;
+            container.innerHTML = `<div class="tks-dashboard"><p style="color:red">Error cargando Operación: ${e.message}</p></div>`;
+        } finally {
+            if (panelAbortController === controller) {
+                panelAbortController = null;
+            }
+        }
+    }
+
+    async function refreshOps() {
+        cache.ops = null;
+        loadTab('ops', { force: true });
+    }
+
+    async function retryChannel(notificationId) {
+        const id = Number(notificationId || 0);
+        if (!id) return;
+        try {
+            const idem = `ops-retry-${id}-${Date.now()}`;
+            await TksApi.retryChannelNotification(id, { headers: { 'Idempotency-Key': idem } });
+            if (window.showToast) window.showToast(`Reintento encolado para notificación #${id}`, 'success');
+            refreshOps();
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error en reintento de canal: ${e.message}`, 'error');
+        }
+    }
+
+    async function recoverStaleJobs() {
+        const raw = prompt('Minutos para considerar ejecución huérfana:', '20');
+        if (raw == null) return;
+        const staleMinutes = Math.max(1, Math.min(240, Number(raw) || 20));
+        try {
+            const out = await TksApi.recoverStaleJobs(staleMinutes);
+            const recovered = Number(out?.recovered?.recovered || 0);
+            if (window.showToast) window.showToast(`Recover stale ejecutado: ${recovered} jobs`, 'success');
+            refreshOps();
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error al recuperar huérfanos: ${e.message}`, 'error');
+        }
+    }
+
     function onDragStart(event, ticketId) {
         event.dataTransfer.setData('text/plain', ticketId);
         event.dataTransfer.effectAllowed = 'move';
@@ -456,6 +600,99 @@ const TksMain = (() => {
     function closeCreateModal() {
         const modal = el('tks-create-modal');
         if (modal) modal.classList.remove('open');
+    }
+
+    // ---- CLIENT ASSOCIATION ----
+    let assocEmail = '';
+
+    function openAssociateClientModal(email) {
+        assocEmail = email;
+        const container = document.body;
+        // Check if already exists, remove it
+        const existing = el('tks-associate-modal');
+        if (existing) existing.remove();
+
+        const html = TksUI.renderAssociateClientModal(email);
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        container.appendChild(wrapper.firstElementChild);
+
+        // Show immediate
+        setTimeout(() => el('tks-associate-modal').classList.add('open'), 10);
+
+        // Focus search
+        setTimeout(() => {
+            const input = el('tks-assoc-search');
+            if (input) input.focus();
+        }, 100);
+    }
+
+    function closeAssociateModal() {
+        const modal = el('tks-associate-modal');
+        if (modal) {
+            modal.classList.remove('open');
+            setTimeout(() => modal.remove(), 300);
+        }
+    }
+
+    async function searchClients() {
+        const q = el('tks-assoc-search').value.trim();
+        const resultsEl = el('tks-assoc-results');
+        if (!q || q.length < 2) {
+            if (window.showToast) window.showToast('Escribe al menos 2 caracteres', 'warning');
+            return;
+        }
+
+        resultsEl.style.display = 'block';
+        resultsEl.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--tks-text-muted)">Buscando...</div>';
+
+        try {
+            const data = await fetchApi(`/api/tks/customers/search?q=${encodeURIComponent(q)}`);
+            const items = data.items || [];
+
+            if (items.length === 0) {
+                resultsEl.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--tks-text-muted)">No se encontraron clientes</div>';
+                return;
+            }
+
+            resultsEl.innerHTML = items.map(c => `
+                <div class="tks-assoc-item" onclick="TksMain.selectClient('${c.id}', '${escapeHtml(c.name).replace(/'/g, "\\'")}')" 
+                     style="padding:0.8rem;border-bottom:1px solid var(--tks-border);cursor:pointer;transition:background 0.2s">
+                    <div style="font-weight:600;color:var(--tks-text-main)">${escapeHtml(c.name)}</div>
+                    <div style="font-size:0.8rem;color:var(--tks-text-muted)">RUT: ${escapeHtml(c.vat_id || 'N/A')}</div>
+                </div>
+            `).join('');
+
+            // Add hover effect via JS/CSS or inline
+            resultsEl.querySelectorAll('.tks-assoc-item').forEach(div => {
+                div.addEventListener('mouseenter', () => div.style.background = 'rgba(255,255,255,0.05)');
+                div.addEventListener('mouseleave', () => div.style.background = 'transparent');
+            });
+
+        } catch (e) {
+            resultsEl.innerHTML = `<div style="padding:1rem;color:red">Error: ${e.message}</div>`;
+        }
+    }
+
+    async function selectClient(custId, custName) {
+        if (!confirm(`¿Vincular ${assocEmail} al cliente "${custName}"?`)) return;
+
+        try {
+            await fetchApi('/api/tks/customers/associate-email', {
+                method: 'POST',
+                body: JSON.stringify({
+                    email: assocEmail,
+                    customer_id: custId,
+                    customer_name: custName
+                })
+            });
+
+            if (window.showToast) window.showToast('Vinculación exitosa', 'success');
+            closeAssociateModal();
+            refreshList(); // Reload list to see changes
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error vinculando: ${e.message}`, 'error');
+        }
     }
 
     async function submitCreate() {
@@ -526,8 +763,109 @@ const TksMain = (() => {
         openCreateModal,
         closeCreateModal,
         submitCreate,
+        retryChannel,
+        refreshOps,
+        recoverStaleJobs,
+        loadCustomer360,
+        closeDetail,
+        generatePaymentLink,
+        openAssociateClientModal,
+        closeAssociateModal,
+        searchClients,
+        selectClient,
     };
 })();
+
+async function loadCustomer360(customerId, ticketId) {
+    const container = document.querySelector('.tks-customer-360-container');
+    const loading = document.getElementById('tks-c360-loading');
+    const content = document.getElementById('tks-c360-content');
+
+    if (!container || !loading || !content) return;
+
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    content.innerHTML = '';
+
+    if (!customerId) {
+        loading.style.display = 'none';
+        content.innerHTML = '<p style="color:var(--tks-text-muted); text-align:center; padding:2rem">Este ticket no está asociado a un cliente.</p>';
+        content.style.display = 'block';
+        return;
+    }
+
+    try {
+        // En un escenario real, esto llamaría a /api/crm/customers/{id}
+        // Simulamos respuesta por ahora o usamos un endpoint existente si hay
+        // Como no tenemos un endpoint unificado de "Cliente 360", hacemos un fetch mock o partial
+
+        // Intentamos usar el endpoint de cobros para tener info financiera
+        // GET /api/cobranza/resumen-cliente/{rut} ?? No existe exacto.
+        // Usaremos un mock por ahora basado en la info que tenemos.
+
+        // TODO: Implementar endpoint real backend. Por ahora simulamos delay y data.
+        await new Promise(r => setTimeout(r, 600));
+
+        const mockData = {
+            customer_id: customerId,
+            customer_name: "Cliente " + customerId, // Placeholder
+            status: Math.random() > 0.5 ? 'DEBT' : 'OK',
+            total_debt: Math.floor(Math.random() * 500000),
+            last_tickets: []
+        };
+
+        loading.style.display = 'none';
+        content.innerHTML = TksUI.renderCustomer360(mockData);
+        content.style.display = 'block';
+
+    } catch (e) {
+        loading.style.display = 'none';
+        content.innerHTML = `<p style="color:red">Error cargando datos: ${e.message}</p>`;
+        content.style.display = 'block';
+    }
+}
+
+async function generatePaymentLink(customerId, amount) {
+    const btn = event.target.closest('button');
+    const originalText = btn.innerHTML;
+    const resultDiv = document.getElementById('payment-link-result');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+    resultDiv.style.display = 'none';
+
+    try {
+        const payload = { customer_id: customerId, amount: amount };
+        const response = await window.fetchApi('/api/cobranza/payment-link', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        resultDiv.innerHTML = `
+            <div style="background:rgba(0,255,100,0.1); border:1px solid #00c851; padding:1rem; border-radius:6px; margin-top:1rem">
+                <div style="font-weight:bold; color:#00c851; margin-bottom:0.5rem"><i class="fas fa-check-circle"></i> Link generado</div>
+                <div style="display:flex; gap:0.5rem">
+                    <input type="text" readonly value="${response.payment_url}" style="flex:1; background:#111; border:1px solid #333; color:#eee; padding:4px; border-radius:4px" onclick="this.select()">
+                    <button class="tks-btn tks-btn-sm" onclick="navigator.clipboard.writeText('${response.payment_url}')"><i class="fas fa-copy"></i></button>
+                </div>
+                <div style="font-size:0.75rem; opacity:0.7; margin-top:0.5rem">Expira: ${new Date(response.expires_at).toLocaleString()}</div>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+
+    } catch (e) {
+        if (window.showToast) window.showToast(`Error: ${e.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+// Attach to TksMain scope hack (since we are using IIFE above but these need to be accessible if not inside)
+// Actually, better to put them INSIDE the IIFE or attach them to the returned object.
+// We are replacing the RETURN block, so we can't easily append outside.
+// Let's rewrite the replacement to be INSIDE the IIFE return.
+
 
 // Auto-init on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {

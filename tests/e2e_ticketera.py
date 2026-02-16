@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import subprocess
 import sys
@@ -290,7 +291,31 @@ except Exception as e:
         if not found_attachment:
             return fail(f"No se encontró adjunto '{attachment_name}' en historial")
 
-        print("[OK] Reply + dedupe + incoming thread match validados")
+        attachments_list = session.get(f"{base_url}/api/tks/tickets/{ticket_id}/attachments", timeout=args.timeout)
+        ensure_status("Lista de adjuntos ticket", attachments_list.status_code, attachments_list.text, {200})
+        att_items = as_json(attachments_list).get("items", [])
+        if not att_items:
+            return fail("No se encontraron adjuntos persistidos en ticket_attachments")
+        att = att_items[0]
+        att_id = int(att.get("id") or 0)
+        if att_id <= 0:
+            return fail(f"Adjunto sin id válido: {att}")
+
+        download = session.get(
+            f"{base_url}/api/tks/tickets/{ticket_id}/attachments/{att_id}/download",
+            timeout=max(args.timeout, 30),
+        )
+        ensure_status("Descarga de adjunto", download.status_code, download.text if hasattr(download, "text") else "", {200})
+        content = download.content or b""
+        if len(content) == 0:
+            return fail("Descarga de adjunto devolvió contenido vacío")
+        expected_sha = str(att.get("sha256") or "").strip().lower()
+        if expected_sha:
+            got_sha = hashlib.sha256(content).hexdigest().lower()
+            if got_sha != expected_sha:
+                return fail(f"Hash inconsistente en descarga de adjunto: esperado={expected_sha} obtenido={got_sha}")
+
+        print("[OK] Reply + dedupe + incoming thread match + download adjuntos validados")
     except Exception as exc:
         return fail(str(exc))
     finally:
@@ -564,6 +589,7 @@ finally:
             timeout=max(args.timeout, 30),
         )
         ensure_status("Run compliance export", export_resp.status_code, export_resp.text, {200})
+        export_body = as_json(export_resp)
         export_dup = session.post(
             f"{base_url}/api/tks/compliance/exports/run",
             json={"from_ts": from_ts, "to_ts": to_ts, "scope": "both"},
@@ -573,6 +599,42 @@ finally:
         ensure_status("Run compliance export duplicate", export_dup.status_code, export_dup.text, {200})
         if not as_json(export_dup).get("duplicate_skipped"):
             return fail(f"Export compliance idempotente no deduplicó: {export_dup.text}")
+
+        manifest_path = str(export_body.get("manifest_path") or "").strip()
+        first_run_id = int(export_body.get("run_id") or 0)
+        if not manifest_path or first_run_id <= 0:
+            return fail(f"Run export sin manifest_path/run_id válido: {export_body}")
+
+        delete_manifest_script = f"""
+from pathlib import Path
+p = Path({manifest_path!r})
+if p.exists():
+    p.unlink()
+print("SUCCESS")
+"""
+        delete_cmd = [
+            "docker", "compose", "--env-file", ".env.server.dev",
+            "exec", "-T", "api", "python3", "-c", delete_manifest_script
+        ]
+        delete_proc = subprocess.run(delete_cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
+        if delete_proc.returncode != 0 or "SUCCESS" not in delete_proc.stdout:
+            return fail(f"No se pudo borrar manifest para prueba de rerun: {delete_proc.stdout} // {delete_proc.stderr}")
+
+        export_rerun = session.post(
+            f"{base_url}/api/tks/compliance/exports/run",
+            json={"from_ts": from_ts, "to_ts": to_ts, "scope": "both"},
+            headers={"Idempotency-Key": export_key},
+            timeout=max(args.timeout, 30),
+        )
+        ensure_status("Run compliance export rerun sin artefacto", export_rerun.status_code, export_rerun.text, {200})
+        export_rerun_body = as_json(export_rerun)
+        if export_rerun_body.get("duplicate_skipped"):
+            return fail(f"Rerun de export no se ejecutó pese a artefacto faltante: {export_rerun_body}")
+        rerun_id = int(export_rerun_body.get("run_id") or 0)
+        if rerun_id <= 0 or rerun_id == first_run_id:
+            return fail(f"Rerun de export no generó run nuevo: first={first_run_id} rerun={rerun_id}")
+        if export_rerun_body.get("artifact_exists") is not True:
+            return fail(f"Rerun de export sin artefacto verificado: {export_rerun_body}")
 
         verify_audit = session.get(
             f"{base_url}/api/tks/compliance/hash-chain/verify?stream=audit",
@@ -604,7 +666,7 @@ finally:
             timeout=max(args.timeout, 30),
         )
         ensure_status("Purge run", purge_run.status_code, purge_run.text, {200})
-        print("[OK] Compliance core validado")
+        print("[OK] Compliance core validado (incluye rerun cuando falta artefacto)")
     except Exception as exc:
         return fail(str(exc))
 
@@ -751,7 +813,103 @@ print("SUCCESS")
         return fail(str(exc))
 
     # ------------------------------------------------------------
-    # 7) Paralelo Jira + MONSTRUO (bootstrap/delta/runs/kpi/go-no-go)
+    # 7) Cola jobs: queue-health + recover stale + dedupe recurrentes
+    # ------------------------------------------------------------
+    try:
+        inner_queue_seed = f"""
+import asyncio
+from datetime import datetime, timedelta, timezone
+from app.core import db, jobs_engine
+
+conn = db.get_conn()
+try:
+    now = db.now_utc_iso()
+    old = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
+    conn.execute("DELETE FROM sys_jobs WHERE job_type = 'E2E_RECURRENCE_TEST'")
+    row = conn.execute(
+        '''INSERT INTO sys_jobs
+           (job_type, status, payload, next_run_at, retries_count, max_retries, created_at, updated_at)
+           VALUES ('PROCESS_NOTIFICATIONS', 'RUNNING', '{{}}', ?, 0, 0, ?, ?)
+           RETURNING id''',
+        (old, now, old),
+    ).fetchone()
+    stale_id = int(row["id"]) if row else 0
+    conn.commit()
+finally:
+    conn.close()
+
+async def _run():
+    first = await jobs_engine.enqueue_unique_job("E2E_RECURRENCE_TEST", {{"recurring": True}}, max_retries=0)
+    second = await jobs_engine.enqueue_unique_job("E2E_RECURRENCE_TEST", {{"recurring": True}}, max_retries=0)
+    return first, second
+
+f, s = asyncio.run(_run())
+if not f.get("enqueued") or not s.get("duplicate"):
+    print("FAIL_DEDUPE", f, s)
+    raise SystemExit(1)
+print(f"SUCCESS STALE_ID={{stale_id}}")
+"""
+        seed_cmd = [
+            "docker", "compose", "--env-file", ".env.server.dev",
+            "exec", "-T", "api", "python3", "-c", inner_queue_seed
+        ]
+        seed_proc = subprocess.run(seed_cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
+        if seed_proc.returncode != 0 or "SUCCESS" not in seed_proc.stdout:
+            return fail(f"Error preparando prueba de cola/recurrentes: {seed_proc.stdout} // {seed_proc.stderr}")
+
+        stale_job_id = 0
+        for token in seed_proc.stdout.split():
+            if token.startswith("STALE_ID="):
+                try:
+                    stale_job_id = int(token.split("=", 1)[1])
+                except Exception:
+                    stale_job_id = 0
+        if stale_job_id <= 0:
+            return fail(f"No se pudo obtener stale_job_id desde seed script: {seed_proc.stdout}")
+
+        queue_health = session.get(f"{base_url}/api/tks/ops/queue-health", timeout=max(args.timeout, 30))
+        ensure_status("Queue health", queue_health.status_code, queue_health.text, {200})
+        q_body = as_json(queue_health)
+        for k in ("generated_at", "by_job_type", "totals"):
+            if k not in q_body:
+                return fail(f"Queue health sin campo requerido '{k}': {q_body}")
+
+        recover = session.post(f"{base_url}/api/jobs/recover-stale?stale_minutes=20", timeout=max(args.timeout, 30))
+        ensure_status("Recover stale jobs", recover.status_code, recover.text, {200})
+        recovered = as_json(recover)
+        if recovered.get("ok") is not True:
+            return fail(f"Recover stale respondió sin ok=true: {recovered}")
+
+        inner_check_stale = f"""
+from app.core import db
+conn = db.get_conn()
+try:
+    row = conn.execute("SELECT status FROM sys_jobs WHERE id = ?", ({stale_job_id},)).fetchone()
+finally:
+    conn.close()
+if not row:
+    print("FAIL_NOT_FOUND")
+    raise SystemExit(1)
+status = str(row.get("status") or "").upper()
+if status not in ("RETRY", "FAILED"):
+    print("FAIL_STATUS", status)
+    raise SystemExit(1)
+print("SUCCESS")
+"""
+        check_cmd = [
+            "docker", "compose", "--env-file", ".env.server.dev",
+            "exec", "-T", "api", "python3", "-c", inner_check_stale
+        ]
+        check_proc = subprocess.run(check_cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
+        if check_proc.returncode != 0 or "SUCCESS" not in check_proc.stdout:
+            return fail(f"Recover stale no movió job a RETRY: {check_proc.stdout} // {check_proc.stderr}")
+
+        print("[OK] Cola jobs validada (queue-health + recover stale + dedupe recurrentes)")
+    except Exception as exc:
+        return fail(str(exc))
+
+    # ------------------------------------------------------------
+    # 8) Paralelo Jira + MONSTRUO (bootstrap/delta/runs/kpi/go-no-go)
     # ------------------------------------------------------------
     try:
         jira_key = f"E2E-JIRA-{int(time.time())}"

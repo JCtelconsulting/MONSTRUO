@@ -17,6 +17,7 @@ from urllib.parse import unquote
 env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=env_path)
 from app.core import db, security, auth_service, audit, jobs_engine
+from app.core.config import settings as app_settings
 from app.api.routers import bancos
 from app.jobs import (
     ticket_sla,
@@ -109,6 +110,7 @@ def register_all_jobs():
     # Enlazar string 'SYNC_STOCK' con la función real
     jobs_engine.register_job("SYNC_STOCK", stock_sync.sync_stock)
     jobs_engine.register_job("CHECK_TICKET_SLA", ticket_sla.check_ticket_sla)
+    jobs_engine.register_job("TKS_SLA_EVALUATE", ticket_sla.evaluate_ticket_sla_job)
     jobs_engine.register_job("SYNC_CUSTOMERS", crm_sync.sync_customers)
     jobs_engine.register_job("SYNC_BILLING_CYCLES", facturacion_job.run_billing_cycles)
     jobs_engine.register_job("SYNC_INVOICE_PAYMENTS", invoice_sync.sync_invoice_payments)
@@ -134,50 +136,58 @@ async def start_background_workers():
     # 1. Registrar trabajos conocidos
     register_all_jobs()
 
-    # 2. Iniciar el Worker Loop (corre en background)
-    asyncio.create_task(jobs_engine.worker_loop())
+    # 2. Recuperar jobs huérfanos RUNNING + limpieza inicial de históricos.
+    stale_minutes = int(getattr(app_settings, "JOBS_STALE_RUNNING_MINUTES", 20) or 20)
+    recovered = jobs_engine.recover_stale_running_jobs(stale_minutes=stale_minutes)
+    retention_days = int(getattr(app_settings, "SYS_JOBS_RETENTION_DAYS", 14) or 14)
+    cleaned = jobs_engine.cleanup_old_jobs(retention_days=retention_days)
 
-    # 3. Encolar job recurrente de SLA (cada 30 minutos)
-    from datetime import datetime, timedelta
-
-    now_dt = datetime.utcnow()
-    next_run = (now_dt + timedelta(minutes=30)).isoformat()
-    await jobs_engine.enqueue_job(
+    # 3. Asegurar una sola instancia pendiente por job recurrente.
+    await jobs_engine.enqueue_unique_job(
         "CHECK_TICKET_SLA", payload={"recurring": True}, max_retries=1
     )
-    # Encolar ciclo de facturación (cada 12 horas)
-    await jobs_engine.enqueue_job(
+    await jobs_engine.enqueue_unique_job(
+        "TKS_SLA_EVALUATE",
+        payload={"recurring": True, "limit": int(getattr(app_settings, "TKS_SLA_EVAL_LIMIT", 500) or 500)},
+        max_retries=1,
+    )
+    await jobs_engine.enqueue_unique_job(
         "SYNC_BILLING_CYCLES", payload={"recurring": True}, max_retries=1
     )
-    # Encolar sync de pagos de facturas (cada 6 horas)
-    await jobs_engine.enqueue_job(
+    await jobs_engine.enqueue_unique_job(
         "SYNC_INVOICE_PAYMENTS", payload={"recurring": True}, max_retries=1
     )
-    # Encolar sync de servicios desde Laudus (diario)
-    await jobs_engine.enqueue_job(
+    await jobs_engine.enqueue_unique_job(
         "SYNC_SERVICES_LAUDUS", payload={"recurring": True}, max_retries=1
     )
-    # Encolar ciclo de lectura de correos (inicia inmediatamente, luego se re-agenda)
-    await jobs_engine.enqueue_job(
-        "EMAIL_POLLING", payload={}, max_retries=0
+    await jobs_engine.enqueue_unique_job(
+        "EMAIL_POLLING", payload={"recurring": True}, max_retries=0
     )
-    
-    # Job para procesar notificaciones escalonadas (polling cada 1 min idealmente)
-    # Por ahora lo lanzamos una vez y deberíamos re-agendarlo igual que email polling
-    await jobs_engine.enqueue_job(
+    await jobs_engine.enqueue_unique_job(
         "PROCESS_NOTIFICATIONS", payload={"recurring": True}, max_retries=0
     )
-    await jobs_engine.enqueue_job(
+    await jobs_engine.enqueue_unique_job(
         "COMPLIANCE_EXPORT_DAILY", payload={"recurring": True}, max_retries=1
     )
-    await jobs_engine.enqueue_job(
+    await jobs_engine.enqueue_unique_job(
         "COMPLIANCE_PURGE_DAILY", payload={"recurring": True}, max_retries=1
     )
-    await jobs_engine.enqueue_job(
+    await jobs_engine.enqueue_unique_job(
         "JIRA_DELTA_SYNC_DAILY", payload={"recurring": True}, max_retries=1
     )
+    await jobs_engine.enqueue_unique_job(
+        "CLEANUP_SYS_JOBS",
+        payload={"recurring": True, "retention_days": retention_days},
+        max_retries=1,
+    )
 
-    print(f"[Startup] Billing, SLA and Email jobs scheduled")
+    # 4. Iniciar el Worker Loop (corre en background)
+    asyncio.create_task(jobs_engine.worker_loop())
+
+    print(
+        f"[Startup] jobs scheduled | recovered_stale={recovered.get('recovered', 0)} "
+        f"| cleaned={cleaned.get('deleted', 0)}"
+    )
 
 
 

@@ -1,6 +1,6 @@
 # Validación E2E Ticketera - DEV
-**Fecha:** sáb 14 feb 2026 19:31:26 -03
-**Commit:** b8d8b8e
+**Fecha:** dom 15 feb 2026 14:59:57 -03
+**Commit:** 11b556f
 
 ## Ejecución de Pruebas
 
@@ -23,7 +23,7 @@
 ```
 [OK] Login: juan.lopez@telconsulting.cl
 [OK] whoami
-[OK] Ticket creado: TK-14-02-2026-0034 (id=34)
+[OK] Ticket creado: TK-15-02-2026-0004 (id=4)
 [OK] Detalle ticket
 [OK] Evento agregado
 [OK] Timeline con 2 eventos
@@ -37,29 +37,18 @@
 ### 4. e2e_ticketera.py (Incoming Match)
 ```
 [OK] Login: juan.lopez@telconsulting.cl
-[OK] Ticket creado: TK-14-02-2026-0035 (id=35)
-[OK] Primer reply enviado
-[OK] Dedupe activo: Se evitó un envío duplicado (correo ya enviado recientemente).
-[INFO] Thread ID capturado: mock-1771108289@monstruo.dev
-[INFO] Ejecutando simulación de correo entrante en contenedor API...
-[OK] Simulación incoming ejecutada.
-[OK] Incoming Thread Match VERIFICADO (Correo entrante apareció en el historial).
-[OK] Historial validado (Outgoing + Incoming). Correos totales: 2
+[OK] Tickets creados: inc=5 req=6 chg=7
+[OK] Idempotencia transición activa
+[OK] Bloqueo de ejecución sin doble aprobación
+[OK] Workflow + doble aprobación validado
+[OK] Dedupe de correo activo
+[OK] Reply + dedupe + incoming thread match + download adjuntos validados
+[OK] Auto-reply seguro validado (allowlist + antiloop + one-shot)
+[OK] Contrato SLA metrics/breaches validado
+[OK] Compliance core validado (incluye rerun cuando falta artefacto)
+[OK] Worker canales: sin usuario con phone_number, test de dispatch omitido en este entorno
+[OK] Cola jobs validada (queue-health + recover stale + dedupe recurrentes)
+[OK] Paralelo Jira+MONSTRUO técnico validado (bootstrap/delta/runs/kpi/go-no-go)
 [SUCCESS] E2E Ticketera PASS
 [PASS] e2e_ticketera.py
 ```
-
-## Parámetros Operacionales Auto-Respuesta Segura v1
-
-Variables requeridas por entorno:
-- `TICKET_AUTO_REPLY_ENABLED` (`true|false`)
-- `TICKET_AUTO_REPLY_DELAY_MINUTES` (default `15`)
-- `TICKET_AUTO_REPLY_ALLOWLIST_EMAILS` (CSV emails exactos)
-- `TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS` (CSV dominios, opcional con o sin `@`)
-- `TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST` (default `true`, fail-closed)
-- `TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS` (default `noreply,no-reply,mailer-daemon,postmaster`)
-
-Reglas operativas:
-- Precedencia: `blocklist > allowlist`.
-- One-shot: máximo 1 auto-respuesta por `ticket_id + destinatario`.
-- Threading: usar siempre `In-Reply-To` + `References` con cadena acumulada (`tickets.email_references`).

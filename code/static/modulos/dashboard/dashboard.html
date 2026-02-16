@@ -143,7 +143,7 @@
           document.querySelector('.monstruo-dashboard-grid').after(failContainer);
         }
 
-        if (data.recent_failures.length > 0) {
+        if (data.recent_failures && data.recent_failures.length > 0) {
           let html = `<h4>⚠️ Alertas Recientes</h4><table class="monstruo-table" style="width:100%; margin-top:0.5rem"><thead><tr><th>Job</th><th>Error</th><th>Hora</th></tr></thead><tbody>`;
           data.recent_failures.forEach(f => {
             html += `<tr><td>${f.job_type}</td><td style="color:#d32f2f">${f.error_msg.substring(0, 50)}...</td><td>${f.started_at.substring(11, 16)}</td></tr>`;
@@ -151,7 +151,80 @@
           html += `</tbody></table>`;
           failContainer.innerHTML = html;
         } else {
-          failContainer.innerHTML = `<div style="margin-top:2rem; opacity:0.6; text-align:center"><i class="fas fa-check-circle" style="color:#00c851"></i> Todos los sistemas operativos</div>`;
+          failContainer.innerHTML += `<div style="margin-top:2rem; opacity:0.6; text-align:center"><i class="fas fa-check-circle" style="color:#00c851"></i> Todos los sistemas operativos</div>`;
+        }
+
+        // --- Ticketera V3 Widget ---
+        try {
+            const tksData = await window.fetchApi('/api/tks/dashboard/kpi');
+            let tksContainer = document.getElementById('tks-widget-container');
+            if (!tksContainer) {
+                tksContainer = document.createElement('div');
+                tksContainer.id = 'tks-widget-container';
+                tksContainer.className = 'monstruo-dashboard-grid';
+                tksContainer.style.marginTop = '2rem';
+                tksContainer.style.gridTemplateColumns = '1fr 1fr'; 
+                document.querySelector('.monstruo-dashboard-grid').after(tksContainer);
+                
+                // Add header for this section
+                const tksHeader = document.createElement('div');
+                tksHeader.innerHTML = '<h3>Ticketera 360°</h3>';
+                tksHeader.style.marginTop = '2rem';
+                tksContainer.before(tksHeader);
+            }
+
+            // Widget 1: Top Clientes
+            let clientsHtml = `
+                <div class="card" style="grid-column: span 1; cursor:default; align-items: flex-start; text-align: left;">
+                    <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:1rem">
+                        <h4 style="margin:0"><i class="fas fa-building"></i> Top Clientes (Activos)</h4>
+                    </div>
+                    <table class="monstruo-table" style="width:100%; font-size:0.9rem">
+                        <thead><tr><th>Cliente</th><th style="text-align:right">Tickets</th></tr></thead>
+                        <tbody>
+            `;
+            if (tksData.top_clientes.length === 0) {
+                clientsHtml += `<tr><td colspan="2" style="text-align:center; opacity:0.6">Sin actividad reciente</td></tr>`;
+            } else {
+                tksData.top_clientes.forEach(c => {
+                    clientsHtml += `<tr><td>${c.cliente}</td><td style="text-align:right"><strong>${c.total}</strong></td></tr>`;
+                });
+            }
+            clientsHtml += `</tbody></table></div>`;
+
+            // Widget 2: Pendientes de Respuesta
+            let emailsHtml = `
+                <div class="card" style="grid-column: span 1; cursor:default; align-items: flex-start; text-align: left;">
+                    <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:1rem">
+                        <h4 style="margin:0"><i class="fas fa-envelope-open-text"></i> Correos Pendientes</h4>
+                    </div>
+                    <table class="monstruo-table" style="width:100%; font-size:0.9rem">
+                         <thead><tr><th>Asunto</th><th>Cliente</th><th>Hace</th></tr></thead>
+                        <tbody>
+            `;
+             if (tksData.pending_emails.length === 0) {
+                emailsHtml += `<tr><td colspan="3" style="text-align:center; opacity:0.6">Todo al día 🚀</td></tr>`;
+            } else {
+                tksData.pending_emails.forEach(e => {
+                    const created = new Date(e.created_at);
+                    const now = new Date();
+                    const diffHrs = Math.round((now - created) / 36e5);
+                    const timeStr = diffHrs > 24 ? `${Math.round(diffHrs/24)}d` : `${diffHrs}h`;
+                    
+                    emailsHtml += `
+                        <tr style="cursor:pointer" onclick="window.location.href='/modulos/tks/tks.html?ticket_id=${e.id}'">
+                            <td>${e.titulo.substring(0, 25)}...</td>
+                            <td>${e.customer_id || '-'}</td>
+                            <td style="color:${diffHrs > 4 ? '#ff4444' : 'inherit'}">${timeStr}</td>
+                        </tr>`;
+                });
+            }
+            emailsHtml += `</tbody></table></div>`;
+
+            tksContainer.innerHTML = clientsHtml + emailsHtml;
+
+        } catch (e) {
+            console.warn("No se pudo cargar widget Ticketera/KPI:", e);
         }
 
       } catch (err) {

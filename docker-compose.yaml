@@ -23,6 +23,9 @@ services:
     volumes:
       - ./code:/app/code
       - ./data/tickets:/srv/monstruo/data/tickets
+      - ./data/tickets:/srv/monstruo_dev/data/tickets
+      - ./data/compliance:/srv/monstruo/data/compliance
+      - ./data/compliance:/srv/monstruo_dev/data/compliance
     ports:
       - "${PORT:-9000}:9000"
     environment:

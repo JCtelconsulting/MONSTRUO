@@ -347,18 +347,21 @@
 /* ==========================================================================
    VISTA LISTA
    ========================================================================== */
+/* ==========================================================================
+   VISTA LISTA (Refactor: Full Width + Drawer)
+   ========================================================================== */
 .tks-list-layout {
-    display: grid;
-    grid-template-columns: 380px 1fr;
-    gap: 0;
-    flex: 1;
+    position: relative;
+    height: 100%;
+    width: 100%;
     overflow: hidden;
+    background: var(--tks-bg-secondary);
 }
 
-/* Panel Izquierdo: Lista */
+/* Panel Lista: Ahora ocupa todo el ancho */
 .tks-list-panel {
-    background: var(--tks-bg-secondary);
-    border-right: 1px solid var(--tks-border);
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -402,6 +405,7 @@
 
 .tks-filter-chip {
     background: rgba(255, 255, 255, 0.05);
+    /* Dark background */
     border: 1px solid var(--tks-border);
     color: var(--tks-text-muted);
     padding: 4px 10px;
@@ -416,222 +420,60 @@
 
 .tks-filter-chip:hover {
     background: rgba(255, 255, 255, 0.08);
+    /* Slightly lighter dark */
     color: #fff;
 }
 
 .tks-filter-chip.active {
     background: var(--tks-accent);
+    /* Active state color */
     border-color: var(--tks-accent);
     color: #fff;
 }
 
-.tks-items-list {
-    flex: 1;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
-}
-
-/* Ticket Item */
-.tks-item {
-    padding: 0.9rem 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    position: relative;
-}
-
-.tks-item::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: transparent;
-    transition: background 0.2s;
-}
-
-.tks-item:hover {
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.tks-item.active {
-    background: rgba(99, 102, 241, 0.08);
-}
-
-.tks-item.active::before {
-    background: var(--tks-accent);
-}
-
-/* Priority indicator */
-.tks-item[data-prio="1"]::before {
-    background: var(--tks-critica);
-}
-
-.tks-item[data-prio="2"]::before {
-    background: var(--tks-alta);
-}
-
-.tks-item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.5rem;
-}
-
-.tks-item-title {
-    font-weight: 600;
-    color: #fff;
-    font-size: 0.9rem;
-    line-height: 1.3;
-    flex: 1;
-}
-
-.tks-item-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 6px;
-    gap: 0.5rem;
-}
-
-.tks-item-meta-left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.tks-codigo {
-    font-size: 0.72rem;
-    color: var(--tks-text-muted);
-    font-family: 'Space Grotesk', monospace;
-}
-
-.tks-cat-badge {
-    font-size: 0.65rem;
-    padding: 2px 6px;
-    border-radius: 3px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-}
-
-.tks-cat-redes {
-    background: rgba(6, 182, 212, 0.15);
-    color: var(--tks-cat-redes);
-}
-
-.tks-cat-sistemas {
-    background: rgba(139, 92, 246, 0.15);
-    color: var(--tks-cat-sistemas);
-}
-
-.tks-cat-ejecucion {
-    background: rgba(245, 158, 11, 0.15);
-    color: var(--tks-cat-ejecucion);
-}
-
-.tks-cat-admin {
-    background: rgba(236, 72, 153, 0.15);
-    color: var(--tks-cat-admin);
-}
-
-.tks-cat-general {
-    background: rgba(107, 114, 128, 0.15);
-    color: var(--tks-cat-general);
-}
-
-/* Status Badge */
-.tks-status {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-}
-
-.tks-status-abierto {
-    background: rgba(56, 189, 248, 0.15);
-    color: var(--tks-abierto);
-}
-
-.tks-status-en_progreso {
-    background: rgba(251, 191, 36, 0.15);
-    color: var(--tks-en_progreso);
-}
-
-.tks-status-resuelto {
-    background: rgba(167, 139, 250, 0.15);
-    color: var(--tks-resuelto);
-}
-
-.tks-status-cerrado {
-    background: rgba(52, 211, 153, 0.15);
-    color: var(--tks-cerrado);
-}
-
-/* Severity Badge */
-.tks-sev {
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-}
-
-.tks-sev-critica {
-    background: rgba(239, 68, 68, 0.2);
-    color: var(--tks-critica);
-}
-
-.tks-sev-alta {
-    background: rgba(249, 115, 22, 0.2);
-    color: var(--tks-alta);
-}
-
-.tks-sev-media {
-    background: rgba(59, 130, 246, 0.2);
-    color: var(--tks-media);
-}
-
-.tks-sev-baja {
-    background: rgba(34, 197, 94, 0.2);
-    color: var(--tks-baja);
-}
-
-/* SLA indicator */
-.tks-sla-indicator {
-    font-size: 0.72rem;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.tks-sla-ok {
-    color: var(--tks-baja);
-}
-
-.tks-sla-warning {
-    color: var(--tks-en_progreso);
-}
-
-.tks-sla-breached {
-    color: var(--tks-critica);
-    font-weight: 700;
-}
-
 /* ==========================================================================
-   PANEL DE DETALLE (SLIDE-OVER)
+   PANEL DE DETALLE (SLIDE-OVER DRAWER)
    ========================================================================== */
 .tks-detail-panel {
-    background: var(--tks-bg-primary);
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 850px;
+    /* Ancho cómodo para correos y timeline */
+    max-width: 90%;
+    background: #0f172a;
+    /* Fondo sólido oscuro */
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 50;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    border-left: 1px solid var(--tks-border);
+}
+
+.tks-detail-panel.open {
+    transform: translateX(0);
+}
+
+/* Backdrop para cerrar al hacer click fuera (opcional, requiere JS extra) */
+.tks-detail-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.tks-detail-backdrop.visible {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .tks-detail-empty {
@@ -879,76 +721,118 @@
 }
 
 /* ==========================================================================
-   BOTONES
+   BOTONES (PREMIUM)
+   ========================================================================== */
+/* ==========================================================================
+   BOTONES (CLEAN DARK)
    ========================================================================== */
 .tks-btn {
-    border: none;
-    padding: 7px 14px;
+    border: 1px solid transparent;
+    padding: 8px 16px;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     font-weight: 500;
-    font-family: inherit;
+    font-family: 'Space Grotesk', sans-serif;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 8px;
     transition: all 0.2s ease;
+    letter-spacing: 0.3px;
 }
 
+.tks-btn:active {
+    transform: translateY(1px);
+}
+
+/* Primary: Solid Accent, no border */
 .tks-btn-primary {
     background: var(--tks-accent);
     color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .tks-btn-primary:hover {
     background: #4f46e5;
-    box-shadow: 0 4px 12px var(--tks-accent-glow);
+    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
 }
 
+/* Ghost: Cleaner, no borders by default */
 .tks-btn-ghost {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--tks-text);
-    border: 1px solid var(--tks-border);
+    background: transparent;
+    color: var(--tks-text-muted);
+    border: 1px solid transparent;
 }
 
 .tks-btn-ghost:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
 }
 
+/* Status Actions: Subtle backgrounds, flat */
 .tks-btn-success {
-    background: rgba(34, 197, 94, 0.2);
-    color: var(--tks-baja);
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
 }
 
 .tks-btn-success:hover {
-    background: rgba(34, 197, 94, 0.3);
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
 }
 
 .tks-btn-warning {
-    background: rgba(251, 191, 36, 0.2);
-    color: var(--tks-en_progreso);
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
 }
 
 .tks-btn-warning:hover {
-    background: rgba(251, 191, 36, 0.3);
+    background: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
 }
 
 .tks-btn-danger {
-    background: rgba(239, 68, 68, 0.2);
-    color: var(--tks-critica);
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
 }
 
 .tks-btn-danger:hover {
-    background: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
 }
 
+/* Sizes */
 .tks-btn-sm {
     padding: 4px 10px;
     font-size: 0.75rem;
+    border-radius: 4px;
 }
 
 .tks-btn-icon {
-    padding: 7px 9px;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+}
+
+.tks-btn-sm {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    gap: 5px;
+}
+
+.tks-btn-icon {
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
 }
 
 /* ==========================================================================
@@ -1261,4 +1145,72 @@
     100% {
         background-position: -200% 0;
     }
+}
+
+/* ==========================================================================
+   TABLE STYLES (LISTA)
+   ========================================================================== */
+.tks-table-wrapper {
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.tks-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.tks-table th {
+    position: sticky;
+    top: 0;
+    background: var(--tks-bg-secondary);
+    color: var(--tks-text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--tks-border);
+    z-index: 10;
+}
+
+.tks-table td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+    color: var(--tks-text);
+}
+
+.tks-table tr.tks-row {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.tks-table tr.tks-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.tks-table tr.tks-row.active {
+    background: rgba(99, 102, 241, 0.08);
+    border-left: 3px solid var(--tks-accent);
+}
+
+.tks-table .td-min {
+    white-space: nowrap;
+    width: 1%;
+}
+
+.tks-btn-icon-sm {
+    background: none;
+    border: none;
+    color: var(--tks-text-muted);
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.tks-btn-icon-sm:hover {
+    color: #fff;
 }

@@ -48,6 +48,30 @@ const TksUI = (() => {
         return { critica: 'Crítica', alta: 'Alta', media: 'Media', baja: 'Baja' }[s] || escapeHtml(s);
     }
 
+    function opsStatusLabel(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        return {
+            pending: 'pendiente',
+            dispatching: 'despachando',
+            sent: 'enviado',
+            failed: 'fallido',
+            cancelled: 'cancelado',
+            running: 'ejecutando',
+            retry: 'reintento',
+            completed: 'completado',
+            completed_with_errors: 'completado con errores',
+        }[normalized] || escapeHtml(value || '-');
+    }
+
+    function adapterModeLabel(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        return {
+            disabled: 'deshabilitado',
+            dry_run: 'simulación',
+            live: 'activo',
+        }[normalized] || escapeHtml(value || '-');
+    }
+
     // --- DASHBOARD ---
     function renderDashboard(stats) {
         const total = stats.total || 0;
@@ -88,7 +112,7 @@ const TksUI = (() => {
         <div class="tks-dashboard">
             <div class="tks-stats-row">
                 <div class="tks-stat-card" style="--card-accent: var(--tks-accent)">
-                    <span class="label">Total Tickets</span>
+                    <span class="label">Tickets Totales</span>
                     <span class="value">${total}</span>
                 </div>
                 <div class="tks-stat-card" style="--card-accent: var(--tks-abierto)">
@@ -106,7 +130,7 @@ const TksUI = (() => {
             </div>
 
             <div class="tks-sla-bar">
-                <h4>📊 SLA Compliance — ${slaPct}%</h4>
+                <h4>📊 Cumplimiento SLA — ${slaPct}%</h4>
                 <div class="sla-progress">
                     <div class="on-time" style="width:${slaPct}%"></div>
                     <div class="breached" style="width:${100 - slaPct}%"></div>
@@ -140,27 +164,105 @@ const TksUI = (() => {
         </div>`;
     }
 
-    // --- TICKET ITEM (LISTA) ---
-    function renderTicketItem(t) {
-        const sla = slaStatus(t.vence_at);
-        return `<div class="tks-item" data-id="${t.id}" data-prio="${t.prioridad || 3}">
-            <div class="tks-item-header">
-                <span class="tks-item-title">${escapeHtml(t.titulo || 'Sin título')}</span>
-                <span class="tks-status tks-status-${escapeHtml(t.estado)}">${statusLabel(t.estado)}</span>
-            </div>
-            <div class="tks-item-meta">
-                <div class="tks-item-meta-left">
-                    <span class="tks-codigo">${escapeHtml(t.codigo || `#${t.id}`)}</span>
-                    <span class="tks-cat-badge tks-cat-${escapeHtml(t.categoria || 'general')}">${catLabel(t.categoria)}</span>
-                    <span class="tks-sev tks-sev-${escapeHtml(t.severidad)}">${sevLabel(t.severidad)}</span>
-                </div>
-                <span class="tks-sla-indicator ${sla.class}">${sla.label}</span>
-            </div>
+    // --- UTILS ---
+    function decodeMimeEncodedString(str) {
+        if (!str) return '';
+        // 1. Intentar decodificar headers MIME estándar (=?UTF-8?Q?...?=)
+        let decoded = str.replace(/=\?UTF-8\?Q\?(.+?)\?=/gi, (match, p1) => {
+            try {
+                let hex = p1.replace(/_/g, ' ');
+                hex = hex.replace(/=([0-9A-F]{2})/yi, '%$1');
+                return decodeURIComponent(hex);
+            } catch (e) {
+                return match;
+            }
+        });
+
+        // 2. Si quedan secuencias Quoted-Printable "crudas" (ej: Juan L=C3=B3pez), intentamos decodificarlas
+        // Buscamos si hay al menos un patrón =XX donde XX es hex
+        if (decoded.match(/=[0-9A-F]{2}/i)) {
+            try {
+                // Reemplazamos todos los =XX por %XX para que decodeURIComponent lo entienda
+                // Asumimos UTF-8 ("Juan L=C3=B3pez" -> "Juan L%C3%B3pez" -> "Juan López")
+                let candidate = decoded.replace(/=([0-9A-F]{2})/gi, '%$1');
+                let tryDecoded = decodeURIComponent(candidate);
+                if (tryDecoded !== candidate) {
+                    decoded = tryDecoded;
+                }
+            } catch (e) {
+                // Si falla (secuencia inválida), devolvemos lo que teníamos
+            }
+        }
+
+        return decoded;
+    }
+
+    // --- TICKET TABLE (LISTA) ---
+    function renderTicketTable(items) {
+        if (!items || items.length === 0) {
+            return '<div style="padding:2rem;text-align:center;color:var(--tks-text-muted)">Sin tickets</div>';
+        }
+
+        const rows = items.map(t => {
+            const sla = slaStatus(t.vence_at);
+            const slaClass = sla.class === 'tks-sla-breached' ? 'color:var(--tks-critica)' : (sla.class === 'tks-sla-warning' ? 'color:var(--tks-alta)' : 'color:var(--tks-text-muted)');
+            const clientNameRaw = decodeMimeEncodedString(t.cliente_nombre || '');
+            let clientHtml = '<span style="color:var(--tks-text-muted)">-</span>';
+
+            if (clientNameRaw && clientNameRaw !== 'Desconocido') {
+                clientHtml = `<div style="font-weight:500;color:var(--tks-text-main)">${escapeHtml(clientNameRaw)}</div>`;
+            } else if (t.origen_email) {
+                clientHtml = `<button class="tks-btn-link" onclick="event.stopPropagation(); TksMain.openAssociateClientModal('${escapeHtml(t.origen_email)}')">
+                    <i class="fas fa-link"></i> Desconocido (Vincular)
+                </button>`;
+            }
+
+            return `<tr class="tks-row" data-id="${t.id}">
+                <td class="td-min"><span class="tks-codigo">${escapeHtml(t.codigo || `#${t.id}`)}</span></td>
+                <td>
+                    <div style="font-weight:500;color:var(--tks-text-main)">${escapeHtml(t.titulo || 'Sin título')}</div>
+                </td>
+                <td>
+                    ${clientHtml}
+                    ${t.origen_email ? `<div style="font-size:0.75rem;color:var(--tks-text-muted)">${escapeHtml(t.origen_email)}</div>` : ''}
+                </td>
+                <td class="td-min"><span class="tks-cat-badge tks-cat-${escapeHtml(t.categoria || 'general')}">${catLabel(t.categoria)}</span></td>
+                <td class="td-min"><span class="tks-sev tks-sev-${escapeHtml(t.severidad)}">${sevLabel(t.severidad)}</span></td>
+                <td class="td-min"><span class="tks-status tks-status-${escapeHtml(t.estado)}">${statusLabel(t.estado)}</span></td>
+                <td class="td-min" style="font-size:0.8rem;white-space:nowrap;${slaClass}">
+                    ${sla.class === 'tks-sla-breached' ? '<i class="fas fa-exclamation-triangle"></i>' : ''} 
+                    ${sla.label}
+                </td>
+                <td class="td-min" style="font-size:0.8rem;color:var(--tks-text-muted)">${timeAgo(t.created_at)}</td>
+                <td class="td-min" style="text-align:right">
+                    <button class="tks-btn-icon-sm" title="Ver detalle"><i class="fas fa-chevron-right"></i></button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        return `
+        <div class="tks-table-wrapper">
+            <table class="tks-table tks-list-table">
+                <thead>
+                    <tr>
+                        <th style="width:80px">ID</th>
+                        <th>Asunto</th>
+                        <th>Cliente</th>
+                        <th style="width:100px">Cat</th>
+                        <th style="width:90px">Sev</th>
+                        <th style="width:100px">Estado</th>
+                        <th style="width:120px">SLA</th>
+                        <th style="width:100px">Creado</th>
+                        <th style="width:40px"></th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
         </div>`;
     }
 
     // --- DETALLE ---
-    function renderDetail(t, eventos = [], emails = []) {
+    function renderDetail(t, eventos = [], emails = [], ticketAttachments = []) {
         if (!t) return '<div class="tks-detail-empty"><span>Selecciona un ticket</span></div>';
 
         const sla = slaStatus(t.vence_at);
@@ -210,12 +312,20 @@ const TksUI = (() => {
                     <div class="tks-email-subject">${escapeHtml(em.subject)}</div>
                     <div class="tks-email-body">${em.body_html}</div> <!-- Render HTML safely? Trusting backend cleaning -->
                     ${attachmentsHtml}
-                    <div class="tks-email-meta">Unknown/System vs ${escapeHtml(em.from_addr || em.to_addr)}</div>
+                    <div class="tks-email-meta">Sistema/Desconocido vs ${escapeHtml(em.from_addr || em.to_addr)}</div>
                 </div>`;
             }
         } else {
             emailsHtml = '<div style="padding:1rem;color:var(--tks-text-muted);font-style:italic">No hay correos registrados.</div>';
         }
+
+        const attachmentItems = (ticketAttachments || []).map(att => {
+            const downloadUrl = TksApi.getTicketAttachmentDownloadUrl(t.id, att.id);
+            const sizeKb = Math.max(0, Math.round(Number(att.size_bytes || 0) / 1024));
+            return `<a class="tks-att-chip" href="${escapeHtml(downloadUrl)}" target="_blank" rel="noopener">
+                <i class="fas fa-paperclip"></i> ${escapeHtml(att.filename || 'adjunto')} (${sizeKb}KB)
+            </a>`;
+        }).join('');
 
         return `
         <div class="tks-detail-header">
@@ -243,6 +353,13 @@ const TksUI = (() => {
         <div class="tks-detail-body">
             <div class="tks-description-box">${escapeHtml(t.descripcion || 'Sin descripción')}</div>
 
+            <div style="margin:0.8rem 0 1rem 0;">
+                <div style="font-size:0.8rem;color:var(--tks-text-muted);margin-bottom:0.3rem;">Adjuntos del ticket</div>
+                <div class="tks-email-attachments">
+                    ${attachmentItems || '<span class="tks-att-chip" style="opacity:.7">Sin adjuntos</span>'}
+                </div>
+            </div>
+
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.5rem;font-size:0.85rem;">
                 <div><strong style="color:var(--tks-text-muted)">Asignado:</strong> ${escapeHtml(t.asignado_a || 'Sin asignar')}</div>
                 <div><strong style="color:var(--tks-text-muted)">Creador:</strong> ${escapeHtml(t.creador_id || '-')}</div>
@@ -254,8 +371,9 @@ const TksUI = (() => {
             
             <!-- TABS INTERNOS DEL DETALLE -->
             <div class="tks-detail-tabs">
-                <button class="tks-detail-tab active" onclick="this.parentElement.nextElementSibling.querySelector('.tks-timeline-container').style.display='block';this.parentElement.nextElementSibling.querySelector('.tks-emails-container').style.display='none';this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active')">📜 Timeline</button>
-                <button class="tks-detail-tab" onclick="this.parentElement.nextElementSibling.querySelector('.tks-timeline-container').style.display='none';this.parentElement.nextElementSibling.querySelector('.tks-emails-container').style.display='block';this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active')">📧 Historial Correos</button>
+                <button class="tks-detail-tab active" onclick="this.parentElement.nextElementSibling.querySelector('.tks-timeline-container').style.display='block';this.parentElement.nextElementSibling.querySelector('.tks-emails-container').style.display='none';this.parentElement.nextElementSibling.querySelector('.tks-customer-360-container').style.display='none';this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active')">📜 Línea de tiempo</button>
+                <button class="tks-detail-tab" onclick="this.parentElement.nextElementSibling.querySelector('.tks-timeline-container').style.display='none';this.parentElement.nextElementSibling.querySelector('.tks-emails-container').style.display='block';this.parentElement.nextElementSibling.querySelector('.tks-customer-360-container').style.display='none';this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active')">📧 Historial Correos</button>
+                <button class="tks-detail-tab" onclick="this.parentElement.nextElementSibling.querySelector('.tks-timeline-container').style.display='none';this.parentElement.nextElementSibling.querySelector('.tks-emails-container').style.display='none';this.parentElement.nextElementSibling.querySelector('.tks-customer-360-container').style.display='block';this.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));this.classList.add('active'); TksMain.loadCustomer360('${escapeHtml(t.customer_id || '')}', ${t.id})">🏢 Cliente 360°</button>
             </div>
             
             <div class="tks-detail-content-area">
@@ -264,6 +382,12 @@ const TksUI = (() => {
                  </div>
                  <div class="tks-emails-container" style="display:none">
                     ${emailsHtml}
+                 </div>
+                 <div class="tks-customer-360-container" style="display:none; padding:1rem">
+                    <div class="tks-loading-spinner" id="tks-c360-loading">Cargando datos del cliente...</div>
+                    <div id="tks-c360-content" style="display:none">
+                        <!-- Content injected by TksMain.loadCustomer360 -->
+                    </div>
                  </div>
             </div>
 
@@ -301,6 +425,41 @@ const TksUI = (() => {
         </div>`;
     }
 
+    function renderCustomer360(data) {
+        if (!data) return '<p>No se encontró información del cliente.</p>';
+
+        const debtClass = data.status === 'DEBT' ? 'tks-sla-breached' : 'tks-sla-ok';
+        const debtLabel = data.status === 'DEBT' ? 'Con Deuda' : 'Al Día';
+
+        return `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem">
+            <!-- Info General -->
+            <div class="card" style="padding:1rem">
+                <h4 style="margin-top:0"><i class="fas fa-id-card"></i> ${escapeHtml(data.customer_name)}</h4>
+                <div style="font-size:0.9rem; line-height:1.6">
+                    <div><strong>ID:</strong> ${escapeHtml(data.customer_id)}</div>
+                    <div><strong>Estado Pago:</strong> <span class="${debtClass}" style="padding:2px 6px; border-radius:4px; font-size:0.8em">${debtLabel}</span></div>
+                    <div><strong>Deuda Total:</strong> $${new Intl.NumberFormat('es-CL').format(data.total_debt)}</div>
+                </div>
+                ${data.total_debt > 0 ? `
+                <div style="margin-top:1rem">
+                    <button class="tks-btn tks-btn-warning tks-btn-sm" onclick="TksMain.generatePaymentLink('${data.customer_id}', ${data.total_debt})">
+                        <i class="fas fa-link"></i> Generar Link de Pago
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+
+            <!-- Acciones / Historial (Placeholder) -->
+            <div class="card" style="padding:1rem; opacity:0.7">
+                <h4 style="margin-top:0"><i class="fas fa-history"></i> Historial Reciente</h4>
+                <p style="font-size:0.85rem">Próximamente: Lista de últimos 5 tickets y facturas.</p>
+            </div>
+        </div>
+        <div id="payment-link-result" style="margin-top:1rem; display:none"></div>
+        `;
+    }
+
     // --- KANBAN ---
     function renderKanban(kanban) {
         const cols = [
@@ -333,6 +492,127 @@ const TksUI = (() => {
                 </div>
             </div>`;
         }).join('')}</div>`;
+    }
+
+    // --- OPS VIEW ---
+    function renderOps(data) {
+        const queue = data?.queue || {};
+        const queueRows = Object.entries(queue.by_job_type || {}).map(([job, metrics]) => `
+            <tr>
+                <td>${escapeHtml(job)}</td>
+                <td class="td-num">${Number(metrics.due_now || 0)}</td>
+                <td class="td-num">${Number(metrics.stale_running || 0)}</td>
+                <td class="td-num">${Number(metrics.created_last_hour || 0)}</td>
+            </tr>
+        `).join('');
+
+        const channels = data?.channels || {};
+        const adapters = channels.adapters || {};
+        const adapterRows = Object.entries(adapters).map(([name, info]) => `
+            <tr>
+                <td>${escapeHtml(name)}</td>
+                <td>${adapterModeLabel(info.mode)}</td>
+                <td>${escapeHtml(info.provider || '-')}</td>
+                <td>${info.configured ? 'Sí' : 'No'}</td>
+            </tr>
+        `).join('');
+
+        const notifs = data?.channelNotifications?.items || [];
+        const notifRows = notifs.slice(0, 10).map(n => `
+            <tr>
+                <td>${escapeHtml(n.codigo || `#${n.ticket_id}`)}</td>
+                <td>${escapeHtml(n.channel || '-')}</td>
+                <td>${opsStatusLabel(n.status)}</td>
+                <td>${Number(n.attempt_count || 0)}/${Number(n.max_attempts || 0)}</td>
+                <td>${escapeHtml(n.last_error || '')}</td>
+                <td>
+                    ${n.status === 'failed' || n.status === 'pending'
+                ? `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="TksMain.retryChannel(${Number(n.id)})">Reintentar</button>`
+                : '-'}
+                </td>
+            </tr>
+        `).join('');
+
+        const jiraRuns = data?.jiraRuns?.items || [];
+        const jiraRows = jiraRuns.slice(0, 8).map(r => `
+            <tr>
+                <td>${escapeHtml(r.run_type || '-')}</td>
+                <td>${opsStatusLabel(r.status)}</td>
+                <td>${escapeHtml(r.started_at || '-')}</td>
+                <td>${escapeHtml(r.ended_at || '-')}</td>
+            </tr>
+        `).join('');
+
+        const kpis = data?.parallelKpi?.items || [];
+        const kpi = kpis.length ? kpis[0] : null;
+        const reconciliationOk = data?.reconciliation?.ok === true;
+        const exportRuns = data?.complianceExportRuns?.items || [];
+        const latestExport = exportRuns.length ? exportRuns[0] : null;
+
+        return `
+        <div class="tks-dashboard">
+            <div class="tks-stats-row">
+                <div class="tks-stat-card">
+                    <span class="label">Cola vencida ahora</span>
+                    <span class="value">${Number(queue.totals?.due_now || 0)}</span>
+                </div>
+                <div class="tks-stat-card">
+                    <span class="label">Ejecuciones huérfanas</span>
+                    <span class="value">${Number(queue.totals?.stale_running || 0)}</span>
+                </div>
+                <div class="tks-stat-card">
+                    <span class="label">Trabajos última hora</span>
+                    <span class="value">${Number(queue.totals?.created_last_hour || 0)}</span>
+                </div>
+                <div class="tks-stat-card">
+                    <span class="label">Reconciliación Jira</span>
+                    <span class="value">${reconciliationOk ? 'OK' : 'ALERTA'}</span>
+                </div>
+            </div>
+
+            <div class="tks-pivot-container">
+                <h4>Salud de Cola</h4>
+                <table class="tks-pivot-table">
+                    <thead><tr><th>Tipo de trabajo</th><th class="td-num">Vencidos</th><th class="td-num">Huérfanos</th><th class="td-num">Creados 1h</th></tr></thead>
+                    <tbody>${queueRows || '<tr><td colspan="4" style="text-align:center;color:var(--tks-text-muted)">Sin datos</td></tr>'}</tbody>
+                </table>
+            </div>
+
+            <div class="tks-pivot-container" style="margin-top:1rem">
+                <h4>Canales</h4>
+                <table class="tks-pivot-table">
+                    <thead><tr><th>Canal</th><th>Modo</th><th>Proveedor</th><th>Configurado</th></tr></thead>
+                    <tbody>${adapterRows || '<tr><td colspan="4" style="text-align:center;color:var(--tks-text-muted)">Sin adaptadores</td></tr>'}</tbody>
+                </table>
+            </div>
+
+            <div class="tks-pivot-container" style="margin-top:1rem">
+                <h4>Notificaciones de Canal</h4>
+                <table class="tks-pivot-table">
+                    <thead><tr><th>Ticket</th><th>Canal</th><th>Estado</th><th>Intentos</th><th>Error</th><th>Acción</th></tr></thead>
+                    <tbody>${notifRows || '<tr><td colspan="6" style="text-align:center;color:var(--tks-text-muted)">Sin notificaciones</td></tr>'}</tbody>
+                </table>
+            </div>
+
+            <div class="tks-pivot-container" style="margin-top:1rem">
+                <h4>Paralelo Jira</h4>
+                <div style="margin-bottom:0.6rem;color:var(--tks-text-muted);font-size:0.8rem;">
+                    KPI diario: ${kpi ? `SLA ${Number(kpi.sla_compliance_pct || 0)}% | descuadre ${Number(kpi.mismatch_count || 0)}` : 'sin corte diario'}
+                </div>
+                <table class="tks-pivot-table">
+                    <thead><tr><th>Tipo ejecución</th><th>Estado</th><th>Inicio</th><th>Fin</th></tr></thead>
+                    <tbody>${jiraRows || '<tr><td colspan="4" style="text-align:center;color:var(--tks-text-muted)">Sin ejecuciones</td></tr>'}</tbody>
+                </table>
+            </div>
+
+            <div class="tks-pivot-container" style="margin-top:1rem">
+                <h4>Exportación Compliance</h4>
+                <div style="color:var(--tks-text-muted);font-size:0.8rem;">
+                    Última ejecución: ${latestExport ? `${opsStatusLabel(latestExport.status || '-')} | artefacto=${latestExport.artifact_exists ? 'sí' : 'no'}` : 'sin ejecuciones'}
+                </div>
+            </div>
+        </div>
+        `;
     }
 
     // --- MODAL NUEVO TICKET ---
@@ -394,14 +674,17 @@ const TksUI = (() => {
 
     return {
         renderDashboard,
-        renderTicketItem,
+        renderTicketTable,
         renderDetail,
         renderKanban,
+        renderOps,
         renderCreateModal,
         timeAgo,
         slaStatus,
         catLabel,
         statusLabel,
+        statusLabel,
         sevLabel,
+        renderCustomer360,
     };
 })();

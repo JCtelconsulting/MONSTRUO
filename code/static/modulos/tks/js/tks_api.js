@@ -4,7 +4,8 @@
  */
 const TksApi = (() => {
     // Detectar si estamos en /dev (Reverse Proxy)
-    const BASE = window.getApiBase ? window.getApiBase() + '/tks' : '/api/tks';
+    const API_BASE = window.getApiBase ? window.getApiBase() : '/api';
+    const BASE = `${API_BASE}/tks`;
 
     async function _fetch(url, opts = {}) {
         return window.fetchApi(url, opts);
@@ -38,6 +39,10 @@ const TksApi = (() => {
             _fetch(`${BASE}/tickets/${ticketId}/eventos`, { method: 'POST', body }),
 
         getTicketEmails: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/emails`, requestOpts || {}),
+        getTicketWorkflow: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/workflow`, requestOpts || {}),
+        getTicketApprovals: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/approvals`, requestOpts || {}),
+        getTicketAttachments: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/attachments`, requestOpts || {}),
+        getTicketAttachmentDownloadUrl: (ticketId, attachmentId) => `${BASE}/tickets/${ticketId}/attachments/${attachmentId}/download`,
 
         replyByEmail: (ticketId, body, requestOpts = null) => {
             // Si body es FormData, no stringify y dejar que fetch ponga headers (multipart).
@@ -69,5 +74,42 @@ const TksApi = (() => {
 
         // --- Mis Tickets ---
         getMisTickets: () => _fetch(`${BASE}/mis-tickets`),
+
+        // --- Operación / Cola / Canales ---
+        getQueueHealth: (requestOpts = null) => _fetch(`${BASE}/ops/queue-health`, requestOpts || {}),
+        getChannelsStatus: (requestOpts = null) => _fetch(`${BASE}/channels/status`, requestOpts || {}),
+        listChannelNotifications: (params = {}, requestOpts = null) => {
+            const qs = new URLSearchParams();
+            if (params.status) qs.set('status', params.status);
+            if (params.channel) qs.set('channel', params.channel);
+            if (params.limit) qs.set('limit', params.limit);
+            if (params.offset) qs.set('offset', params.offset);
+            const query = qs.toString();
+            return _fetch(`${BASE}/channels/notifications${query ? '?' + query : ''}`, requestOpts || {});
+        },
+        retryChannelNotification: (notificationId, requestOpts = null) =>
+            _fetch(`${BASE}/channels/notifications/${notificationId}/retry`, requestOpts ? { method: 'POST', ...requestOpts } : { method: 'POST' }),
+        recoverStaleJobs: (staleMinutes = 20, requestOpts = null) =>
+            _fetch(
+                `${API_BASE}/jobs/recover-stale?stale_minutes=${encodeURIComponent(staleMinutes)}`,
+                requestOpts ? { method: 'POST', ...requestOpts } : { method: 'POST' }
+            ),
+
+        // --- Paralelo Jira ---
+        listJiraRuns: (params = {}, requestOpts = null) => {
+            const qs = new URLSearchParams();
+            if (params.run_type) qs.set('run_type', params.run_type);
+            if (params.status) qs.set('status', params.status);
+            if (params.limit) qs.set('limit', params.limit);
+            if (params.offset) qs.set('offset', params.offset);
+            const query = qs.toString();
+            return _fetch(`${BASE}/migration/jira/runs${query ? '?' + query : ''}`, requestOpts || {});
+        },
+        getJiraReconciliationDaily: (requestOpts = null) => _fetch(`${BASE}/migration/jira/reconciliation/daily`, requestOpts || {}),
+        listParallelKpiDaily: (requestOpts = null) => _fetch(`${BASE}/parallel/kpi/daily`, requestOpts || {}),
+
+        // --- Compliance ---
+        listComplianceExportRuns: (requestOpts = null) => _fetch(`${BASE}/compliance/exports/runs?limit=20`, requestOpts || {}),
+        listCompliancePurgeRuns: (requestOpts = null) => _fetch(`${BASE}/compliance/purge/runs?limit=20`, requestOpts || {}),
     };
 })();

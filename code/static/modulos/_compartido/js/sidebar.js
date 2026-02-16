@@ -55,6 +55,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.ok) {
                 allowed = data.allowed_modules || [];
                 role = data.role;
+
+                // Actualizar info de usuario en sidebar
+                const whoEl = document.getElementById('who');
+                if (whoEl) {
+                    const userName = data.user || 'Usuario';
+                    const userRole = (data.role || 'user').toUpperCase();
+                    // Limpieza simple del nombre (ej. juan.lopez@... -> Juan Lopez)
+                    let displayName = userName;
+                    if (userName.includes('@')) {
+                        displayName = userName.split('@')[0].replace('.', ' ');
+                        displayName = displayName.replace(/\b\w/g, l => l.toUpperCase()); // Capitalize
+                    }
+
+                    whoEl.textContent = `${displayName} (${userRole})`;
+                    whoEl.style.opacity = '1';
+                    whoEl.style.fontWeight = '600';
+                    whoEl.title = userName; // Tooltip con email original
+                }
             }
         } catch (e) {
             console.warn("Sidebar session check failed", e);
@@ -238,160 +256,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (p.includes('bodega.html') && window.initBodega) window.initBodega();
 
     // ========================================================================
-    // NOTIFICACIONES IN-APP (Campanita)
+    // NOTIFICACIONES IN-APP (ELIMINADO A PEDIDO DEL USUARIO)
     // ========================================================================
+    /*
     (function initNotifications() {
-        // Solo si hay usuario logueado (verificamos si existe btnLogout o who)
-        if (!document.getElementById('btnLogout')) return;
-
-        // En la página de ticketera ya existe un poll propio para evitar doble carga.
-        const isTicketeraPage =
-            window.location.pathname.includes('/modulos/tks/') ||
-            window.location.hostname.startsWith('ticketera.');
-        if (isTicketeraPage) return;
-
-        const headerActions = document.querySelector('.header-actions');
-        if (!headerActions) return;
-        let notifInFlight = false;
-
-        // Crear contenedor de notificaciones si no existe
-        let notifContainer = document.getElementById('notif-container');
-        if (!notifContainer) {
-            notifContainer = document.createElement('div');
-            notifContainer.id = 'notif-container';
-            notifContainer.style.cssText = 'position:relative; margin-right:15px; cursor:pointer;';
-
-            notifContainer.innerHTML = `
-                <i class="fas fa-bell" style="font-size:1.2rem; color:rgba(255,255,255,0.7);"></i>
-                <span id="notif-badge" style="
-                    display:none; position:absolute; top:-5px; right:-5px; 
-                    background:#ff4444; color:white; font-size:0.65rem; 
-                    padding:2px 5px; border-radius:10px; font-weight:bold;
-                    box-shadow:0 0 5px rgba(255,68,68,0.5);">0</span>
-                <div id="notif-dropdown" style="
-                    display:none; position:absolute; top:35px; right:0; 
-                    width:320px; background:#1a1a1a; border:1px solid rgba(255,255,255,0.1); 
-                    border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); z-index:1000;
-                    overflow:hidden; max-height:400px; display:flex; flex-direction:column;">
-                    <div style="padding:10px 15px; border-bottom:1px solid rgba(255,255,255,0.1); font-weight:bold; font-size:0.85rem; background:rgba(255,255,255,0.03);">
-                        Notificaciones
-                    </div>
-                    <div id="notif-list" style="overflow-y:auto; max-height:350px;">
-                        <div style="padding:20px; text-align:center; opacity:0.5; font-size:0.8rem;">Cargando...</div>
-                    </div>
-                </div>
-            `;
-
-            // Insertar antes del perfil/usuario
-            const firstItem = headerActions.firstChild;
-            headerActions.insertBefore(notifContainer, firstItem);
-
-            // Toggle dropdown
-            notifContainer.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const dd = document.getElementById('notif-dropdown');
-                const isHidden = dd.style.display === 'none';
-                dd.style.display = isHidden ? 'block' : 'none';
-                if (isHidden) markAsSeen();
-            });
-
-            // Cerrar al hacer click fuera
-            document.addEventListener('click', () => {
-                const dd = document.getElementById('notif-dropdown');
-                if (dd) dd.style.display = 'none';
-            });
-        }
-
-        async function checkNotifications() {
-            if (document.hidden || notifInFlight) return;
-            notifInFlight = true;
-            try {
-                const data = await window.fetchApi('/api/tks/notificaciones?limit=10', { timeoutMs: 8000 });
-                // fetchApi already returns the parsed JSON or error object
-
-                const items = data.items || [];
-                const badge = document.getElementById('notif-badge');
-                const list = document.getElementById('notif-list');
-
-                // Update badge
-                const unread = items.length; // Suponemos que la API devuelve solo pendientes/no leídas o filtramos
-                if (unread > 0) {
-                    badge.textContent = unread > 9 ? '9+' : unread;
-                    badge.style.display = 'block';
-                } else {
-                    badge.style.display = 'none';
-                }
-
-                // Helper anti-XSS
-                const escapeHtml = Str => {
-                    if (!Str) return Str;
-                    return String(Str)
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/"/g, '&quot;')
-                        .replace(/'/g, '&#039;');
-                };
-
-                // Update list content
-                list.innerHTML = ''; // Limpiar lista
-                if (items.length === 0) {
-                    list.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.5; font-size:0.8rem;">Sin notificaciones nuevas</div>';
-                } else {
-                    // Obtener URL base de Ticketera según entorno actual
-                    const tksItem = menuItems.find(i => i.title === 'Ticketera');
-                    let tksBaseUrl = tksItem ? tksItem.link : '/modulos/tks/tks.html';
-
-                    items.forEach(n => {
-                        // Construir URL de forma segura
-                        // ticket_id como entero para evitar inyecciones en URL
-                        const ticketId = parseInt(n.ticket_id, 10);
-                        const sep = tksBaseUrl.includes('?') ? '&' : '?';
-                        const targetUrl = `${tksBaseUrl}${sep}ticket_id=${ticketId}`;
-
-                        const div = document.createElement('div');
-                        div.className = 'notif-item';
-                        div.style.cssText = 'padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05); cursor:pointer; transition:background 0.2s;';
-
-                        // Event listeners en lugar de onclick inline
-                        div.addEventListener('click', () => { window.location.href = targetUrl; });
-                        div.addEventListener('mouseenter', () => div.style.background = 'rgba(255,255,255,0.05)');
-                        div.addEventListener('mouseleave', () => div.style.background = 'transparent');
-
-                        // Escapado de HTML
-                        const safeCode = escapeHtml(n.codigo || 'TK-????');
-                        const safeTitle = escapeHtml(n.titulo);
-                        const safeTime = new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        const statusText = n.status === 'pending' ? '🔴 Nueva asignación' : 'Mensaje nuevo';
-
-                        div.innerHTML = `
-                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span style="font-size:0.75rem; color:#44ff88; font-weight:bold;">${safeCode}</span>
-                                <span style="font-size:0.7rem; opacity:0.5;">${safeTime}</span>
-                            </div>
-                            <div style="font-size:0.85rem; line-height:1.3;">${safeTitle}</div>
-                            <div style="font-size:0.75rem; opacity:0.7; margin-top:2px;">${statusText}</div>
-                        `;
-
-                        list.appendChild(div);
-                    });
-                }
-
-            } catch (e) {
-                console.warn('Error polling notifications:', e);
-            } finally {
-                notifInFlight = false;
-            }
-        }
-
-        async function markAsSeen() {
-            // Aquí idealmente llamaríamos a un endpoint PATCH /notificaciones/mark-seen
-            // Por ahora solo ocultamos el badge visualmente hasta el próximo poll
-            document.getElementById('notif-badge').style.display = 'none';
-        }
-
-        // Poll inicial y luego cada 60s
-        checkNotifications();
-        setInterval(checkNotifications, 60000);
+        // ... logic removed ...
     })();
+    */
 });
