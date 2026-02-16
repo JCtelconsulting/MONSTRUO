@@ -110,6 +110,11 @@ def repo_checks() -> List[str]:
         "TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS",
         "TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST",
         "TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS",
+        "TICKET_ATTACHMENTS_DIR",
+        "COMPLIANCE_EXPORT_DIR",
+        "JOBS_STALE_RUNNING_MINUTES",
+        "SYS_JOBS_RETENTION_DAYS",
+        "TKS_SLA_EVAL_LIMIT",
         "CHANNELS_ENABLED",
         "WHATSAPP_ADAPTER_MODE",
         "THREECX_ADAPTER_MODE",
@@ -140,6 +145,11 @@ def repo_checks() -> List[str]:
             "TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS",
             "TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST",
             "TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS",
+            "TICKET_ATTACHMENTS_DIR",
+            "COMPLIANCE_EXPORT_DIR",
+            "JOBS_STALE_RUNNING_MINUTES",
+            "SYS_JOBS_RETENTION_DAYS",
+            "TKS_SLA_EVAL_LIMIT",
             "CHANNELS_ENABLED",
             "WHATSAPP_ADAPTER_MODE",
             "THREECX_ADAPTER_MODE",
@@ -307,6 +317,25 @@ def api_checks(args: argparse.Namespace) -> List[str]:
     except Exception as exc:
         errors.append(f"Error consultando /api/tks/channels/notifications: {exc}")
 
+    try:
+        queue_health = session.get(f"{base_url}/api/tks/ops/queue-health", timeout=args.timeout)
+        if queue_health.status_code != 200:
+            errors.append(f"/api/tks/ops/queue-health -> {queue_health.status_code} {queue_health.text}")
+        else:
+            payload = as_json(queue_health)
+            for key in ("generated_at", "by_job_type", "totals"):
+                if key not in payload:
+                    errors.append(f"/api/tks/ops/queue-health no contiene '{key}'")
+    except Exception as exc:
+        errors.append(f"Error consultando /api/tks/ops/queue-health: {exc}")
+
+    try:
+        recover = session.post(f"{base_url}/api/jobs/recover-stale?stale_minutes=20", timeout=max(args.timeout, 30))
+        if recover.status_code != 200:
+            errors.append(f"/api/jobs/recover-stale -> {recover.status_code} {recover.text}")
+    except Exception as exc:
+        errors.append(f"Error ejecutando /api/jobs/recover-stale: {exc}")
+
     jira_sample_issue = {
         "key": f"HARD-{int(time.time())}",
         "summary": "Hardening Jira bootstrap/delta",
@@ -386,8 +415,10 @@ def api_checks(args: argparse.Namespace) -> List[str]:
         ("GET", f"{base_url}/api/tks/compliance/purge/runs", None),
         ("GET", f"{base_url}/api/tks/compliance/legal-holds", None),
         ("GET", f"{base_url}/api/tks/channels/status", None),
+        ("GET", f"{base_url}/api/tks/ops/queue-health", None),
         ("GET", f"{base_url}/api/tks/channels/notifications?limit=5", None),
         ("POST", f"{base_url}/api/tks/channels/notifications/1/retry", None),
+        ("POST", f"{base_url}/api/jobs/recover-stale?stale_minutes=20", None),
         ("POST", f"{base_url}/api/tks/migration/jira/bootstrap-open", {"dry_run": True, "issues": []}),
         ("POST", f"{base_url}/api/tks/migration/jira/delta-sync/run", {"dry_run": True, "issues": []}),
         ("GET", f"{base_url}/api/tks/migration/jira/runs", None),

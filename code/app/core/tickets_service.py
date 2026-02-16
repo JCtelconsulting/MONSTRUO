@@ -14,6 +14,7 @@ import hashlib
 import base64
 from email.utils import parseaddr
 from pathlib import Path
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 from urllib import parse as urlparse
 from urllib import request as urlrequest
@@ -176,6 +177,13 @@ def _default_compliance_export_dir() -> str:
     return "/srv/monstruo_dev/data/compliance"
 
 
+def _default_ticket_attachments_dir() -> str:
+    env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
+    if env_type == "prod":
+        return "/srv/monstruo/data/tickets"
+    return "/srv/monstruo_dev/data/tickets"
+
+
 COMPLIANCE_TZ = _parse_timezone_name(getattr(app_settings, "COMPLIANCE_TZ", "America/Santiago"))
 COMPLIANCE_EXPORT_DIR = (
     str(getattr(app_settings, "COMPLIANCE_EXPORT_DIR", "") or "").strip()
@@ -234,6 +242,45 @@ if CHANNELS_RETRY_MAX_SECONDS < CHANNELS_RETRY_BASE_SECONDS:
 
 def _channels_enabled() -> bool:
     return bool(getattr(app_settings, "CHANNELS_ENABLED", CHANNELS_ENABLED))
+
+
+def _attachment_roots() -> List[Path]:
+    roots: List[Path] = []
+    configured = str(getattr(app_settings, "TICKET_ATTACHMENTS_DIR", "") or "").strip()
+    for raw in (
+        configured,
+        _default_ticket_attachments_dir(),
+        "/srv/monstruo/data/tickets",
+        "/srv/monstruo_dev/data/tickets",
+    ):
+        if not raw:
+            continue
+        try:
+            p = Path(raw).resolve()
+        except Exception:
+            continue
+        if p not in roots:
+            roots.append(p)
+    return roots
+
+
+def _is_safe_attachment_path(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except Exception:
+        return False
+    for root in _attachment_roots():
+        try:
+            resolved.relative_to(root)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def _attachment_storage_name(filename: str) -> str:
+    safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(filename or "attachment.bin"))
+    return f"{int(datetime.now(timezone.utc).timestamp() * 1000)}_{uuid4().hex[:10]}_{safe_filename}"
 
 WORKFLOW_RULES: Dict[str, Dict[str, List[str]]] = {
     "incidencia": {
@@ -989,38 +1036,14 @@ def log_notification_attempt(
 
 
 async def _schedule_next_process_notifications(delay_seconds: int = 60) -> None:
-    next_run = (datetime.utcnow() + timedelta(seconds=max(5, int(delay_seconds or 60)))).isoformat()
-    conn = db.get_conn()
-    try:
-        exists = conn.execute(
-            """SELECT 1
-               FROM sys_jobs
-               WHERE job_type = 'PROCESS_NOTIFICATIONS'
-                 AND status IN ('PENDING', 'RETRY')
-                 AND next_run_at::timestamptz >= ?::timestamptz
-               LIMIT 1""",
-            (next_run,),
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if exists:
-        return
-
-    await jobs_engine.enqueue_job("PROCESS_NOTIFICATIONS", {"recurring": True}, max_retries=0)
-    conn2 = db.get_conn()
-    try:
-        conn2.execute(
-            """UPDATE sys_jobs
-               SET next_run_at = ?
-               WHERE id = (
-                   SELECT MAX(id) FROM sys_jobs WHERE job_type = 'PROCESS_NOTIFICATIONS'
-               )""",
-            (next_run,),
-        )
-        conn2.commit()
-    finally:
-        conn2.close()
+    next_run = (datetime.now(timezone.utc) + timedelta(seconds=max(5, int(delay_seconds or 60)))).isoformat()
+    await jobs_engine.enqueue_unique_job(
+        "PROCESS_NOTIFICATIONS",
+        {"recurring": True},
+        max_retries=0,
+        next_run_at=next_run,
+        update_existing_next_run=False,
+    )
 
 
 async def process_pending_notifications(payload: Dict[str, Any] = None):
@@ -1033,7 +1056,8 @@ async def process_pending_notifications(payload: Dict[str, Any] = None):
     if not _channels_enabled():
         logger.info("[ticket_notifications] CHANNELS_ENABLED=false, ciclo de dispatch omitido.")
         if recurring:
-            await _schedule_next_process_notifications(delay_seconds=60)
+            # Evitar churn cuando canales externos están deshabilitados.
+            await _schedule_next_process_notifications(delay_seconds=600)
         return
 
     claimed_rows: List[Dict[str, Any]] = []
@@ -1132,6 +1156,57 @@ async def process_pending_notifications(payload: Dict[str, Any] = None):
 
     if recurring:
         await _schedule_next_process_notifications(delay_seconds=60)
+
+
+def get_jobs_queue_health() -> Dict[str, Any]:
+    """
+    Métricas operativas de cola para jobs críticos de Ticketera.
+    """
+    now_iso = db.now_utc_iso()
+    stale_cutoff = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT job_type,
+                      COUNT(*) FILTER (
+                          WHERE status = 'PENDING'
+                            AND next_run_at::timestamptz <= ?::timestamptz
+                      ) AS due_now,
+                      COUNT(*) FILTER (
+                          WHERE status = 'RUNNING'
+                            AND updated_at::timestamptz < ?::timestamptz
+                      ) AS stale_running,
+                      COUNT(*) FILTER (
+                          WHERE created_at::timestamptz >= (?::timestamptz - INTERVAL '60 minutes')
+                      ) AS created_last_hour
+               FROM sys_jobs
+               WHERE job_type IN ('EMAIL_POLLING', 'PROCESS_NOTIFICATIONS', 'CHECK_TICKET_SLA', 'TKS_SLA_EVALUATE',
+                                  'COMPLIANCE_EXPORT_DAILY', 'COMPLIANCE_PURGE_DAILY', 'JIRA_DELTA_SYNC_DAILY')
+               GROUP BY job_type
+               ORDER BY job_type""",
+            (now_iso, stale_cutoff, now_iso),
+        ).fetchall()
+        by_job_type: Dict[str, Dict[str, int]] = {}
+        totals = {"due_now": 0, "stale_running": 0, "created_last_hour": 0}
+        for row in rows:
+            job_type = str(row.get("job_type") or "")
+            metrics = {
+                "due_now": int(row.get("due_now") or 0),
+                "stale_running": int(row.get("stale_running") or 0),
+                "created_last_hour": int(row.get("created_last_hour") or 0),
+            }
+            by_job_type[job_type] = metrics
+            totals["due_now"] += metrics["due_now"]
+            totals["stale_running"] += metrics["stale_running"]
+            totals["created_last_hour"] += metrics["created_last_hour"]
+        return {
+            "generated_at": now_iso,
+            "stale_cutoff": stale_cutoff,
+            "by_job_type": by_job_type,
+            "totals": totals,
+        }
+    finally:
+        conn.close()
 
 
 def get_channels_status() -> Dict[str, Any]:
@@ -1493,6 +1568,42 @@ def _evaluate_ticket_sla(conn, ticket_id: int, now_iso: Optional[str] = None) ->
             )
 
 
+def run_sla_evaluation_batch(limit: int = 500) -> Dict[str, Any]:
+    """
+    Evalúa SLA en lote para tickets que pueden requerir actualización de breach/alertas.
+    Se ejecuta vía job periódico para mantener endpoints GET sin side effects.
+    """
+    batch_limit = max(1, min(int(limit or 500), 5000))
+    now_iso = db.now_utc_iso()
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT id
+               FROM tickets
+               WHERE (
+                   (first_response_at IS NULL AND frt_due_at IS NOT NULL)
+                   OR
+                   (ttr_due_at IS NOT NULL)
+               )
+               ORDER BY COALESCE(updated_at, created_at) ASC, id ASC
+               LIMIT ?""",
+            (batch_limit,),
+        ).fetchall()
+        processed = 0
+        for row in rows:
+            _evaluate_ticket_sla(conn, int(row["id"]), now_iso)
+            processed += 1
+        conn.commit()
+        return {
+            "ok": True,
+            "processed": processed,
+            "limit": batch_limit,
+            "evaluated_at": now_iso,
+        }
+    finally:
+        conn.close()
+
+
 def _maybe_mark_first_response(conn, ticket_id: int, by_user: str, now_iso: Optional[str] = None) -> None:
     if not by_user:
         return
@@ -1567,6 +1678,23 @@ def _hydrate_ticket_runtime(ticket: Dict[str, Any], now_dt: Optional[datetime] =
 # ==========================================================================
 # CRUD PRINCIPAL
 # ==========================================================================
+def _find_customer_by_email(conn, email: str) -> Optional[str]:
+    """Busca un cliente (external_id) por coincidencia exacta de email."""
+    if not email or "@" not in email:
+        return None
+    normalized = email.strip().lower()
+    
+    # Intento 1: Match exacto en campo email
+    row = conn.execute(
+        "SELECT external_id FROM customers WHERE lower(email) = ?", 
+        (normalized,)
+    ).fetchone()
+    if row:
+        return row["external_id"]
+        
+    return None
+
+# ==========================================================================
 def create_ticket(
     titulo: str,
     descripcion: str,
@@ -1580,11 +1708,30 @@ def create_ticket(
     email_references: Optional[str] = None,
     subestado: Optional[str] = None,
     ticket_security_class: Optional[str] = "internal",
+    customer_id: Optional[str] = None,
+    contact_role: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Crear un nuevo ticket con auto-clasificación y auto-asignación."""
     conn = db.get_conn()
     try:
         now = db.now_utc_iso()
+
+        # Auto-resolver cliente por email si existe mapeo
+        if origen_email:
+            # Primero buscamos si hay asociación explícita
+            client_map = get_client_for_email(origen_email)
+            if client_map:
+                cliente_nombre = client_map.get("customer_name")
+            else:
+                # Si NO hay asociación, indicamos "Desconocido" para permitir vincular
+                # (aunque venga un nombre en el header del correo, queremos que el usuario lo asocie)
+                # Excepción: si ya venía un cliente_nombre explícito (ej: creación manual), lo respetamos
+                # pero si viene del procesador de correo, a veces trae el nombre.
+                # Asumimos: si tiene origen_email y no está mapeado -> Desconocido
+                # A menos que sea un ticket interno o el nombre sea muy distinto.
+                # Para simplificar y cumplir el requerimiento: forzamos Desconocido si no está mapeado.
+                cliente_nombre = "Desconocido"
+
 
         # Normalizar severidad
         severidad = severidad.lower() if severidad else "media"
@@ -1620,19 +1767,28 @@ def create_ticket(
         except Exception as e:
             logger.warning(f"[create_ticket] auto_asignar falló para categoría '{categoria}': {e}")
 
+        # Auto-link cliente si no viene explícito
+        if not customer_id and origen_email:
+            _, email_addr = _sender_identity(origen_email)
+            if email_addr:
+                customer_id = _find_customer_by_email(conn, email_addr)
+                if customer_id:
+                     logger.info(f"[create_ticket] Cliente auto-detectado por email '{email_addr}': {customer_id}")
+
+
         try:
             cursor = conn.execute(
                 """INSERT INTO tickets
                    (titulo, descripcion, estado, severidad, tipo, creador_id,
                     asignado_a, vence_at, created_at, updated_at,
                     categoria, origen_email, cliente_nombre, prioridad, sla_horas, email_thread_id, email_references,
-                    ticket_security_class, retention_days_snapshot, subestado, frt_due_at, ttr_due_at)
-                   VALUES (?, ?, 'abierto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ticket_security_class, retention_days_snapshot, subestado, frt_due_at, ttr_due_at, customer_id, contact_role)
+                   VALUES (?, ?, 'abierto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    RETURNING id""",
                 (titulo, descripcion, severidad, tipo, creador_id,
                  asignado_a, vence_at, now, now,
                  categoria, origen_email, cliente_nombre, prioridad, sla_horas, thread_id, refs,
-                 security_class, retention_days, subestado, frt_due_at, ttr_due_at)
+                 security_class, retention_days, subestado, frt_due_at, ttr_due_at, customer_id, contact_role)
             )
         except Exception as insert_error:
             # Compatibilidad transitoria si la migración aún no aplicó email_references.
@@ -1646,13 +1802,13 @@ def create_ticket(
                    (titulo, descripcion, estado, severidad, tipo, creador_id,
                     asignado_a, vence_at, created_at, updated_at,
                     categoria, origen_email, cliente_nombre, prioridad, sla_horas, email_thread_id,
-                    ticket_security_class, retention_days_snapshot, subestado, frt_due_at, ttr_due_at)
-                   VALUES (?, ?, 'abierto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ticket_security_class, retention_days_snapshot, subestado, frt_due_at, ttr_due_at, customer_id, contact_role)
+                   VALUES (?, ?, 'abierto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    RETURNING id""",
                 (titulo, descripcion, severidad, tipo, creador_id,
                  asignado_a, vence_at, now, now,
                  categoria, origen_email, cliente_nombre, prioridad, sla_horas, thread_id,
-                 security_class, retention_days, subestado, frt_due_at, ttr_due_at)
+                 security_class, retention_days, subestado, frt_due_at, ttr_due_at, customer_id, contact_role)
             )
         row = cursor.fetchone()
         ticket_id = row["id"] if row else None
@@ -1707,10 +1863,7 @@ def get_ticket(ticket_id: int) -> Optional[Dict[str, Any]]:
         row = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
         if not row:
             return None
-        _evaluate_ticket_sla(conn, ticket_id, db.now_utc_iso())
-        conn.commit()
-        refreshed = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
-        return _hydrate_ticket_runtime(dict(refreshed)) if refreshed else _hydrate_ticket_runtime(dict(row))
+        return _hydrate_ticket_runtime(dict(row))
     finally:
         conn.close()
 
@@ -1773,7 +1926,7 @@ def list_tickets(
                 prioridad, email_thread_id, resolucion, sla_horas,
                 subestado, frt_due_at, ttr_due_at, first_response_at, resolved_at,
                 frt_breached_at, ttr_breached_at, ticket_security_class,
-                retention_until, retention_days_snapshot
+                retention_until, retention_days_snapshot, customer_id, contact_role
             """
         )
 
@@ -1783,17 +1936,7 @@ def list_tickets(
             f"SELECT {select_fields} FROM tickets WHERE {where_sql} ORDER BY prioridad ASC, created_at DESC LIMIT ? OFFSET ?",
             items_params
         )
-        raw_items = [dict(row) for row in cursor.fetchall()]
-        now_iso = db.now_utc_iso()
-        for item in raw_items:
-            _evaluate_ticket_sla(conn, int(item["id"]), now_iso)
-        conn.commit()
-
-        cursor = conn.execute(
-            f"SELECT {select_fields} FROM tickets WHERE {where_sql} ORDER BY prioridad ASC, created_at DESC LIMIT ? OFFSET ?",
-            items_params,
-        )
-        now_dt = _parse_dt(now_iso) or _now_dt()
+        now_dt = _now_dt()
         items = [_hydrate_ticket_runtime(dict(row), now_dt=now_dt) for row in cursor.fetchall()]
 
         return {"items": items, "total": total if include_total else len(items)}
@@ -1815,6 +1958,8 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
         "prioridad",
         "resolucion",
         "ticket_security_class",
+        "customer_id",
+        "contact_role",
     }
     current = get_ticket(ticket_id)
     if not current:
@@ -1838,6 +1983,9 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
             continue
         if key == "ticket_security_class":
             normalized_updates[key] = normalize_ticket_security_class(value)
+            continue
+        if key == "customer_id" or key == "contact_role":
+            normalized_updates[key] = str(value).strip() if value else None
             continue
         normalized_updates[key] = value
 
@@ -1961,6 +2109,52 @@ def add_comment(ticket_id: int, user_id: str, content: str, event_type: str = "c
 
         row = conn.execute("SELECT * FROM ticket_comments WHERE id = ?", (comment_id,)).fetchone()
         return dict(row)
+    finally:
+        conn.close()
+
+
+def get_dashboard_kpi() -> Dict[str, Any]:
+    """
+    Retorna KPIs para el Dashboard V3:
+    1. Top Clientes (por volumen de tickets abiertos)
+    2. Correos pendientes de respuesta (auto-replyable)
+    """
+    conn = db.get_conn()
+    try:
+        # 1. Top Clientes
+        rows = conn.execute(
+            """
+            SELECT 
+                COALESCE(customer_id, 'Sin Cliente') as cliente,
+                COUNT(*) as total
+            FROM tickets 
+            WHERE estado IN ('abierto', 'en_progreso')
+            GROUP BY customer_id
+            ORDER BY total DESC
+            LIMIT 5
+            """
+        ).fetchall()
+        top_clientes = [{"cliente": r["cliente"], "total": r["total"]} for r in rows]
+
+        # 2. Correos Pendientes (Threads que requieren respuesta)
+        # Lógica simplificada: Tickets abiertos con origen_email y sin respuesta reciente del agente?
+        # Por ahora, listamos tickets recientes creados por correo
+        rows_emails = conn.execute(
+            """
+            SELECT id, titulo, origen_email, created_at, customer_id
+            FROM tickets
+            WHERE origen_email IS NOT NULL 
+              AND estado = 'abierto'
+            ORDER BY created_at DESC
+            LIMIT 10
+            """
+        ).fetchall()
+        pending_emails = [dict(r) for r in rows_emails]
+
+        return {
+            "top_clientes": top_clientes,
+            "pending_emails": pending_emails
+        }
     finally:
         conn.close()
 
@@ -2311,7 +2505,8 @@ def reply_ticket_email(
     stored_attachments = []
     
     if files:
-        base_path = Path(app_settings.TICKET_ATTACHMENTS_DIR) / str(ticket_id) / "attachments"
+        base_root = str(getattr(app_settings, "TICKET_ATTACHMENTS_DIR", "") or _default_ticket_attachments_dir())
+        base_path = Path(base_root) / str(ticket_id) / "attachments"
         base_path.mkdir(parents=True, exist_ok=True)
 
         for file in files:
@@ -2335,11 +2530,14 @@ def reply_ticket_email(
 
                 # Guardar en disco (temporalmente, confirmaremos si no es duplicado)
                 filename = getattr(file, "filename", "untitled")
-                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', filename)
-                file_path = base_path / f"{int(datetime.utcnow().timestamp())}_{safe_filename}"
+                file_path = base_path / _attachment_storage_name(filename)
+                if not _is_safe_attachment_path(file_path):
+                    logger.warning(f"[reply_email] ruta de adjunto fuera de raíz permitida: {file_path}")
+                    continue
                 
                 with open(file_path, "wb") as f:
                     f.write(file_content)
+                sha256 = hashlib.sha256(file_content).hexdigest()
                     
                 email_attachments.append({
                     "filename": filename,
@@ -2351,7 +2549,8 @@ def reply_ticket_email(
                     "filename": filename,
                     "path": str(file_path),
                     "size": len(file_content),
-                    "content_type": getattr(file, "content_type", "application/octet-stream")
+                    "content_type": getattr(file, "content_type", "application/octet-stream"),
+                    "sha256": sha256,
                 })
             except Exception as e:
                 logger.error(f"Error procesando adjunto {getattr(file, 'filename', '?')}: {e}")
@@ -2466,6 +2665,11 @@ def reply_ticket_email(
                 cleanup_conn.commit()
             finally:
                 cleanup_conn.close()
+        for att in stored_attachments:
+            try:
+                Path(att["path"]).unlink(missing_ok=True)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup attachment file on send error {att['path']}: {cleanup_error}")
         raise ValueError(str(e))
 
     conn = db.get_conn()
@@ -2492,6 +2696,23 @@ def reply_ticket_email(
                     json.dumps(stored_attachments),
                     normalized_idempotency_key,
                     now,
+                ),
+            )
+
+        for att in stored_attachments:
+            conn.execute(
+                """INSERT INTO ticket_attachments
+                   (ticket_id, filename, file_path, uploaded_by, created_at, size_bytes, content_type, sha256)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    ticket_id,
+                    str(att.get("filename") or "attachment.bin"),
+                    str(att.get("path") or ""),
+                    author_id,
+                    now,
+                    int(att.get("size") or 0),
+                    str(att.get("content_type") or "application/octet-stream"),
+                    str(att.get("sha256") or ""),
                 ),
             )
         
@@ -2565,6 +2786,92 @@ def _parse_attachments_json(raw_value: Any) -> List[Dict[str, Any]]:
     return []
 
 
+def _persist_incoming_attachments(
+    conn,
+    ticket_id: int,
+    attachments: Optional[List[Dict[str, Any]]],
+    *,
+    uploaded_by: str = "email_bot",
+) -> List[Dict[str, Any]]:
+    """
+    Persist incoming email attachments into ticket_attachments.
+    Accepts items in format:
+    - {"filename": "...", "content_type": "...", "data": bytes}
+    - {"filename": "...", "content_type": "...", "data_base64": "..."}
+    """
+    if not attachments:
+        return []
+    now = db.now_utc_iso()
+    base_path = Path(str(getattr(app_settings, "TICKET_ATTACHMENTS_DIR", "") or _default_ticket_attachments_dir()))
+    base_path = (base_path / str(ticket_id) / "incoming").resolve()
+    base_path.mkdir(parents=True, exist_ok=True)
+
+    saved: List[Dict[str, Any]] = []
+    for item in attachments:
+        if not isinstance(item, dict):
+            continue
+        filename = str(item.get("filename") or "").strip() or "attachment.bin"
+        ext = Path(filename).suffix.lower()
+        if ext not in app_settings.TICKET_ALLOWED_EXTENSIONS:
+            logger.warning(f"[incoming_attachments] extensión no permitida: {filename}")
+            continue
+
+        raw_data = item.get("data")
+        data: bytes
+        if isinstance(raw_data, bytes):
+            data = raw_data
+        else:
+            b64 = str(item.get("data_base64") or "").strip()
+            if not b64:
+                continue
+            try:
+                data = base64.b64decode(b64, validate=True)
+            except Exception:
+                logger.warning(f"[incoming_attachments] base64 inválido en archivo {filename}")
+                continue
+
+        if not data:
+            continue
+        if len(data) > app_settings.TICKET_MAX_FILE_SIZE:
+            logger.warning(f"[incoming_attachments] tamaño excedido: {filename} ({len(data)})")
+            continue
+
+        file_path = (base_path / _attachment_storage_name(filename)).resolve()
+        if not _is_safe_attachment_path(file_path):
+            logger.warning(f"[incoming_attachments] ruta fuera de raíz permitida: {file_path}")
+            continue
+
+        with open(file_path, "wb") as fh:
+            fh.write(data)
+        sha256 = hashlib.sha256(data).hexdigest()
+        content_type = str(item.get("content_type") or "application/octet-stream")
+        conn.execute(
+            """INSERT INTO ticket_attachments
+               (ticket_id, filename, file_path, uploaded_by, created_at, size_bytes, content_type, sha256)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                int(ticket_id),
+                filename,
+                str(file_path),
+                uploaded_by,
+                now,
+                len(data),
+                content_type,
+                sha256,
+            ),
+        )
+        saved.append(
+            {
+                "filename": filename,
+                "path": str(file_path),
+                "size": len(data),
+                "content_type": content_type,
+                "sha256": sha256,
+            }
+        )
+    return saved
+
+
 def get_ticket_emails(ticket_id: int, format_human: bool = False) -> List[Dict[str, Any]]:
     """Obtiene el historial de correos de un ticket; opcionalmente en formato legible."""
     conn = db.get_conn()
@@ -2610,7 +2917,8 @@ def upload_ticket_attachments(ticket_id: int, uploaded_by: str, files: Optional[
     if not files:
         return {"ok": True, "ticket_id": ticket_id, "uploaded": 0, "items": list_ticket_attachments(ticket_id)}
 
-    base_path = Path(app_settings.TICKET_ATTACHMENTS_DIR) / str(ticket_id) / "manual"
+    base_root = str(getattr(app_settings, "TICKET_ATTACHMENTS_DIR", "") or _default_ticket_attachments_dir())
+    base_path = Path(base_root) / str(ticket_id) / "manual"
     base_path.mkdir(parents=True, exist_ok=True)
     now = db.now_utc_iso()
     uploaded = 0
@@ -2635,8 +2943,10 @@ def upload_ticket_attachments(ticket_id: int, uploaded_by: str, files: Optional[
 
             content = file.file.read()
             sha256 = hashlib.sha256(content).hexdigest()
-            safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", filename)
-            file_path = base_path / f"{int(datetime.utcnow().timestamp())}_{safe_filename}"
+            file_path = base_path / _attachment_storage_name(filename)
+            if not _is_safe_attachment_path(file_path):
+                logger.warning(f"[attachments] ruta de adjunto fuera de raíz permitida: {file_path}")
+                continue
             with open(file_path, "wb") as fh:
                 fh.write(content)
 
@@ -2696,6 +3006,36 @@ def list_ticket_attachments(ticket_id: int) -> List[Dict[str, Any]]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def get_ticket_attachment_for_download(ticket_id: int, attachment_id: int) -> Dict[str, Any]:
+    conn = db.get_conn()
+    try:
+        row = conn.execute(
+            """SELECT id, ticket_id, filename, file_path, uploaded_by, created_at, size_bytes, content_type, sha256
+               FROM ticket_attachments
+               WHERE ticket_id = ? AND id = ?
+               LIMIT 1""",
+            (int(ticket_id), int(attachment_id)),
+        ).fetchone()
+        if not row:
+            raise ValueError("Adjunto no encontrado")
+        item = dict(row)
+    finally:
+        conn.close()
+
+    raw_path = str(item.get("file_path") or "").strip()
+    if not raw_path:
+        raise ValueError("Adjunto sin ruta de archivo")
+
+    path = Path(raw_path)
+    if not _is_safe_attachment_path(path):
+        raise ValueError("Ruta de adjunto fuera de raíz permitida")
+    if not path.exists() or not path.is_file():
+        raise ValueError("Archivo adjunto no disponible")
+
+    item["resolved_path"] = str(path.resolve())
+    return item
 
 
 def get_timeline(ticket_id: int, limit: int = 120) -> List[Dict[str, Any]]:
@@ -2819,25 +3159,6 @@ def get_sla_metrics(
             params.append(assignee)
 
         where_sql = " AND ".join(where)
-
-        # Snapshot de breaches para trazabilidad persistente.
-        conn.execute(
-            """UPDATE tickets
-               SET frt_breached_at = COALESCE(frt_breached_at, ?)
-               WHERE first_response_at IS NULL
-                 AND frt_due_at IS NOT NULL
-                 AND frt_due_at::timestamptz < ?::timestamptz""",
-            (now_iso, now_iso),
-        )
-        conn.execute(
-            """UPDATE tickets
-               SET ttr_breached_at = COALESCE(ttr_breached_at, ?)
-               WHERE estado NOT IN ('resuelto','cerrado')
-                 AND ttr_due_at IS NOT NULL
-                 AND ttr_due_at::timestamptz < ?::timestamptz""",
-            (now_iso, now_iso),
-        )
-        conn.commit()
 
         totals = conn.execute(
             f"""SELECT
@@ -3192,6 +3513,40 @@ def _normalize_compliance_scope(scope: Optional[str]) -> str:
     return normalized
 
 
+def _artifact_exists_with_hash(manifest_path: str, artifact_hash: str) -> bool:
+    path = Path(str(manifest_path or "").strip())
+    if not path.exists() or not path.is_file():
+        return False
+    expected_hash = str(artifact_hash or "").strip()
+    if not expected_hash:
+        return True
+    try:
+        return _sha256_file(path) == expected_hash
+    except Exception:
+        return False
+
+
+def _compliance_run_duplicate_decision(run: Dict[str, Any]) -> Tuple[bool, str]:
+    """
+    Decide if idempotent call should return duplicate_skipped.
+    Returns (should_skip, reason).
+    """
+    status = str(run.get("status") or "").strip().lower()
+    manifest_path = str(run.get("manifest_path") or "").strip()
+    artifact_hash = str(run.get("artifact_hash") or "").strip()
+    has_artifact = _artifact_exists_with_hash(manifest_path, artifact_hash)
+
+    if status in {"completed", "completed_with_errors"} and has_artifact:
+        return True, "completed_artifact_exists"
+    if status == "running":
+        return True, "run_in_progress"
+    if status == "failed":
+        return False, "previous_failed"
+    if status in {"completed", "completed_with_errors"} and not has_artifact:
+        return False, "artifact_missing_or_invalid"
+    return False, "allow_rerun"
+
+
 def _retention_case_sql() -> str:
     return (
         f"CASE "
@@ -3369,8 +3724,16 @@ def run_compliance_export(
             ).fetchone()
             if existing:
                 out = dict(existing)
-                out["duplicate_skipped"] = True
-                return out
+                should_skip, reason = _compliance_run_duplicate_decision(out)
+                out["duplicate_skipped"] = bool(should_skip)
+                out["duplicate_skipped_reason"] = reason
+                out["artifact_exists"] = _artifact_exists_with_hash(
+                    str(out.get("manifest_path") or ""),
+                    str(out.get("artifact_hash") or ""),
+                )
+                out["artifact_verified_at"] = db.now_utc_iso()
+                if should_skip:
+                    return out
 
         row = conn.execute(
             """INSERT INTO compliance_export_runs
@@ -3520,7 +3883,11 @@ def run_compliance_export(
         "artifact_dir": str(run_dir),
         "manifest_path": str(manifest_path),
         "artifact_hash": manifest_hash,
+        "artifact_exists": _artifact_exists_with_hash(str(manifest_path), manifest_hash),
+        "artifact_verified_at": db.now_utc_iso(),
         "counts": counts,
+        "duplicate_skipped": False,
+        "duplicate_skipped_reason": "",
     }
 
 
@@ -3551,7 +3918,17 @@ def list_compliance_export_runs(
                 LIMIT ? OFFSET ?""",
             (*params, limit, offset),
         ).fetchall()
-        return {"items": [dict(r) for r in rows], "total": int(total["c"] or 0), "limit": limit, "offset": offset}
+        verified_at = db.now_utc_iso()
+        items: List[Dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            item["artifact_exists"] = _artifact_exists_with_hash(
+                str(item.get("manifest_path") or ""),
+                str(item.get("artifact_hash") or ""),
+            )
+            item["artifact_verified_at"] = verified_at
+            items.append(item)
+        return {"items": items, "total": int(total["c"] or 0), "limit": limit, "offset": offset}
     finally:
         conn.close()
 
@@ -3604,8 +3981,13 @@ def run_compliance_purge(
             ).fetchone()
             if existing:
                 out = dict(existing)
-                out["duplicate_skipped"] = True
-                return out
+                status_existing = str(out.get("status") or "").strip().lower()
+                if status_existing in {"completed", "completed_with_errors", "running"}:
+                    out["duplicate_skipped"] = True
+                    out["duplicate_skipped_reason"] = (
+                        "run_in_progress" if status_existing == "running" else "completed_run_exists"
+                    )
+                    return out
 
         row = conn.execute(
             """INSERT INTO compliance_purge_runs
@@ -3719,6 +4101,8 @@ def run_compliance_purge(
         "run_id": run_id,
         "status": final_status,
         "summary": summary,
+        "duplicate_skipped": False,
+        "duplicate_skipped_reason": "",
     }
 
 
@@ -5362,11 +5746,12 @@ def handle_incoming_email(msg: Dict[str, Any]) -> None:
     msg_id = msg.get("message_id", "")
     in_reply_to = msg.get("in_reply_to", "")
     references = msg.get("references", "")
+    attachments = msg.get("attachments") if isinstance(msg.get("attachments"), list) else []
 
     try:
         ticket_id = _find_ticket_by_thread_headers(in_reply_to, references)
         if ticket_id:
-            _process_reply_email(ticket_id, sender, subject, body, msg_id, in_reply_to, references)
+            _process_reply_email(ticket_id, sender, subject, body, msg_id, in_reply_to, references, attachments)
             return
     except Exception as e:
         logger.error(f"[EMAIL] Error matching by thread headers: {e}")
@@ -5374,12 +5759,12 @@ def handle_incoming_email(msg: Dict[str, Any]) -> None:
     try:
         ticket_id = _find_ticket_by_subject(subject)
         if ticket_id:
-            _process_reply_email(ticket_id, sender, subject, body, msg_id, in_reply_to, references)
+            _process_reply_email(ticket_id, sender, subject, body, msg_id, in_reply_to, references, attachments)
             return
     except Exception as e:
         logger.error(f"[EMAIL] Error matching by subject: {e}")
 
-    _process_new_email_ticket(subject, sender, body, msg_id, in_reply_to, references)
+    _process_new_email_ticket(subject, sender, body, msg_id, in_reply_to, references, attachments)
 
 
 def _process_reply_email(
@@ -5390,6 +5775,7 @@ def _process_reply_email(
     msg_id: str,
     in_reply_to: Optional[str] = None,
     references: Optional[str] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
 ):
     print(f"[EMAIL] Reply to Ticket #{ticket_id} from {sender}")
     conn = db.get_conn()
@@ -5403,6 +5789,12 @@ def _process_reply_email(
             "INSERT INTO ticket_comments (ticket_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
             (ticket_id, f"email:{sender}", f"[CORREO_ENTRANTE] {preview}", now)
         )
+        saved_attachments = _persist_incoming_attachments(
+            conn,
+            ticket_id,
+            attachments,
+            uploaded_by=f"email:{sender}",
+        )
         conn.execute(
             """INSERT INTO ticket_emails
                (ticket_id, direction, from_addr, to_addr, subject, body_html, attachments_json, created_at)
@@ -5414,10 +5806,20 @@ def _process_reply_email(
                 "",
                 subject or "",
                 html.escape(body or "").replace("\n", "<br>"),
-                "[]",
+                json.dumps(saved_attachments, ensure_ascii=False),
                 now,
             ),
         )
+        if saved_attachments:
+            conn.execute(
+                """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
+                   VALUES (?, 'system', ?, ?)""",
+                (
+                    ticket_id,
+                    f"[ADJUNTO_INCOMING] Se guardaron {len(saved_attachments)} adjunto(s) del correo entrante.",
+                    now,
+                ),
+            )
         conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, ticket_id))
         _update_ticket_thread_metadata(
             conn,
@@ -5439,6 +5841,7 @@ def _process_new_email_ticket(
     msg_id: str,
     in_reply_to: Optional[str] = None,
     references: Optional[str] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
 ):
     print(f"[EMAIL] New Ticket from {sender}")
     
@@ -5504,6 +5907,12 @@ def _process_new_email_ticket(
 
         # Registrar correo entrante en historial de correos.
         conn = db.get_conn()
+        saved_attachments = _persist_incoming_attachments(
+            conn,
+            ticket_id,
+            attachments,
+            uploaded_by=f"email:{sender}",
+        )
         conn.execute(
             """INSERT INTO ticket_emails
                (ticket_id, direction, from_addr, to_addr, subject, body_html, attachments_json, created_at)
@@ -5515,10 +5924,20 @@ def _process_new_email_ticket(
                 "",
                 subject or "",
                 html.escape(body or "").replace("\n", "<br>"),
-                "[]",
+                json.dumps(saved_attachments, ensure_ascii=False),
                 now,
             ),
         )
+        if saved_attachments:
+            conn.execute(
+                """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
+                   VALUES (?, 'system', ?, ?)""",
+                (
+                    ticket_id,
+                    f"[ADJUNTO_INCOMING] Se guardaron {len(saved_attachments)} adjunto(s) del correo entrante.",
+                    now,
+                ),
+            )
         _update_ticket_thread_metadata(
             conn,
             ticket_id,
@@ -5556,3 +5975,77 @@ def _process_new_email_ticket(
     finally:
         if conn:
             conn.close()
+
+# ==========================================================================
+# CLIENT ASSOCIATION LOGIC
+# ==========================================================================
+def associate_email_to_client(email: str, customer_id: str, customer_name: str, actor: str) -> bool:
+    """Asocia un correo a un cliente de Laudus/Sistema."""
+    email = email.strip().lower()
+    if not email or not customer_id:
+        raise ValueError("Email y Customer ID son requeridos")
+    
+    conn = db.get_conn()
+    now_ts = db.now_utc_iso()
+    
+    # 1. UPSERT en la tabla de configuración
+    # SQLite vs Postgres syntax diff handling via simple delete/insert or check
+    # Asumimos SQLite por compatibilidad simple o standard SQL
+    
+    # Check if exists
+    row = conn.execute("SELECT 1 FROM ticket_config_client_emails WHERE email = ?", (email,)).fetchone()
+    
+    if row:
+        conn.execute("""
+            UPDATE ticket_config_client_emails 
+            SET customer_id = ?, customer_name = ?, updated_at = ?
+            WHERE email = ?
+        """, (customer_id, customer_name, now_ts, email))
+    else:
+        conn.execute("""
+            INSERT INTO ticket_config_client_emails (email, customer_id, customer_name, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (email, customer_id, customer_name, now_ts, now_ts))
+    
+    # 2. Actualizar tickets históricos ABIERTOS de este correo?
+    # El usuario pidió "que en un futuro asocie", pero usualmente se espera que retroactivamente
+    # arregle lo que se ve FEO ahora. Vamos a actualizar tickets abiertos que tengan ese origen_email.
+    conn.execute("""
+        UPDATE tickets 
+        SET cliente_nombre = ? 
+        WHERE lower(origen_email) = ? 
+          AND (cliente_nombre IS NULL OR cliente_nombre = '' OR cliente_nombre = 'Desconocido')
+    """, (customer_name, email))
+    
+    conn.commit()
+    conn.close()
+    return True
+
+def search_customers(q: str, limit: int = 20) -> List[Dict[str, Any]]:
+    """Busca clientes en la tabla laudus_customers."""
+    if not q:
+        return []
+    
+    conn = db.get_conn()
+    wildcard = f"%{q}%"
+    rows = conn.execute("""
+        SELECT laudus_customer_id as id, name, legal_name, vat_id
+        FROM laudus_customers
+        WHERE name LIKE ? OR legal_name LIKE ? OR vat_id LIKE ?
+        LIMIT ?
+    """, (wildcard, wildcard, wildcard, limit)).fetchall()
+    conn.close()
+    
+    return [dict(r) for r in rows]
+
+def get_client_for_email(email: str) -> Optional[Dict[str, Any]]:
+    """Resuelve el cliente asociado a un correo."""
+    if not email:
+        return None
+    email = email.strip().lower()
+    conn = db.get_conn()
+    row = conn.execute("SELECT customer_id, customer_name FROM ticket_config_client_emails WHERE email = ?", (email,)).fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None

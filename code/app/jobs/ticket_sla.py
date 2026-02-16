@@ -2,9 +2,23 @@
 SLA (Service Level Agreement) checker for tickets (ESPAÑOL compatible).
 Runs periodically to escalate overdue tickets.
 """
-from datetime import datetime, timedelta
-from app.core import db, notifications
-import asyncio
+from datetime import datetime, timedelta, timezone
+
+from app.core import db, notifications, jobs_engine, tickets_service
+
+
+def _next_run_iso(minutes: int) -> str:
+    return (datetime.now(timezone.utc) + timedelta(minutes=max(1, int(minutes or 1)))).isoformat()
+
+
+async def _schedule_unique(job_type: str, payload: dict, minutes: int, max_retries: int) -> None:
+    await jobs_engine.enqueue_unique_job(
+        job_type,
+        payload,
+        max_retries=max_retries,
+        next_run_at=_next_run_iso(minutes),
+        update_existing_next_run=False,
+    )
 
 async def check_ticket_sla(payload: dict = None):
     """
@@ -65,26 +79,21 @@ async def check_ticket_sla(payload: dict = None):
     
     # Re-encolar para próxima ejecución
     if payload and payload.get("recurring"):
-        from app.core import jobs_engine
-        now_iso = db.now_utc_iso()
-        next_run = (datetime.utcnow() + timedelta(minutes=30)).isoformat()
-        
-        # Re-encolar evitando duplicados
-        conn2 = db.get_conn()
-        try:
-            exists = conn2.execute(
-                "SELECT 1 FROM sys_jobs WHERE job_type='CHECK_TICKET_SLA' AND status IN ('PENDING','RETRY')"
-            ).fetchone()
-            if not exists:
-                conn2.execute(
-                    """INSERT INTO sys_jobs 
-                       (job_type, status, payload, next_run_at, retries_count, max_retries, created_at, updated_at)
-                       VALUES ('CHECK_TICKET_SLA', 'PENDING', '{"recurring": true}', ?, 0, 1, ?, ?)""",
-                    (next_run, now_iso, now_iso)
-                )
-                conn2.commit()
-                print(f"[SLA] Próximo chequeo programado para {next_run}")
-            else:
-                print("[SLA] Job recurrente ya pendiente, no se re-encola.")
-        finally:
-            conn2.close()
+        await _schedule_unique("CHECK_TICKET_SLA", {"recurring": True}, minutes=30, max_retries=1)
+
+
+async def evaluate_ticket_sla_job(payload: dict = None):
+    payload = payload or {}
+    limit = max(1, min(int(payload.get("limit", 500) or 500), 5000))
+    result = tickets_service.run_sla_evaluation_batch(limit=limit)
+    print(
+        f"[SLA_EVAL] Processed={result.get('processed', 0)} "
+        f"limit={limit} at={result.get('evaluated_at')}"
+    )
+    if payload.get("recurring", True):
+        await _schedule_unique(
+            "TKS_SLA_EVALUATE",
+            {"recurring": True, "limit": limit},
+            minutes=5,
+            max_retries=1,
+        )

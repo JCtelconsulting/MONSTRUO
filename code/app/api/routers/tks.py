@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Header
+from fastapi.responses import FileResponse
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from app.core import tickets_service, deps
@@ -148,6 +149,12 @@ class CompliancePurgeIn(BaseModel):
     max_tickets: Optional[int] = 500
 
 
+class CustomerAssociateIn(BaseModel):
+    email: str
+    customer_id: str
+    customer_name: str
+
+
 # ==========================================================================
 # ENDPOINTS DE TICKETS
 # ==========================================================================
@@ -199,9 +206,6 @@ async def get_ticket(
     ticket = tickets_service.get_ticket(ticket_id)
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket no encontrado")
-
-    # Marcar notificaciones como vistas cuando el técnico abre el ticket
-    tickets_service.marcar_notificacion_vista(ticket_id, sess["username"])
     return ticket
 
 
@@ -335,6 +339,23 @@ async def get_ticket_attachments(
     return {"items": tickets_service.list_ticket_attachments(ticket_id)}
 
 
+@router.get("/tickets/{ticket_id}/attachments/{attachment_id}/download")
+async def download_ticket_attachment(
+    ticket_id: int,
+    attachment_id: int,
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    try:
+        item = tickets_service.get_ticket_attachment_for_download(ticket_id, attachment_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(
+        path=item["resolved_path"],
+        filename=item.get("filename") or f"ticket-{ticket_id}-attachment-{attachment_id}",
+        media_type=item.get("content_type") or "application/octet-stream",
+    )
+
+
 @router.patch("/tickets/{ticket_id}", response_model=dict)
 async def update_ticket(
     ticket_id: int,
@@ -376,6 +397,18 @@ async def get_stats(
 ):
     """Métricas para el Dashboard."""
     return tickets_service.get_stats()
+
+
+@router.get("/dashboard/kpi", response_model=dict)
+async def get_dashboard_kpi(
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    """
+    KPIs específicos para el Dashboard v3:
+    1. Tickets por Cliente (Top 5 + Otros)
+    2. Correos pendientes de respuesta (Auto-reply candidate)
+    """
+    return tickets_service.get_dashboard_kpi()
 
 
 @router.get("/sla/metrics", response_model=dict)
@@ -799,6 +832,13 @@ async def get_channels_status(
     return tickets_service.get_channels_status()
 
 
+@router.get("/ops/queue-health", response_model=dict)
+async def get_queue_health(
+    sess: dict = Depends(deps.require_permission("tickets:compliance"))
+):
+    return tickets_service.get_jobs_queue_health()
+
+
 @router.get("/channels/notifications", response_model=dict)
 async def list_channel_notifications(
     status: Optional[str] = Query(None, pattern="^(pending|dispatching|sent|failed|cancelled)?$"),
@@ -835,6 +875,37 @@ async def retry_channel_notification(
 # ENDPOINT: MIS TICKETS
 # ==========================================================================
 @router.get("/mis-tickets", response_model=dict)
+async def get_mis_tickets(
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    """Mis tickets asignados."""
+    return tickets_service.list_tickets(asignado_a=sess["username"], limit=50)
+
+
+# ==========================================================================
+# ENDPOINTS DE CLIENTES
+# ==========================================================================
+@router.post("/customers/associate-email", response_model=dict)
+async def associate_email(
+    body: CustomerAssociateIn,
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    """Asocia un email a un cliente."""
+    try:
+        tickets_service.associate_email_to_client(body.email, body.customer_id, body.customer_name, sess["username"])
+        return {"ok": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/customers/search", response_model=dict)
+async def search_customers(
+    q: str = Query(..., min_length=2),
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    """Busca clientes para asociar."""
+    items = tickets_service.search_customers(q)
+    return {"items": items}
 async def get_my_tickets(
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):

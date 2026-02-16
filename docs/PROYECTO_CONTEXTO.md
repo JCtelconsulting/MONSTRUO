@@ -2,6 +2,48 @@
 **Fecha de actualizacion:** 15 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-16 11:30 - Deploy PROD: Fix PMO + Ticketera V1
+- **Solicitud**: Desplegar todos los avances de desarrollo a producción (Fix PMO + Ticketera completa).
+- **Entregables**:
+  - **PMO**: Fix crítico en `init_db` (Postgres syntax) y `pmo.py` para creación de tablas `pmo_proyectos` y `pmo_bitacora_ia`.
+  - **Ticketera**: Despliegue de todas las funcionalidades EPIC 11 (SLA, Workflow, Canales, Compliance) validadas en DEV.
+  - **Gobernanza**: Consolidación de cambios en `dev` y merge a `main`.
+- **Estado**: DESPLEGADO.
+
+## HITO: 2026-02-15 16:30 - EPIC 11 Estabilización Ticketera (Plan 4 semanas) implementado en DEV
+- **Solicitud**: Ejecutar implementación end-to-end del plan de estabilización EPIC 11 para dejar Ticketera operativa previo paralelo Jira+MONSTRUO.
+- **Entregable**:
+  - Cola/worker:
+    - recuperación de `RUNNING` stale robusta sin romper índices únicos en recurrentes (`EMAIL_POLLING`/`PROCESS_NOTIFICATIONS`).
+    - dedupe fuerte de recurrentes con helper único `enqueue_unique_job` + índices parciales en `sys_jobs`.
+    - `poll_email_job` y `process_pending_notifications` con scheduling determinista y control anti-churn (`CHANNELS_ENABLED=false` -> ciclo espaciado).
+    - cleanup operativo `sys_jobs` con retención configurable (`CLEANUP_SYS_JOBS`, `SYS_JOBS_RETENTION_DAYS`).
+    - endpoint operativo nuevo: `POST /api/jobs/recover-stale`.
+  - API Ticketera:
+    - GET críticos sin side effects en DB (`/api/tks/tickets`, `/api/tks/tickets/{id}`, `/api/tks/sla/metrics`).
+    - evaluación SLA movida a job periódico `TKS_SLA_EVALUATE`.
+    - endpoint operativo nuevo: `GET /api/tks/ops/queue-health`.
+    - endpoint nuevo de operación real: `GET /api/tks/tickets/{ticket_id}/attachments/{attachment_id}/download`.
+  - Compliance durable:
+    - idempotencia de export/purge corregida para permitir rerun cuando run previo falla o falta artefacto.
+    - `artifact_exists`, `artifact_verified_at` y `duplicate_skipped_reason` en responses/listados.
+    - auto-reparación de cadena hash (`audit_logs`/`evidence_events`) en init cuando detecta inconsistencia.
+  - Adjuntos:
+    - ingestión de adjuntos entrantes por correo + persistencia con hash.
+    - adjuntos de `reply-email` ahora también persisten en `ticket_attachments`.
+    - naming de archivos endurecido con sufijo único para evitar colisiones por segundo.
+  - UI Ticketera:
+    - tab `Ops` implementado con vista mínima operativa (queue health, canales, retry, recover stale, runs Jira, KPI paralelo, compliance export).
+    - descarga de adjuntos desde detalle de ticket.
+  - Entorno/plantillas:
+    - variables explícitas por entorno: `TICKET_ATTACHMENTS_DIR`, `COMPLIANCE_EXPORT_DIR`, `JOBS_STALE_RUNNING_MINUTES`, `SYS_JOBS_RETENTION_DAYS`, `TKS_SLA_EVAL_LIMIT`.
+    - `docker-compose.yaml` actualizado con mounts persistentes para ticketera/compliance en rutas DEV/PROD esperadas del contenedor.
+- **Validación ejecutada en DEV**:
+  - `python3 tests/verify_hardening.py --check-api --user qa_epic11 --password '***' --timeout 60` -> PASS
+  - `python3 tests/e2e_api_full.py --user qa_epic11 --password '***' --timeout 60` -> PASS
+  - `python3 tests/e2e_ticketera.py --user qa_epic11 --password '***' --timeout 60` -> PASS
+- **Estado**: CERRADO (implementación + validación técnica en DEV).
+
 ## HITO: 2026-02-15 08:40 - EPIC 11 Auto-Respuesta Segura v1 (allowlist + antiloop + hilo completo)
 - **Solicitud**: Implementar auto-respuesta de recepción sin riesgo operacional y sin romper el flujo actual de Ticketera.
 - **Entregable**:

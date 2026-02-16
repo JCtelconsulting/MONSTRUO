@@ -183,6 +183,13 @@ def _create_append_only_triggers(conn, table_name: str) -> None:
     )
 
 
+def _drop_append_only_triggers(conn, table_name: str) -> None:
+    trg_upd = f"trg_{table_name}_no_update"
+    trg_del = f"trg_{table_name}_no_delete"
+    conn.execute(f"DROP TRIGGER IF EXISTS {trg_upd} ON {table_name};")
+    conn.execute(f"DROP TRIGGER IF EXISTS {trg_del} ON {table_name};")
+
+
 def _has_append_only_triggers(conn, table_name: str) -> bool:
     trg_upd = f"trg_{table_name}_no_update"
     trg_del = f"trg_{table_name}_no_delete"
@@ -197,6 +204,24 @@ def _has_append_only_triggers(conn, table_name: str) -> bool:
         (table_name, trg_upd, trg_del),
     ).fetchone()
     return bool(row)
+
+
+def _chain_table_is_consistent(conn, table_name: str, payload_fields: Tuple[str, ...]) -> bool:
+    select_fields = ", ".join(["id", *payload_fields, "chain_prev_hash", "chain_hash"])
+    rows = conn.execute(
+        f"SELECT {select_fields} FROM {table_name} ORDER BY id ASC"
+    ).fetchall()
+    prev_hash = ""
+    for row in rows:
+        record = dict(row)
+        payload = {field: (record.get(field) if record.get(field) is not None else "") for field in payload_fields}
+        expected_hash = _build_chain_hash(prev_hash, payload)
+        current_prev = (record.get("chain_prev_hash") or "")
+        current_hash = (record.get("chain_hash") or "")
+        if current_prev != prev_hash or current_hash != expected_hash:
+            return False
+        prev_hash = expected_hash
+    return True
 
 
 def _run_guarded_pg_section(conn, section_name: str, fn) -> None:
@@ -411,6 +436,82 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_jobs_next_run ON sys_jobs(next_run_at);"
         )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jobs_type_status_next ON sys_jobs(job_type, status, next_run_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jobs_status_updated ON sys_jobs(status, updated_at);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON sys_jobs(created_at);"
+        )
+        # Limpiar duplicados históricos antes de crear índices únicos parciales.
+        try:
+            now_jobs = now_utc_iso()
+            conn.execute(
+                """WITH ranked AS (
+                       SELECT id,
+                              ROW_NUMBER() OVER (
+                                  PARTITION BY job_type
+                                  ORDER BY next_run_at::timestamptz ASC, id ASC
+                              ) AS rn
+                       FROM sys_jobs
+                       WHERE job_type = 'EMAIL_POLLING'
+                         AND status IN ('PENDING', 'RETRY')
+                   )
+                   UPDATE sys_jobs j
+                   SET status = 'FAILED',
+                       updated_at = ?,
+                       last_error = CASE
+                           WHEN COALESCE(last_error, '') = '' THEN '[DB-MIGRATION] duplicate recurring job pruned'
+                           ELSE (last_error || E'\n[DB-MIGRATION] duplicate recurring job pruned')
+                       END
+                   FROM ranked r
+                   WHERE j.id = r.id
+                     AND r.rn > 1""",
+                (now_jobs,),
+            )
+            conn.execute(
+                """WITH ranked AS (
+                       SELECT id,
+                              ROW_NUMBER() OVER (
+                                  PARTITION BY job_type
+                                  ORDER BY next_run_at::timestamptz ASC, id ASC
+                              ) AS rn
+                       FROM sys_jobs
+                       WHERE job_type = 'PROCESS_NOTIFICATIONS'
+                         AND status IN ('PENDING', 'RETRY')
+                   )
+                   UPDATE sys_jobs j
+                   SET status = 'FAILED',
+                       updated_at = ?,
+                       last_error = CASE
+                           WHEN COALESCE(last_error, '') = '' THEN '[DB-MIGRATION] duplicate recurring job pruned'
+                           ELSE (last_error || E'\n[DB-MIGRATION] duplicate recurring job pruned')
+                       END
+                   FROM ranked r
+                   WHERE j.id = r.id
+                     AND r.rn > 1""",
+                (now_jobs,),
+            )
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN prune duplicados sys_jobs: {_e}")
+        # Dedupe fuerte para recurrentes de alta frecuencia.
+        try:
+            conn.execute(
+                """CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_jobs_unique_pending_email
+                   ON sys_jobs(job_type)
+                   WHERE job_type = 'EMAIL_POLLING'
+                     AND status IN ('PENDING', 'RETRY')"""
+            )
+            conn.execute(
+                """CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_jobs_unique_pending_notifications
+                   ON sys_jobs(job_type)
+                   WHERE job_type = 'PROCESS_NOTIFICATIONS'
+                     AND status IN ('PENDING', 'RETRY')"""
+            )
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN índices únicos recurrentes sys_jobs: {_e}")
 
         # Ticketera (EPIC 11)
         conn.execute("""
@@ -501,6 +602,9 @@ def init_db() -> None:
             ("resolved_at", "TEXT", False),
             ("frt_breached_at", "TEXT", False),
             ("ttr_breached_at", "TEXT", False),
+            # --- Ticketera 2.0 (Cliente 360) ---
+            ("customer_id", "TEXT", False),       # Link a Laudus/CRM
+            ("contact_role", "TEXT", False),      # Gerente, Tecnico, etc.
         ]
         for col_name, col_def, is_critical in _v3_columns:
             try:
@@ -532,6 +636,10 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_tickets_subestado ON tickets(subestado);",
             "CREATE INDEX IF NOT EXISTS idx_tickets_frt_due ON tickets(frt_due_at);",
             "CREATE INDEX IF NOT EXISTS idx_tickets_ttr_due ON tickets(ttr_due_at);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_list_status_prio_created ON tickets(estado, prioridad, created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_list_cat_status_prio_created ON tickets(categoria, estado, prioridad, created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_list_assignee_status_prio_created ON tickets(asignado_a, estado, prioridad, created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_list_sev_status_prio_created ON tickets(severidad, estado, prioridad, created_at DESC);",
         ]:
             try:
                 conn.execute(idx_sql)
@@ -689,11 +797,48 @@ def init_db() -> None:
                         next_retry_at = COALESCE(next_retry_at, scheduled_at),
                         updated_at = COALESCE(updated_at, created_at),
                         last_error = COALESCE(NULLIF(last_error, ''), COALESCE(error, '')),
-                        provider = COALESCE(provider, ''),
-                        provider_ref = COALESCE(provider_ref, '')"""
+                        provider = COALESCE(provider, '')
+                    WHERE provider IS NULL OR attempt_count IS NULL"""
             )
         except Exception as _e:
             print(f"[DB-MIGRATION] WARN backfill ticket_notifications: {_e}")
+
+        # --- PMO (Proyectos y Bitacora) ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS pmo_proyectos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            cliente_nombre TEXT,
+            presupuesto_venta REAL DEFAULT 0,
+            fecha_inicio TEXT,
+            fecha_fin_estimada TEXT,
+            estado TEXT DEFAULT 'borrador',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP::text,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP::text
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pmo_proyectos_estado ON pmo_proyectos(estado);"
+        )
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS pmo_bitacora_ia (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            proyecto_id INTEGER NOT NULL,
+            origen TEXT DEFAULT 'manual',
+            contenido_raw TEXT,
+            estado_procesamiento TEXT DEFAULT 'pendiente',
+            resumen_ia TEXT,
+            acciones_json TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP::text,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP::text,
+            FOREIGN KEY(proyecto_id) REFERENCES pmo_proyectos(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pmo_bitacora_proyecto ON pmo_bitacora_ia(proyecto_id);"
+        )
+
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS ticket_notification_attempts (
@@ -934,36 +1079,62 @@ def init_db() -> None:
 
         # Backfill hash-chain previo a activar triggers append-only.
         def _chain_backfill_section() -> None:
-            if _has_append_only_triggers(conn, "audit_logs"):
-                print("[DB-MIGRATION] INFO skip hash-chain backfill audit_logs (append-only activo)")
+            audit_payload_fields = (
+                "timestamp",
+                "actor",
+                "action",
+                "target",
+                "ip_address",
+                "severity",
+                "metadata_json",
+            )
+            evidence_payload_fields = (
+                "control_id",
+                "artifact_ref",
+                "owner",
+                "integrity_hash",
+                "metadata_json",
+                "created_at",
+            )
+
+            audit_has_triggers = _has_append_only_triggers(conn, "audit_logs")
+            audit_consistent = _chain_table_is_consistent(conn, "audit_logs", audit_payload_fields)
+            if not audit_consistent:
+                print("[DB-MIGRATION] WARN audit_logs chain inconsistente; se forzará re-backfill.")
+                if audit_has_triggers:
+                    _drop_append_only_triggers(conn, "audit_logs")
+                _backfill_chain_table(
+                    conn,
+                    "audit_logs",
+                    audit_payload_fields,
+                )
+            elif audit_has_triggers:
+                print("[DB-MIGRATION] INFO skip hash-chain backfill audit_logs (append-only activo y consistente)")
             else:
                 _backfill_chain_table(
                     conn,
                     "audit_logs",
-                    (
-                        "timestamp",
-                        "actor",
-                        "action",
-                        "target",
-                        "ip_address",
-                        "severity",
-                        "metadata_json",
-                    ),
+                    audit_payload_fields,
                 )
-            if _has_append_only_triggers(conn, "evidence_events"):
-                print("[DB-MIGRATION] INFO skip hash-chain backfill evidence_events (append-only activo)")
+
+            evidence_has_triggers = _has_append_only_triggers(conn, "evidence_events")
+            evidence_consistent = _chain_table_is_consistent(conn, "evidence_events", evidence_payload_fields)
+            if not evidence_consistent:
+                print("[DB-MIGRATION] WARN evidence_events chain inconsistente; se forzará re-backfill.")
+                if evidence_has_triggers:
+                    _drop_append_only_triggers(conn, "evidence_events")
+                _backfill_chain_table(
+                    conn,
+                    "evidence_events",
+                    evidence_payload_fields,
+                )
+            elif evidence_has_triggers:
+                print("[DB-MIGRATION] INFO skip hash-chain backfill evidence_events (append-only activo y consistente)")
             else:
                 _backfill_chain_table(
                     conn,
                     "evidence_events",
-                    (
-                        "control_id",
-                        "artifact_ref",
-                        "owner",
-                        "integrity_hash",
-                        "metadata_json",
-                        "created_at",
-                    ),
+                    evidence_payload_fields,
                 )
 
         _run_guarded_pg_section(conn, "hash_chain_backfill", _chain_backfill_section)

@@ -3,6 +3,7 @@ import email
 from email.header import decode_header
 import re
 import html
+import base64
 from app.core import db
 
 def get_imap_config():
@@ -99,11 +100,29 @@ class EmailProcessor:
         references = msg.get("References")
         
         body = ""
+        attachments = []
         if msg.is_multipart():
             for part in msg.walk():
                 content_type = part.get_content_type()
                 content_disposition = str(part.get("Content-Disposition"))
-                
+
+                if "attachment" in content_disposition.lower():
+                    filename = part.get_filename()
+                    if filename:
+                        filename_decoded, enc = decode_header(filename)[0]
+                        if isinstance(filename_decoded, bytes):
+                            filename_decoded = filename_decoded.decode(enc or "utf-8", errors="ignore")
+                        payload = part.get_payload(decode=True) or b""
+                        attachments.append(
+                            {
+                                "filename": filename_decoded or "attachment.bin",
+                                "content_type": content_type or "application/octet-stream",
+                                # Keep as base64 string to avoid binary issues in logs/middlewares.
+                                "data_base64": base64.b64encode(payload).decode("ascii"),
+                            }
+                        )
+                    continue
+
                 if content_type == "text/plain" and "attachment" not in content_disposition:
                     body = part.get_payload(decode=True).decode()
                     break # Prefer plain text
@@ -123,6 +142,7 @@ class EmailProcessor:
             "message_id": message_id,
             "in_reply_to": in_reply_to,
             "references": references,
+            "attachments": attachments,
         }
         
     def close(self):
