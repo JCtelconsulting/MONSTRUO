@@ -7,6 +7,7 @@
 - **Entregables**:
   - **PMO**: Fix crítico en `init_db` (Postgres syntax) y `pmo.py` para creación de tablas `pmo_proyectos` y `pmo_bitacora_ia`.
   - **Ticketera**: Despliegue de todas las funcionalidades EPIC 11 (SLA, Workflow, Canales, Compliance) validadas en DEV.
+  - **Ops**: Corrección de estado `degraded` mediante limpieza de jobs fallidos históricos ("falsos positivos" por migración).
   - **Gobernanza**: Consolidación de cambios en `dev` y merge a `main`.
 - **Estado**: DESPLEGADO.
 
