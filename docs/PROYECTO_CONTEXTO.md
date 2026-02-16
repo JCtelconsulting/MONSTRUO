@@ -7,9 +7,8 @@
 - **Entregables**:
   - **PMO**: Fix crítico en `init_db` (Postgres syntax) y `pmo.py` para creación de tablas `pmo_proyectos` y `pmo_bitacora_ia`.
   - **Ticketera**: Despliegue de todas las funcionalidades EPIC 11 (SLA, Workflow, Canales, Compliance) validadas en DEV.
-  - **Ops**: Corrección de estado `degraded` mediante limpieza de jobs fallidos históricos ("falsos positivos" por migración).
-  - **Gobernanza**: Consolidación de cambios en `dev` y merge a `main`.
-- **Estado**: DESPLEGADO.
+- **Ops/CI-CD**: Robustecimiento de `deploy.sh` con `git checkout -f` y limpieza manual del entorno `PROD` para desbloquear el pipeline automático tras detectar cambios locales que bloqueaban el `checkout`.
+- **Estado**: DESPLEGADO Y OPERATIVO.
 
 ## HITO: 2026-02-15 16:30 - EPIC 11 Estabilización Ticketera (Plan 4 semanas) implementado en DEV
 - **Solicitud**: Ejecutar implementación end-to-end del plan de estabilización EPIC 11 para dejar Ticketera operativa previo paralelo Jira+MONSTRUO.
