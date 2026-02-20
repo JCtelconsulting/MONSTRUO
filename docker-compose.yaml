@@ -6,11 +6,13 @@ services:
     image: postgres:16
     container_name: ${STACK_NAME:-monstruo}-postgres
     environment:
-      POSTGRES_DB: monstruo
-      POSTGRES_USER: monstruo
-      POSTGRES_PASSWORD: monstruo
+      POSTGRES_DB: ${POSTGRES_DB:-monstruo}
+      POSTGRES_USER: ${POSTGRES_USER:-monstruo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}
     volumes:
       - monstruo_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     restart: unless-stopped
 
   api:
@@ -22,17 +24,15 @@ services:
       - ${ENV_FILE:-.env}
     volumes:
       - ./code:/app/code
-      - ./data/tickets:/srv/monstruo/data/tickets
-      - ./data/tickets:/srv/monstruo_dev/data/tickets
-      - ./data/compliance:/srv/monstruo/data/compliance
-      - ./data/compliance:/srv/monstruo_dev/data/compliance
+      - ./data/tickets:${TICKET_ATTACHMENTS_DIR:-/srv/monstruo_dev/data/tickets}
+      - ./data/compliance:${COMPLIANCE_EXPORT_DIR:-/srv/monstruo_dev/data/compliance}
     ports:
       - "${PORT:-9000}:9000"
     environment:
       - PYTHONPATH=/app/code
       - PORT=${PORT:-9000}
-      - DB_URL=postgresql://monstruo:monstruo@db:5432/monstruo
-      - SECRET_KEY=${SECRET_KEY:-CAMBIAME_ESTO_ES_INSEGURO_F8A9}
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY_required}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-0}
       - LAUDUS_BASE_URL=${LAUDUS_BASE_URL:-https://api.laudus.cl}

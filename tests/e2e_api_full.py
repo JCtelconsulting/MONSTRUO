@@ -76,6 +76,14 @@ def main() -> int:
         ensure_200("Detalle ticket", detail.status_code, detail.text)
         print("[OK] Detalle ticket")
 
+        claim = session.patch(
+            f"{base_url}/api/tks/tickets/{ticket_id}",
+            json={"asignado_a": args.user, "estado": "en_progreso"},
+            timeout=args.timeout,
+        )
+        ensure_200("Tomar ticket", claim.status_code, claim.text)
+        print("[OK] Ticket tomado para acciones de ejecución")
+
         add_event = session.post(
             f"{base_url}/api/tks/tickets/{ticket_id}/eventos",
             json={"evento": "comentario", "detalle": "Comentario E2E API full"},

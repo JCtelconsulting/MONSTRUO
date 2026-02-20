@@ -4,8 +4,77 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from app.core import tickets_service, deps
 from app.core.audit_decorator import audit_action
+from app.core.tickets import roles as ticket_roles
 
 router = APIRouter(prefix="/api/tks", tags=["tickets"])
+
+ROLES_TECNICOS = set(ticket_roles.ROLES_TECNICOS)
+ROLES_GESTION_GLOBAL = set(ticket_roles.ROLES_ADMIN_GESTION)
+
+
+def _normalize_session_roles(sess: dict) -> List[str]:
+    out: List[str] = []
+    raw_roles = (sess or {}).get("roles")
+    if isinstance(raw_roles, list):
+        for item in raw_roles:
+            role = str(item or "").strip().lower()
+            if role and role not in out:
+                out.append(role)
+    primary = str((sess or {}).get("role") or "").strip().lower()
+    if primary and primary not in out:
+        out.insert(0, primary)
+    return out
+
+
+def _normalize_session_role(sess: dict) -> str:
+    roles = _normalize_session_roles(sess)
+    return roles[0] if roles else ""
+
+
+def _normalize_session_user(sess: dict) -> str:
+    return str((sess or {}).get("username") or "").strip().lower()
+
+
+def _is_tech_session(sess: dict) -> bool:
+    roles = _normalize_session_roles(sess)
+    has_management_scope = any(role in ROLES_GESTION_GLOBAL for role in roles)
+    has_tech_scope = any(role in ROLES_TECNICOS for role in roles)
+    return has_tech_scope and not has_management_scope
+
+
+def _session_actor_roles(sess: dict):
+    roles = _normalize_session_roles(sess)
+    if not roles:
+        return str((sess or {}).get("role") or "").strip().lower()
+    return roles
+
+
+def _scoped_assignee(sess: dict, requested_assignee: Optional[str]) -> Optional[str]:
+    if _is_tech_session(sess):
+        return _normalize_session_user(sess) or "__no_user__"
+    return requested_assignee
+
+
+def _ensure_ticket_read_scope(
+    ticket_id: int,
+    sess: dict,
+    *,
+    ticket: Optional[dict] = None,
+) -> dict:
+    current = ticket or tickets_service.get_ticket(ticket_id)
+    if not current:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado")
+    if not _is_tech_session(sess):
+        return current
+
+    user = _normalize_session_user(sess)
+    assignee = str(current.get("asignado_a") or "").strip().lower()
+    if not user or assignee != user:
+        raise HTTPException(
+            status_code=403,
+            detail="Los técnicos solo pueden ver tickets asignados a su usuario.",
+        )
+    return current
 
 
 # ==========================================================================
@@ -20,6 +89,7 @@ class TicketCreate(BaseModel):
     categoria: Optional[str] = None
     origen_email: Optional[str] = None
     cliente_nombre: Optional[str] = None
+    notify_emails: List[str] = Field(default_factory=list)
     subestado: Optional[str] = None
     ticket_security_class: Optional[str] = "internal"
 
@@ -33,6 +103,7 @@ class TicketUpdate(BaseModel):
     categoria: Optional[str] = None
     resolucion: Optional[str] = None
     ticket_security_class: Optional[str] = None
+    notify_emails: Optional[List[str]] = None
 
 
 class ComentarioCreate(BaseModel):
@@ -155,6 +226,37 @@ class CustomerAssociateIn(BaseModel):
     customer_name: str
 
 
+class EmailDraftLockIn(BaseModel):
+    force: bool = False
+
+
+class EmailDraftHeartbeatIn(BaseModel):
+    lock_token: str
+
+
+class EmailDraftUpdateIn(BaseModel):
+    lock_token: str
+    version: int = Field(ge=1)
+    to_addr: Optional[str] = None
+    cc_addrs: Optional[str] = None
+    bcc_addrs: Optional[str] = None
+    subject: Optional[str] = None
+    body_text: Optional[str] = None
+
+
+class EmailDraftAttachmentDeleteIn(BaseModel):
+    lock_token: str
+
+
+class EmailDraftSendIn(BaseModel):
+    lock_token: str
+    version: int = Field(ge=1)
+
+
+class EmailDraftDiscardIn(BaseModel):
+    lock_token: str
+
+
 # ==========================================================================
 # ENDPOINTS DE TICKETS
 # ==========================================================================
@@ -170,9 +272,14 @@ async def list_tickets(
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     """Listar tickets con filtros avanzados."""
+    tech_scope = _is_tech_session(sess)
+    scoped_asignado = _scoped_assignee(sess, asignado_a)
     return tickets_service.list_tickets(
-        estado=status, q=q, categoria=categoria,
-        asignado_a=asignado_a, severidad=severidad,
+        estado=None if tech_scope else status,
+        q=None if tech_scope else q,
+        categoria=None if tech_scope else categoria,
+        asignado_a=scoped_asignado,
+        severidad=None if tech_scope else severidad,
         limit=limit, offset=offset
     )
 
@@ -193,6 +300,7 @@ async def create_ticket(
         categoria=body.categoria,
         origen_email=body.origen_email,
         cliente_nombre=body.cliente_nombre,
+        notify_emails=body.notify_emails,
         subestado=body.subestado,
         ticket_security_class=body.ticket_security_class,
     )
@@ -203,10 +311,181 @@ async def get_ticket(
     ticket_id: int,
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
-    ticket = tickets_service.get_ticket(ticket_id)
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket no encontrado")
-    return ticket
+    return _ensure_ticket_read_scope(ticket_id, sess)
+
+
+@router.get("/tickets/{ticket_id}/email-draft", response_model=dict)
+async def get_ticket_email_draft(
+    ticket_id: int,
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    _ensure_ticket_read_scope(ticket_id, sess)
+    try:
+        return tickets_service.get_ticket_email_draft(
+            ticket_id=ticket_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tickets/{ticket_id}/email-draft/lock", response_model=dict)
+async def lock_ticket_email_draft(
+    ticket_id: int,
+    body: EmailDraftLockIn,
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    try:
+        return tickets_service.acquire_ticket_email_draft_lock(
+            ticket_id=ticket_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+            force=body.force,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except tickets_service.ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tickets/{ticket_id}/email-draft/lock/heartbeat", response_model=dict)
+async def heartbeat_ticket_email_draft(
+    ticket_id: int,
+    body: EmailDraftHeartbeatIn,
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    try:
+        return tickets_service.heartbeat_ticket_email_draft_lock(
+            ticket_id=ticket_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+            lock_token=body.lock_token,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except tickets_service.ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/tickets/{ticket_id}/email-draft", response_model=dict)
+async def save_ticket_email_draft(
+    ticket_id: int,
+    body: EmailDraftUpdateIn,
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    try:
+        return tickets_service.save_ticket_email_draft(
+            ticket_id=ticket_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+            lock_token=body.lock_token,
+            version=body.version,
+            to_addr=body.to_addr,
+            cc_addrs=body.cc_addrs,
+            bcc_addrs=body.bcc_addrs,
+            subject=body.subject,
+            body_text=body.body_text,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except tickets_service.ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tickets/{ticket_id}/email-draft/attachments", response_model=dict)
+async def upload_ticket_email_draft_attachments(
+    ticket_id: int,
+    lock_token: str = Form(...),
+    files: List[UploadFile] = File(default=[]),
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    try:
+        return tickets_service.upload_ticket_email_draft_attachments(
+            ticket_id=ticket_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+            lock_token=lock_token,
+            files=files,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except tickets_service.ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/tickets/{ticket_id}/email-draft/attachments/{attachment_id}", response_model=dict)
+async def delete_ticket_email_draft_attachment(
+    ticket_id: int,
+    attachment_id: int,
+    body: EmailDraftAttachmentDeleteIn,
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    try:
+        return tickets_service.delete_ticket_email_draft_attachment(
+            ticket_id=ticket_id,
+            attachment_id=attachment_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+            lock_token=body.lock_token,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except tickets_service.ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tickets/{ticket_id}/email-draft/send", response_model=dict)
+async def send_ticket_email_draft(
+    ticket_id: int,
+    body: EmailDraftSendIn,
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    try:
+        return tickets_service.send_ticket_email_draft(
+            ticket_id=ticket_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+            lock_token=body.lock_token,
+            version=body.version,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except tickets_service.ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tickets/{ticket_id}/email-draft/discard", response_model=dict)
+async def discard_ticket_email_draft(
+    ticket_id: int,
+    body: EmailDraftDiscardIn,
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    try:
+        return tickets_service.discard_ticket_email_draft(
+            ticket_id=ticket_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+            lock_token=body.lock_token,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except tickets_service.ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/tickets/{ticket_id}/eventos", response_model=dict)
@@ -215,6 +494,7 @@ async def get_ticket_eventos(
     limit: int = Query(120, ge=1, le=500),
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
+    _ensure_ticket_read_scope(ticket_id, sess)
     eventos = tickets_service.get_timeline(ticket_id, limit=limit)
     return {"items": eventos}
 
@@ -225,6 +505,7 @@ async def get_ticket_emails(
     format: Optional[str] = Query(None, pattern="^(human)?$"),
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
+    _ensure_ticket_read_scope(ticket_id, sess)
     emails = tickets_service.get_ticket_emails(ticket_id, format_human=(format == "human"))
     return {"items": emails}
 
@@ -235,7 +516,18 @@ async def add_evento(
     body: ComentarioCreate,
     sess: dict = Depends(deps.require_permission("tickets:write"))
 ):
-    return tickets_service.add_comment(ticket_id, sess["username"], body.detalle, body.evento)
+    try:
+        return tickets_service.add_comment(
+            ticket_id,
+            sess["username"],
+            body.detalle,
+            body.evento,
+            actor_role=_session_actor_roles(sess),
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/tickets/{ticket_id}/workflow", response_model=dict)
@@ -243,6 +535,7 @@ async def get_ticket_workflow(
     ticket_id: int,
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
+    _ensure_ticket_read_scope(ticket_id, sess)
     try:
         return tickets_service.get_ticket_workflow(ticket_id)
     except ValueError as e:
@@ -261,9 +554,12 @@ async def transition_ticket(
             ticket_id=ticket_id,
             to_subestado=body.to_subestado,
             actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
             motivo=body.motivo or "",
             idempotency_key=idempotency_key,
         )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -281,7 +577,7 @@ async def approve_ticket_change(
             step=body.step,
             decision=body.decision,
             approver=sess["username"],
-            approver_role=sess.get("role", ""),
+            approver_role=_session_actor_roles(sess),
             decision_note=body.decision_note or "",
             idempotency_key=idempotency_key,
         )
@@ -294,6 +590,7 @@ async def list_ticket_approvals(
     ticket_id: int,
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
+    _ensure_ticket_read_scope(ticket_id, sess)
     return {"items": tickets_service.list_ticket_approvals(ticket_id)}
 
 
@@ -311,10 +608,13 @@ async def reply_ticket_email(
             ticket_id=ticket_id,
             author_id=sess["username"],
             mensaje=mensaje,
+            author_role=_session_actor_roles(sess),
             asunto=asunto,
             files=files,
             idempotency_key=idempotency_key,
         )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -326,7 +626,14 @@ async def post_ticket_attachments(
     sess: dict = Depends(deps.require_permission("tickets:write"))
 ):
     try:
-        return tickets_service.upload_ticket_attachments(ticket_id, sess["username"], files)
+        return tickets_service.upload_ticket_attachments(
+            ticket_id,
+            sess["username"],
+            files,
+            uploaded_role=_session_actor_roles(sess),
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -336,6 +643,7 @@ async def get_ticket_attachments(
     ticket_id: int,
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
+    _ensure_ticket_read_scope(ticket_id, sess)
     return {"items": tickets_service.list_ticket_attachments(ticket_id)}
 
 
@@ -345,6 +653,7 @@ async def download_ticket_attachment(
     attachment_id: int,
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
+    _ensure_ticket_read_scope(ticket_id, sess)
     try:
         item = tickets_service.get_ticket_attachment_for_download(ticket_id, attachment_id)
     except ValueError as e:
@@ -362,14 +671,39 @@ async def update_ticket(
     body: TicketUpdate,
     sess: dict = Depends(deps.require_permission("tickets:write"))
 ):
-    result = tickets_service.update_ticket(
-        ticket_id,
-        body.model_dump(exclude_unset=True),
-        actor_id=sess["username"],
-    )
+    try:
+        result = tickets_service.update_ticket(
+            ticket_id,
+            body.model_dump(exclude_unset=True),
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except tickets_service.ConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not result:
         raise HTTPException(status_code=404, detail="Ticket no encontrado")
     return result
+
+
+@router.post("/tickets/{ticket_id}/claim", response_model=dict)
+async def claim_ticket(
+    ticket_id: int,
+    sess: dict = Depends(deps.require_permission("tickets:write"))
+):
+    try:
+        return tickets_service.claim_ticket(
+            ticket_id=ticket_id,
+            actor_id=sess["username"],
+            actor_role=_session_actor_roles(sess),
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/tablero", response_model=dict)
@@ -377,7 +711,13 @@ async def get_tablero(
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     """Agrupación por estados para el Kanban."""
-    data = tickets_service.list_tickets(limit=120, include_total=False)
+    scoped_asignado = _scoped_assignee(sess, None) if _is_tech_session(sess) else None
+
+    data = tickets_service.list_tickets(
+        limit=120,
+        include_total=False,
+        asignado_a=scoped_asignado,
+    )
     kanban = {
         "abierto": [],
         "en_progreso": [],
@@ -396,7 +736,23 @@ async def get_stats(
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     """Métricas para el Dashboard."""
-    return tickets_service.get_stats()
+    return tickets_service.get_stats(
+        asignado_a=_scoped_assignee(sess, None) if _is_tech_session(sess) else None
+    )
+
+
+@router.get("/asignacion/timeline", response_model=dict)
+async def get_assignment_timeline(
+    window_h: int = Query(72, ge=1, le=720),
+    limit: int = Query(400, ge=50, le=2000),
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    """Timeline de asignación por técnico + cola de tickets sin asignar."""
+    return tickets_service.get_assignment_timeline(
+        window_hours=window_h,
+        ticket_limit=limit,
+        assignee=_scoped_assignee(sess, None) if _is_tech_session(sess) else None,
+    )
 
 
 @router.get("/dashboard/kpi", response_model=dict)
@@ -900,11 +1256,12 @@ async def associate_email(
 
 @router.get("/customers/search", response_model=dict)
 async def search_customers(
-    q: str = Query(..., min_length=2),
+    q: Optional[str] = Query(""),
+    limit: int = Query(0, ge=0, le=5000),
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     """Busca clientes para asociar."""
-    items = tickets_service.search_customers(q)
+    items = tickets_service.search_customers(q or "", limit=limit)
     return {"items": items}
 async def get_my_tickets(
     sess: dict = Depends(deps.require_permission("tickets:read"))

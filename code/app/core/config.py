@@ -7,9 +7,17 @@ load_dotenv()
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Monstruo"
-    SECRET_KEY: str = "CAMBIAME_ESTO_ES_INSEGURO_F8A9"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120 
+    
+    # OAuth2 Google
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_AUTO_PROVISION_ALLOWLIST: str = ""
+    GOOGLE_OAUTH_STATE_TTL_SECONDS: int = 600
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
     
     # Configuración de Ticketera y Entorno
     TICKET_AUTO_REPLY_ENABLED: bool = False
@@ -64,9 +72,16 @@ class Settings(BaseSettings):
         ".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".csv", ".zip"
     ] 
 
-    # Roles permitidos: admin, ops, finance, warehouse
+    # Roles permitidos: admin, encargado_mesa, ops, finance, warehouse
     ROLE_PERMISSIONS: Dict[str, List[str]] = {
         "admin": ["*"],
+        "encargado_mesa": [
+            "dashboard:read",
+            "tickets:read",
+            "tickets:write",
+            "tickets:compliance",
+            "audit:read",
+        ],
         "ops": [
             "dashboard:read",
             "invoice:read",
@@ -98,7 +113,6 @@ class Settings(BaseSettings):
         "gerencia": [
             "dashboard:read", 
             "tickets:read", 
-            "tickets:compliance",
             "pmo:read", 
             "finanzas:read", 
             "audit:read",

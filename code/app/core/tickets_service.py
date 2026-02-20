@@ -12,6 +12,7 @@ import re
 import asyncio
 import hashlib
 import base64
+import secrets
 from email.utils import parseaddr
 from pathlib import Path
 from uuid import uuid4
@@ -21,6 +22,8 @@ from urllib import request as urlrequest
 from urllib import error as urlerror
 from app.core import email_integration, email as email_sender, jobs_engine
 from app.core.config import settings as app_settings
+from app.core.tickets import roles as ticket_roles
+from app.core.tickets import workflow as ticket_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -30,24 +33,20 @@ logger = logging.getLogger(__name__)
 CATEGORIAS_VALIDAS = {"redes", "sistemas", "ejecucion", "admin", "general"}
 ESTADOS_VALIDOS = {"abierto", "en_progreso", "resuelto", "cerrado"}
 SEVERIDADES_VALIDAS = {"baja", "media", "alta", "critica"}
-ROLES_TECNICOS = ("redes", "sistemas", "implementaciones", "ops")
+ROLES_TECNICOS = ticket_roles.ROLES_TECNICOS
+ROLES_TECNICOS_SET = ticket_roles.ROLES_TECNICOS_SET
+ROLES_ADMIN_GESTION = ticket_roles.ROLES_ADMIN_GESTION
+ROLES_DESPACHO_MESA = ticket_roles.ROLES_DESPACHO_MESA
 TICKET_SECURITY_CLASSES = {"public", "internal", "restricted"}
-TIPOS_TICKET_VALIDOS = {"incidencia", "requerimiento", "cambio"}
-SUBESTADOS_VALIDOS = {
-    "nuevo",
-    "triage",
-    "en_analisis",
-    "pendiente_cliente",
-    "pendiente_aprobacion_1",
-    "pendiente_aprobacion_2",
-    "aprobado",
-    "rechazado",
-    "en_ejecucion",
-    "en_validacion",
-    "reabierto",
-    "en_progreso",
-    "resuelto",
-    "cerrado",
+TIPOS_TICKET_VALIDOS = ticket_workflow.TIPOS_TICKET_VALIDOS
+SUBESTADOS_VALIDOS = ticket_workflow.SUBESTADOS_VALIDOS
+SUBESTADOS_ESPERA = ticket_workflow.SUBESTADOS_ESPERA
+SUBESTADOS_LEGACY_MAP = ticket_workflow.SUBESTADOS_LEGACY_MAP
+ROLE_SPECIALTY_FALLBACK = {
+    "redes": "redes",
+    "sistemas": "sistemas",
+    "implementaciones": "ejecucion",
+    "ops": "general",
 }
 
 SLA_HORAS = {
@@ -73,6 +72,17 @@ FRT_MINUTOS = {
 
 CHAIN_ALGO = "sha256"
 CHAIN_VERSION = 1
+EMAIL_DRAFT_LOCK_MINUTES = 5
+EMAIL_DRAFT_LOCK_HEARTBEAT_SECONDS = 60
+# "cerrado" -> Bloqueo total (ReadOnly)
+# "resuelto" -> Bloqueo de envío de correos (EmailBlocked)
+TICKET_READONLY_ESTADOS = {"cerrado"}
+TICKET_EMAIL_BLOCKED_ESTADOS = {"resuelto", "cerrado"}
+REPLY_BLOCKED_ESTADOS = TICKET_EMAIL_BLOCKED_ESTADOS  # Alias legacy
+
+
+class ConflictError(Exception):
+    """Conflicto de concurrencia (lock/version) para borradores de correo."""
 
 
 def _clamp_int(value: Any, default_value: int, min_value: int, max_value: int) -> int:
@@ -159,6 +169,12 @@ if SLA_BUSINESS_END_HOUR <= SLA_BUSINESS_START_HOUR:
 
 SLA_ESCALATION_WINDOWS_PCT = _parse_escalation_windows(
     getattr(app_settings, "TICKET_SLA_ESCALATION_WINDOWS_PCT", "80,100")
+)
+RESUELTO_AUTO_CLOSE_HOURS = _clamp_int(
+    getattr(app_settings, "TICKET_RESUELTO_AUTO_CLOSE_HOURS", 72),
+    default_value=72,
+    min_value=0,
+    max_value=720,
 )
 
 
@@ -250,8 +266,6 @@ def _attachment_roots() -> List[Path]:
     for raw in (
         configured,
         _default_ticket_attachments_dir(),
-        "/srv/monstruo/data/tickets",
-        "/srv/monstruo_dev/data/tickets",
     ):
         if not raw:
             continue
@@ -282,36 +296,7 @@ def _attachment_storage_name(filename: str) -> str:
     safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(filename or "attachment.bin"))
     return f"{int(datetime.now(timezone.utc).timestamp() * 1000)}_{uuid4().hex[:10]}_{safe_filename}"
 
-WORKFLOW_RULES: Dict[str, Dict[str, List[str]]] = {
-    "incidencia": {
-        "nuevo": ["triage"],
-        "triage": ["en_progreso"],
-        "en_progreso": ["resuelto"],
-        "resuelto": ["cerrado", "reabierto"],
-        "cerrado": ["reabierto"],
-        "reabierto": ["triage", "en_progreso"],
-    },
-    "requerimiento": {
-        "nuevo": ["en_analisis"],
-        "en_analisis": ["en_progreso"],
-        "en_progreso": ["en_validacion"],
-        "en_validacion": ["cerrado", "reabierto"],
-        "cerrado": ["reabierto"],
-        "reabierto": ["en_analisis", "en_progreso"],
-    },
-    "cambio": {
-        "nuevo": ["en_analisis"],
-        "en_analisis": ["pendiente_aprobacion_1"],
-        "pendiente_aprobacion_1": ["pendiente_aprobacion_2", "rechazado"],
-        "pendiente_aprobacion_2": ["aprobado", "rechazado"],
-        "aprobado": ["en_ejecucion"],
-        "en_ejecucion": ["en_validacion"],
-        "en_validacion": ["cerrado", "reabierto"],
-        "rechazado": ["en_analisis"],
-        "cerrado": ["reabierto"],
-        "reabierto": ["en_analisis", "en_ejecucion"],
-    },
-}
+WORKFLOW_RULES = ticket_workflow.WORKFLOW_RULES
 
 JIRA_STATUS_MAP = {
     "to do": "abierto",
@@ -453,29 +438,339 @@ def normalize_ticket_security_class(value: Optional[str]) -> str:
 
 
 def normalize_ticket_type(value: Optional[str]) -> str:
-    normalized = (value or "incidencia").strip().lower()
-    if normalized not in TIPOS_TICKET_VALIDOS:
-        return "incidencia"
-    return normalized
+    return ticket_workflow.normalize_ticket_type(value)
 
 
-def normalize_subestado(value: Optional[str], default_value: str = "nuevo") -> str:
-    normalized = (value or default_value).strip().lower()
-    if normalized not in SUBESTADOS_VALIDOS:
-        return default_value
-    return normalized
+def normalize_subestado(value: Optional[str], default_value: str = "recibido") -> str:
+    return ticket_workflow.normalize_subestado(value, default_value)
+
+
+def _normalize_roles(value: Optional[Any]) -> List[str]:
+    return ticket_roles.normalize_roles(value)
+
+
+def _normalize_role(value: Optional[Any]) -> str:
+    return ticket_roles.normalize_role(value)
+
+
+def _normalize_username(value: Optional[str]) -> str:
+    return ticket_roles.normalize_username(value)
+
+
+def _scope_enforced(actor_role: Optional[Any]) -> bool:
+    return ticket_roles.scope_enforced(actor_role)
+
+
+def _is_admin_management_role(actor_role: Optional[Any]) -> bool:
+    return ticket_roles.is_admin_management_role(actor_role)
+
+
+def _is_tech_role(actor_role: Optional[Any]) -> bool:
+    return ticket_roles.is_tech_execution_role(actor_role)
+
+
+def _is_dispatcher_role(actor_role: Optional[Any]) -> bool:
+    return ticket_roles.is_dispatcher_role(actor_role)
+
+
+def _can_dispatch_reassign(
+    ticket: Dict[str, Any],
+    actor_id: str,
+    actor_role: Optional[Any],
+) -> bool:
+    return ticket_roles.can_dispatch_reassign(ticket, actor_id, actor_role)
+
+
+def _ticket_assignee_username(ticket: Dict[str, Any]) -> str:
+    return ticket_roles.ticket_assignee_username(ticket)
+
+
+def _ensure_can_manage_ticket(
+    ticket: Dict[str, Any],
+    actor_id: str,
+    actor_role: Optional[Any],
+    action_label: str,
+) -> None:
+    ticket_roles.require_can_manage(ticket, actor_id, actor_role, action_label)
+
+
+def _ensure_can_participate_ticket(
+    ticket: Dict[str, Any],
+    actor_id: str,
+    actor_role: Optional[Any],
+    action_label: str,
+) -> None:
+    ticket_roles.require_can_participate(ticket, actor_id, actor_role, action_label)
+
+
+def _is_reply_blocked_by_estado(ticket: Dict[str, Any]) -> bool:
+    estado = str(ticket.get("estado") or "").strip().lower()
+    return estado in TICKET_EMAIL_BLOCKED_ESTADOS
+
+
+def _is_readonly_blocked_by_estado(ticket: Dict[str, Any]) -> bool:
+    estado = str(ticket.get("estado") or "").strip().lower()
+    return estado in TICKET_READONLY_ESTADOS
+
+
+def _ensure_reply_allowed_estado(ticket: Dict[str, Any], action_label: str) -> None:
+    if _is_reply_blocked_by_estado(ticket):
+        estado = str(ticket.get("estado") or "").strip().lower() or "-"
+        raise ValueError(f"No se puede {action_label} cuando el ticket está en estado '{estado}'.")
+
+
+def _extract_ticket_target_email(ticket: Dict[str, Any]) -> str:
+    _, parsed_addr = parseaddr(ticket.get("origen_email") or "")
+    to_email = parsed_addr.strip() if parsed_addr else (ticket.get("origen_email") or "").strip()
+    return str(to_email or "").strip()
+
+
+def _tokenize_email_values(raw_value: Any) -> List[str]:
+    if raw_value is None:
+        return []
+
+    raw_items: List[str] = []
+    if isinstance(raw_value, str):
+        raw_items = [raw_value]
+    elif isinstance(raw_value, (list, tuple, set)):
+        raw_items = [str(v or "") for v in raw_value]
+    else:
+        raw_items = [str(raw_value)]
+
+    tokens: List[str] = []
+    for item in raw_items:
+        for token in re.split(r"[,\n;]+", str(item or "")):
+            clean = token.strip()
+            if clean:
+                tokens.append(clean)
+    return tokens
+
+
+def _normalize_notify_emails(raw_value: Any) -> tuple[List[str], List[str]]:
+    valid: List[str] = []
+    invalid: List[str] = []
+    seen: set[str] = set()
+
+    for token in _tokenize_email_values(raw_value):
+        normalized = _normalize_email_address(token)
+        if not normalized:
+            invalid.append(token)
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        valid.append(normalized)
+    return valid, invalid
+
+
+def _serialize_notify_emails(raw_value: Any, *, strict: bool = True) -> str:
+    valid, invalid = _normalize_notify_emails(raw_value)
+    if strict and invalid:
+        invalid_text = ", ".join(invalid[:5])
+        raise ValueError(f"Correos inválidos en notificación: {invalid_text}")
+    return ", ".join(valid)
+
+
+def _notify_emails_from_ticket(ticket: Dict[str, Any]) -> List[str]:
+    valid, _ = _normalize_notify_emails(ticket.get("notify_emails") or "")
+    return valid
+
+
+def _normalize_recipient_emails(raw_value: Any, *, label: str) -> List[str]:
+    valid, invalid = _normalize_notify_emails(raw_value)
+    if invalid:
+        invalid_text = ", ".join(invalid[:5])
+        raise ValueError(f"Correos inválidos en {label}: {invalid_text}")
+    return valid
+
+
+def _compose_reply_recipients(
+    ticket: Dict[str, Any],
+    explicit_to: Optional[str] = None,
+    explicit_cc: Optional[Any] = None,
+    explicit_bcc: Optional[Any] = None,
+) -> tuple[str, List[str], List[str], str]:
+    to_email = _normalize_email_address(explicit_to or _extract_ticket_target_email(ticket))
+
+    cc_source = explicit_cc if explicit_cc is not None else _notify_emails_from_ticket(ticket)
+    bcc_source = explicit_bcc if explicit_bcc is not None else []
+    cc_raw = _normalize_recipient_emails(cc_source, label="CC")
+    bcc_raw = _normalize_recipient_emails(bcc_source, label="CCO")
+
+    seen: set[str] = set()
+    if to_email:
+        seen.add(to_email)
+
+    cc_emails: List[str] = []
+    for email in cc_raw:
+        if email in seen:
+            continue
+        seen.add(email)
+        cc_emails.append(email)
+
+    bcc_emails: List[str] = []
+    for email in bcc_raw:
+        if email in seen:
+            continue
+        seen.add(email)
+        bcc_emails.append(email)
+
+    to_record = ", ".join(([to_email] if to_email else []) + cc_emails)
+    return to_email, cc_emails, bcc_emails, to_record
+
+
+def _estado_label(estado: Optional[str]) -> str:
+    value = str(estado or "").strip().lower()
+    mapping = {
+        "abierto": "Abierto",
+        "en_progreso": "En progreso",
+        "resuelto": "Resuelto",
+        "cerrado": "Cerrado",
+    }
+    return mapping.get(value, value.replace("_", " ").capitalize() or "-")
+
+
+def _send_ticket_status_update_to_notify_emails(
+    ticket: Dict[str, Any],
+    *,
+    from_estado: str,
+    to_estado: str,
+    actor_id: str,
+    motivo: str = "",
+) -> Dict[str, Any]:
+    notify = _notify_emails_from_ticket(ticket)
+    if not notify:
+        return {"ok": True, "sent": False, "reason": "no_notify_emails"}
+
+    primary_to = notify[0]
+    cc_emails = notify[1:]
+    to_record = ", ".join(notify)
+    ticket_id = int(ticket.get("id") or 0)
+    code = str(ticket.get("codigo") or f"#{ticket_id}")
+    title = str(ticket.get("titulo") or "Sin título")
+    actor = str(actor_id or "sistema").strip() or "sistema"
+    from_label = _estado_label(from_estado)
+    to_label = _estado_label(to_estado)
+
+    subject = f"[{code}] Estado actualizado: {to_label}"
+    motivo_html = f"<p><strong>Motivo:</strong> {html.escape(motivo)}</p>" if str(motivo or "").strip() else ""
+    body_html = f"""
+    <p>Se actualizó el estado del ticket <strong>{html.escape(code)}</strong>.</p>
+    <p><strong>Título:</strong> {html.escape(title)}</p>
+    <p><strong>Cambio:</strong> {html.escape(from_label)} -> {html.escape(to_label)}</p>
+    <p><strong>Actualizado por:</strong> {html.escape(actor)}</p>
+    {motivo_html}
+    """
+    send_meta = email_sender.send_email_advanced(
+        to_email=primary_to,
+        cc_emails=cc_emails,
+        subject=subject,
+        html_body=body_html,
+    )
+
+    now = db.now_utc_iso()
+    conn = db.get_conn()
+    try:
+        conn.execute(
+            """INSERT INTO ticket_emails
+               (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
+               VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, '[]', ?, ?)""",
+            (
+                ticket_id,
+                send_meta.get("from_addr"),
+                primary_to,
+                ", ".join(cc_emails),
+                "",
+                subject,
+                body_html,
+                f"status:{ticket_id}:{from_estado}->{to_estado}:{actor}:{now[:19]}",
+                now,
+            ),
+        )
+        conn.execute(
+            """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (
+                ticket_id,
+                actor_id or 'system',
+                f"[CORREO] Actualización de estado enviada a {to_record}. Cambio: {from_label} -> {to_label}.",
+                now,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "ok": True,
+        "sent": True,
+        "to_email": primary_to,
+        "cc_emails": cc_emails,
+        "subject": subject,
+    }
+
+
+def _build_ticket_reply_subject(ticket: Dict[str, Any], asunto: Optional[str] = None) -> str:
+    if asunto and str(asunto).strip():
+        subject = str(asunto).strip()
+    else:
+        base = ticket.get("codigo") or f"Ticket #{int(ticket.get('id') or 0)}"
+        title = (ticket.get("titulo") or "").strip()
+        subject = f"{base} - {title}" if title else str(base)
+    if not subject.lower().startswith("re:"):
+        subject = f"Re: {subject}"
+    return subject
+
+
+def _hash_draft_lock_token(lock_token: str) -> str:
+    return hashlib.sha256(str(lock_token or "").encode("utf-8")).hexdigest()
+
+
+def _lock_expiry_iso(now_iso: str, minutes: int = EMAIL_DRAFT_LOCK_MINUTES) -> str:
+    now_dt = _parse_dt(now_iso) or _now_dt()
+    return (now_dt + timedelta(minutes=max(1, minutes))).isoformat()
+
+
+def _is_draft_lock_active(lock_expires_at: Optional[str], now_dt: Optional[datetime] = None) -> bool:
+    if not lock_expires_at:
+        return False
+    now_dt = now_dt or _now_dt()
+    exp_dt = _parse_dt(lock_expires_at)
+    return bool(exp_dt and exp_dt > now_dt)
+
+
+def _draft_lock_info(draft: Dict[str, Any], actor_id: str, now_dt: Optional[datetime] = None) -> Dict[str, Any]:
+    now_dt = now_dt or _now_dt()
+    owner = str(draft.get("lock_owner") or "").strip()
+    expires_at = draft.get("lock_expires_at")
+    active = _is_draft_lock_active(expires_at, now_dt)
+    return {
+        "owner": owner or None,
+        "expires_at": expires_at,
+        "active": active,
+        "mine": bool(active and owner and _normalize_username(owner) == _normalize_username(actor_id)),
+    }
+
+
+def _new_draft_lock_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _drafts_base_path(ticket_id: int, draft_id: int) -> Path:
+    base_root = str(getattr(app_settings, "TICKET_ATTACHMENTS_DIR", "") or _default_ticket_attachments_dir())
+    return Path(base_root) / str(ticket_id) / "drafts" / str(draft_id)
 
 
 def estado_from_subestado(subestado: str, current_estado: str = "abierto") -> str:
-    s = normalize_subestado(subestado, "nuevo")
+    s = normalize_subestado(subestado, "recibido")
     if s in {"resuelto"}:
         return "resuelto"
     if s in {"cerrado"}:
         return "cerrado"
-    if s in {"en_progreso", "en_ejecucion", "en_validacion", "aprobado", "reabierto"}:
+    if s in {"en_progreso", "en_ejecucion", "en_validacion", "aprobado"}:
         return "en_progreso"
     if current_estado in ESTADOS_VALIDOS and current_estado in {"resuelto", "cerrado"} and s == "reabierto":
-        return "en_progreso"
+        return "abierto"
     return "abierto"
 
 
@@ -805,6 +1100,50 @@ def auto_asignar(categoria: str) -> Optional[str]:
             """, (db.now_utc_iso(), username, specialty))
             conn.commit()
             return username
+
+        # Fallback final (modo solo-roles):
+        # seleccionar técnico activo por menor carga real de tickets abiertos/en_progreso.
+        user_rows = conn.execute(
+            "SELECT username, role, secondary_roles FROM users WHERE COALESCE(is_active, 1) = 1 ORDER BY username ASC"
+        ).fetchall()
+        if user_rows:
+            active_counts_rows = conn.execute(
+                """
+                SELECT LOWER(asignado_a) AS username, COUNT(*) AS active_count
+                FROM tickets
+                WHERE COALESCE(asignado_a, '') <> ''
+                  AND estado IN ('abierto', 'en_progreso')
+                GROUP BY LOWER(asignado_a)
+                """
+            ).fetchall()
+            active_map = {
+                _normalize_username(r.get("username")): int(r.get("active_count") or 0)
+                for r in active_counts_rows
+                if _normalize_username(r.get("username"))
+            }
+
+            candidates: List[Tuple[int, str]] = []
+            for user_row in user_rows:
+                username = _normalize_username(user_row.get("username"))
+                if not username:
+                    continue
+                roles = []
+                primary_role = _normalize_role(user_row.get("role"))
+                if primary_role:
+                    roles.append(primary_role)
+                try:
+                    parsed_secondary = json.loads(user_row.get("secondary_roles") or "[]")
+                except Exception:
+                    parsed_secondary = []
+                roles.extend(_normalize_roles(parsed_secondary))
+                normalized_roles = _normalize_roles(roles)
+                if not any(role in ROLES_TECNICOS_SET for role in normalized_roles):
+                    continue
+                candidates.append((int(active_map.get(username, 0)), username))
+
+            if candidates:
+                candidates.sort(key=lambda item: (item[0], item[1]))
+                return candidates[0][1]
 
         return None
     finally:
@@ -1423,13 +1762,25 @@ def generar_codigo(ticket_id: int) -> str:
 
 
 def _workflow_next(tipo: str, subestado: str) -> List[str]:
-    rules = WORKFLOW_RULES.get(normalize_ticket_type(tipo), WORKFLOW_RULES["incidencia"])
-    return list(rules.get(normalize_subestado(subestado), []))
+    return ticket_workflow.workflow_next(tipo, subestado)
 
 
 def _workflow_can_transition(tipo: str, from_subestado: str, to_subestado: str) -> bool:
-    allowed = _workflow_next(tipo, from_subestado)
-    return normalize_subestado(to_subestado) in allowed
+    return ticket_workflow.can_transition(tipo, from_subestado, to_subestado)
+
+
+def _normalize_transition_target(from_subestado: str, requested_subestado: Optional[str]) -> str:
+    return ticket_workflow.normalize_transition_target(from_subestado, requested_subestado)
+
+
+def _is_estado_en_progreso(estado: Optional[str]) -> bool:
+    return str(estado or "").strip().lower() == "en_progreso"
+
+
+def _filter_waiting_subestados(allowed_next: List[str], estado_actual: Optional[str]) -> List[str]:
+    if _is_estado_en_progreso(estado_actual):
+        return list(allowed_next or [])
+    return [s for s in (allowed_next or []) if normalize_subestado(s, "") not in SUBESTADOS_ESPERA]
 
 
 def _comment_with_prefix_exists(conn, ticket_id: int, prefix: str) -> bool:
@@ -1445,11 +1796,11 @@ def _comment_with_prefix_exists(conn, ticket_id: int, prefix: str) -> bool:
     return bool(row)
 
 
-def _emit_system_comment(conn, ticket_id: int, content: str, now_iso: str) -> None:
+def _emit_system_comment(conn, ticket_id: int, content: str, now_iso: str, author_id: str = "system") -> None:
     conn.execute(
         """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-           VALUES (?, 'system', ?, ?)""",
-        (ticket_id, content, now_iso),
+           VALUES (?, ?, ?, ?)""",
+        (ticket_id, author_id, content, now_iso),
     )
 
 
@@ -1477,7 +1828,7 @@ def _evaluate_ticket_sla(conn, ticket_id: int, now_iso: Optional[str] = None) ->
     now_iso = now_iso or db.now_utc_iso()
     now_dt = _parse_dt(now_iso) or _now_dt()
     row = conn.execute(
-        """SELECT id, estado, created_at, updated_at, first_response_at, frt_due_at, ttr_due_at,
+        """SELECT id, estado, subestado, created_at, updated_at, first_response_at, frt_due_at, ttr_due_at,
                   frt_breached_at, ttr_breached_at, resolved_at
            FROM tickets
            WHERE id = ?""",
@@ -1567,6 +1918,42 @@ def _evaluate_ticket_sla(conn, ticket_id: int, now_iso: Optional[str] = None) ->
                 (resolved_dt.isoformat(), ticket_id),
             )
 
+    # Auto-cierre opcional para tickets en resuelto tras ventana de seguimiento.
+    if estado == "resuelto" and RESUELTO_AUTO_CLOSE_HOURS > 0 and resolved_dt:
+        auto_close_at = resolved_dt + timedelta(hours=RESUELTO_AUTO_CLOSE_HOURS)
+        if now_dt >= auto_close_at:
+            from_sub = normalize_subestado(ticket.get("subestado"), "resuelto")
+            update_result = conn.execute(
+                """UPDATE tickets
+                   SET estado = 'cerrado',
+                       subestado = 'cerrado',
+                       updated_at = ?,
+                       resolved_at = COALESCE(resolved_at, ?)
+                   WHERE id = ? AND estado = 'resuelto'""",
+                (now_iso, now_iso, ticket_id),
+            )
+            updated_rows = getattr(update_result, "rowcount", None)
+            if updated_rows == 0:
+                return
+            conn.execute(
+                """INSERT INTO ticket_transitions
+                   (ticket_id, from_subestado, to_subestado, actor, reason, created_at)
+                   VALUES (?, ?, 'cerrado', 'system', ?, ?)""",
+                (
+                    ticket_id,
+                    from_sub,
+                    f"auto_close_resuelto_timeout_{RESUELTO_AUTO_CLOSE_HOURS}h",
+                    now_iso,
+                ),
+            )
+            _emit_system_comment(
+                conn,
+                ticket_id,
+                f"[AUTO_CIERRE] Ticket cerrado automáticamente tras {RESUELTO_AUTO_CLOSE_HOURS}h en estado resuelto.",
+                now_iso,
+            )
+            _recompute_ticket_retention(conn, ticket_id)
+
 
 def run_sla_evaluation_batch(limit: int = 500) -> Dict[str, Any]:
     """
@@ -1584,6 +1971,8 @@ def run_sla_evaluation_batch(limit: int = 500) -> Dict[str, Any]:
                    (first_response_at IS NULL AND frt_due_at IS NOT NULL)
                    OR
                    (ttr_due_at IS NOT NULL)
+                   OR
+                   (estado = 'resuelto')
                )
                ORDER BY COALESCE(updated_at, created_at) ASC, id ASC
                LIMIT ?""",
@@ -1636,12 +2025,24 @@ def _maybe_mark_first_response(conn, ticket_id: int, by_user: str, now_iso: Opti
 def _hydrate_ticket_runtime(ticket: Dict[str, Any], now_dt: Optional[datetime] = None) -> Dict[str, Any]:
     now_dt = now_dt or _now_dt()
     t = dict(ticket)
+    notify_list = _notify_emails_from_ticket(t)
+    t["notify_emails_list"] = notify_list
+    t["notify_emails"] = ", ".join(notify_list)
+    estado_norm = str(t.get("estado") or "").strip().lower()
+    sub_norm = normalize_subestado(t.get("subestado"), "recibido")
+    # Guard rail: normaliza combinaciones legacy incoherentes (estado/subestado)
+    # para evitar flujos inválidos en UI/workflow.
+    if estado_norm == "cerrado":
+        sub_norm = "cerrado"
+    elif estado_norm == "resuelto":
+        sub_norm = "resuelto"
+    t["subestado"] = sub_norm
     created_dt = _parse_dt(t.get("created_at"))
     frt_due_dt = _parse_dt(t.get("frt_due_at"))
     ttr_due_dt = _parse_dt(t.get("ttr_due_at")) or _parse_dt(t.get("vence_at"))
     first_response_dt = _parse_dt(t.get("first_response_at"))
     resolved_dt = _parse_dt(t.get("resolved_at")) or _parse_dt(t.get("updated_at"))
-    estado = (t.get("estado") or "").lower()
+    estado = estado_norm
 
     is_frt_breached = bool(t.get("frt_breached_at"))
     if not is_frt_breached and frt_due_dt and first_response_dt is None and now_dt > frt_due_dt:
@@ -1710,6 +2111,7 @@ def create_ticket(
     ticket_security_class: Optional[str] = "internal",
     customer_id: Optional[str] = None,
     contact_role: Optional[str] = None,
+    notify_emails: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Crear un nuevo ticket con auto-clasificación y auto-asignación."""
     conn = db.get_conn()
@@ -1744,6 +2146,7 @@ def create_ticket(
 
         # Normalizar tipo
         tipo = normalize_ticket_type(tipo)
+        explicit_subestado = str(subestado or "").strip()
 
         # Calcular SLA
         now_dt = datetime.fromisoformat(now.replace("Z", "+00:00"))
@@ -1751,7 +2154,6 @@ def create_ticket(
         ttr_due_at = _ttr_due_iso(now_dt, severidad)
         frt_due_at = _frt_due_iso(now_dt, severidad)
         vence_at = ttr_due_at
-        subestado = normalize_subestado(subestado, "nuevo")
 
         # Prioridad numérica
         prioridad = PRIORIDAD_MAP.get(severidad, 3)
@@ -1759,6 +2161,7 @@ def create_ticket(
         retention_days = _retention_days_for_class(security_class)
         thread_id = _normalize_message_id(email_thread_id)
         refs = _merge_reference_chain(email_references, thread_id)
+        notify_emails_csv = _serialize_notify_emails(notify_emails, strict=True)
 
         # Auto-asignar (no-crítico: si falla, ticket se crea sin asignar)
         asignado_a = None
@@ -1766,6 +2169,12 @@ def create_ticket(
             asignado_a = auto_asignar(categoria)
         except Exception as e:
             logger.warning(f"[create_ticket] auto_asignar falló para categoría '{categoria}': {e}")
+
+        if explicit_subestado:
+            subestado = normalize_subestado(explicit_subestado, "recibido")
+        else:
+            subestado = "asignado" if asignado_a else "recibido"
+            subestado = normalize_subestado(subestado, "recibido")
 
         # Auto-link cliente si no viene explícito
         if not customer_id and origen_email:
@@ -1782,13 +2191,13 @@ def create_ticket(
                    (titulo, descripcion, estado, severidad, tipo, creador_id,
                     asignado_a, vence_at, created_at, updated_at,
                     categoria, origen_email, cliente_nombre, prioridad, sla_horas, email_thread_id, email_references,
-                    ticket_security_class, retention_days_snapshot, subestado, frt_due_at, ttr_due_at, customer_id, contact_role)
-                   VALUES (?, ?, 'abierto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ticket_security_class, retention_days_snapshot, subestado, frt_due_at, ttr_due_at, customer_id, contact_role, notify_emails)
+                   VALUES (?, ?, 'abierto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    RETURNING id""",
                 (titulo, descripcion, severidad, tipo, creador_id,
                  asignado_a, vence_at, now, now,
                  categoria, origen_email, cliente_nombre, prioridad, sla_horas, thread_id, refs,
-                 security_class, retention_days, subestado, frt_due_at, ttr_due_at, customer_id, contact_role)
+                 security_class, retention_days, subestado, frt_due_at, ttr_due_at, customer_id, contact_role, notify_emails_csv)
             )
         except Exception as insert_error:
             # Compatibilidad transitoria si la migración aún no aplicó email_references.
@@ -1802,13 +2211,13 @@ def create_ticket(
                    (titulo, descripcion, estado, severidad, tipo, creador_id,
                     asignado_a, vence_at, created_at, updated_at,
                     categoria, origen_email, cliente_nombre, prioridad, sla_horas, email_thread_id,
-                    ticket_security_class, retention_days_snapshot, subestado, frt_due_at, ttr_due_at, customer_id, contact_role)
-                   VALUES (?, ?, 'abierto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ticket_security_class, retention_days_snapshot, subestado, frt_due_at, ttr_due_at, customer_id, contact_role, notify_emails)
+                   VALUES (?, ?, 'abierto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    RETURNING id""",
                 (titulo, descripcion, severidad, tipo, creador_id,
                  asignado_a, vence_at, now, now,
                  categoria, origen_email, cliente_nombre, prioridad, sla_horas, thread_id,
-                 security_class, retention_days, subestado, frt_due_at, ttr_due_at, customer_id, contact_role)
+                 security_class, retention_days, subestado, frt_due_at, ttr_due_at, customer_id, contact_role, notify_emails_csv)
             )
         row = cursor.fetchone()
         ticket_id = row["id"] if row else None
@@ -1824,8 +2233,8 @@ def create_ticket(
         # Evento de creación
         conn.execute(
             """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-               VALUES (?, 'system', ?, ?)""",
-            (ticket_id, f"[CREACION] Ticket creado. Tipo: {tipo}. Categoría: {categoria}. Severidad: {severidad}.", now)
+               VALUES (?, ?, ?, ?)""",
+            (ticket_id, creador_id or 'system', f"[CREACION] Ticket creado. Tipo: {tipo}. Categoría: {categoria}. Severidad: {severidad}.", now)
         )
         conn.execute(
             """INSERT INTO ticket_transitions
@@ -1837,8 +2246,8 @@ def create_ticket(
         if asignado_a:
             conn.execute(
                 """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-                   VALUES (?, 'system', ?, ?)""",
-                (ticket_id, f"[ASIGNACION] Auto-asignado a {asignado_a} (especialidad: {categoria})", now)
+                   VALUES (?, ?, ?, ?)""",
+                (ticket_id, creador_id or 'system', f"[ASIGNACION] Auto-asignado a {asignado_a} (especialidad: {categoria})", now)
             )
 
         _evaluate_ticket_sla(conn, ticket_id, now)
@@ -1926,7 +2335,7 @@ def list_tickets(
                 prioridad, email_thread_id, resolucion, sla_horas,
                 subestado, frt_due_at, ttr_due_at, first_response_at, resolved_at,
                 frt_breached_at, ttr_breached_at, ticket_security_class,
-                retention_until, retention_days_snapshot, customer_id, contact_role
+                retention_until, retention_days_snapshot, customer_id, contact_role, notify_emails
             """
         )
 
@@ -1944,7 +2353,91 @@ def list_tickets(
         conn.close()
 
 
-def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "system") -> Optional[Dict[str, Any]]:
+def claim_ticket(ticket_id: int, actor_id: str, actor_role: str = "") -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+
+    actor_username = str(actor_id or "").strip()
+    if not actor_username:
+        raise ValueError("Usuario inválido para tomar ticket")
+
+    if _scope_enforced(actor_role):
+        role_norm = _normalize_role(actor_role)
+        if role_norm in ROLES_ADMIN_GESTION:
+            raise PermissionError("El admin no puede tomar tickets. Debe reasignarlos.")
+        if role_norm not in ROLES_TECNICOS_SET:
+            raise PermissionError("Rol no autorizado para tomar tickets.")
+
+    actor_norm = _normalize_username(actor_username)
+    current_assignee_norm = _ticket_assignee_username(ticket)
+    if current_assignee_norm == actor_norm:
+        return {"ok": True, "already_assigned": True, "ticket": ticket}
+    if current_assignee_norm and current_assignee_norm != actor_norm:
+        raise PermissionError(
+            f"Ticket asignado a '{ticket.get('asignado_a')}'. Solo admin puede reasignarlo."
+        )
+
+    from_subestado = normalize_subestado(ticket.get("subestado"), "recibido")
+    target_subestado = "asignado" if from_subestado == "recibido" else from_subestado
+    target_estado = estado_from_subestado(target_subestado, str(ticket.get("estado") or "abierto"))
+
+    conn = db.get_conn()
+    try:
+        now = db.now_utc_iso()
+        row = conn.execute(
+            """UPDATE tickets
+               SET asignado_a = ?, subestado = ?, estado = ?, updated_at = ?
+               WHERE id = ? AND COALESCE(asignado_a, '') = ''
+               RETURNING id""",
+            (actor_username, target_subestado, target_estado, now, ticket_id),
+        ).fetchone()
+
+        if not row:
+            live_row = conn.execute("SELECT asignado_a FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+            live_assignee = _normalize_username((live_row or {}).get("asignado_a"))
+            if live_assignee == actor_norm:
+                return {"ok": True, "already_assigned": True, "ticket": get_ticket(ticket_id)}
+            if live_assignee:
+                raise PermissionError(
+                    f"Ticket asignado a '{live_row.get('asignado_a')}'. Solo admin puede reasignarlo."
+                )
+            raise ValueError("No fue posible tomar el ticket en este momento.")
+
+        _emit_system_comment(conn, ticket_id, f"[ASIGNACION] Ticket tomado por {actor_username}", now, author_id=actor_username)
+        if target_subestado != from_subestado:
+            conn.execute(
+                """INSERT INTO ticket_transitions
+                   (ticket_id, from_subestado, to_subestado, actor, reason, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (ticket_id, from_subestado, target_subestado, actor_username, "claim_ticket", now),
+            )
+            _emit_system_comment(conn, ticket_id, f"[TRANSICION] {from_subestado} -> {target_subestado}", now, author_id=actor_username)
+        _maybe_mark_first_response(conn, ticket_id, actor_username, now)
+        _evaluate_ticket_sla(conn, ticket_id, now)
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        incrementar_carga(actor_username, specialty=ticket.get("categoria"))
+    except Exception as e:
+        logger.warning(f"[claim_ticket] Falló incrementar_carga para {actor_username}: {e}")
+
+    try:
+        programar_notificaciones(ticket_id, actor_username)
+    except Exception as e:
+        logger.warning(f"[claim_ticket] Falló programar_notificaciones para {actor_username}: {e}")
+
+    return {"ok": True, "claimed": True, "ticket": get_ticket(ticket_id)}
+
+
+def update_ticket(
+    ticket_id: int,
+    updates: Dict[str, Any],
+    actor_id: str = "system",
+    actor_role: str = "",
+) -> Optional[Dict[str, Any]]:
     """Actualizar campos del ticket."""
     allowed_keys = {
         "estado",
@@ -1960,6 +2453,7 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
         "ticket_security_class",
         "customer_id",
         "contact_role",
+        "notify_emails",
     }
     current = get_ticket(ticket_id)
     if not current:
@@ -1972,10 +2466,26 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
         if key == "estado":
             estado = str(value or "").strip().lower()
             if estado in ESTADOS_VALIDOS:
+                current_estado = str(current.get("estado") or "abierto").lower()
+                
+                # Matriz de transiciones
+                # ABIERTO -> EN_PROGRESO, RESUELTO, CERRADO
+                # EN_PROGRESO -> ABIERTO, RESUELTO, CERRADO 
+                # RESUELTO -> EN_PROGRESO, CERRADO
+                # CERRADO -> RESUELTO
+                
+                if current_estado == "cerrado":
+                    if estado not in ["resuelto", "cerrado"]:
+                        raise ConflictError("Transición de estado inválida: un ticket CERRADO solo puede reabrirse parcialmente a RESUELTO.")
+                
+                if current_estado == "resuelto":
+                    if estado == "abierto":
+                        raise ConflictError("Transición de estado inválida: un ticket RESUELTO no puede volver directo a ABIERTO. Debe retroceder a EN PROGRESO.")
+
                 normalized_updates[key] = estado
             continue
         if key == "subestado":
-            normalized_updates[key] = normalize_subestado(value, current.get("subestado") or "nuevo")
+            normalized_updates[key] = normalize_subestado(value, current.get("subestado") or "recibido")
             continue
         if key == "severidad":
             sev = str(value or "").strip().lower()
@@ -1984,10 +2494,21 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
         if key == "ticket_security_class":
             normalized_updates[key] = normalize_ticket_security_class(value)
             continue
+        if key == "asignado_a":
+            normalized_updates[key] = str(value).strip() if value else None
+            continue
         if key == "customer_id" or key == "contact_role":
             normalized_updates[key] = str(value).strip() if value else None
             continue
+        if key == "notify_emails":
+            normalized_updates[key] = _serialize_notify_emails(value, strict=True)
+            continue
         normalized_updates[key] = value
+
+    if "asignado_a" in normalized_updates and normalized_updates.get("asignado_a") and "subestado" not in normalized_updates:
+        current_sub = normalize_subestado(current.get("subestado"), "recibido")
+        if current_sub == "recibido":
+            normalized_updates["subestado"] = "asignado"
 
     if "subestado" in normalized_updates and "estado" not in normalized_updates:
         normalized_updates["estado"] = estado_from_subestado(
@@ -1995,19 +2516,89 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
             str(current.get("estado") or "abierto"),
         )
 
+    # Cuando llega solo "estado" (ej: drag/drop Kanban), sincronizamos subestado para
+    # evitar combinaciones incoherentes (ej: estado=abierto con subestado=en_progreso).
+    if "estado" in normalized_updates and "subestado" not in normalized_updates:
+        target_estado = str(normalized_updates.get("estado") or "").strip().lower()
+        current_sub = normalize_subestado(current.get("subestado"), "recibido")
+        current_sub_estado = estado_from_subestado(current_sub, str(current.get("estado") or "abierto"))
+
+        if target_estado == "abierto":
+            if current_sub_estado == "abierto":
+                normalized_updates["subestado"] = current_sub
+            else:
+                normalized_updates["subestado"] = "asignado" if current.get("asignado_a") else "recibido"
+        elif target_estado == "en_progreso":
+            if current_sub_estado == "en_progreso" and current_sub not in {"resuelto", "cerrado"}:
+                normalized_updates["subestado"] = current_sub
+            else:
+                normalized_updates["subestado"] = "en_progreso"
+        elif target_estado == "resuelto":
+            normalized_updates["subestado"] = "resuelto"
+        elif target_estado == "cerrado":
+            normalized_updates["subestado"] = "cerrado"
+
     keys_to_update = list(normalized_updates.keys())
     if not keys_to_update:
         return get_ticket(ticket_id)
 
+    actor_norm = _normalize_username(actor_id)
+    current_assignee_norm = _ticket_assignee_username(current)
+    is_admin_actor = _is_admin_management_role(actor_role)
+    can_dispatch_reassign = _can_dispatch_reassign(current, actor_id, actor_role)
+    if _scope_enforced(actor_role) and not is_admin_actor:
+        if "asignado_a" in normalized_updates:
+            target_assignee_norm = _normalize_username(normalized_updates.get("asignado_a"))
+            if not target_assignee_norm:
+                if not can_dispatch_reassign:
+                    raise PermissionError("Solo admin o encargado de mesa puede desasignar tickets.")
+            if target_assignee_norm != actor_norm and not can_dispatch_reassign:
+                raise PermissionError("Solo admin o encargado de mesa puede reasignar tickets a otro usuario.")
+            if current_assignee_norm and current_assignee_norm != actor_norm and not can_dispatch_reassign:
+                raise PermissionError(
+                    f"Ticket asignado a '{current.get('asignado_a')}'. Solo admin o encargado de mesa puede reasignarlo."
+                )
+
+        writes_without_assignment = set(keys_to_update) - {"asignado_a"}
+        if writes_without_assignment:
+            request_claims_self = _normalize_username(normalized_updates.get("asignado_a")) == actor_norm
+            if current_assignee_norm != actor_norm and not (not current_assignee_norm and request_claims_self):
+                if current_assignee_norm:
+                    raise PermissionError(
+                        f"Ticket asignado a '{current.get('asignado_a')}'. Solo el asignado puede modificarlo."
+                    )
+                raise PermissionError("Ticket sin asignar. Debes tomarlo antes de modificarlo.")
+
+    assignment_claim_mode = (
+        _scope_enforced(actor_role)
+        and not is_admin_actor
+        and "asignado_a" in normalized_updates
+        and _normalize_username(normalized_updates.get("asignado_a")) == actor_norm
+        and not current_assignee_norm
+    )
+
+    old_estado = str(current.get("estado") or "").strip().lower()
     conn = db.get_conn()
     try:
         now = db.now_utc_iso()
         now_dt = _parse_dt(now) or _now_dt()
         set_clause = ", ".join([f"{k} = ?" for k in keys_to_update]) + ", updated_at = ?"
+        where_clause = "id = ?"
+        if assignment_claim_mode:
+            where_clause += " AND COALESCE(asignado_a, '') = ''"
         params = [normalized_updates[k] for k in keys_to_update] + [now, ticket_id]
 
-        cursor = conn.execute(f"UPDATE tickets SET {set_clause} WHERE id = ?", params)
+        cursor = conn.execute(f"UPDATE tickets SET {set_clause} WHERE {where_clause}", params)
         if cursor.rowcount == 0:
+            if assignment_claim_mode:
+                live_row = conn.execute("SELECT asignado_a FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+                live_assignee = _normalize_username((live_row or {}).get("asignado_a"))
+                if live_assignee == actor_norm:
+                    return get_ticket(ticket_id)
+                if live_assignee:
+                    raise PermissionError(
+                        f"Ticket asignado a '{live_row.get('asignado_a')}'. Solo admin puede reasignarlo."
+                    )
             return None
 
         if "subestado" in normalized_updates:
@@ -2032,11 +2623,12 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
                     ticket_id,
                     f"[TRANSICION] Subestado cambiado de {from_sub or '-'} a {to_sub}",
                     now,
+                    author_id=actor_id,
                 )
 
         if "estado" in normalized_updates:
             new_estado = normalized_updates["estado"]
-            _emit_system_comment(conn, ticket_id, f"[CAMBIO_ESTADO] Estado cambiado a {new_estado}", now)
+            _emit_system_comment(conn, ticket_id, f"[CAMBIO_ESTADO] Estado cambiado a {new_estado}", now, author_id=actor_id)
             if new_estado in ("cerrado", "resuelto"):
                 if current.get("asignado_a"):
                     decrementar_carga(current["asignado_a"], specialty=current.get("categoria"))
@@ -2049,18 +2641,22 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
 
         if "asignado_a" in normalized_updates:
             new_asignado = normalized_updates["asignado_a"]
-            _emit_system_comment(conn, ticket_id, f"[REASIGNACION] Reasignado a {new_asignado}", now)
-            old_cat = current.get("categoria")
-            new_cat = normalized_updates.get("categoria", old_cat)
-            if current.get("asignado_a"):
-                decrementar_carga(current["asignado_a"], specialty=old_cat)
-            if new_asignado:
-                incrementar_carga(str(new_asignado), specialty=new_cat)
-                _maybe_mark_first_response(conn, ticket_id, actor_id, now)
-                try:
-                    programar_notificaciones(ticket_id, str(new_asignado))
-                except Exception as e:
-                    logger.warning(f"[update_ticket] Falló programar_notificaciones para {new_asignado}: {e}")
+            old_asignado_norm = _normalize_username(current.get("asignado_a"))
+            new_asignado_norm = _normalize_username(new_asignado)
+            if old_asignado_norm != new_asignado_norm:
+                target_label = new_asignado or "sin asignar"
+                _emit_system_comment(conn, ticket_id, f"[REASIGNACION] Reasignado a {target_label}", now, author_id=actor_id)
+                old_cat = current.get("categoria")
+                new_cat = normalized_updates.get("categoria", old_cat)
+                if current.get("asignado_a"):
+                    decrementar_carga(current["asignado_a"], specialty=old_cat)
+                if new_asignado:
+                    incrementar_carga(str(new_asignado), specialty=new_cat)
+                    _maybe_mark_first_response(conn, ticket_id, actor_id, now)
+                    try:
+                        programar_notificaciones(ticket_id, str(new_asignado))
+                    except Exception as e:
+                        logger.warning(f"[update_ticket] Falló programar_notificaciones para {new_asignado}: {e}")
 
         if "severidad" in normalized_updates:
             new_sev = normalized_updates["severidad"]
@@ -2080,18 +2676,48 @@ def update_ticket(ticket_id: int, updates: Dict[str, Any], actor_id: str = "syst
                 ticket_id,
                 f"[ESCALAMIENTO] Severidad cambiada a {new_sev}. Nuevo SLA: {new_sla}h",
                 now,
+                author_id=actor_id,
             )
 
         _recompute_ticket_retention(conn, ticket_id)
         _evaluate_ticket_sla(conn, ticket_id, now)
         conn.commit()
-        return get_ticket(ticket_id)
+        updated_ticket = get_ticket(ticket_id)
     finally:
         conn.close()
 
+    if "estado" in normalized_updates and updated_ticket:
+        new_estado = str(updated_ticket.get("estado") or "").strip().lower()
+        if old_estado and new_estado and old_estado != new_estado:
+            try:
+                _send_ticket_status_update_to_notify_emails(
+                    updated_ticket,
+                    from_estado=old_estado,
+                    to_estado=new_estado,
+                    actor_id=actor_id,
+                    motivo="cambio_estado_manual",
+                )
+            except Exception as status_mail_error:
+                logger.warning(f"[update_ticket] aviso de estado por correo no crítico falló para ticket {ticket_id}: {status_mail_error}")
 
-def add_comment(ticket_id: int, user_id: str, content: str, event_type: str = "comentario") -> Dict[str, Any]:
+    return updated_ticket
+
+
+def add_comment(
+    ticket_id: int,
+    user_id: str,
+    content: str,
+    event_type: str = "comentario",
+    actor_role: str = "",
+) -> Dict[str, Any]:
     """Agregar un comentario/evento al ticket."""
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+    _ensure_can_participate_ticket(ticket, user_id, actor_role, "agregar notas")
+    if _is_readonly_blocked_by_estado(ticket):
+        raise ValueError("El ticket está CERRADO y no admite más notas.")
+
     conn = db.get_conn()
     try:
         now = db.now_utc_iso()
@@ -2111,6 +2737,750 @@ def add_comment(ticket_id: int, user_id: str, content: str, event_type: str = "c
         return dict(row)
     finally:
         conn.close()
+
+
+def _get_active_email_draft_row(conn, ticket_id: int) -> Optional[Dict[str, Any]]:
+    row = conn.execute(
+        """SELECT *
+           FROM ticket_email_drafts
+           WHERE ticket_id = ? AND status = 'active'
+           ORDER BY id DESC
+           LIMIT 1""",
+        (int(ticket_id),),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _list_email_draft_attachments(conn, draft_id: int) -> List[Dict[str, Any]]:
+    rows = conn.execute(
+        """SELECT id, draft_id, filename, file_path, size_bytes, content_type, sha256,
+                  uploaded_by, created_at, sent_email_id
+           FROM ticket_email_draft_attachments
+           WHERE draft_id = ?
+           ORDER BY id ASC""",
+        (int(draft_id),),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _ensure_active_email_draft(conn, ticket: Dict[str, Any], actor_id: str) -> Dict[str, Any]:
+    ticket_id = int(ticket.get("id") or 0)
+    current = _get_active_email_draft_row(conn, ticket_id)
+    if current:
+        return current
+
+    now = db.now_utc_iso()
+    actor = str(actor_id or "").strip() or "system"
+    to_addr = _extract_ticket_target_email(ticket)
+    _, cc_emails, _, _ = _compose_reply_recipients(ticket, explicit_to=to_addr)
+    subject = _build_ticket_reply_subject(ticket)
+    try:
+        row = conn.execute(
+            """INSERT INTO ticket_email_drafts
+               (ticket_id, status, to_addr, cc_addrs, bcc_addrs, subject, body_text, version,
+                created_by, updated_by, created_at, updated_at)
+               VALUES (?, 'active', ?, ?, '', ?, '', 1, ?, ?, ?, ?)
+               RETURNING id""",
+            (ticket_id, to_addr, ", ".join(cc_emails), subject, actor, actor, now, now),
+        ).fetchone()
+    except Exception as e:
+        msg = str(e).lower()
+        if "idx_tk_email_drafts_active" in msg or "duplicate" in msg:
+            existing = _get_active_email_draft_row(conn, ticket_id)
+            if existing:
+                return existing
+        raise
+    draft_id = int((row or {}).get("id") or 0)
+    created = conn.execute(
+        "SELECT * FROM ticket_email_drafts WHERE id = ?",
+        (draft_id,),
+    ).fetchone()
+    if not created:
+        raise ValueError("No fue posible crear borrador activo.")
+    return dict(created)
+
+
+def _serialize_email_draft(conn, draft: Dict[str, Any], actor_id: str) -> Dict[str, Any]:
+    draft_id = int(draft.get("id") or 0)
+    lock = _draft_lock_info(draft, actor_id)
+    attachments_raw = _list_email_draft_attachments(conn, draft_id)
+    attachments = [
+        {
+            "id": int(item.get("id") or 0),
+            "draft_id": int(item.get("draft_id") or 0),
+            "filename": str(item.get("filename") or ""),
+            "size_bytes": int(item.get("size_bytes") or 0),
+            "content_type": str(item.get("content_type") or "application/octet-stream"),
+            "sha256": str(item.get("sha256") or ""),
+            "uploaded_by": str(item.get("uploaded_by") or ""),
+            "created_at": item.get("created_at"),
+            "sent_email_id": item.get("sent_email_id"),
+        }
+        for item in attachments_raw
+    ]
+    out = {
+        "id": draft_id,
+        "ticket_id": int(draft.get("ticket_id") or 0),
+        "status": str(draft.get("status") or "active"),
+        "to_addr": str(draft.get("to_addr") or ""),
+        "cc_addrs": str(draft.get("cc_addrs") or ""),
+        "bcc_addrs": str(draft.get("bcc_addrs") or ""),
+        "subject": str(draft.get("subject") or ""),
+        "body_text": str(draft.get("body_text") or ""),
+        "version": int(draft.get("version") or 1),
+        "created_by": str(draft.get("created_by") or ""),
+        "updated_by": str(draft.get("updated_by") or ""),
+        "created_at": draft.get("created_at"),
+        "updated_at": draft.get("updated_at"),
+        "sent_by": draft.get("sent_by"),
+        "sent_email_id": draft.get("sent_email_id"),
+        "sent_at": draft.get("sent_at"),
+        "attachments": attachments,
+        "lock": lock,
+    }
+    return out
+
+
+def _ensure_can_edit_email_draft(
+    ticket: Dict[str, Any],
+    actor_id: str,
+    actor_role: str,
+    action_label: str,
+) -> None:
+    _ensure_can_participate_ticket(ticket, actor_id, actor_role, action_label)
+    _ensure_reply_allowed_estado(ticket, action_label)
+
+
+def _validate_draft_lock(
+    draft: Dict[str, Any],
+    actor_id: str,
+    lock_token: str,
+) -> None:
+    pass
+
+
+def _acquire_draft_lock(
+    conn,
+    draft: Dict[str, Any],
+    actor_id: str,
+    *,
+    force: bool = False,
+) -> Tuple[str, Dict[str, Any]]:
+    actor = str(actor_id or "").strip() or "system"
+    now_iso = db.now_utc_iso()
+    lock_info = _draft_lock_info(draft, actor)
+    if lock_info["active"] and not lock_info["mine"] and not force:
+        owner = lock_info.get("owner") or "otro usuario"
+        raise ConflictError(f"El borrador está en edición por '{owner}'.")
+
+    lock_token = _new_draft_lock_token()
+    lock_hash = _hash_draft_lock_token(lock_token)
+    lock_expires_at = _lock_expiry_iso(now_iso, EMAIL_DRAFT_LOCK_MINUTES)
+    conn.execute(
+        """UPDATE ticket_email_drafts
+           SET lock_owner = ?, lock_token_hash = ?, lock_expires_at = ?,
+               updated_by = ?, updated_at = ?
+           WHERE id = ?""",
+        (actor, lock_hash, lock_expires_at, actor, now_iso, int(draft["id"])),
+    )
+    row = conn.execute(
+        "SELECT * FROM ticket_email_drafts WHERE id = ?",
+        (int(draft["id"]),),
+    ).fetchone()
+    if not row:
+        raise ValueError("No fue posible refrescar lock del borrador.")
+    return lock_token, dict(row)
+
+
+def _normalize_draft_to_email(value: Optional[str]) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    _, parsed = parseaddr(raw)
+    out = parsed.strip() if parsed else raw
+    return out
+
+
+def get_ticket_email_draft(
+    ticket_id: int,
+    actor_id: str,
+    actor_role: str = "",
+) -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+
+    can_edit = True
+    blocked_reason = ""
+    try:
+        _ensure_can_edit_email_draft(ticket, actor_id, actor_role, "editar borrador de respuesta")
+    except (PermissionError, ValueError) as e:
+        can_edit = False
+        blocked_reason = str(e)
+
+    conn = db.get_conn()
+    try:
+        draft = _ensure_active_email_draft(conn, ticket, actor_id)
+        draft_payload = _serialize_email_draft(conn, draft, actor_id)
+        conn.commit()
+        return {
+            "ok": True,
+            "ticket_id": int(ticket_id),
+            "ticket_estado": str(ticket.get("estado") or ""),
+            "can_edit": can_edit,
+            "blocked_reason": blocked_reason,
+            "draft": draft_payload,
+            "lock_timeout_seconds": EMAIL_DRAFT_LOCK_MINUTES * 60,
+            "heartbeat_seconds": EMAIL_DRAFT_LOCK_HEARTBEAT_SECONDS,
+        }
+    finally:
+        conn.close()
+
+
+def acquire_ticket_email_draft_lock(
+    ticket_id: int,
+    actor_id: str,
+    actor_role: str = "",
+    *,
+    force: bool = False,
+) -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+    _ensure_can_edit_email_draft(ticket, actor_id, actor_role, "tomar control del borrador")
+
+    conn = db.get_conn()
+    try:
+        draft = _ensure_active_email_draft(conn, ticket, actor_id)
+        lock_token, locked_draft = _acquire_draft_lock(conn, draft, actor_id, force=bool(force))
+        payload = _serialize_email_draft(conn, locked_draft, actor_id)
+        conn.commit()
+        return {
+            "ok": True,
+            "ticket_id": int(ticket_id),
+            "lock_token": lock_token,
+            "draft": payload,
+            "lock_timeout_seconds": EMAIL_DRAFT_LOCK_MINUTES * 60,
+            "heartbeat_seconds": EMAIL_DRAFT_LOCK_HEARTBEAT_SECONDS,
+        }
+    finally:
+        conn.close()
+
+
+def heartbeat_ticket_email_draft_lock(
+    ticket_id: int,
+    actor_id: str,
+    actor_role: str,
+    lock_token: str,
+) -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+    _ensure_can_edit_email_draft(ticket, actor_id, actor_role, "mantener control del borrador")
+
+    conn = db.get_conn()
+    try:
+        draft = _get_active_email_draft_row(conn, ticket_id)
+        if not draft:
+            raise ValueError("No existe borrador activo para este ticket.")
+        _validate_draft_lock(draft, actor_id, lock_token)
+        now_iso = db.now_utc_iso()
+        conn.execute(
+            """UPDATE ticket_email_drafts
+               SET lock_expires_at = ?, updated_at = ?, updated_by = ?
+               WHERE id = ?""",
+            (_lock_expiry_iso(now_iso, EMAIL_DRAFT_LOCK_MINUTES), now_iso, actor_id, int(draft["id"])),
+        )
+        refreshed = conn.execute(
+            "SELECT * FROM ticket_email_drafts WHERE id = ?",
+            (int(draft["id"]),),
+        ).fetchone()
+        payload = _serialize_email_draft(conn, dict(refreshed), actor_id) if refreshed else None
+        conn.commit()
+        return {
+            "ok": True,
+            "ticket_id": int(ticket_id),
+            "draft": payload,
+            "heartbeat_seconds": EMAIL_DRAFT_LOCK_HEARTBEAT_SECONDS,
+        }
+    finally:
+        conn.close()
+
+
+def save_ticket_email_draft(
+    ticket_id: int,
+    actor_id: str,
+    actor_role: str,
+    *,
+    lock_token: str,
+    version: int,
+    to_addr: Optional[str] = None,
+    cc_addrs: Optional[str] = None,
+    bcc_addrs: Optional[str] = None,
+    subject: Optional[str] = None,
+    body_text: Optional[str] = None,
+) -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+    _ensure_can_edit_email_draft(ticket, actor_id, actor_role, "guardar borrador de respuesta")
+
+    expected_version = int(version or 0)
+    if expected_version <= 0:
+        raise ValueError("La versión del borrador es obligatoria.")
+
+    conn = db.get_conn()
+    try:
+        draft = _ensure_active_email_draft(conn, ticket, actor_id)
+        _validate_draft_lock(draft, actor_id, lock_token)
+        current_version = int(draft.get("version") or 1)
+        if current_version != expected_version:
+            raise ConflictError(
+                f"El borrador cambió de versión ({current_version}). Recarga antes de guardar."
+            )
+
+        next_to_addr = _normalize_draft_to_email(to_addr) if to_addr is not None else str(draft.get("to_addr") or "")
+        if next_to_addr and "@" not in next_to_addr:
+            raise ValueError("Correo destino inválido para el borrador.")
+        next_cc_raw = cc_addrs if cc_addrs is not None else str(draft.get("cc_addrs") or "")
+        next_bcc_raw = bcc_addrs if bcc_addrs is not None else str(draft.get("bcc_addrs") or "")
+        next_cc_list = _normalize_recipient_emails(next_cc_raw, label="CC")
+        next_bcc_list = _normalize_recipient_emails(next_bcc_raw, label="CCO")
+        if next_to_addr:
+            next_cc_list = [email for email in next_cc_list if email != next_to_addr]
+            next_bcc_list = [email for email in next_bcc_list if email != next_to_addr]
+        cc_set = set(next_cc_list)
+        next_bcc_list = [email for email in next_bcc_list if email not in cc_set]
+        next_cc_addrs = ", ".join(next_cc_list)
+        next_bcc_addrs = ", ".join(next_bcc_list)
+        next_subject = str(subject if subject is not None else draft.get("subject") or "").strip()
+        next_body = str(body_text if body_text is not None else draft.get("body_text") or "")
+
+        now_iso = db.now_utc_iso()
+        conn.execute(
+            """UPDATE ticket_email_drafts
+               SET to_addr = ?, cc_addrs = ?, bcc_addrs = ?, subject = ?, body_text = ?, version = ?,
+                   updated_by = ?, updated_at = ?
+               WHERE id = ?""",
+            (
+                next_to_addr,
+                next_cc_addrs,
+                next_bcc_addrs,
+                next_subject,
+                next_body,
+                current_version + 1,
+                actor_id,
+                now_iso,
+                int(draft["id"]),
+            ),
+        )
+        refreshed = conn.execute(
+            "SELECT * FROM ticket_email_drafts WHERE id = ?",
+            (int(draft["id"]),),
+        ).fetchone()
+        payload = _serialize_email_draft(conn, dict(refreshed), actor_id) if refreshed else None
+        conn.commit()
+        return {"ok": True, "ticket_id": int(ticket_id), "draft": payload}
+    finally:
+        conn.close()
+
+
+def upload_ticket_email_draft_attachments(
+    ticket_id: int,
+    actor_id: str,
+    actor_role: str,
+    lock_token: str,
+    files: Optional[List[Any]],
+) -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+    _ensure_can_edit_email_draft(ticket, actor_id, actor_role, "subir adjuntos al borrador")
+
+    conn = db.get_conn()
+    try:
+        draft = _ensure_active_email_draft(conn, ticket, actor_id)
+        _validate_draft_lock(draft, actor_id, lock_token)
+        if not files:
+            payload = _serialize_email_draft(conn, draft, actor_id)
+            conn.commit()
+            return {"ok": True, "ticket_id": int(ticket_id), "uploaded": 0, "draft": payload}
+
+        base_path = _drafts_base_path(ticket_id, int(draft["id"])).resolve()
+        base_path.mkdir(parents=True, exist_ok=True)
+        uploaded = 0
+        for file in files:
+            filename = str(getattr(file, "filename", "") or "").strip() or "untitled"
+            ext = Path(filename).suffix.lower()
+            if ext not in app_settings.TICKET_ALLOWED_EXTENSIONS:
+                logger.warning(f"[draft_attachments] extensión no permitida: {filename}")
+                continue
+
+            file.file.seek(0, 2)
+            size = int(file.file.tell())
+            file.file.seek(0)
+            if size > app_settings.TICKET_MAX_FILE_SIZE:
+                logger.warning(f"[draft_attachments] tamaño excedido: {filename} ({size})")
+                continue
+
+            content = file.file.read()
+            sha256 = hashlib.sha256(content).hexdigest()
+            file_path = (base_path / _attachment_storage_name(filename)).resolve()
+            if not _is_safe_attachment_path(file_path):
+                logger.warning(f"[draft_attachments] ruta fuera de raíz permitida: {file_path}")
+                continue
+
+            with open(file_path, "wb") as fh:
+                fh.write(content)
+
+            conn.execute(
+                """INSERT INTO ticket_email_draft_attachments
+                   (draft_id, filename, file_path, size_bytes, content_type, sha256, uploaded_by, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    int(draft["id"]),
+                    filename,
+                    str(file_path),
+                    len(content),
+                    str(getattr(file, "content_type", "application/octet-stream") or "application/octet-stream"),
+                    sha256,
+                    actor_id,
+                    db.now_utc_iso(),
+                ),
+            )
+            uploaded += 1
+
+        if uploaded > 0:
+            now_iso = db.now_utc_iso()
+            conn.execute(
+                """UPDATE ticket_email_drafts
+                   SET version = version + 1, updated_by = ?, updated_at = ?
+                   WHERE id = ?""",
+                (actor_id, now_iso, int(draft["id"])),
+            )
+
+        refreshed = conn.execute(
+            "SELECT * FROM ticket_email_drafts WHERE id = ?",
+            (int(draft["id"]),),
+        ).fetchone()
+        payload = _serialize_email_draft(conn, dict(refreshed), actor_id) if refreshed else None
+        conn.commit()
+        return {"ok": True, "ticket_id": int(ticket_id), "uploaded": uploaded, "draft": payload}
+    finally:
+        conn.close()
+
+
+def delete_ticket_email_draft_attachment(
+    ticket_id: int,
+    attachment_id: int,
+    actor_id: str,
+    actor_role: str,
+    lock_token: str,
+) -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+    _ensure_can_edit_email_draft(ticket, actor_id, actor_role, "eliminar adjuntos del borrador")
+
+    attachment_path = None
+    conn = db.get_conn()
+    try:
+        draft = _get_active_email_draft_row(conn, ticket_id)
+        if not draft:
+            raise ValueError("No existe borrador activo para este ticket.")
+        _validate_draft_lock(draft, actor_id, lock_token)
+        row = conn.execute(
+            """SELECT id, file_path
+               FROM ticket_email_draft_attachments
+               WHERE id = ? AND draft_id = ?
+               LIMIT 1""",
+            (int(attachment_id), int(draft["id"])),
+        ).fetchone()
+        if not row:
+            raise ValueError("Adjunto de borrador no encontrado.")
+        attachment_path = str(row.get("file_path") or "")
+        conn.execute(
+            "DELETE FROM ticket_email_draft_attachments WHERE id = ?",
+            (int(attachment_id),),
+        )
+        now_iso = db.now_utc_iso()
+        conn.execute(
+            """UPDATE ticket_email_drafts
+               SET version = version + 1, updated_by = ?, updated_at = ?
+               WHERE id = ?""",
+            (actor_id, now_iso, int(draft["id"])),
+        )
+        refreshed = conn.execute(
+            "SELECT * FROM ticket_email_drafts WHERE id = ?",
+            (int(draft["id"]),),
+        ).fetchone()
+        payload = _serialize_email_draft(conn, dict(refreshed), actor_id) if refreshed else None
+        conn.commit()
+    finally:
+        conn.close()
+
+    if attachment_path:
+        try:
+            path = Path(attachment_path).resolve()
+            if _is_safe_attachment_path(path):
+                path.unlink(missing_ok=True)
+        except Exception as e:
+            logger.warning(f"[delete_draft_attachment] no se pudo borrar archivo: {e}")
+
+    return {"ok": True, "ticket_id": int(ticket_id), "draft": payload}
+
+
+def discard_ticket_email_draft(
+    ticket_id: int,
+    actor_id: str,
+    actor_role: str,
+    lock_token: str,
+) -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+    _ensure_can_participate_ticket(ticket, actor_id, actor_role, "descartar borrador de respuesta")
+
+    conn = db.get_conn()
+    try:
+        draft = _get_active_email_draft_row(conn, ticket_id)
+        if not draft:
+            return {"ok": True, "ticket_id": int(ticket_id), "discarded": False}
+        _validate_draft_lock(draft, actor_id, lock_token)
+        now_iso = db.now_utc_iso()
+        conn.execute(
+            """UPDATE ticket_email_drafts
+               SET status = 'discarded',
+                   lock_owner = NULL,
+                   lock_token_hash = NULL,
+                   lock_expires_at = NULL,
+                   updated_by = ?,
+                   updated_at = ?
+               WHERE id = ?""",
+            (actor_id, now_iso, int(draft["id"])),
+        )
+        conn.commit()
+        return {"ok": True, "ticket_id": int(ticket_id), "discarded": True}
+    finally:
+        conn.close()
+
+
+def send_ticket_email_draft(
+    ticket_id: int,
+    actor_id: str,
+    actor_role: str,
+    *,
+    lock_token: str,
+    version: int,
+) -> Dict[str, Any]:
+    ticket = get_ticket(ticket_id)
+    if not ticket:
+        raise ValueError("Ticket no encontrado")
+    _ensure_can_edit_email_draft(ticket, actor_id, actor_role, "enviar respuesta al cliente")
+
+    expected_version = int(version or 0)
+    if expected_version <= 0:
+        raise ValueError("La versión del borrador es obligatoria para enviar.")
+
+    conn = db.get_conn()
+    try:
+        draft = _get_active_email_draft_row(conn, ticket_id)
+        if not draft:
+            raise ValueError("No existe borrador activo para este ticket.")
+        _validate_draft_lock(draft, actor_id, lock_token)
+        current_version = int(draft.get("version") or 1)
+        if current_version != expected_version:
+            raise ConflictError(
+                f"El borrador cambió de versión ({current_version}). Recarga antes de enviar."
+            )
+
+        to_email, cc_emails, bcc_emails, to_addr_record = _compose_reply_recipients(
+            ticket,
+            explicit_to=_normalize_draft_to_email(draft.get("to_addr")) or _extract_ticket_target_email(ticket),
+            explicit_cc=draft.get("cc_addrs"),
+            explicit_bcc=draft.get("bcc_addrs"),
+        )
+        if not to_email or "@" not in to_email:
+            raise ValueError("Este ticket no tiene un correo de cliente válido")
+
+        subject = _build_ticket_reply_subject(ticket, draft.get("subject"))
+        body_text = str(draft.get("body_text") or "")
+        clean_msg = body_text.strip()
+        if not clean_msg:
+            raise ValueError("El borrador está vacío. Agrega un mensaje antes de enviar.")
+
+        draft_attachments = _list_email_draft_attachments(conn, int(draft["id"]))
+        email_attachments: List[Dict[str, Any]] = []
+        stored_attachments: List[Dict[str, Any]] = []
+        for item in draft_attachments:
+            raw_path = str(item.get("file_path") or "").strip()
+            path = Path(raw_path).resolve() if raw_path else None
+            if not path or not _is_safe_attachment_path(path):
+                raise ValueError(f"Adjunto de borrador inválido: {item.get('filename')}")
+            if not path.exists() or not path.is_file():
+                raise ValueError(f"Adjunto no disponible: {item.get('filename')}")
+            content = path.read_bytes()
+            email_attachments.append(
+                {
+                    "filename": str(item.get("filename") or "attachment.bin"),
+                    "data": content,
+                    "content_type": str(item.get("content_type") or "application/octet-stream"),
+                }
+            )
+            stored_attachments.append(
+                {
+                    "id": int(item.get("id") or 0),
+                    "filename": str(item.get("filename") or "attachment.bin"),
+                    "path": str(path),
+                    "size": int(item.get("size_bytes") or len(content)),
+                    "content_type": str(item.get("content_type") or "application/octet-stream"),
+                    "sha256": str(item.get("sha256") or hashlib.sha256(content).hexdigest()),
+                }
+            )
+
+        headers = _build_ticket_thread_headers(ticket)
+        threaded = bool(headers.get("In-Reply-To") or headers.get("References"))
+        escaped_msg = html.escape(clean_msg).replace("\n", "<br>")
+        body_html = f"""
+
+    <p>{escaped_msg}</p>
+    <hr>
+    <p style="color:#666;font-size:12px">
+      Respuesta enviada desde Mesa de Ayuda {html.escape(ticket.get("codigo") or f"#{ticket_id}")}.
+    </p>
+    """
+        send_meta = email_sender.send_email_advanced(
+            to_email=to_email,
+            cc_emails=cc_emails,
+            bcc_emails=bcc_emails,
+            subject=subject,
+            html_body=body_html,
+            headers=headers or None,
+            attachments=email_attachments,
+        )
+
+        now = db.now_utc_iso()
+        email_row = conn.execute(
+            """INSERT INTO ticket_emails
+               (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
+               VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               RETURNING id""",
+            (
+                int(ticket_id),
+                send_meta.get("from_addr"),
+                to_addr_record or to_email,
+                ", ".join(cc_emails),
+                ", ".join(bcc_emails),
+                subject,
+                body_html,
+                json.dumps(stored_attachments),
+                f"draft:{int(draft['id'])}:v{current_version}",
+                now,
+            ),
+        ).fetchone()
+        email_id = int((email_row or {}).get("id") or 0)
+        if email_id <= 0:
+            raise ValueError("No se pudo registrar el correo enviado desde borrador.")
+
+        for att in stored_attachments:
+            conn.execute(
+                """INSERT INTO ticket_attachments
+                   (ticket_id, filename, file_path, uploaded_by, created_at, size_bytes, content_type, sha256)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    int(ticket_id),
+                    att["filename"],
+                    att["path"],
+                    actor_id,
+                    now,
+                    int(att["size"]),
+                    att["content_type"],
+                    att["sha256"],
+                ),
+            )
+
+        conn.execute(
+            """UPDATE ticket_email_draft_attachments
+               SET sent_email_id = ?
+               WHERE draft_id = ? AND sent_email_id IS NULL""",
+            (email_id, int(draft["id"])),
+        )
+
+        preview = clean_msg if len(clean_msg) <= 300 else clean_msg[:300] + "..."
+        has_attachments = " (con adjuntos)" if stored_attachments else ""
+        cc_hint = f" + CC: {', '.join(cc_emails)}" if cc_emails else ""
+        bcc_hint = f" + CCO: {', '.join(bcc_emails)}" if bcc_emails else ""
+        conn.execute(
+            """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (
+                int(ticket_id),
+                actor_id,
+                f"[CORREO] Respuesta enviada a {to_email}{cc_hint}{bcc_hint}{has_attachments}: {preview}",
+                now,
+            ),
+        )
+        conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, int(ticket_id)))
+        _maybe_mark_first_response(conn, int(ticket_id), actor_id, now)
+        _update_ticket_thread_metadata(
+            conn,
+            int(ticket_id),
+            message_id=send_meta.get("message_id"),
+            in_reply_to=headers.get("In-Reply-To"),
+            references=headers.get("References"),
+        )
+        _evaluate_ticket_sla(conn, int(ticket_id), now)
+
+        conn.execute(
+            """UPDATE ticket_email_drafts
+               SET status = 'sent',
+                   sent_by = ?,
+                   sent_email_id = ?,
+                   sent_at = ?,
+                   lock_owner = NULL,
+                   lock_token_hash = NULL,
+                   lock_expires_at = NULL,
+                   updated_by = ?,
+                   updated_at = ?
+               WHERE id = ?""",
+            (actor_id, email_id, now, actor_id, now, int(draft["id"])),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        create_evidence_event(
+            control_id="A.8.16",
+            artifact_ref=f"ticket:{ticket_id}:email_reply_draft",
+            owner=actor_id,
+            integrity_hash=send_meta.get("message_id") or "",
+            metadata={
+                "to": to_email,
+                "cc": cc_emails,
+                "bcc": bcc_emails,
+                "threaded": threaded,
+                "has_attachments": bool(stored_attachments),
+                "draft_id": int(draft["id"]),
+                "version": current_version,
+            },
+        )
+    except Exception as e:
+        logger.warning(f"[send_ticket_email_draft] evidence_event no crítico falló para ticket {ticket_id}: {e}")
+
+    return {
+        "ok": True,
+        "ticket_id": int(ticket_id),
+        "to_email": to_email,
+        "cc_emails": cc_emails,
+        "bcc_emails": bcc_emails,
+        "subject": subject,
+        "threaded": threaded,
+        "message_id": send_meta.get("message_id"),
+        "sent_email_id": email_id,
+        "draft_status": "sent",
+        "ticket": get_ticket(ticket_id),
+    }
 
 
 def get_dashboard_kpi() -> Dict[str, Any]:
@@ -2163,17 +3533,23 @@ def transition_ticket(
     ticket_id: int,
     to_subestado: str,
     actor_id: str,
+    actor_role: str = "",
     motivo: str = "",
     idempotency_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     ticket = get_ticket(ticket_id)
     if not ticket:
         raise ValueError("Ticket no encontrado")
+    _ensure_can_manage_ticket(ticket, actor_id, actor_role, "cambiar estado")
+    old_estado = str(ticket.get("estado") or "").strip().lower()
 
     tipo = normalize_ticket_type(ticket.get("tipo"))
-    from_sub = normalize_subestado(ticket.get("subestado"), "nuevo")
-    target_sub = normalize_subestado(to_subestado, from_sub)
+    from_sub = normalize_subestado(ticket.get("subestado"), "recibido")
+    target_sub = _normalize_transition_target(from_sub, to_subestado)
     normalized_idem = (idempotency_key or "").strip()[:128] or None
+
+    if target_sub in SUBESTADOS_ESPERA and not _is_estado_en_progreso(ticket.get("estado")):
+        raise ValueError("Los subestados de espera solo se permiten cuando el ticket está en estado 'en_progreso'.")
 
     if target_sub == from_sub:
         if normalized_idem:
@@ -2200,6 +3576,7 @@ def transition_ticket(
     if not _workflow_can_transition(tipo, from_sub, target_sub):
         raise ValueError(f"Transición inválida para tipo '{tipo}': {from_sub} -> {target_sub}")
 
+    result_ticket: Optional[Dict[str, Any]] = None
     conn = db.get_conn()
     try:
         now = db.now_utc_iso()
@@ -2227,16 +3604,21 @@ def transition_ticket(
                 raise ValueError("El cambio requiere aprobación de paso 2 antes de ejecutar.")
 
         new_estado = estado_from_subestado(target_sub, str(ticket.get("estado") or "abierto"))
+        reopen_to_progress = (
+            target_sub in {"en_progreso", "asignado"}
+            and from_sub in {"cerrado", "resuelto", "reabierto"}
+        )
         conn.execute(
             """UPDATE tickets
                SET subestado = ?, estado = ?, updated_at = ?,
                    resolved_at = CASE
                        WHEN ? IN ('resuelto','cerrado') THEN COALESCE(resolved_at, ?)
+                       WHEN ? THEN NULL
                        WHEN ? = 'reabierto' THEN NULL
                        ELSE resolved_at
                    END
                WHERE id = ?""",
-            (target_sub, new_estado, now, new_estado, now, target_sub, ticket_id),
+            (target_sub, new_estado, now, new_estado, now, reopen_to_progress, target_sub, ticket_id),
         )
 
         transition_row = conn.execute(
@@ -2252,19 +3634,36 @@ def transition_ticket(
             ticket_id,
             f"[TRANSICION] {from_sub} -> {target_sub}" + (f" | Motivo: {motivo}" if motivo else ""),
             now,
+            author_id=actor_id,
         )
         if target_sub in {"resuelto", "cerrado"} and ticket.get("asignado_a"):
             decrementar_carga(str(ticket["asignado_a"]), specialty=ticket.get("categoria"))
         _recompute_ticket_retention(conn, ticket_id)
         _evaluate_ticket_sla(conn, ticket_id, now)
         conn.commit()
-        return {
-            "ok": True,
-            "transition_id": int(transition_row["id"]) if transition_row else None,
-            "ticket": get_ticket(ticket_id),
-        }
+        result_ticket = get_ticket(ticket_id)
     finally:
         conn.close()
+
+    if result_ticket:
+        new_estado = str(result_ticket.get("estado") or "").strip().lower()
+        if old_estado and new_estado and old_estado != new_estado:
+            try:
+                _send_ticket_status_update_to_notify_emails(
+                    result_ticket,
+                    from_estado=old_estado,
+                    to_estado=new_estado,
+                    actor_id=actor_id,
+                    motivo=motivo or "transicion_workflow",
+                )
+            except Exception as status_mail_error:
+                logger.warning(f"[transition_ticket] aviso de estado por correo no crítico falló para ticket {ticket_id}: {status_mail_error}")
+
+    return {
+        "ok": True,
+        "transition_id": int(transition_row["id"]) if transition_row else None,
+        "ticket": result_ticket or get_ticket(ticket_id),
+    }
 
 
 def approve_ticket_change(
@@ -2290,12 +3689,13 @@ def approve_ticket_change(
     if decision_norm not in {"approved", "rejected"}:
         raise ValueError("La decisión debe ser 'approved' o 'rejected'.")
 
-    role_norm = (approver_role or "").strip().lower()
+    role_values = _normalize_roles(approver_role)
     step1_roles = {"admin", "implementaciones", "redes", "sistemas", "ops"}
     step2_roles = {"admin", "finance", "gerencia"}
     allowed_roles = step1_roles if step == 1 else step2_roles
-    if role_norm not in allowed_roles:
-        raise ValueError(f"El rol '{approver_role}' no está autorizado para aprobar paso {step}.")
+    if not any(role in allowed_roles for role in role_values):
+        role_label = ", ".join(role_values) if role_values else str(approver_role or "-")
+        raise ValueError(f"El/los rol(es) '{role_label}' no están autorizados para aprobar paso {step}.")
 
     normalized_idem = (idempotency_key or "").strip()[:128] or None
     conn = db.get_conn()
@@ -2317,7 +3717,7 @@ def approve_ticket_change(
                     "ticket": get_ticket(ticket_id),
                 }
 
-        current_sub = normalize_subestado(ticket.get("subestado"), "nuevo")
+        current_sub = normalize_subestado(ticket.get("subestado"), "recibido")
         if step == 1 and current_sub != "pendiente_aprobacion_1":
             raise ValueError("Paso 1 solo permitido cuando el cambio está en 'pendiente_aprobacion_1'.")
         if step == 2 and current_sub != "pendiente_aprobacion_2":
@@ -2344,6 +3744,7 @@ def approve_ticket_change(
             ticket_id,
             f"[APROBACION] Paso {step}: {decision_norm} por {approver}",
             now,
+            author_id=approver,
         )
 
         to_subestado = None
@@ -2426,8 +3827,9 @@ def get_ticket_workflow(ticket_id: int) -> Dict[str, Any]:
         conn.close()
 
     tipo = normalize_ticket_type(ticket.get("tipo"))
-    sub = normalize_subestado(ticket.get("subestado"), "nuevo")
+    sub = normalize_subestado(ticket.get("subestado"), "recibido")
     allowed_next = _workflow_next(tipo, sub)
+    allowed_next = _filter_waiting_subestados(allowed_next, ticket.get("estado"))
     if tipo == "cambio":
         if latest_approvals.get(1) != "approved":
             allowed_next = [s for s in allowed_next if s not in {"pendiente_aprobacion_2", "aprobado", "en_ejecucion"}]
@@ -2437,6 +3839,7 @@ def get_ticket_workflow(ticket_id: int) -> Dict[str, Any]:
     return {
         "ticket": ticket,
         "allowed_next": allowed_next,
+        "resuelto_auto_close_hours": RESUELTO_AUTO_CLOSE_HOURS,
         "approvals_status": {
             "step1": latest_approvals.get(1, "pending"),
             "step2": latest_approvals.get(2, "pending"),
@@ -2450,6 +3853,7 @@ def reply_ticket_email(
     ticket_id: int,
     author_id: str,
     mensaje: str,
+    author_role: str = "",
     asunto: Optional[str] = None,
     files: Optional[List[Any]] = None,  # List[UploadFile]
     idempotency_key: Optional[str] = None,
@@ -2463,33 +3867,27 @@ def reply_ticket_email(
     if not ticket:
         logger.error(f"Reply failed: Ticket {ticket_id} not found")
         raise ValueError("Ticket no encontrado")
+    _ensure_can_participate_ticket(ticket, author_id, author_role, "responder correos")
+    _ensure_reply_allowed_estado(ticket, "responder correos")
 
     clean_msg = (mensaje or "").strip()
     if not clean_msg:
         logger.error(f"Reply failed: Message empty for ticket {ticket_id}")
         raise ValueError("El mensaje de respuesta está vacío")
 
-    _, parsed_addr = parseaddr(ticket.get("origen_email") or "")
-    to_email = parsed_addr.strip() if parsed_addr else (ticket.get("origen_email") or "").strip()
+    to_email, cc_emails, bcc_emails, to_addr_record = _compose_reply_recipients(ticket)
     if not to_email or "@" not in to_email:
         logger.error(f"Reply failed: Invalid to_email '{to_email}' for ticket {ticket_id}")
         raise ValueError("Este ticket no tiene un correo de cliente válido")
 
-    if asunto and asunto.strip():
-        subject = asunto.strip()
-    else:
-        base = ticket.get("codigo") or f"Ticket #{ticket_id}"
-        title = (ticket.get("titulo") or "").strip()
-        subject = f"{base} - {title}" if title else base
-    if not subject.lower().startswith("re:"):
-        subject = f"Re: {subject}"
+    subject = _build_ticket_reply_subject(ticket, asunto)
 
     headers = _build_ticket_thread_headers(ticket)
     threaded = bool(headers.get("In-Reply-To") or headers.get("References"))
 
     escaped_msg = html.escape(clean_msg).replace("\n", "<br>")
     body_html = f"""
-    <p>Hola,</p>
+
     <p>{escaped_msg}</p>
     <hr>
     <p style="color:#666;font-size:12px">
@@ -2589,6 +3987,8 @@ def reply_ticket_email(
                     "ok": True,
                     "ticket_id": ticket_id,
                     "to_email": to_email,
+                    "cc_emails": cc_emails,
+                    "bcc_emails": bcc_emails,
                     "subject": subject,
                     "threaded": threaded,
                     "duplicate_skipped": True,
@@ -2608,7 +4008,7 @@ def reply_ticket_email(
                  AND created_at >= ?
                ORDER BY id DESC
                LIMIT 1""",
-            (ticket_id, to_email, subject, body_html, dedupe_since),
+            (ticket_id, to_addr_record or to_email, subject, body_html, dedupe_since),
         ).fetchone()
         
         if dup_row:
@@ -2623,6 +4023,8 @@ def reply_ticket_email(
                 "ok": True,
                 "ticket_id": ticket_id,
                 "to_email": to_email,
+                "cc_emails": cc_emails,
+                "bcc_emails": bcc_emails,
                 "subject": subject,
                 "threaded": threaded,
                 "duplicate_skipped": True,
@@ -2631,10 +4033,10 @@ def reply_ticket_email(
 
         marker_row = lock_conn.execute(
             """INSERT INTO ticket_emails
-               (ticket_id, direction, from_addr, to_addr, subject, body_html, attachments_json, idempotency_key, created_at)
-               VALUES (?, 'outgoing_pending', '', ?, ?, ?, ?, ?, ?)
+               (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
+               VALUES (?, 'outgoing_pending', '', ?, ?, ?, ?, ?, ?, ?, ?)
                RETURNING id""",
-            (ticket_id, to_email, subject, body_html, json.dumps(stored_attachments), normalized_idempotency_key, now),
+            (ticket_id, to_addr_record or to_email, ", ".join(cc_emails), ", ".join(bcc_emails), subject, body_html, json.dumps(stored_attachments), normalized_idempotency_key, now),
         ).fetchone()
         marker_id = marker_row["id"] if marker_row else None
         lock_conn.commit()
@@ -2648,6 +4050,8 @@ def reply_ticket_email(
     try:
         send_meta = email_sender.send_email_advanced(
             to_email=to_email,
+            cc_emails=cc_emails,
+            bcc_emails=bcc_emails,
             subject=subject,
             html_body=body_html,
             headers=headers or None,
@@ -2677,20 +4081,22 @@ def reply_ticket_email(
         if marker_id:
             conn.execute(
                 """UPDATE ticket_emails
-                   SET direction = 'outgoing', from_addr = ?
+                   SET direction = 'outgoing', from_addr = ?, to_addr = ?, cc_addrs = ?, bcc_addrs = ?
                    WHERE id = ?""",
-                (send_meta.get("from_addr"), marker_id),
+                (send_meta.get("from_addr"), to_addr_record or to_email, ", ".join(cc_emails), ", ".join(bcc_emails), marker_id),
             )
         else:
             conn.execute(
                 """INSERT INTO ticket_emails
-                   (ticket_id, direction, from_addr, to_addr, subject, body_html, attachments_json, idempotency_key, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     ticket_id,
                     "outgoing",
                     send_meta.get("from_addr"),
-                    to_email,
+                    to_addr_record or to_email,
+                    ", ".join(cc_emails),
+                    ", ".join(bcc_emails),
                     subject,
                     body_html,
                     json.dumps(stored_attachments),
@@ -2717,10 +4123,12 @@ def reply_ticket_email(
             )
         
         has_attachments = " (con adjuntos)" if stored_attachments else ""
+        cc_hint = f" + CC: {', '.join(cc_emails)}" if cc_emails else ""
+        bcc_hint = f" + CCO: {', '.join(bcc_emails)}" if bcc_emails else ""
         conn.execute(
             """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
                VALUES (?, ?, ?, ?)""",
-            (ticket_id, author_id, f"[CORREO] Respuesta enviada a {to_email}{has_attachments}: {preview}", now),
+            (ticket_id, author_id, f"[CORREO] Respuesta enviada a {to_email}{cc_hint}{bcc_hint}{has_attachments}: {preview}", now),
         )
         conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, ticket_id))
         _maybe_mark_first_response(conn, ticket_id, author_id, now)
@@ -2746,6 +4154,8 @@ def reply_ticket_email(
             integrity_hash=send_meta.get("message_id") or "",
             metadata={
                 "to": to_email,
+                "cc": cc_emails,
+                "bcc": bcc_emails,
                 "threaded": threaded,
                 "has_attachments": bool(stored_attachments),
                 "idempotency_key": normalized_idempotency_key or "",
@@ -2758,6 +4168,8 @@ def reply_ticket_email(
         "ok": True,
         "ticket_id": ticket_id,
         "to_email": to_email,
+        "cc_emails": cc_emails,
+        "bcc_emails": bcc_emails,
         "subject": subject,
         "threaded": threaded,
         "message_id": send_meta.get("message_id"),
@@ -2898,6 +4310,8 @@ def get_ticket_emails(ticket_id: int, format_human: bool = False) -> List[Dict[s
                     "subject": row.get("subject") or "",
                     "from_addr": row.get("from_addr") or "",
                     "to_addr": row.get("to_addr") or "",
+                    "cc_addrs": row.get("cc_addrs") or "",
+                    "bcc_addrs": row.get("bcc_addrs") or "",
                     "created_at": row.get("created_at"),
                     "body_text": body_text,
                     "preview": body_text[:280] + ("..." if len(body_text) > 280 else ""),
@@ -2909,11 +4323,17 @@ def get_ticket_emails(ticket_id: int, format_human: bool = False) -> List[Dict[s
         conn.close()
 
 
-def upload_ticket_attachments(ticket_id: int, uploaded_by: str, files: Optional[List[Any]]) -> Dict[str, Any]:
+def upload_ticket_attachments(
+    ticket_id: int,
+    uploaded_by: str,
+    files: Optional[List[Any]],
+    uploaded_role: str = "",
+) -> Dict[str, Any]:
     """Sube adjuntos manuales al ticket y devuelve metadata con hash/size."""
     ticket = get_ticket(ticket_id)
     if not ticket:
         raise ValueError("Ticket no encontrado")
+    _ensure_can_participate_ticket(ticket, uploaded_by, uploaded_role, "subir adjuntos")
     if not files:
         return {"ok": True, "ticket_id": ticket_id, "uploaded": 0, "items": list_ticket_attachments(ticket_id)}
 
@@ -3060,7 +4480,7 @@ def get_timeline(ticket_id: int, limit: int = 120) -> List[Dict[str, Any]]:
                 detail = parts[1].strip()
 
             result.append({
-                "creado_at": r["created_at"],
+                "created_at": r["created_at"],
                 "evento": event_name,
                 "detalle": detail,
                 "usuario": r["user_id"]
@@ -3070,10 +4490,17 @@ def get_timeline(ticket_id: int, limit: int = 120) -> List[Dict[str, Any]]:
         conn.close()
 
 
-def get_stats() -> Dict[str, Any]:
+def get_stats(asignado_a: Optional[str] = None) -> Dict[str, Any]:
     """Obtener métricas para Dashboard."""
     conn = db.get_conn()
     try:
+        where_parts = ["1=1"]
+        where_params: List[Any] = []
+        if asignado_a is not None and str(asignado_a).strip():
+            where_parts.append("LOWER(COALESCE(asignado_a, '')) = ?")
+            where_params.append(str(asignado_a).strip().lower())
+        where_sql = " AND ".join(where_parts)
+
         stats = {
             "by_status": {},
             "by_prio": {},
@@ -3084,24 +4511,34 @@ def get_stats() -> Dict[str, Any]:
         }
 
         # Por Estado
-        rows = conn.execute("SELECT estado, COUNT(*) as c FROM tickets GROUP BY estado").fetchall()
+        rows = conn.execute(
+            f"SELECT estado, COUNT(*) as c FROM tickets WHERE {where_sql} GROUP BY estado",
+            tuple(where_params),
+        ).fetchall()
         for r in rows:
             stats["by_status"][r["estado"]] = r["c"]
             stats["total"] += r["c"]
 
         # Por Severidad
-        rows = conn.execute("SELECT severidad, COUNT(*) as c FROM tickets GROUP BY severidad").fetchall()
+        rows = conn.execute(
+            f"SELECT severidad, COUNT(*) as c FROM tickets WHERE {where_sql} GROUP BY severidad",
+            tuple(where_params),
+        ).fetchall()
         for r in rows:
             stats["by_prio"][r["severidad"]] = r["c"]
 
         # Por Categoría
-        rows = conn.execute("SELECT categoria, COUNT(*) as c FROM tickets GROUP BY categoria").fetchall()
+        rows = conn.execute(
+            f"SELECT categoria, COUNT(*) as c FROM tickets WHERE {where_sql} GROUP BY categoria",
+            tuple(where_params),
+        ).fetchall()
         for r in rows:
             stats["by_category"][r["categoria"] or "general"] = r["c"]
 
         # Pivot: Assignee vs Status
         rows = conn.execute(
-            "SELECT asignado_a, estado, COUNT(*) as c FROM tickets GROUP BY asignado_a, estado"
+            f"SELECT asignado_a, estado, COUNT(*) as c FROM tickets WHERE {where_sql} GROUP BY asignado_a, estado",
+            tuple(where_params),
         ).fetchall()
         for r in rows:
             assignee = r["asignado_a"] or "Sin Asignar"
@@ -3114,12 +4551,14 @@ def get_stats() -> Dict[str, Any]:
 
         # SLA Compliance
         now = db.now_utc_iso()
+        sla_params: List[Any] = [now, now, *where_params]
         row = conn.execute("""
             SELECT
                 COUNT(CASE WHEN vence_at >= ? OR estado IN ('cerrado','resuelto') THEN 1 END) as on_time,
                 COUNT(CASE WHEN vence_at < ? AND estado NOT IN ('cerrado','resuelto') THEN 1 END) as breached
-            FROM tickets WHERE vence_at IS NOT NULL
-        """, (now, now)).fetchone()
+            FROM tickets WHERE vence_at IS NOT NULL AND """ + where_sql,
+            tuple(sla_params),
+        ).fetchone()
         if row:
             stats["sla_compliance"]["on_time"] = row["on_time"]
             stats["sla_compliance"]["breached"] = row["breached"]
@@ -3127,6 +4566,321 @@ def get_stats() -> Dict[str, Any]:
         return stats
     finally:
         conn.close()
+
+
+def _assignment_phase_from_subestado(subestado: Optional[str]) -> Optional[str]:
+    raw = str(subestado or "").strip().lower()
+    normalized = SUBESTADOS_LEGACY_MAP.get(raw, raw)
+    if normalized == "asignado":
+        return "asignado"
+    if normalized in {"en_progreso", "en_validacion", "en_ejecucion", "en_analisis", "aprobado"}:
+        return "en_progreso"
+    if normalized == "resuelto":
+        return "resuelto"
+    return None
+
+
+def _build_assignment_segments(
+    ticket: Dict[str, Any],
+    transitions: List[Dict[str, Any]],
+    now_dt: datetime,
+) -> List[Dict[str, Any]]:
+    ordered = sorted(
+        (dict(t or {}) for t in (transitions or [])),
+        key=lambda t: ((_parse_dt(t.get("created_at")) or now_dt), int(t.get("id") or 0)),
+    )
+    segments: List[Dict[str, Any]] = []
+    active_phase: Optional[str] = None
+    active_start: Optional[datetime] = None
+
+    for tr in ordered:
+        ts = _parse_dt(tr.get("created_at"))
+        if not ts:
+            continue
+        next_phase = _assignment_phase_from_subestado(tr.get("to_subestado"))
+
+        if active_phase and active_start:
+            if next_phase == active_phase:
+                continue
+            end_dt = ts if ts >= active_start else active_start
+            segments.append(
+                {
+                    "phase": active_phase,
+                    "start_at": active_start.isoformat(),
+                    "end_at": end_dt.isoformat(),
+                }
+            )
+            active_phase = None
+            active_start = None
+
+        if next_phase:
+            active_phase = next_phase
+            active_start = ts
+
+    if not segments and not active_phase:
+        fallback_phase = _assignment_phase_from_subestado(ticket.get("subestado"))
+        fallback_start = _parse_dt(ticket.get("created_at"))
+        if fallback_phase and fallback_start:
+            active_phase = fallback_phase
+            active_start = fallback_start
+
+    if active_phase and active_start:
+        estado = str(ticket.get("estado") or "").strip().lower()
+        if estado == "cerrado":
+            fallback_end = (
+                _parse_dt(ticket.get("updated_at"))
+                or _parse_dt(ticket.get("resolved_at"))
+                or now_dt
+            )
+        elif estado == "resuelto":
+            fallback_end = (
+                _parse_dt(ticket.get("resolved_at"))
+                or _parse_dt(ticket.get("updated_at"))
+                or now_dt
+            )
+        else:
+            fallback_end = now_dt
+        if fallback_end < active_start:
+            fallback_end = active_start
+        segments.append(
+            {
+                "phase": active_phase,
+                "start_at": active_start.isoformat(),
+                "end_at": fallback_end.isoformat(),
+            }
+        )
+
+    merged: List[Dict[str, Any]] = []
+    for seg in segments:
+        if not merged:
+            merged.append(seg)
+            continue
+        prev = merged[-1]
+        prev_end = _parse_dt(prev.get("end_at"))
+        cur_start = _parse_dt(seg.get("start_at"))
+        cur_end = _parse_dt(seg.get("end_at"))
+        if (
+            prev.get("phase") == seg.get("phase")
+            and prev_end
+            and cur_start
+            and cur_start <= prev_end
+        ):
+            if cur_end and cur_end > prev_end:
+                prev["end_at"] = cur_end.isoformat()
+            continue
+        merged.append(seg)
+    return merged
+
+
+def get_assignment_timeline(
+    window_hours: int = 72,
+    ticket_limit: int = 400,
+    assignee: Optional[str] = None,
+) -> Dict[str, Any]:
+    window_hours = _clamp_int(window_hours, default_value=72, min_value=1, max_value=720)
+    ticket_limit = _clamp_int(ticket_limit, default_value=400, min_value=50, max_value=2000)
+    assignee_filter = _normalize_username(assignee)
+
+    now_iso = db.now_utc_iso()
+    now_dt = _parse_dt(now_iso) or _now_dt()
+    window_start_dt = now_dt - timedelta(hours=window_hours)
+
+    spec_rows = list_specialties()
+    tech_map: Dict[str, Dict[str, Any]] = {}
+    for row in spec_rows:
+        username = str(row.get("username") or "").strip().lower()
+        specialty = str(row.get("specialty") or "").strip().lower()
+        if not username:
+            continue
+        if assignee_filter and username != assignee_filter:
+            continue
+        if specialty == "admin":
+            continue
+        lane = tech_map.setdefault(
+            username,
+            {
+                "username": username,
+                "specialties": [],
+                "roles": [],
+                "current_load": 0,
+                "max_load": int(row.get("max_load") or 0),
+                "_items": [],
+            },
+        )
+        role_primary = _normalize_role(row.get("role"))
+        if role_primary and role_primary not in lane["roles"]:
+            lane["roles"].append(role_primary)
+        try:
+            secondary_roles = json.loads(row.get("secondary_roles") or "[]")
+        except Exception:
+            secondary_roles = []
+        for role_item in _normalize_roles(secondary_roles):
+            if role_item and role_item not in lane["roles"]:
+                lane["roles"].append(role_item)
+        if specialty and specialty not in lane["specialties"]:
+            lane["specialties"].append(specialty)
+        lane["current_load"] = max(int(lane.get("current_load") or 0), int(row.get("current_load") or 0))
+        lane["max_load"] = max(int(lane.get("max_load") or 0), int(row.get("max_load") or 0))
+
+    conn = db.get_conn()
+    try:
+        if assignee_filter:
+            ticket_rows = conn.execute(
+                """SELECT id, codigo, titulo, estado, subestado, asignado_a, categoria, severidad,
+                          created_at, updated_at, resolved_at
+                   FROM tickets
+                   WHERE LOWER(COALESCE(asignado_a, '')) = ?
+                   ORDER BY created_at ASC, id ASC
+                   LIMIT ?""",
+                (assignee_filter, ticket_limit),
+            ).fetchall()
+        else:
+            ticket_rows = conn.execute(
+                """SELECT id, codigo, titulo, estado, subestado, asignado_a, categoria, severidad,
+                          created_at, updated_at, resolved_at
+                   FROM tickets
+                   WHERE (asignado_a IS NOT NULL)
+                      OR (COALESCE(asignado_a, '') = '' AND estado = 'abierto')
+                   ORDER BY created_at ASC, id ASC
+                   LIMIT ?""",
+                (ticket_limit,),
+            ).fetchall()
+        tickets_data = [dict(r) for r in ticket_rows]
+        ticket_ids = [int(t["id"]) for t in tickets_data if t.get("id") is not None]
+
+        transitions_by_ticket: Dict[int, List[Dict[str, Any]]] = {}
+        if ticket_ids:
+            placeholders = ", ".join(["?"] * len(ticket_ids))
+            transition_rows = conn.execute(
+                f"""SELECT id, ticket_id, to_subestado, created_at
+                    FROM ticket_transitions
+                    WHERE ticket_id IN ({placeholders})
+                    ORDER BY created_at ASC, id ASC""",
+                tuple(ticket_ids),
+            ).fetchall()
+            for row in transition_rows:
+                tid = int(row["ticket_id"])
+                transitions_by_ticket.setdefault(tid, []).append(dict(row))
+    finally:
+        conn.close()
+
+    queue: List[Dict[str, Any]] = []
+    for ticket in tickets_data:
+        ticket_assignee = str(ticket.get("asignado_a") or "").strip().lower()
+        estado = str(ticket.get("estado") or "").strip().lower()
+        subestado = str(ticket.get("subestado") or "").strip().lower()
+        tid = int(ticket.get("id") or 0)
+
+        segments = _build_assignment_segments(ticket, transitions_by_ticket.get(tid, []), now_dt)
+        item = {
+            "ticket_id": tid,
+            "codigo": ticket.get("codigo") or f"#{tid}",
+            "titulo": ticket.get("titulo") or "Sin título",
+            "estado": estado,
+            "subestado": subestado,
+            "categoria": ticket.get("categoria") or "general",
+            "severidad": ticket.get("severidad") or "media",
+            "created_at": ticket.get("created_at"),
+            "updated_at": ticket.get("updated_at"),
+            "resolved_at": ticket.get("resolved_at"),
+            "segments": segments,
+            "active_phase": _assignment_phase_from_subestado(subestado),
+            "is_done": estado in {"resuelto", "cerrado"},
+            "started_at": segments[0]["start_at"] if segments else ticket.get("created_at"),
+            "ended_at": segments[-1]["end_at"] if segments else ticket.get("updated_at"),
+        }
+
+        if ticket_assignee:
+            if ticket_assignee not in tech_map:
+                tech_map[ticket_assignee] = {
+                    "username": ticket_assignee,
+                    "specialties": [],
+                    "roles": [],
+                    "current_load": 0,
+                    "max_load": 0,
+                    "_items": [],
+                }
+            tech_map[ticket_assignee]["_items"].append(item)
+            continue
+
+        if estado == "abierto":
+            created_dt = _parse_dt(ticket.get("created_at"))
+            waiting_minutes = max(0, int((now_dt - created_dt).total_seconds() // 60)) if created_dt else 0
+            queue.append(
+                {
+                    "ticket_id": tid,
+                    "codigo": ticket.get("codigo") or f"#{tid}",
+                    "titulo": ticket.get("titulo") or "Sin título",
+                    "categoria": ticket.get("categoria") or "general",
+                    "severidad": ticket.get("severidad") or "media",
+                    "created_at": ticket.get("created_at"),
+                    "waiting_minutes": waiting_minutes,
+                }
+            )
+
+    technicians: List[Dict[str, Any]] = []
+    for username in sorted(tech_map.keys()):
+        lane = tech_map[username]
+        items = sorted(
+            lane.get("_items") or [],
+            key=lambda x: (_parse_dt(x.get("started_at")) or now_dt, int(x.get("ticket_id") or 0)),
+        )
+        active_items = [it for it in items if str(it.get("estado") or "").lower() not in {"resuelto", "cerrado"}]
+        technicians.append(
+            {
+                "username": lane.get("username"),
+                "specialties": sorted(lane.get("specialties") or []),
+                "roles": sorted(lane.get("roles") or []),
+                "current_load": int(lane.get("current_load") or 0),
+                "max_load": int(lane.get("max_load") or 0),
+                "status": "ocupado" if active_items else "disponible",
+                "active_count": len(active_items),
+                "items": items,
+            }
+        )
+
+    queue_projection = [dict(q) for q in queue]
+    for lane in technicians:
+        next_ticket: Optional[Dict[str, Any]] = None
+        if lane.get("status") == "disponible" and queue_projection:
+            specialties = {str(s).strip().lower() for s in (lane.get("specialties") or []) if str(s).strip()}
+            pick_idx: Optional[int] = None
+            for idx, queued in enumerate(queue_projection):
+                cat = str(queued.get("categoria") or "").strip().lower()
+                if cat in specialties or cat in {"general", ""}:
+                    pick_idx = idx
+                    break
+            if pick_idx is None:
+                pick_idx = 0
+            next_ticket = queue_projection.pop(pick_idx)
+        lane["next_queue_ticket"] = next_ticket
+
+    range_points: List[datetime] = [window_start_dt, now_dt]
+    for lane in technicians:
+        for item in lane.get("items") or []:
+            for seg in item.get("segments") or []:
+                sdt = _parse_dt(seg.get("start_at"))
+                edt = _parse_dt(seg.get("end_at"))
+                if sdt:
+                    range_points.append(sdt)
+                if edt:
+                    range_points.append(edt)
+    range_start = min(range_points) if range_points else window_start_dt
+    range_end = max(range_points) if range_points else now_dt
+    if range_end <= range_start:
+        range_end = range_start + timedelta(minutes=1)
+
+    return {
+        "ok": True,
+        "generated_at": now_iso,
+        "window_hours": window_hours,
+        "range": {
+            "start_at": range_start.isoformat(),
+            "end_at": range_end.isoformat(),
+        },
+        "technicians": technicians,
+        "queue": queue,
+    }
 
 
 # ==========================================================================
@@ -5390,17 +7144,97 @@ def record_parallel_go_no_go_decision(
 # ==========================================================================
 # GESTIÓN DE ESPECIALIDADES
 # ==========================================================================
+def _resolve_role_specialties(role_value: Any, secondary_roles_value: Any) -> List[str]:
+    out: List[str] = []
+    for role_item in _normalize_roles([role_value, *(_normalize_roles(secondary_roles_value))]):
+        mapped = ROLE_SPECIALTY_FALLBACK.get(role_item)
+        if mapped and mapped not in out:
+            out.append(mapped)
+    return out
+
+
+def _active_ticket_load_map(conn) -> Dict[str, int]:
+    rows = conn.execute(
+        """
+        SELECT LOWER(asignado_a) AS username, COUNT(*) AS active_count
+        FROM tickets
+        WHERE COALESCE(asignado_a, '') <> ''
+          AND estado IN ('abierto', 'en_progreso')
+        GROUP BY LOWER(asignado_a)
+        """
+    ).fetchall()
+    out: Dict[str, int] = {}
+    for row in rows:
+        username = _normalize_username(row.get("username"))
+        if not username:
+            continue
+        out[username] = int(row.get("active_count") or 0)
+    return out
+
+
+def _list_specialties_with_role_fallback(conn) -> List[Dict[str, Any]]:
+    base_rows = conn.execute(
+        """
+        SELECT us.*, u.role, u.secondary_roles
+        FROM user_specialties us
+        LEFT JOIN users u ON u.username = us.username
+        ORDER BY us.specialty, us.username
+        """
+    ).fetchall()
+    items = [dict(r) for r in base_rows]
+    existing_keys = {
+        (_normalize_username(item.get("username")), _normalize_role(item.get("specialty")))
+        for item in items
+        if _normalize_username(item.get("username")) and _normalize_role(item.get("specialty"))
+    }
+
+    load_map = _active_ticket_load_map(conn)
+    now = db.now_utc_iso()
+    user_rows = conn.execute(
+        "SELECT username, role, secondary_roles FROM users WHERE COALESCE(is_active, 1) = 1 ORDER BY username ASC"
+    ).fetchall()
+    for row in user_rows:
+        username = _normalize_username(row.get("username"))
+        if not username:
+            continue
+        role = _normalize_role(row.get("role"))
+        try:
+            secondary_roles_raw = json.loads(row.get("secondary_roles") or "[]")
+        except Exception:
+            secondary_roles_raw = []
+        derived_specialties = _resolve_role_specialties(role, secondary_roles_raw)
+        if not derived_specialties:
+            continue
+        role_secondary_json = json.dumps(_normalize_roles(secondary_roles_raw))
+        active_load = int(load_map.get(username, 0))
+        for specialty in derived_specialties:
+            key = (username, specialty)
+            if key in existing_keys:
+                continue
+            items.append(
+                {
+                    "username": username,
+                    "specialty": specialty,
+                    "current_load": active_load,
+                    "max_load": max(10, active_load + 1),
+                    "is_available": 1,
+                    "created_at": now,
+                    "updated_at": now,
+                    "role": role,
+                    "secondary_roles": role_secondary_json,
+                }
+            )
+            existing_keys.add(key)
+
+    items.sort(key=lambda row: (str(row.get("specialty") or ""), str(row.get("username") or "")))
+    return items
+
+
 def list_specialties() -> List[Dict[str, Any]]:
-    """Lista todas las especialidades de usuarios."""
+    """Lista especialidades reales + fallback derivado de roles técnicos."""
     conn = db.get_conn()
     try:
-        rows = conn.execute("""
-            SELECT us.*, u.role
-            FROM user_specialties us
-            LEFT JOIN users u ON u.username = us.username
-            ORDER BY us.specialty, us.username
-        """).fetchall()
-        return [dict(r) for r in rows]
+        return _list_specialties_with_role_fallback(conn)
     finally:
         conn.close()
 
@@ -5646,7 +7480,17 @@ def _auto_reply_body(nombre: str, code: str, asignado_a: str) -> str:
 
 
 def should_schedule_auto_reply(conn, ticket_id: int, to_email: str) -> tuple[bool, str, Optional[str]]:
-    if not bool(getattr(app_settings, "TICKET_AUTO_REPLY_ENABLED", False)):
+    # 1. Traer de settings de DB
+    row = conn.execute("SELECT value FROM system_settings WHERE key = 'ticket_auto_reply_enabled'").fetchone()
+    db_enabled = None
+    if row and row["value"]:
+        db_enabled = str(row["value"]).lower() in ["true", "1", "yes"]
+    
+    # 2. Fallback a .env
+    env_enabled = bool(getattr(app_settings, "TICKET_AUTO_REPLY_ENABLED", False))
+    
+    is_enabled = db_enabled if db_enabled is not None else env_enabled
+    if not is_enabled:
         return False, "auto_reply_disabled", None
 
     normalized = _normalize_email_address(to_email)
@@ -6021,22 +7865,61 @@ def associate_email_to_client(email: str, customer_id: str, customer_name: str, 
     conn.close()
     return True
 
-def search_customers(q: str, limit: int = 20) -> List[Dict[str, Any]]:
-    """Busca clientes en la tabla laudus_customers."""
-    if not q:
-        return []
-    
+def search_customers(q: str = "", limit: int = 0) -> List[Dict[str, Any]]:
+    """Busca clientes en laudus_customers; con limit=0 devuelve todos."""
+    try:
+        raw_limit = int(limit or 0)
+    except Exception:
+        raw_limit = 0
+    limit = max(0, min(raw_limit, 5000))
+    query = str(q or "").strip()
+
     conn = db.get_conn()
-    wildcard = f"%{q}%"
-    rows = conn.execute("""
-        SELECT laudus_customer_id as id, name, legal_name, vat_id
-        FROM laudus_customers
-        WHERE name LIKE ? OR legal_name LIKE ? OR vat_id LIKE ?
-        LIMIT ?
-    """, (wildcard, wildcard, wildcard, limit)).fetchall()
-    conn.close()
-    
-    return [dict(r) for r in rows]
+    try:
+        if query and limit > 0:
+            wildcard = f"%{query}%"
+            rows = conn.execute(
+                """
+                SELECT laudus_customer_id as id, name, legal_name, vat_id
+                FROM laudus_customers
+                WHERE name ILIKE ? OR legal_name ILIKE ? OR vat_id ILIKE ?
+                ORDER BY COALESCE(name, legal_name, '') ASC
+                LIMIT ?
+                """,
+                (wildcard, wildcard, wildcard, limit),
+            ).fetchall()
+        elif query:
+            wildcard = f"%{query}%"
+            rows = conn.execute(
+                """
+                SELECT laudus_customer_id as id, name, legal_name, vat_id
+                FROM laudus_customers
+                WHERE name ILIKE ? OR legal_name ILIKE ? OR vat_id ILIKE ?
+                ORDER BY COALESCE(name, legal_name, '') ASC
+                """,
+                (wildcard, wildcard, wildcard),
+            ).fetchall()
+        elif limit > 0:
+            rows = conn.execute(
+                """
+                SELECT laudus_customer_id as id, name, legal_name, vat_id
+                FROM laudus_customers
+                ORDER BY COALESCE(name, legal_name, '') ASC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT laudus_customer_id as id, name, legal_name, vat_id
+                FROM laudus_customers
+                ORDER BY COALESCE(name, legal_name, '') ASC
+                """
+            ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 def get_client_for_email(email: str) -> Optional[Dict[str, Any]]:
     """Resuelve el cliente asociado a un correo."""

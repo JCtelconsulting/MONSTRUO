@@ -51,6 +51,7 @@ class LaudusClient:
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/json",
             "Content-Type": "application/json",
+            "Connection": "close",
         }
 
     def get_health(self) -> Dict[str, Any]:
@@ -113,7 +114,7 @@ class LaudusClient:
         endpoint = f"/sales/invoices/{invoice_id}"
         url = f"{self.base_url}{endpoint}"
         try:
-            resp = requests.get(url, headers=self._get_headers(), timeout=30)
+            resp = requests.get(url, headers=self._get_headers(), timeout=(5, 30))
             if resp.status_code == 200:
                 return resp.json()
             print(f"Laudus Details Error {invoice_id}: {resp.status_code}")
@@ -227,7 +228,8 @@ class LaudusClient:
         url = f"{self.base_url}{endpoint}"
         payload = {
             "skip": 0,
-            "take": 1000,  # Hard limit for now
+            "take": 1000,
+            "fields": ["customerId", "legalName", "name", "VATId"],
         }
 
         try:

@@ -10,9 +10,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.6" />
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=68.0" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="/modulos/tks/css/tks.css?v=4" />
+    <link rel="stylesheet" href="/modulos/tks/css/tks.css?v=42" />
 </head>
 
 <body class="sidebar-collapsed">
@@ -40,40 +40,40 @@
     </header>
 
     <main>
-        <div class="main-inner">
-            <section class="section-block">
-                <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <h3>🎫 Mesa de Ayuda</h3>
-                        <p>Sistema profesional de tickets — TelConsulting</p>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:1rem;">
-                        <div class="tks-notif-bell" onclick="TksMain.loadTab('lista')" title="Notificaciones">
-                            <i class="fas fa-bell" style="font-size:1.2rem;color:var(--tks-text-muted);"></i>
-                            <span class="tks-notif-count" id="tks-notif-badge" style="display:none;">0</span>
-                        </div>
-                        <button class="tks-btn tks-btn-primary" onclick="TksMain.openCreateModal()">
-                            <i class="fas fa-plus"></i> Nuevo Ticket
-                        </button>
-                    </div>
+        <div class="main-inner module-shell">
+            <div class="section-header module-tabs-header module-shell-header">
+                <div class="module-shell-title">
+                    <h2 class="module-page-title">Mesa de Ayuda</h2>
+                    <p class="module-shell-subtitle">Gestión centralizada de tickets y operación de soporte</p>
                 </div>
-
-                <!-- TAB BAR -->
-                <div class="tks-tab-bar">
-                    <button class="tks-tab-btn active" data-tab="dashboard">
-                        <i class="fas fa-chart-bar"></i> Resumen
-                    </button>
-                    <button class="tks-tab-btn" data-tab="lista">
-                        <i class="fas fa-list"></i> Lista
-                    </button>
-                    <button class="tks-tab-btn" data-tab="kanban">
-                        <i class="fas fa-columns"></i> Kanban
-                    </button>
-                    <button class="tks-tab-btn" data-tab="ops">
-                        <i class="fas fa-shield-alt"></i> Operación
+                <div class="module-shell-actions">
+                    <div class="tks-notif-bell" onclick="TksMain.loadTab('lista')" title="Notificaciones">
+                        <i class="fas fa-bell tks-notif-icon"></i>
+                        <span class="tks-notif-count" id="tks-notif-badge">0</span>
+                    </div>
+                    <button id="tks-create-btn" class="tks-btn tks-btn-primary" onclick="TksMain.openCreateModal()">
+                        <i class="fas fa-plus"></i> Nuevo Ticket
                     </button>
                 </div>
+            </div>
 
+            <!-- TAB BAR -->
+            <div class="tab-bar tks-tab-bar">
+                <button class="tab-btn tks-tab-btn active" data-tab="dashboard">
+                    &#x1F4CA; Resumen
+                </button>
+                <button class="tab-btn tks-tab-btn" data-tab="lista">
+                    &#x1F4CB; Lista
+                </button>
+                <button class="tab-btn tks-tab-btn" data-tab="kanban">
+                    &#x1F5C2; Kanban
+                </button>
+                <button class="tab-btn tks-tab-btn" data-tab="ops">
+                    &#x1F6E1; Operación
+                </button>
+            </div>
+
+            <section class="section-block module-shell-content">
                 <!-- CONTENIDO DINÁMICO -->
                 <div class="tks-container" id="tks-content">
                     <!-- Cargado dinámicamente por JS -->
@@ -143,11 +143,11 @@
 
     <!-- Scripts -->
     <script src="/modulos/_compartido/js/utilidades.js?v=204"></script>
-    <script src="/modulos/_compartido/js/admin.js?v=3"></script>
-    <script src="js/tks_api.js?v=7"></script>
-    <script src="js/tks_ui.js?v=9"></script>
-    <script src="js/tks_main.js?v=12"></script>
-    <script src="/modulos/_compartido/js/sidebar.js?v=9"></script>
+    <script src="/modulos/_compartido/js/admin.js?v=4"></script>
+    <script src="js/tks_api.js?v=11"></script>
+    <script src="js/tks_ui.js?v=70"></script>
+    <script src="js/tks_main.js?v=50"></script>
+    <script src="/modulos/_compartido/js/sidebar.js?v=11"></script>
 </body>
 
 </html>

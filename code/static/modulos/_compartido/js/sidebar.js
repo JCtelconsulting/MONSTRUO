@@ -85,10 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!allowed || allowed.length === 0) {
             const ROLE_MAP = {
                 'admin': ['*'],
+                'encargado_mesa': ['dashboard', 'tks', 'config'],
                 'redes': ['dashboard', 'tks'],
                 'sistemas': ['dashboard', 'tks'],
                 'implementaciones': ['dashboard', 'tks', 'pmo'],
-                'gerencia': ['dashboard', 'pmo', 'erp', 'crm', 'ia', 'zabbix'],
+                'gerencia': ['dashboard', 'tks', 'pmo', 'erp', 'crm', 'ia', 'zabbix'],
                 'ops': ['dashboard', 'tks', 'crm', 'bodega', 'zabbix', 'config'],
                 'finance': ['dashboard', 'erp', 'crm'],
                 'warehouse': ['bodega']

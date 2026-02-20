@@ -172,11 +172,84 @@ input:focus {
 .modal-status.loading {
   color: #fff;
 }
+
 .modal-status.error {
   color: var(--danger);
 }
+
 .modal-status.success {
   color: var(--neon);
+}
+
+/* Google Login Refinement */
+.google-login-section {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.btn-google {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(4px);
+}
+
+.btn-google:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--neon);
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.15);
+  transform: translateY(-1px);
+}
+
+.btn-google img {
+  width: 18px !important;
+  height: 18px !important;
+  object-fit: contain;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
+  flex-shrink: 0;
+}
+
+/* Separator Refinement */
+.login-separator {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.8rem 0;
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.6;
+}
+
+.login-separator::before,
+.login-separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px dashed var(--border);
+}
+
+.login-separator:not(:empty)::before {
+  margin-right: 1.5em;
+}
+
+.login-separator:not(:empty)::after {
+  margin-left: 1.5em;
 }
 
 .sys-id {
@@ -195,6 +268,7 @@ input:focus {
     opacity: 0;
     transform: translateY(14px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

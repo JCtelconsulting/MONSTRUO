@@ -572,11 +572,80 @@ async def send_auto_response_job(payload: dict):
         if lock_acquired:
             try:
                 lock_conn.execute("SELECT pg_advisory_unlock(?)", (ticket_id,))
+                lock_conn.execute("SELECT pg_advisory_unlock(?)", (ticket_id,))
             except Exception:
                 pass
         lock_conn.close()
+
+async def auto_close_tickets_job(payload: dict):
+    from app.core import tickets_service
+
+    logger.info("[JobEngine] Revisando tickets para Auto-Cierre...")
+    conn = db.get_conn()
+    now = db.now_utc_iso()
+    interval_horas = 72
+
+    try:
+        # 1. Leer de DB el tiempo de configuración
+        row = conn.execute("SELECT value FROM system_settings WHERE key = 'ticket_auto_close_time'").fetchone()
+        if row and row["value"]:
+            try:
+                interval_horas = max(1, int(row["value"]))
+            except ValueError:
+                pass
+        
+        # 2. Buscar tickets 'resuelto' que lleven este tiempo sin actualizarse
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=interval_horas)).isoformat()
+        stale_tickets = conn.execute(
+            """SELECT id
+               FROM tickets
+               WHERE estado = 'resuelto'
+                 AND updated_at::timestamptz <= ?::timestamptz""",
+            (cutoff,),
+        ).fetchall()
+
+        count = 0
+        for t in stale_tickets:
+            tid = int(t["id"])
+            try:
+                # 3. Cerramos usando el update en service para asegurar consistencia y webhooks en el futuro
+                tickets_service.update_ticket(
+                    ticket_id=tid,
+                    updates={"estado": "cerrado"},
+                    actor_id="system",
+                    actor_role="admin"
+                )
+                
+                conn.execute(
+                    """INSERT INTO ticket_comments (ticket_id, user_id, content, is_internal, created_at)
+                       VALUES (?, 'system', ?, 1, ?)""",
+                    (tid, f"El ticket ha sido CERRADO automáticamente por alcanzar el plazo de inactividad de {interval_horas} Hrs.", now),
+                )
+                conn.commit()
+                count += 1
+            except Exception as e:
+                logger.error(f"[JobEngine] Error al auto-cerrar ticket {tid}: {e}")
+                conn.rollback()
+
+        if count > 0:
+            logger.info(f"[JobEngine] Se auto-cerraron {count} tickets.")
+    except Exception as e:
+        logger.error(f"[JobEngine] Error general auto-cerrando tickets: {e}")
+    finally:
+        conn.close()
+
+    # Re-encolar cada 3 horas
+    if bool(payload.get("recurring", True)):
+        await enqueue_unique_job(
+            "AUTO_CLOSE_TICKETS",
+            {"recurring": True},
+            max_retries=0,
+            next_run_at=_next_run_iso(3 * 3600),
+            update_existing_next_run=False,
+        )
 
 # Register default jobs
 register_job("EMAIL_POLLING", poll_email_job)
 register_job("SEND_AUTO_RESPONSE", send_auto_response_job)
 register_job("CLEANUP_SYS_JOBS", cleanup_sys_jobs_job)
+register_job("AUTO_CLOSE_TICKETS", auto_close_tickets_job)

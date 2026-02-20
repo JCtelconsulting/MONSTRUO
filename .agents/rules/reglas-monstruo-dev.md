@@ -2,7 +2,7 @@
 trigger: always_on
 ---
 
-# MONSTRUO DEV REGLAS (v2026-02-14)
+# MONSTRUO DEV REGLAS
 
 ## 0) Objetivo
 Este archivo es la regla operativa canonica para agentes en `/srv/monstruo_dev`.

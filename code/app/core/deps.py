@@ -8,6 +8,20 @@ def _bearer_token(auth: Optional[str]) -> str:
     parts = auth.split(" ", 1)
     return parts[1].strip() if len(parts) == 2 and parts[0].lower() == "bearer" else ""
 
+
+def _payload_roles(payload: Dict[str, Any]) -> List[str]:
+    primary = str(payload.get("role") or "").strip().lower()
+    raw_roles = payload.get("roles")
+    out: List[str] = []
+    if isinstance(raw_roles, list):
+        for item in raw_roles:
+            role = str(item or "").strip().lower()
+            if role and role not in out:
+                out.append(role)
+    if primary and primary not in out:
+        out.insert(0, primary)
+    return out or ([primary] if primary else [])
+
 def require_session(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     token = _bearer_token(authorization)
     if not token:
@@ -16,10 +30,13 @@ def require_session(authorization: Optional[str] = Header(default=None)) -> Dict
     payload = security.verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="invalid_token")
+    roles = _payload_roles(payload)
+    role = roles[0] if roles else ""
         
     return {
         "username": payload["sub"],
-        "role": payload["role"]
+        "role": role,
+        "roles": roles,
     }
 
 def require_session_hybrid(
@@ -39,10 +56,13 @@ def require_session_hybrid(
     payload = security.verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="invalid_token")
+    roles = _payload_roles(payload)
+    role = roles[0] if roles else ""
 
     return {
         "username": payload["sub"],
-        "role": payload["role"]
+        "role": role,
+        "roles": roles,
     }
 
 def require_permission(permission: str):
@@ -55,20 +75,24 @@ def require_permission(permission: str):
         access_token: Optional[str] = Cookie(default=None)
     ):
         sess = require_session_hybrid(authorization, access_token)
-        role = sess["role"]
-        
-        allowed_perms = settings.ROLE_PERMISSIONS.get(role, [])
-        
-        if "*" in allowed_perms:
+        roles = [str(r or "").strip().lower() for r in (sess.get("roles") or [sess.get("role")])]
+        roles = [r for r in roles if r]
+
+        allowed_perms: set[str] = set()
+        for role in roles:
+            perms = settings.ROLE_PERMISSIONS.get(role, [])
+            if "*" in perms:
+                return sess
+            allowed_perms.update(perms)
+
+        if permission in allowed_perms:
             return sess
             
-        if permission not in allowed_perms:
-            raise HTTPException(
-                status_code=403, 
-                detail=f"RBAC: Rol '{role}' no tiene permiso '{permission}'"
-            )
-            
-        return sess
+        role_label = " + ".join(roles) if roles else "-"
+        raise HTTPException(
+            status_code=403,
+            detail=f"RBAC: Roles '{role_label}' no tienen permiso '{permission}'"
+        )
     return dep
 
 # Legacy helper fallback (optional)

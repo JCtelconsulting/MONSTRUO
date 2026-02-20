@@ -52,6 +52,8 @@ def send_email_advanced(
     html_body: str,
     headers: Optional[dict[str, str]] = None,
     attachments: Optional[list[dict]] = None,
+    cc_emails: Optional[list[str]] = None,
+    bcc_emails: Optional[list[str]] = None,
 ) -> dict:
     """
     Sends a single email and supports custom headers (e.g. In-Reply-To, References).
@@ -67,18 +69,57 @@ def send_email_advanced(
     password = conf.get("smtp_password")
     from_name = conf.get("smtp_from_name", "Cobranza Monstruo")
 
-    if settings.ENV_TYPE != "prod":
+    import os
+    if settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE"):
         logger.info(f"[EMAIL_MOCK] Would send to {to_email} subject '{subject}' (ENV={settings.ENV_TYPE})")
         if attachments:
             logger.info(f"[EMAIL_MOCK] Attachments: {[a['filename'] for a in attachments]}")
         return {
+            "to_email": str(to_email or "").strip(),
+            "cc_emails": [str(x).strip() for x in (cc_emails or []) if str(x or "").strip()],
+            "bcc_emails": [str(x).strip() for x in (bcc_emails or []) if str(x or "").strip()],
             "from_addr": user,
             "message_id": f"mock-{int(datetime.utcnow().timestamp())}@monstruo.dev"
         }
 
     msg = MIMEMultipart()
     msg["From"] = f"{from_name} <{user}>"
-    msg["To"] = to_email
+    to_addr = str(to_email or "").strip()
+    if not to_addr:
+        raise ValueError("to_email vacío")
+    cc_list = []
+    cc_seen = set()
+    for raw in (cc_emails or []):
+        email = str(raw or "").strip()
+        if not email:
+            continue
+        if email.lower() == to_addr.lower():
+            continue
+        lowered = email.lower()
+        if lowered in cc_seen:
+            continue
+        cc_seen.add(lowered)
+        cc_list.append(email)
+
+    bcc_list = []
+    bcc_seen = set()
+    for raw in (bcc_emails or []):
+        email = str(raw or "").strip()
+        if not email:
+            continue
+        lowered = email.lower()
+        if lowered == to_addr.lower():
+            continue
+        if lowered in cc_seen:
+            continue
+        if lowered in bcc_seen:
+            continue
+        bcc_seen.add(lowered)
+        bcc_list.append(email)
+
+    msg["To"] = to_addr
+    if cc_list:
+        msg["Cc"] = ", ".join(cc_list)
     msg["Subject"] = subject
 
     generated_msg_id = make_msgid()
@@ -103,13 +144,16 @@ def send_email_advanced(
             except Exception as e:
                 print(f"[EMAIL] Attachment error ({a.get('filename')}): {e}")
 
-    # Blindaje DEV/PROD
-    if settings.ENV_TYPE != "prod":
-        print(f"[EMAIL_MOCK] Would send to {to_email} subject '{subject}' (ENV={settings.ENV_TYPE})")
+    # Blindaje DEV/PROD (salvo override)
+    import os
+    if settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE"):
+        print(f"[EMAIL_MOCK] Would send to {to_addr} subject '{subject}' (ENV={settings.ENV_TYPE})")
         # En DEV simulamos éxito pero no enviamos
         return {
             "ok": True,
-            "to_email": to_email,
+            "to_email": to_addr,
+            "cc_emails": cc_list,
+            "bcc_emails": bcc_list,
             "from_addr": user,
             "message_id": generated_msg_id,
             "mock": True
@@ -120,12 +164,15 @@ def send_email_advanced(
         s = smtplib.SMTP(host, port)
         s.starttls()
         s.login(user, password)
-        s.send_message(msg)
+        recipients = [to_addr] + cc_list + bcc_list
+        s.sendmail(msg["From"], recipients, msg.as_string())
         s.quit()
-        print(f"[EMAIL] Sent to {to_email}")
+        print(f"[EMAIL] Sent to {to_addr}")
         return {
             "ok": True,
-            "to_email": to_email,
+            "to_email": to_addr,
+            "cc_emails": cc_list,
+            "bcc_emails": bcc_list,
             "from_addr": user,
             "message_id": generated_msg_id,
         }

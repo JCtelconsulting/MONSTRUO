@@ -24,9 +24,23 @@ class AuthIdentityMiddleware(BaseHTTPMiddleware):
         if token:
             payload = security.verify_token(token)
             if payload:
+                payload_roles = payload.get("roles")
+                roles = []
+                if isinstance(payload_roles, list):
+                    for item in payload_roles:
+                        role_item = str(item or "").strip().lower()
+                        if role_item and role_item not in roles:
+                            roles.append(role_item)
+                primary_role = str(payload.get("role") or "").strip().lower()
+                if primary_role and primary_role not in roles:
+                    roles.insert(0, primary_role)
                 # Inyectamos la identidad en el state
                 # Payload suele tener: {"sub": "juan", "role": "admin", "exp": ...}
-                request.state.user = {"username": payload.get("sub"), "role": payload.get("role")}
+                request.state.user = {
+                    "username": payload.get("sub"),
+                    "role": primary_role,
+                    "roles": roles,
+                }
         
         response = await call_next(request)
         return response

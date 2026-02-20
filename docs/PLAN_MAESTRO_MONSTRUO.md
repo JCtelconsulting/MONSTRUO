@@ -74,6 +74,7 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-02-19: **UI Shell Canónico Unificado**: se oficializa estructura única para módulos shell (`main-inner module-shell` + `module-shell-header` + `section-block module-shell-content`), con subtítulo estándar y ancho compartido (`--max-content-width`), eliminando overrides locales que causaban divergencias visuales.
 - 2026-02-16: Despliegue a producción exitoso de PMO Fix y Ticketera V1 (EPIC 11). Se robusteció el script de despliegue (`deploy.sh`) con `git checkout -f` y `reset --hard` para garantizar la paridad del servidor con el repositorio remoto y evitar bloqueos por cambios locales. Verificación de salud PROD: 200 OK.
 - 2026-02-15: EPIC 11 Ticketera: implementado plan de estabilización operativa (cola jobs con dedupe fuerte + recuperación de stale segura con índices parciales, cleanup de `sys_jobs`, eliminación de side effects en GET críticos `/tickets` y `/sla/metrics`, durabilidad compliance con verificación de artefacto/hash e idempotencia de rerun cuando falta evidencia, endpoint de descarga de adjuntos por ticket, endpoint `ops/queue-health`, endpoint `jobs/recover-stale`, y UI `Ops` mínima para operación Jira/Canales/Compliance). Validación DEV en verde: `verify_hardening --check-api`, `e2e_api_full`, `e2e_ticketera`.
 - 2026-02-15: EPIC 11 Ticketera: fase técnica del paralelo Jira+MONSTRUO completada (tablas `jira_issue_map/jira_sync_runs/jira_sync_cursor/parallel_kpi_daily/parallel_decisions`, sync `bootstrap-open` + `delta-sync`, reconciliación/KPI diario, endpoint formal de decisión Go/No-Go y job recurrente `JIRA_DELTA_SYNC_DAILY`).
@@ -312,15 +313,18 @@ HTML + JS vanilla estilo “Neon Command”.
 Estructura física: `/modulos/${modulo}/${modulo}.html`.
 Solo existen 8 carpetas funcionales bajo `/modulos/` (más `_compartido` y `login`).
 Una “shell” común: sidebar + topbar + notifications.
-4.3.1 Estándar Visual ERP (Gold Standard)
-El módulo ERP define la línea gráfica oficial que deben seguir todos los nuevos módulos.
+4.3.1 Estándar Visual PMO + ERP (Gold Standard)
+Los módulos PMO y ERP definen en conjunto la línea gráfica oficial que deben seguir todos los módulos.
 Elementos clave:
 - Layout: Pestañas de navegación interna (`.tab-bar` + `.tab-btn`) para separar vistas (Resumen, Detalle, Config).
+- Contenedor principal: sin cuadro de fondo (usar `section-block` transparente, sin borde ni sombra).
 - Headers: `h2` con `letter-spacing: -0.5px` y subtítulos explicativos.
 - KPIs: Tarjetas superiores (`.kpi-card`) con valores grandes y etiquetas uppercase.
 - Tablas: Estilo `.erp-table` con filas separadas (`border-spacing`), hover sutil y bordes redondeados.
 - Animaciones: Transiciones suaves (`fadeIn`) al cambiar de pestaña.
 - Paleta: Uso activo de variables CSS `--neon`, `--panel-strong`, `--text-soft`.
+- Contrato visual global: botones, inputs, modales y tablas deben heredar el estándar compartido en `/modulos/_compartido/css/monstruo.css`.
+- No se permite introducir “sub-estilos” por módulo sin justificación funcional explícita.
 Cualquier desviación de este estándar se considera deuda de UX.
 
 4.4 Base de datos
