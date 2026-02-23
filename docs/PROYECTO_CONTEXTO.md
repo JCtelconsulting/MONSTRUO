@@ -2,6 +2,20 @@
 **Fecha de actualizacion:** 23 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-23 - Hotfix CI/CD: despliegue PROD por Actions falla por POSTGRES_PASSWORD faltante
+- **Incidente**:
+  - PR `#8` de Ticketera se mergeó correctamente a `main`, pero el workflow `CI + Deploy` falló en job `deploy`.
+  - Error exacto en step `Deploy to server`: `required variable POSTGRES_PASSWORD is missing`.
+- **Causa raíz**:
+  - en algunos entornos, el despliegue dispone de `DB_URL` pero no de `POSTGRES_PASSWORD` explícito para la interpolación de `docker-compose`.
+- **Corrección aplicada**:
+  - `ops/herramientas/deploy/deploy.sh`:
+    - se agrega fallback para derivar `POSTGRES_PASSWORD` desde `DB_URL` cuando no viene definido.
+    - mantiene comportamiento previo cuando `POSTGRES_PASSWORD` ya existe.
+- **Verificación**:
+  - `bash -n ops/herramientas/deploy/deploy.sh` ✅
+- **Estado**: HOTFIX IMPLEMENTADO EN CÓDIGO (pendiente re-ejecución de workflow para confirmar deploy en PROD).
+
 ## HITO: 2026-02-23 - EPIC 11 Ticketera: revisión integral de flujos y smoke técnico (DEV)
 - **Solicitud**: revisar Ticketera completa (código + flujos) y validar que opere correctamente antes de subida a GitHub.
 - **Verificación ejecutada**:
