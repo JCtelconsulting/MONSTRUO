@@ -74,6 +74,7 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-02-23: Gobernanza de agentes DEV alineada a estructura real del repo: la ruta canónica de reglas cambia de `.agent/...` a `.agents/rules/reglas-monstruo-dev.md` y se valida reset operativo de Ticketera en DEV (`tickets=0`, `current_load=0`).
 - 2026-02-19: **UI Shell Canónico Unificado**: se oficializa estructura única para módulos shell (`main-inner module-shell` + `module-shell-header` + `section-block module-shell-content`), con subtítulo estándar y ancho compartido (`--max-content-width`), eliminando overrides locales que causaban divergencias visuales.
 - 2026-02-16: Despliegue a producción exitoso de PMO Fix y Ticketera V1 (EPIC 11). Se robusteció el script de despliegue (`deploy.sh`) con `git checkout -f` y `reset --hard` para garantizar la paridad del servidor con el repositorio remoto y evitar bloqueos por cambios locales. Verificación de salud PROD: 200 OK.
 - 2026-02-15: EPIC 11 Ticketera: implementado plan de estabilización operativa (cola jobs con dedupe fuerte + recuperación de stale segura con índices parciales, cleanup de `sys_jobs`, eliminación de side effects en GET críticos `/tickets` y `/sla/metrics`, durabilidad compliance con verificación de artefacto/hash e idempotencia de rerun cuando falta evidencia, endpoint de descarga de adjuntos por ticket, endpoint `ops/queue-health`, endpoint `jobs/recover-stale`, y UI `Ops` mínima para operación Jira/Canales/Compliance). Validación DEV en verde: `verify_hardening --check-api`, `e2e_api_full`, `e2e_ticketera`.
@@ -145,7 +146,7 @@ git push origin feature/nueva-funcionalidad
 0.7 Gobernanza de Agentes (obligatoria desde 2026-02-14)
 
 Archivo canonico de reglas para agentes en DEV:
-- `.agent/rules/monstruo-dev-reglas.md`
+- `.agents/rules/reglas-monstruo-dev.md`
 - `AGENTS.md` (bootstrap para agentes compatibles)
 
 Estandar unico:
