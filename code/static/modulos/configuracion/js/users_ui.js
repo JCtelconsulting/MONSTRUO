@@ -1,53 +1,115 @@
-
 /**
- * Gestión de Usuarios en Configuración
+ * Gestion de usuarios por roles (sin especialidades)
  */
-
 const UsersUI = (() => {
     let _users = [];
+    let _secondaryRolesDraft = [];
+    let _tableActionsBound = false;
+    let _roleScopes = new Map();
+    let _roleScopeItems = [];
 
-    async function load() {
-        try {
-            const data = await window.fetchApi('/api/admin/users');
-            _users = data.items || [];
-            renderTable();
-        } catch (e) {
-            console.error("Error loading users", e);
-            document.getElementById('tbodyUsers').innerHTML =
-                `<tr><td colspan="5" style="padding:20px; text-align:center; color:#ff4444;">Error: ${e.message}</td></tr>`;
+    const PROTECTED_USER = 'juan.lopez@telconsulting.cl';
+
+    const ROLE_OPTIONS = [
+        { id: 'admin', label: 'Admin' },
+        { id: 'encargado_mesa', label: 'Encargado Mesa Ayuda' },
+        { id: 'redes', label: 'Redes' },
+        { id: 'sistemas', label: 'Sistemas' },
+        { id: 'implementaciones', label: 'Implementaciones' },
+        { id: 'gerencia', label: 'Gerencia' },
+        { id: 'ops', label: 'Operaciones' },
+        { id: 'finance', label: 'Finanzas' },
+        { id: 'warehouse', label: 'Bodega' }
+    ];
+
+    const ROLE_SCOPE_FALLBACK = {
+        admin: {
+            description: 'Control total de plataforma, seguridad y configuracion global.',
+            permissions: ['Acceso total del sistema']
+        },
+        encargado_mesa: {
+            description: 'Gestiona flujo de ticketera, asignacion, seguimiento y cumplimiento.',
+            permissions: [
+                'Dashboard: lectura',
+                'Ticketera: lectura',
+                'Ticketera: gestion operativa',
+                'Ticketera: compliance y evidencias',
+                'Auditoria: lectura'
+            ]
+        },
+        ops: {
+            description: 'Operacion tecnica transversal para atencion y despacho de tickets.',
+            permissions: [
+                'Dashboard: lectura',
+                'Facturacion: lectura',
+                'Facturacion: sincronizacion',
+                'Bodega: lectura',
+                'Ticketera: lectura',
+                'Ticketera: gestion operativa',
+                'CRM: lectura',
+                'CRM: edicion',
+                'Auditoria: lectura',
+                'Configuracion administrativa'
+            ]
+        },
+        redes: {
+            description: 'Ejecucion tecnica en networking e incidencias de conectividad.',
+            permissions: [
+                'Dashboard: lectura',
+                'Ticketera: lectura',
+                'Ticketera: gestion operativa'
+            ]
+        },
+        sistemas: {
+            description: 'Ejecucion tecnica en servidores, plataformas y sistemas.',
+            permissions: [
+                'Dashboard: lectura',
+                'Ticketera: lectura',
+                'Ticketera: gestion operativa'
+            ]
+        },
+        implementaciones: {
+            description: 'Ejecucion de despliegues/proyectos con alcance tecnico.',
+            permissions: [
+                'Dashboard: lectura',
+                'Ticketera: lectura',
+                'Ticketera: gestion operativa',
+                'PMO: lectura',
+                'PMO: edicion'
+            ]
+        },
+        finance: {
+            description: 'Gestion financiera y cobranza con foco contable.',
+            permissions: [
+                'Dashboard: lectura',
+                'Facturacion: lectura',
+                'Facturacion: edicion',
+                'Facturacion: anulacion',
+                'Pagos: gestion',
+                'CRM: lectura',
+                'CRM: edicion',
+                'Auditoria: exportacion'
+            ]
+        },
+        warehouse: {
+            description: 'Gestion operativa de inventario y movimientos de bodega.',
+            permissions: [
+                'Bodega: lectura',
+                'Bodega: edicion'
+            ]
+        },
+        gerencia: {
+            description: 'Vision ejecutiva y lectura de indicadores/estado operacional.',
+            permissions: [
+                'Dashboard: lectura',
+                'Ticketera: lectura',
+                'PMO: lectura',
+                'Finanzas: lectura',
+                'Auditoria: lectura',
+                'Reportes: lectura'
+            ]
         }
-    }
-
-    function renderTable() {
-        const tbody = document.getElementById('tbodyUsers');
-        if (!_users.length) {
-            tbody.innerHTML = `<tr><td colspan="5" style="padding:20px; text-align:center; opacity:0.5;">No hay usuarios registrados</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = _users.map(u => {
-            const statusBadge = u.is_active
-                ? `<span style="color:#44ff88; background:rgba(68,255,136,0.1); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Activo</span>`
-                : `<span style="color:#ff4444; background:rgba(255,68,68,0.1); padding:2px 8px; border-radius:12px; font-size:0.75rem;">Inactivo</span>`;
-
-            return `
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-                <td style="padding:10px 8px;"><strong>${u.username}</strong></td>
-                <td style="padding:10px 8px;">${u.role}</td>
-                <td style="padding:10px 8px;">${statusBadge}</td>
-                <td style="padding:10px 8px; font-size:0.8rem; opacity:0.6;">${u.created_at || '-'}</td>
-                <td style="padding:10px 8px; text-align:right;">
-                    <button class="btn-icon-sm" onclick="UsersUI.openModal('${u.username}')" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    ${u.username !== 'juan.lopez@telconsulting.cl' ? `
-                    <button class="btn-icon-sm" onclick="UsersUI.deleteUser('${u.username}')" title="Eliminar" style="color:#ff4444;">
-                        <i class="fas fa-trash"></i>
-                    </button>` : ''}
-                </td>
-            </tr>`;
-        }).join('');
-    }
+    };
 
     const MODULES = [
         { id: 'dashboard', label: 'Dashboard' },
@@ -58,8 +120,458 @@ const UsersUI = (() => {
         { id: 'bodega', label: 'Bodega' },
         { id: 'ia', label: 'IA (Ultron)' },
         { id: 'zabbix', label: 'Zabbix' },
-        { id: 'config', label: 'Configuración' }
+        { id: 'config', label: 'Configuracion' }
     ];
+
+    const ROLE_ORDER = Object.freeze(
+        ROLE_OPTIONS.reduce((acc, item, idx) => {
+            acc[item.id] = idx;
+            return acc;
+        }, {})
+    );
+
+    const SCOPE_MODULE_ORDER = Object.freeze({
+        acceso_total_del_sistema: 0,
+        dashboard: 10,
+        ticketera: 20,
+        pmo: 30,
+        crm: 40,
+        bodega: 50,
+        facturacion: 60,
+        pagos: 70,
+        finanzas: 80,
+        auditoria: 90,
+        reportes: 100,
+        configuracion_administrativa: 110,
+    });
+
+    const SCOPE_ACTION_ORDER = Object.freeze({
+        lectura: 10,
+        read: 10,
+        sincronizacion: 20,
+        sync: 20,
+        gestion_operativa: 30,
+        gestion: 35,
+        write: 40,
+        edicion: 40,
+        compliance: 50,
+        compliance_y_evidencias: 50,
+        exportacion: 60,
+        anulacion: 70,
+    });
+
+    const KNOWN_SCOPE_MODULES = new Set([
+        'dashboard',
+        'ticketera',
+        'pmo',
+        'crm',
+        'bodega',
+        'facturacion',
+        'pagos',
+        'finanzas',
+        'auditoria',
+        'reportes',
+        'configuracion_administrativa',
+        'acceso_total_del_sistema',
+    ]);
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function encodeDataset(value) {
+        return encodeURIComponent(String(value || ''));
+    }
+
+    function decodeDataset(value) {
+        try {
+            return decodeURIComponent(String(value || ''));
+        } catch (_) {
+            return String(value || '');
+        }
+    }
+
+    function normalizeUsername(value) {
+        return String(value || '').trim().toLowerCase();
+    }
+
+    function normalizeKey(value) {
+        return String(value || '')
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, '_');
+    }
+
+    function roleLabel(role) {
+        const normalized = normalizeKey(role);
+        const item = ROLE_OPTIONS.find((r) => r.id === normalized);
+        return item ? item.label : (normalized || '-');
+    }
+
+    function normalizeRoleList(primaryRole, secondaryRoles = []) {
+        const out = [];
+        const pushRole = (value) => {
+            const role = normalizeKey(value);
+            if (!role || out.includes(role)) return;
+            out.push(role);
+        };
+        pushRole(primaryRole);
+        if (Array.isArray(secondaryRoles)) {
+            secondaryRoles.forEach(pushRole);
+        }
+        return out;
+    }
+
+    function permissionFallbackLabel(permission) {
+        const normalized = normalizeKey(permission).replace(/_/g, ':');
+        const map = {
+            '*': 'Acceso total del sistema',
+            'dashboard:read': 'Dashboard: lectura',
+            'tickets:read': 'Ticketera: lectura',
+            'tickets:write': 'Ticketera: gestion operativa',
+            'tickets:compliance': 'Ticketera: compliance',
+            'admin.settings': 'Configuracion administrativa',
+            'audit:read': 'Auditoria: lectura',
+            'audit:export': 'Auditoria: exportacion',
+            'invoice:read': 'Facturacion: lectura',
+            'invoice:write': 'Facturacion: edicion',
+            'invoice:sync': 'Facturacion: sincronizacion',
+            'invoice:void': 'Facturacion: anulacion',
+            'payment:write': 'Pagos: gestion',
+            'crm:read': 'CRM: lectura',
+            'crm:write': 'CRM: edicion',
+            'bodega:read': 'Bodega: lectura',
+            'bodega:write': 'Bodega: edicion',
+            'pmo:read': 'PMO: lectura',
+            'pmo:write': 'PMO: edicion',
+            'reports:read': 'Reportes: lectura',
+            'finanzas:read': 'Finanzas: lectura'
+        };
+        if (map[normalized]) return map[normalized];
+        if (!normalized) return '-';
+        if (normalized.includes(':')) {
+            const [prefix, action] = normalized.split(':', 2);
+            return `${prefix.toUpperCase()}: ${action}`;
+        }
+        return normalized;
+    }
+
+    function parseScopeLabel(label) {
+        const raw = String(label || '').trim();
+        if (!raw) return { module: '', action: '' };
+        if (raw.includes(':')) {
+            const [modulePart, actionPart] = raw.split(':', 2);
+            return {
+                module: normalizeKey(modulePart),
+                action: normalizeKey(actionPart),
+            };
+        }
+        return {
+            module: normalizeKey(raw),
+            action: '',
+        };
+    }
+
+    function compareScopeLabels(a, b) {
+        const pa = parseScopeLabel(a);
+        const pb = parseScopeLabel(b);
+        const moduleRankA = Object.prototype.hasOwnProperty.call(SCOPE_MODULE_ORDER, pa.module)
+            ? SCOPE_MODULE_ORDER[pa.module]
+            : 999;
+        const moduleRankB = Object.prototype.hasOwnProperty.call(SCOPE_MODULE_ORDER, pb.module)
+            ? SCOPE_MODULE_ORDER[pb.module]
+            : 999;
+        if (moduleRankA !== moduleRankB) return moduleRankA - moduleRankB;
+
+        const actionRankA = Object.prototype.hasOwnProperty.call(SCOPE_ACTION_ORDER, pa.action)
+            ? SCOPE_ACTION_ORDER[pa.action]
+            : 999;
+        const actionRankB = Object.prototype.hasOwnProperty.call(SCOPE_ACTION_ORDER, pb.action)
+            ? SCOPE_ACTION_ORDER[pb.action]
+            : 999;
+        if (actionRankA !== actionRankB) return actionRankA - actionRankB;
+
+        return String(a || '').localeCompare(String(b || ''), 'es');
+    }
+
+    function setRoleScopes(items) {
+        _roleScopes = new Map();
+        _roleScopeItems = [];
+
+        const list = Array.isArray(items) ? items : [];
+        list.forEach((rawItem) => {
+            const role = normalizeKey(rawItem?.role);
+            if (!role) return;
+
+            const permissions = [];
+            const seen = new Set();
+            const detail = Array.isArray(rawItem?.permissions_detail) ? rawItem.permissions_detail : [];
+            if (detail.length > 0) {
+                detail.forEach((entry) => {
+                    const label = String(entry?.label || entry?.id || '').trim();
+                    if (!label || seen.has(label)) return;
+                    seen.add(label);
+                    permissions.push(label);
+                });
+            } else {
+                const rawPerms = Array.isArray(rawItem?.permissions) ? rawItem.permissions : [];
+                rawPerms.forEach((perm) => {
+                    const label = permissionFallbackLabel(perm);
+                    if (!label || seen.has(label)) return;
+                    seen.add(label);
+                    permissions.push(label);
+                });
+            }
+
+            const item = {
+                role,
+                label: String(rawItem?.label || roleLabel(role) || role).trim(),
+                description: String(rawItem?.description || '').trim(),
+                permissions: permissions.sort(compareScopeLabels)
+            };
+            _roleScopes.set(role, item);
+            _roleScopeItems.push(item);
+        });
+
+        _roleScopeItems.sort((a, b) => {
+            const ar = Object.prototype.hasOwnProperty.call(ROLE_ORDER, a.role) ? ROLE_ORDER[a.role] : 999;
+            const br = Object.prototype.hasOwnProperty.call(ROLE_ORDER, b.role) ? ROLE_ORDER[b.role] : 999;
+            if (ar !== br) return ar - br;
+            return String(a.label || a.role).localeCompare(String(b.label || b.role), 'es');
+        });
+    }
+
+    function fallbackRoleScopes() {
+        return ROLE_OPTIONS.map((roleItem) => {
+            const role = roleItem.id;
+            const fallback = ROLE_SCOPE_FALLBACK[role] || {};
+            const perms = Array.isArray(fallback.permissions) ? fallback.permissions : [];
+            return {
+                role,
+                label: roleItem.label,
+                description: String(fallback.description || 'Rol operativo de plataforma.'),
+                permissions: perms.map((p) => String(p || '').trim()).filter(Boolean),
+                permissions_detail: perms.map((p) => ({ id: normalizeKey(p).replace(/_/g, ':'), label: String(p || '').trim() }))
+            };
+        });
+    }
+
+    function renderRoleBadges(roleIds) {
+        const roles = Array.isArray(roleIds) ? roleIds : [];
+        if (!roles.length) return '<span class="cfg-muted">Sin roles</span>';
+        return roles.map((role, idx) => {
+            const label = escapeHtml(roleLabel(role));
+            const toneClass = idx === 0 ? 'is-primary' : '';
+            return `<span class="cfg-role-pill ${toneClass}">${label}</span>`;
+        }).join('');
+    }
+
+    function scopeModuleClass(scopeLabel) {
+        const module = parseScopeLabel(scopeLabel).module || 'default';
+        const safe = String(module).replace(/[^a-z0-9_]/g, '_') || 'default';
+        if (!KNOWN_SCOPE_MODULES.has(safe)) return 'scope-mod-default';
+        return `scope-mod-${safe}`;
+    }
+
+    function renderScopePills(scopeLabels) {
+        if (!Array.isArray(scopeLabels) || !scopeLabels.length) {
+            return '<span class="cfg-muted">Sin permisos definidos</span>';
+        }
+        return `<div class="cfg-scope-list">${scopeLabels.map((scope) => `
+            <span class="cfg-scope-pill ${scopeModuleClass(scope)}">${escapeHtml(scope)}</span>
+        `).join('')}</div>`;
+    }
+
+    function renderRolesCell(roleIds) {
+        return `
+            <div class="cfg-profile-cell">
+                <div class="cfg-profile-block">
+                    <span class="cfg-profile-label">Roles</span>
+                    <div class="cfg-profile-roles">${renderRoleBadges(roleIds)}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function scopesForRoles(roleIds) {
+        const roles = Array.isArray(roleIds) ? roleIds : [];
+        const scopes = [];
+        const seen = new Set();
+
+        roles.forEach((roleId) => {
+            const role = normalizeKey(roleId);
+            const roleScope = _roleScopes.get(role);
+            if (!roleScope || !Array.isArray(roleScope.permissions)) return;
+            roleScope.permissions.forEach((label) => {
+                const clean = String(label || '').trim();
+                if (!clean || seen.has(clean)) return;
+                seen.add(clean);
+                scopes.push(clean);
+            });
+        });
+        return scopes.sort(compareScopeLabels);
+    }
+
+    function renderRoleGuide() {
+        const body = document.getElementById('cfgRoleGuideBody');
+        if (!body) return;
+
+        if (!_roleScopeItems.length) {
+            body.innerHTML = '<div class="cfg-role-guide-empty">No se pudo cargar la matriz de alcances.</div>';
+            return;
+        }
+
+        body.innerHTML = _roleScopeItems.map((item) => {
+            const perms = Array.isArray(item.permissions) ? item.permissions : [];
+            return `
+                <article class="cfg-role-guide-row">
+                    <div class="cfg-role-guide-head">
+                        <div class="cfg-role-guide-title">${escapeHtml(item.label || roleLabel(item.role) || item.role)}</div>
+                        <p class="cfg-role-guide-desc">${escapeHtml(item.description || 'Rol operativo de plataforma.')}</p>
+                    </div>
+                    <div class="cfg-role-guide-perms">${renderScopePills(perms)}</div>
+                </article>
+            `;
+        }).join('');
+    }
+
+    function renderUserScopeGuide() {
+        const body = document.getElementById('cfgUserScopesBody');
+        if (!body) return;
+
+        if (!_users.length) {
+            body.innerHTML = '<div class="cfg-role-guide-empty">No hay usuarios registrados.</div>';
+            return;
+        }
+
+        body.innerHTML = [..._users]
+            .sort((a, b) => String(a?.username || '').localeCompare(String(b?.username || ''), 'es'))
+            .map((user) => {
+                const username = String(user?.username || '').trim();
+                const roleIds = normalizeRoleList(user?.role, user?.secondary_roles);
+                const scopes = scopesForRoles(roleIds);
+                return `
+                    <article class="cfg-user-scope-row">
+                        <div class="cfg-user-scope-head">
+                            <div class="cfg-user-scope-name">${escapeHtml(username)}</div>
+                            <div class="cfg-profile-roles">${renderRoleBadges(roleIds)}</div>
+                        </div>
+                        <div class="cfg-user-scope-perms">${renderScopePills(scopes)}</div>
+                    </article>
+                `;
+            })
+            .join('');
+    }
+
+    function bindTableActions() {
+        if (_tableActionsBound) return;
+        const tbody = document.getElementById('tbodyUsers');
+        if (!tbody) return;
+
+        tbody.addEventListener('click', async (evt) => {
+            const actionBtn = evt.target.closest('button[data-action]');
+            if (!actionBtn) return;
+
+            const action = String(actionBtn.dataset.action || '').trim();
+            const username = decodeDataset(actionBtn.dataset.username || '');
+            if (!username) return;
+
+            if (action === 'edit') {
+                openModal(username);
+                return;
+            }
+
+            if (action === 'delete') {
+                await deleteUser(username);
+            }
+        });
+
+        _tableActionsBound = true;
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('tbodyUsers');
+        if (!tbody) return;
+
+        if (!_users.length) {
+            tbody.innerHTML = '<tr class="cfg-placeholder-row"><td colspan="4">No hay usuarios registrados</td></tr>';
+            return;
+        }
+
+        const rows = [..._users]
+            .sort((a, b) => String(a?.username || '').localeCompare(String(b?.username || ''), 'es'))
+            .map((user) => {
+                const username = String(user?.username || '').trim();
+                const encodedUsername = encodeDataset(username);
+                const statusBadge = user?.is_active
+                    ? '<span class="cfg-state-pill is-active">Activo</span>'
+                    : '<span class="cfg-state-pill is-inactive">Inactivo</span>';
+                const roleIds = normalizeRoleList(user?.role, user?.secondary_roles);
+
+                return `
+                    <tr>
+                        <td class="cfg-table-cell-strong">${escapeHtml(username)}</td>
+                        <td>${renderRolesCell(roleIds)}</td>
+                        <td>${statusBadge}</td>
+                        <td class="ta-right">
+                            <div class="cfg-action-group">
+                                <button class="btn-icon-sm" data-action="edit" data-username="${encodedUsername}" title="Editar usuario">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                ${username !== PROTECTED_USER
+                                    ? `<button class="btn-icon-sm btn-icon-danger" data-action="delete" data-username="${encodedUsername}" title="Eliminar usuario"><i class="fas fa-trash"></i></button>`
+                                    : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            })
+            .join('');
+
+        tbody.innerHTML = rows;
+    }
+
+    async function load() {
+        bindTableActions();
+
+        try {
+            const [usersData, scopesDataRaw] = await Promise.all([
+                window.fetchApi('/api/admin/users'),
+                window.fetchApi('/api/config/role-scopes').catch(() => null)
+            ]);
+
+            _users = Array.isArray(usersData?.items) ? usersData.items : [];
+            const scopesItems = Array.isArray(scopesDataRaw?.items) && scopesDataRaw.items.length
+                ? scopesDataRaw.items
+                : fallbackRoleScopes();
+            setRoleScopes(scopesItems);
+
+            renderTable();
+            renderUserScopeGuide();
+            renderRoleGuide();
+        } catch (e) {
+            console.error('Error loading users view', e);
+            const tbody = document.getElementById('tbodyUsers');
+            if (tbody) {
+                tbody.innerHTML = `<tr class="cfg-placeholder-row error"><td colspan="4">Error: ${escapeHtml(e.message || 'No se pudo cargar')}</td></tr>`;
+            }
+            const userScopeBody = document.getElementById('cfgUserScopesBody');
+            if (userScopeBody) {
+                userScopeBody.innerHTML = '<div class="cfg-role-guide-empty">No se pudo cargar permisos por usuario.</div>';
+            }
+            const body = document.getElementById('cfgRoleGuideBody');
+            if (body) {
+                body.innerHTML = '<div class="cfg-role-guide-empty">No se pudo cargar la matriz de alcances.</div>';
+            }
+        }
+    }
 
     function openModal(username = null) {
         const modal = document.getElementById('modalUser');
@@ -67,122 +579,211 @@ const UsersUI = (() => {
         const title = document.getElementById('modalUserTitle');
         const userInput = document.getElementById('inpUsername');
         const container = document.getElementById('containerModules');
+        const secondaryContainer = document.getElementById('containerSecondaryRoles');
+        const roleSelect = document.getElementById('selRole');
 
         form.reset();
         container.innerHTML = '';
+        secondaryContainer.innerHTML = '';
 
         let userModules = [];
 
         if (username) {
-            // Edit Mode
-            const u = _users.find(x => x.username === username);
-            if (!u) return;
+            const user = _users.find((item) => item.username === username);
+            if (!user) return;
 
-            title.textContent = "Editar Usuario";
-            userInput.value = u.username;
+            title.textContent = 'Editar Usuario';
+            userInput.value = user.username;
             userInput.disabled = true;
-            document.getElementById('selRole').value = u.role;
-            document.getElementById('chkActive').checked = u.is_active;
-            document.getElementById('inpPassword').placeholder = "(Dejar en blanco para no cambiar)";
+            roleSelect.value = user.role;
+            document.getElementById('chkActive').checked = user.is_active;
+            document.getElementById('inpPassword').placeholder = '(Dejar en blanco para no cambiar)';
             form.dataset.mode = 'edit';
-            userModules = u.allowed_modules || [];
+            userModules = user.allowed_modules || [];
+            _secondaryRolesDraft = Array.isArray(user.secondary_roles) ? [...user.secondary_roles] : [];
         } else {
-            // Create Mode
-            title.textContent = "Nuevo Usuario";
-            userInput.value = "";
+            title.textContent = 'Nuevo Usuario';
+            userInput.value = '';
             userInput.disabled = false;
-            document.getElementById('inpPassword').placeholder = "Contraseña";
+            document.getElementById('inpPassword').placeholder = 'Contrasena';
             document.getElementById('chkActive').checked = true;
             form.dataset.mode = 'create';
-            // Default modules for new users? Maybe none or Dashboard
             userModules = ['dashboard'];
+            _secondaryRolesDraft = [];
         }
 
-        // Render Checkboxes
-        MODULES.forEach(m => {
-            const checked = userModules.includes(m.id) ? 'checked' : '';
+        MODULES.forEach((mod) => {
+            const checked = userModules.includes(mod.id);
             const div = document.createElement('div');
-            div.style.display = 'flex';
-            div.style.alignItems = 'center';
-            div.style.gap = '6px';
-            div.innerHTML = `
-                <input type="checkbox" id="mod_${m.id}" value="${m.id}" ${checked}>
-                <label for="mod_${m.id}" style="margin:0; font-size:0.8rem; cursor:pointer;">${m.label}</label>
-            `;
+            div.className = 'cfg-check-item';
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.id = `mod_${mod.id}`;
+            input.value = mod.id;
+            input.checked = checked;
+
+            const label = document.createElement('label');
+            label.textContent = mod.label;
+
+            const mark = document.createElement('span');
+            mark.className = 'cfg-check-mark';
+
+            const syncCheckedState = () => {
+                div.classList.toggle('is-checked', Boolean(input.checked));
+                mark.textContent = input.checked ? '✓' : '';
+            };
+            syncCheckedState();
+            input.addEventListener('change', syncCheckedState);
+            const toggleModule = () => {
+                input.checked = !input.checked;
+                syncCheckedState();
+            };
+            div.addEventListener('click', (evt) => {
+                if (evt.target === label) return;
+                toggleModule();
+            });
+            label.addEventListener('click', (evt) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+                toggleModule();
+            });
+
+            div.appendChild(input);
+            div.appendChild(label);
+            div.appendChild(mark);
             container.appendChild(div);
         });
 
+        const renderSecondaryRoleChecks = () => {
+            const primary = normalizeKey(roleSelect.value);
+            secondaryContainer.innerHTML = '';
+
+            ROLE_OPTIONS
+                .filter((item) => item.id !== primary)
+                .forEach((item) => {
+                    const roleId = item.id;
+                    const selected = _secondaryRolesDraft.includes(roleId);
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = `role-square-btn ${selected ? 'is-selected' : ''}`;
+                    button.dataset.role = roleId;
+                    button.innerHTML = `
+                        <span class="role-square-label">${item.label}</span>
+                        <span class="role-square-mark">${selected ? '✓' : ''}</span>
+                    `;
+                    button.addEventListener('click', () => {
+                        if (_secondaryRolesDraft.includes(roleId)) {
+                            _secondaryRolesDraft = _secondaryRolesDraft.filter((r) => r !== roleId);
+                        } else {
+                            _secondaryRolesDraft.push(roleId);
+                        }
+                        renderSecondaryRoleChecks();
+                    });
+                    secondaryContainer.appendChild(button);
+                });
+        };
+
+        roleSelect.onchange = () => {
+            const primary = normalizeKey(roleSelect.value);
+            _secondaryRolesDraft = _secondaryRolesDraft
+                .map((r) => normalizeKey(r))
+                .filter(Boolean)
+                .filter((value, idx, arr) => arr.indexOf(value) === idx)
+                .filter((r) => r !== primary);
+            renderSecondaryRoleChecks();
+        };
+
+        renderSecondaryRoleChecks();
+
+        modal.classList.add('is-open');
         modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('modalUser');
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
     }
 
     async function saveUser(e) {
         e.preventDefault();
+
         const form = document.getElementById('formUser');
         const mode = form.dataset.mode;
 
-        const username = document.getElementById('inpUsername').value.trim();
-        const role = document.getElementById('selRole').value;
-        const password = document.getElementById('inpPassword').value;
-        const isActive = document.getElementById('chkActive').checked;
+        const username = String(document.getElementById('inpUsername').value || '').trim();
+        const role = normalizeKey(document.getElementById('selRole').value);
+        const password = String(document.getElementById('inpPassword').value || '');
+        const isActive = Boolean(document.getElementById('chkActive').checked);
 
-        // Collect modules
-        const allowed_modules = [];
+        const allowedModules = [];
         const checks = document.getElementById('containerModules').querySelectorAll('input[type="checkbox"]');
-        checks.forEach(c => {
-            if (c.checked) allowed_modules.push(c.value);
+        checks.forEach((check) => {
+            if (check.checked) allowedModules.push(check.value);
         });
 
+        const secondaryRoles = _secondaryRolesDraft
+            .map((r) => normalizeKey(r))
+            .filter(Boolean)
+            .filter((value, idx, arr) => arr.indexOf(value) === idx)
+            .filter((r) => r !== role);
+
         if (!username || !role) {
-            alert("Campos obligatorios faltantes");
+            alert('Campos obligatorios faltantes');
             return;
         }
 
         try {
             if (mode === 'create') {
-                if (!password) { alert("Contraseña requerida para nuevo usuario"); return; }
+                if (!password) {
+                    alert('Contrasena requerida para nuevo usuario');
+                    return;
+                }
                 await window.fetchApi('/api/admin/users', {
                     method: 'POST',
-                    body: { username, password, role, allowed_modules }
+                    body: { username, password, role, secondary_roles: secondaryRoles, allowed_modules: allowedModules }
                 });
             } else {
-                const body = { role, is_active: isActive, allowed_modules };
+                const body = { role, secondary_roles: secondaryRoles, is_active: isActive, allowed_modules: allowedModules };
                 if (password) body.password = password;
 
-                await window.fetchApi(`/api/admin/users/${username}`, {
+                await window.fetchApi(`/api/admin/users/${encodeURIComponent(username)}`, {
                     method: 'PATCH',
-                    body: body
+                    body,
                 });
             }
 
-            document.getElementById('modalUser').style.display = 'none';
+            closeModal();
             load();
-            if (window.showToast) window.showToast("Usuario guardado correctamente", "success");
-            else alert("Usuario guardado");
-
+            if (window.showToast) window.showToast('Usuario guardado correctamente', 'success');
         } catch (err) {
-            alert("Error: " + err.message);
+            alert(`Error: ${err.message}`);
         }
     }
 
     async function deleteUser(username) {
-        if (!confirm(`¿Estás SEGURO de eliminar a ${username}? Esta acción no se puede deshacer.`)) return;
+        if (!confirm(`Estas SEGURO de eliminar a ${username}? Esta accion no se puede deshacer.`)) return;
 
         try {
-            await window.fetchApi(`/api/admin/users/${username}`, { method: 'DELETE' });
+            await window.fetchApi(`/api/admin/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
             load();
-            if (window.showToast) window.showToast("Usuario eliminado", "success");
+            if (window.showToast) window.showToast('Usuario eliminado', 'success');
         } catch (err) {
-            alert("Error: " + err.message);
+            alert(`Error: ${err.message}`);
         }
     }
 
     return {
         load,
         openModal,
+        closeModal,
         saveUser,
-        deleteUser
+        deleteUser,
     };
 })();
 
-// Expose globally
 window.UsersUI = UsersUI;

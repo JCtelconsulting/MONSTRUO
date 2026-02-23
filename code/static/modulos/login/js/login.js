@@ -18,7 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- API BASE URL ---
   const IS_DEV = window.location.pathname.startsWith('/dev');
-  const API_BASE = IS_DEV ? '/dev' : '';
+  const IS_PROD = window.location.pathname.startsWith('/prod');
+  const API_BASE = IS_DEV ? '/dev' : (IS_PROD ? '/prod' : '');
 
   function getPostLoginTarget() {
     const isProdHost = window.location.hostname.toLowerCase().endsWith('.telconsulting.cl');
@@ -26,8 +27,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return '/modulos/dashboard/dashboard.html';
     }
     // Detectar si estamos en /dev/ o /prod/ y mantener el prefijo
-    const prefix = window.location.pathname.startsWith('/dev') ? '/dev' : '/prod';
+    const prefix = IS_DEV ? '/dev' : '/prod';
     return `${prefix}/dashboard`;
+  }
+
+  // --- GOOGLE LOGIN ---
+  const btnGoogle = document.getElementById('btnGoogle');
+  if (btnGoogle) {
+    btnGoogle.addEventListener('click', () => {
+      // Usar la base de la API detectada para redirigir
+      const redirectUrl = `${API_BASE}/api/auth/google/login`;
+      window.location.href = redirectUrl;
+    });
   }
 
   // Si ya tiene cookie, redirigir

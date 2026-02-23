@@ -11,9 +11,13 @@
   --danger: #ff3333;
   --warning: #ffcc00;
   --info: #00f3ff;
+  --accent-color: #00f3ff;
   --text: #f5f7f8;
   --text-soft: #a5adb4;
+  --text-main: #f5f7f8;
+  --text-muted: #a5adb4;
   --border: #1f2935;
+  --bg: #070b11;
   --header-bg: #0c1119;
   --header-height: 60px;
   --sidebar-width: 260px;
@@ -474,6 +478,14 @@ main {
   position: relative;
   z-index: 1;
   transition: padding-left 0.3s ease;
+  /* Evita saltos horizontales entre módulos con/sin scroll vertical */
+  scrollbar-gutter: stable both-edges;
+}
+
+@supports not (scrollbar-gutter: stable) {
+  main {
+    overflow-y: scroll;
+  }
 }
 
 main .main-inner {
@@ -2463,4 +2475,304 @@ form {
     color: var(--text-soft);
     text-transform: uppercase;
     margin-top: 5px;
+}
+
+/* =========================================================
+   PMO + ERP VISUAL STANDARD (CANONICAL APP STYLE)
+   Vigente desde 2026-02-19 para todos los modulos shell.
+   ========================================================= */
+body:not(.login-shell) .section-block {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+body:not(.login-shell) .section-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding-bottom: 12px !important;
+  margin-bottom: 14px !important;
+}
+
+body:not(.login-shell) .section-header h2,
+body:not(.login-shell) .section-header h3 {
+  font-weight: 800 !important;
+  letter-spacing: -0.3px !important;
+  color: #f2f8ff !important;
+}
+
+body:not(.login-shell) .section-header .module-page-title {
+  font-size: 1.8rem !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.5px !important;
+  text-transform: none !important;
+  margin: 0 !important;
+}
+
+body:not(.login-shell) .section-header p {
+  color: var(--text-soft) !important;
+  opacity: 0.86 !important;
+}
+
+body:not(.login-shell) .section-header + .tab-bar {
+  margin-top: 10px !important;
+}
+
+body:not(.login-shell) .module-tabs-header {
+  min-height: 56px !important;
+  margin-bottom: 10px !important;
+  padding-bottom: 0 !important;
+}
+
+body:not(.login-shell) .module-shell-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 1rem !important;
+  flex-wrap: wrap !important;
+  border: none !important;
+  padding-bottom: 0 !important;
+}
+
+body:not(.login-shell) .module-shell-title {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+}
+
+body:not(.login-shell) .module-shell-subtitle {
+  margin: 0 !important;
+  opacity: 0.6 !important;
+}
+
+body:not(.login-shell) .module-shell-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 1rem !important;
+  margin-left: auto !important;
+}
+
+body:not(.login-shell) .section-block.module-shell-content {
+  padding: 0 !important;
+}
+
+body:not(.login-shell) .section-block.module-shell-content.module-shell-content-fill {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+body:not(.login-shell) .module-tabs-header + .tab-bar {
+  margin-top: 0 !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: thin !important;
+  padding-bottom: 8px !important;
+}
+
+body:not(.login-shell) .module-tabs-header + .tab-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+body:not(.login-shell) .module-tabs-header + .tab-bar::-webkit-scrollbar-track {
+  background: rgba(12, 16, 22, 0.45);
+  border-radius: 999px;
+}
+
+body:not(.login-shell) .module-tabs-header + .tab-bar::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.35);
+  border-radius: 999px;
+}
+
+body:not(.login-shell) .module-tabs-header + .tab-bar > .tab-btn {
+  min-height: 34px !important;
+  min-width: 86px !important;
+  padding: 0 10px !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.25px !important;
+  gap: 6px !important;
+}
+
+body:not(.login-shell) .tab-bar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: stretch !important;
+  row-gap: 10px !important;
+  gap: 0.8rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  margin-bottom: 16px !important;
+  padding: 0 4px 10px !important;
+}
+
+body:not(.login-shell) .tab-bar > .tab-btn {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+  color: var(--text-soft) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 40px !important;
+  min-width: 108px !important;
+  padding: 0 14px !important;
+  cursor: pointer !important;
+  font-size: 0.86rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  letter-spacing: 0.35px !important;
+  transition: all 0.18s ease !important;
+}
+
+body:not(.login-shell) .tab-bar > .tab-btn i {
+  width: 14px !important;
+  text-align: center !important;
+  font-size: 0.9em !important;
+  line-height: 1 !important;
+}
+
+body:not(.login-shell) .tab-bar > .tab-btn:hover {
+  color: #ffffff !important;
+  border-color: rgba(0, 255, 65, 0.25) !important;
+  background: rgba(0, 255, 65, 0.1) !important;
+}
+
+body:not(.login-shell) .tab-bar > .tab-btn.active {
+  color: var(--neon) !important;
+  border-color: rgba(0, 255, 65, 0.38) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body:not(.login-shell) .tab-bar > .tab-btn.active::after {
+  content: none !important;
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  body:not(.login-shell) .section-header .module-page-title {
+    font-size: 1.5rem !important;
+  }
+
+  body:not(.login-shell) .module-shell-actions {
+    width: 100% !important;
+    margin-left: 0 !important;
+    justify-content: flex-start !important;
+  }
+
+  body:not(.login-shell) .module-tabs-header {
+    min-height: auto !important;
+  }
+
+  body:not(.login-shell) .tab-bar > .tab-btn {
+    min-width: 96px !important;
+  }
+}
+
+body:not(.login-shell) .btn-primary {
+  background: linear-gradient(135deg, rgba(0, 255, 65, 0.92), rgba(0, 214, 255, 0.8)) !important;
+  color: #04110a !important;
+  border: 1px solid rgba(0, 255, 65, 0.48) !important;
+  border-radius: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.3px !important;
+  transition: all 0.18s ease !important;
+}
+
+body:not(.login-shell) .btn-primary:hover {
+  filter: brightness(1.03) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.33) !important;
+}
+
+body:not(.login-shell) .btn-secondary {
+  background: rgba(6, 10, 14, 0.9) !important;
+  color: #e6edf7 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+
+body:not(.login-shell) .btn-secondary:hover {
+  border-color: rgba(0, 243, 255, 0.35) !important;
+  background: rgba(0, 243, 255, 0.1) !important;
+}
+
+body:not(.login-shell) .input-dark,
+body:not(.login-shell) input.input-dark,
+body:not(.login-shell) select.input-dark,
+body:not(.login-shell) textarea.input-dark {
+  background: rgba(6, 10, 14, 0.88) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #eef5ff !important;
+  border-radius: 10px !important;
+  min-height: 38px !important;
+}
+
+body:not(.login-shell) .input-dark::placeholder,
+body:not(.login-shell) input.input-dark::placeholder,
+body:not(.login-shell) textarea.input-dark::placeholder {
+  color: rgba(220, 228, 236, 0.55) !important;
+}
+
+body:not(.login-shell) .input-dark:focus,
+body:not(.login-shell) input.input-dark:focus,
+body:not(.login-shell) select.input-dark:focus,
+body:not(.login-shell) textarea.input-dark:focus {
+  outline: none !important;
+  border-color: rgba(0, 255, 65, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(0, 255, 65, 0.12) !important;
+}
+
+body:not(.login-shell) .monstruo-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 10px !important;
+  background: transparent !important;
+}
+
+body:not(.login-shell) .monstruo-table thead th {
+  padding: 10px 14px !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgba(228, 236, 244, 0.8) !important;
+  font-size: 0.74rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.9px !important;
+  text-transform: uppercase !important;
+  background: transparent !important;
+}
+
+body:not(.login-shell) .monstruo-table tbody td {
+  background: rgba(18, 26, 36, 0.92) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.22) !important;
+  padding: 12px 14px !important;
+  color: #f2f6fb !important;
+}
+
+body:not(.login-shell) .monstruo-table tbody td:first-child {
+  border-top-left-radius: 12px !important;
+  border-bottom-left-radius: 12px !important;
+}
+
+body:not(.login-shell) .monstruo-table tbody td:last-child {
+  border-top-right-radius: 12px !important;
+  border-bottom-right-radius: 12px !important;
+}
+
+body:not(.login-shell) .monstruo-table tbody tr:hover td {
+  background: rgba(24, 33, 46, 0.96) !important;
+}
+
+body:not(.login-shell) .modal-content,
+body:not(.login-shell) dialog[open],
+body:not(.login-shell) .cfg-modal-card,
+body:not(.login-shell) .tks-modal {
+  background: linear-gradient(155deg, rgba(14, 19, 27, 0.98), rgba(8, 12, 17, 0.98)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.52) !important;
+  border-radius: 16px !important;
 }

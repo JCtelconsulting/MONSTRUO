@@ -7,30 +7,273 @@
   <title>Monstruo Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
-    rel="stylesheet">
-  <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.6" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=68.0" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#070b11">
+  <style>
+    .dash-dev-badge {
+      background: #ff4444;
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7em;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+
+    .dash-who-pill {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+      opacity: 0.7;
+    }
+
+    .dashboard-server-status {
+      margin: 0;
+      text-align: right;
+      white-space: nowrap;
+      font-size: 0.86rem;
+      color: var(--text-soft);
+      align-self: center;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard-server-status {
+        width: 100%;
+        text-align: left;
+        white-space: normal;
+        margin-top: 2px;
+      }
+    }
+
+    .dashboard-grid {
+      display: grid;
+      gap: 1.3rem;
+    }
+
+    .dashboard-grid--kpi {
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      margin-top: 1rem;
+    }
+
+    .dashboard-grid--two {
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      margin-top: 0.8rem;
+    }
+
+    .dashboard-card {
+      cursor: default;
+    }
+
+    .dashboard-card.is-critical {
+      border-left: 4px solid #ff4444;
+    }
+
+    .dashboard-block {
+      margin-top: 2rem;
+    }
+
+    .dashboard-block-title {
+      margin: 0 0 0.7rem;
+      font-size: 1rem;
+      letter-spacing: 0.3px;
+    }
+
+    .dashboard-empty-ok {
+      margin-top: 0.7rem;
+      border: 1px solid rgba(68, 255, 136, 0.25);
+      border-radius: 12px;
+      padding: 12px;
+      color: rgba(203, 255, 219, 0.95);
+      text-align: center;
+      background: rgba(68, 255, 136, 0.1);
+      font-size: 0.87rem;
+    }
+
+    .dashboard-widget-card {
+      align-items: flex-start;
+      text-align: left;
+      min-height: 220px;
+    }
+
+    .dashboard-widget-head {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 0.85rem;
+      gap: 12px;
+    }
+
+    .dashboard-widget-head h4 {
+      margin: 0;
+      font-size: 0.95rem;
+      letter-spacing: 0.3px;
+    }
+
+    .dashboard-widget-help {
+      color: var(--text-soft);
+      font-size: 0.8rem;
+      line-height: 1.35;
+      margin-bottom: 0.65rem;
+    }
+
+    .monstruo-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    .monstruo-table thead tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: left;
+    }
+
+    .monstruo-table th,
+    .monstruo-table td {
+      padding: 9px 8px;
+      vertical-align: middle;
+    }
+
+    .monstruo-table th {
+      font-size: 0.76rem;
+      color: rgba(226, 233, 240, 0.82);
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    .monstruo-table tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .monstruo-table tbody tr:hover td {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .monstruo-table td:last-child,
+    .monstruo-table th:last-child {
+      text-align: right;
+    }
+
+    .dash-link-row[data-ticket-id] {
+      cursor: pointer;
+    }
+
+    .dash-link-row[data-ticket-id]:hover td {
+      background: rgba(0, 243, 255, 0.08);
+    }
+
+    .dash-age-warn {
+      color: #ff7f7f;
+      font-weight: 700;
+    }
+
+    .pill-success {
+      color: #7dffb0;
+      border-color: rgba(68, 255, 136, 0.45);
+      background: rgba(68, 255, 136, 0.15);
+    }
+
+    .pill-error {
+      color: #ff9999;
+      border-color: rgba(255, 68, 68, 0.45);
+      background: rgba(255, 68, 68, 0.18);
+    }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .guide-card {
+      background: rgba(8, 12, 18, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .guide-card h4 {
+      margin: 0;
+      font-size: 0.92rem;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .guide-desc {
+      font-size: 0.85rem;
+      color: var(--text-soft);
+      line-height: 1.4;
+    }
+
+    .guide-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.84rem;
+    }
+
+    .guide-list-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 7px 10px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .guide-token {
+      font-family: 'Space Grotesk', monospace;
+      color: #e6f0f9;
+      font-size: 0.8rem;
+    }
+
+    .guide-value {
+      color: var(--text-soft);
+      font-size: 0.8rem;
+      text-align: right;
+    }
+
+    .guide-code {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      background: rgba(3, 5, 8, 0.9);
+      padding: 10px;
+      color: #c8f8d6;
+      font-size: 0.79rem;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 720px) {
+      .dashboard-grid--two {
+        grid-template-columns: 1fr;
+      }
+
+      .monstruo-table {
+        font-size: 0.82rem;
+      }
+    }
+  </style>
 </head>
 
 <body class="sidebar-collapsed">
   <header id="app-header">
     <div class="header-top">
-      <h1>MONSTRUO <span
-          style="background: #ff4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7em; margin-left: 10px; vertical-align: middle;">DEV</span>
-      </h1>
+      <h1>MONSTRUO <span class="dash-dev-badge">DEV</span></h1>
       <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
         <i class="fas fa-bars"></i>
       </button>
     </div>
 
-    <nav id="dynamic-sidebar" class="side-nav">
-    </nav>
+    <nav id="dynamic-sidebar" class="side-nav"></nav>
     <div class="header-actions">
-      <span id="who" class="pill"
-        style="display:block; margin-bottom:10px; font-size:0.8rem; opacity:0.7;">Usuario</span>
+      <span id="who" class="pill dash-who-pill">Usuario</span>
       <div class="footer-buttons-container">
         <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
           <i class="fas fa-key"></i> <span>Cuenta</span>
@@ -43,37 +286,99 @@
   </header>
 
   <main>
-    <div class="main-inner">
-      <section class="section-block" id="section-general">
-        <div class="section-header">
-          <h3>Dashboard</h3>
-          <p>Resumen Operativo Monstruo</p>
+    <div class="main-inner module-shell">
+      <div class="section-header module-tabs-header module-shell-header">
+        <div class="module-shell-title">
+          <h2 class="module-page-title">Dashboard</h2>
+          <p class="module-shell-subtitle">Resumen Operativo Monstruo</p>
         </div>
-        <style>
-          .monstruo-dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-top: 1rem;
-          }
+        <div class="module-shell-actions">
+          <p id="dashboard-status" class="dashboard-server-status">Cargando estado del servidor...</p>
+        </div>
+      </div>
 
-        </style>
-        <div class="monstruo-dashboard-grid">
-          <div class="card card-terreno" style="cursor: default;">
-            <i class="fas fa-chart-pie"></i>
-            <h2>Operaciones</h2>
-            <p>Vista General</p>
+      <section class="section-block module-shell-content" id="section-general">
+
+        <div class="dashboard-grid dashboard-grid--kpi" id="ops-kpi-grid">
+          <div class="card card-terreno dashboard-card" id="kpi-card-tickets">
+            <i class="fas fa-ticket-alt"></i>
+            <h2>Tickets</h2>
+            <p>Cargando...</p>
           </div>
-          <div class="card card-supervisor" style="cursor: default;">
+          <div class="card card-supervisor dashboard-card" id="kpi-card-sales">
             <i class="fas fa-file-invoice-dollar"></i>
-            <h2>Facturación</h2>
-            <p>Cobranza</p>
+            <h2>Ventas</h2>
+            <p>Cargando...</p>
           </div>
-          <div class="card card-gerencia" style="cursor: default;">
+          <div class="card card-gerencia dashboard-card" id="kpi-card-customers">
             <i class="fas fa-users"></i>
             <h2>Clientes</h2>
-            <p>Cartera</p>
+            <p>Cargando...</p>
           </div>
+        </div>
+
+        <div id="failures-container" class="dashboard-block"></div>
+
+        <div class="dashboard-block">
+          <h3 class="dashboard-block-title">Ticketera 360°</h3>
+          <div id="tks-widget-container" class="dashboard-grid dashboard-grid--two"></div>
+        </div>
+      </section>
+
+      <section class="section-block" id="section-style-guide">
+        <div class="section-header">
+          <h3>Guía Visual de la App</h3>
+          <p>Base oficial obligatoria: patrones PMO + ERP. Todo módulo nuevo o editado debe respetar esta línea visual, incluyendo contenedor principal sin cuadro de fondo.</p>
+        </div>
+
+        <div class="guide-grid demo-stagger">
+          <article class="guide-card" style="--i:0;">
+            <h4>Fuente Oficial PMO + ERP</h4>
+            <p class="guide-desc">PMO y ERP son la referencia canónica de UX para MONSTRUO. No se aceptan variantes visuales paralelas.</p>
+            <div class="guide-list">
+              <div class="guide-list-item"><span class="guide-token">Layout</span><span class="guide-value">`section-block` + `section-header` (sin cuadro base)</span></div>
+              <div class="guide-list-item"><span class="guide-token">Navegación</span><span class="guide-value">`tab-bar` + `tab-btn`</span></div>
+              <div class="guide-list-item"><span class="guide-token">Datos</span><span class="guide-value">`monstruo-table` / `erp-table`</span></div>
+              <div class="guide-list-item"><span class="guide-token">Acción</span><span class="guide-value">`btn-primary` neon + dark surface</span></div>
+            </div>
+          </article>
+
+          <article class="guide-card" style="--i:1;">
+            <h4>Contrato de Componentes</h4>
+            <p class="guide-desc">La composición visual mínima debe ser uniforme para que cualquier agente pueda intervenir sin romper consistencia.</p>
+            <div class="demo-row">
+              <span class="demo-chip demo-chip--ok">Panel principal</span>
+              <span class="demo-chip demo-chip--info">Subsecciones</span>
+              <span class="demo-chip">Acciones arriba</span>
+            </div>
+            <pre class="guide-code">div.main-inner.module-shell
+  div.section-header.module-tabs-header.module-shell-header
+  div.tab-bar (si aplica)
+  section.section-block.module-shell-content</pre>
+          </article>
+
+          <article class="guide-card" style="--i:2;">
+            <h4>Estados y Feedback</h4>
+            <p class="guide-desc">Toda pantalla debe comunicar estados de carga, éxito y error sin cajas blancas ni estilos del navegador.</p>
+            <div class="demo-stack">
+              <div class="demo-toast demo-toast--ok">Guardado correcto</div>
+              <div class="demo-toast demo-toast--info">Sin actividad reciente</div>
+              <div class="demo-skeleton"></div>
+            </div>
+          </article>
+
+          <article class="guide-card" style="--i:3;">
+            <h4>Checklist para Agentes</h4>
+            <p class="guide-desc">Checklist obligatorio antes de cerrar un cambio de UI en cualquier módulo.</p>
+            <div class="guide-list">
+              <div class="guide-list-item"><span class="guide-token">1.</span><span class="guide-value">Paleta PMO/ERP (`--neon`, `--info`, `--danger`)</span></div>
+              <div class="guide-list-item"><span class="guide-token">2.</span><span class="guide-value">Sin cajas blancas o inputs nativos sin tema</span></div>
+              <div class="guide-list-item"><span class="guide-token">3.</span><span class="guide-value">Contenedor principal sin cuadro (transparente)</span></div>
+              <div class="guide-list-item"><span class="guide-token">4.</span><span class="guide-value">Tablas/modales en superficie oscura consistente</span></div>
+              <div class="guide-list-item"><span class="guide-token">5.</span><span class="guide-value">Evitar inline style salvo excepción justificada</span></div>
+              <div class="guide-list-item"><span class="guide-token">6.</span><span class="guide-value">No romper contratos públicos del módulo</span></div>
+            </div>
+          </article>
         </div>
       </section>
     </div>
@@ -82,157 +387,217 @@
   <script src="/modulos/_compartido/js/utilidades.js?v=203"></script>
   <script src="/modulos/_compartido/js/admin.js?v=4"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      if (window.initLogout) window.initLogout();
-      loadDashboard();
-      setInterval(loadDashboard, 30000); // 30s auto-refresh
-    });
+    const DASHBOARD_REFRESH_MS = 30000;
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function asNumber(value, fallback = 0) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function truncate(text, max = 48) {
+      const raw = String(text || '');
+      if (raw.length <= max) return raw;
+      return raw.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+    }
+
+    function relativeHours(isoDate) {
+      const created = new Date(isoDate);
+      if (Number.isNaN(created.getTime())) return { label: '-', warn: false };
+      const diffHrs = Math.max(0, Math.round((Date.now() - created.getTime()) / 36e5));
+      if (diffHrs > 24) {
+        return { label: `${Math.round(diffHrs / 24)}d`, warn: true };
+      }
+      return { label: `${diffHrs}h`, warn: diffHrs > 4 };
+    }
+
+    function initDashboardInteractions() {
+      const tksContainer = document.getElementById('tks-widget-container');
+      if (!tksContainer) return;
+      tksContainer.addEventListener('click', (evt) => {
+        const row = evt.target.closest('tr[data-ticket-id]');
+        if (!row) return;
+        const ticketId = asNumber(row.dataset.ticketId, 0);
+        if (ticketId <= 0) return;
+        window.location.href = `/modulos/tks/tks.html?ticket_id=${ticketId}`;
+      });
+    }
+
+    function renderDashboardHeader(data) {
+      const statusNode = document.getElementById('dashboard-status');
+      if (!statusNode) return;
+      const systemStatus = String(data.system_status || 'unknown').toLowerCase();
+      const healthy = systemStatus === 'healthy';
+      const statusLabel = healthy ? 'HEALTHY' : systemStatus.toUpperCase();
+      const failures24h = asNumber(data.jobs_health && data.jobs_health.failures_24h, 0);
+      let html = `Estado: <span class="pill ${healthy ? 'pill-success' : 'pill-error'}">${escapeHtml(statusLabel)}</span>`;
+      if (failures24h > 0) {
+        html += ` • ${failures24h} fallas de jobs (24h)`;
+      }
+      statusNode.innerHTML = html;
+    }
+
+    function renderOpsCards(kpis) {
+      const ticketsOpen = asNumber(kpis.tickets_open, 0);
+      const ticketsCritical = asNumber(kpis.tickets_critical, 0);
+      const salesTodayAmount = asNumber(kpis.sales_today_amount, 0);
+      const salesTodayCount = asNumber(kpis.sales_today_count, 0);
+      const totalCustomers = asNumber(kpis.total_customers, 0);
+
+      const cardTickets = document.getElementById('kpi-card-tickets');
+      if (cardTickets) {
+        cardTickets.classList.toggle('is-critical', ticketsCritical > 0);
+        cardTickets.innerHTML = `
+          <i class="fas fa-ticket-alt"></i>
+          <h2>${ticketsOpen} Tickets</h2>
+          <p>${ticketsCritical} críticos</p>
+        `;
+      }
+
+      const cardSales = document.getElementById('kpi-card-sales');
+      if (cardSales) {
+        cardSales.innerHTML = `
+          <i class="fas fa-file-invoice-dollar"></i>
+          <h2>$${new Intl.NumberFormat('es-CL', { notation: 'compact' }).format(salesTodayAmount)}</h2>
+          <p>${salesTodayCount} ventas hoy</p>
+        `;
+      }
+
+      const cardCustomers = document.getElementById('kpi-card-customers');
+      if (cardCustomers) {
+        cardCustomers.innerHTML = `
+          <i class="fas fa-users"></i>
+          <h2>${totalCustomers}</h2>
+          <p>clientes activos</p>
+        `;
+      }
+    }
+
+    function renderRecentFailures(data) {
+      const failContainer = document.getElementById('failures-container');
+      if (!failContainer) return;
+      const failures = Array.isArray(data.recent_failures) ? data.recent_failures : [];
+
+      if (!failures.length) {
+        failContainer.innerHTML = `
+          <h4 class="dashboard-block-title">Alertas Recientes</h4>
+          <div class="dashboard-empty-ok"><i class="fas fa-check-circle"></i> Todos los sistemas operativos</div>
+        `;
+        return;
+      }
+
+      const rows = failures.map((f) => {
+        const jobType = escapeHtml(f.job_type || '-');
+        const err = escapeHtml(truncate(f.error_msg || '-', 70));
+        const startedAt = String(f.started_at || '');
+        const hour = startedAt.length >= 16 ? escapeHtml(startedAt.substring(11, 16)) : '-';
+        return `<tr><td>${jobType}</td><td style="color:#ff8d8d">${err}</td><td>${hour}</td></tr>`;
+      }).join('');
+
+      failContainer.innerHTML = `
+        <h4 class="dashboard-block-title">⚠️ Alertas Recientes</h4>
+        <table class="monstruo-table">
+          <thead><tr><th>Job</th><th>Error</th><th>Hora</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function renderTicketeraWidgets(tksData) {
+      const tksContainer = document.getElementById('tks-widget-container');
+      if (!tksContainer) return;
+      const topClientes = Array.isArray(tksData.top_clientes) ? tksData.top_clientes : [];
+      const pendingEmails = Array.isArray(tksData.pending_emails) ? tksData.pending_emails : [];
+
+      const clientsRows = topClientes.length
+        ? topClientes.map((c) => `
+            <tr>
+              <td>${escapeHtml(c.cliente || '-')}</td>
+              <td><strong>${asNumber(c.total, 0)}</strong></td>
+            </tr>
+          `).join('')
+        : `<tr><td colspan="2" style="text-align:center; opacity:0.62;">Sin actividad reciente</td></tr>`;
+
+      const emailRows = pendingEmails.length
+        ? pendingEmails.map((email) => {
+          const ticketId = asNumber(email.id, 0);
+          const rowAttr = ticketId > 0 ? ` data-ticket-id="${ticketId}"` : '';
+          const subject = escapeHtml(truncate(email.titulo || 'Sin asunto', 30));
+          const customer = escapeHtml(email.customer_id || '-');
+          const age = relativeHours(email.created_at);
+          return `
+            <tr class="dash-link-row"${rowAttr}>
+              <td>${subject}</td>
+              <td>${customer}</td>
+              <td class="${age.warn ? 'dash-age-warn' : ''}">${escapeHtml(age.label)}</td>
+            </tr>
+          `;
+        }).join('')
+        : `<tr><td colspan="3" style="text-align:center; opacity:0.62;">Todo al día</td></tr>`;
+
+      tksContainer.innerHTML = `
+        <div class="card dashboard-widget-card">
+          <div class="dashboard-widget-head">
+            <h4><i class="fas fa-building"></i> Top Clientes</h4>
+          </div>
+          <div class="dashboard-widget-help">Clientes con mayor actividad abierta en ticketera.</div>
+          <table class="monstruo-table">
+            <thead><tr><th>Cliente</th><th>Tickets</th></tr></thead>
+            <tbody>${clientsRows}</tbody>
+          </table>
+        </div>
+
+        <div class="card dashboard-widget-card">
+          <div class="dashboard-widget-head">
+            <h4><i class="fas fa-envelope-open-text"></i> Correos Pendientes</h4>
+          </div>
+          <div class="dashboard-widget-help">Correos recibidos sin respuesta operativa reciente.</div>
+          <table class="monstruo-table">
+            <thead><tr><th>Asunto</th><th>Cliente</th><th>Hace</th></tr></thead>
+            <tbody>${emailRows}</tbody>
+          </table>
+        </div>
+      `;
+    }
 
     async function loadDashboard() {
       try {
         const data = await window.fetchApi('/api/ops/dashboard');
+        renderDashboardHeader(data || {});
+        renderOpsCards((data && data.kpis) || {});
+        renderRecentFailures(data || {});
 
-        // Render KPIs
-        const kpis = data.kpis;
-        const salesCard = document.querySelector('.card-supervisor');
-        salesCard.querySelector('p').innerHTML = `Hoy: ${kpis.sales_today_count} doc<br>$${new Intl.NumberFormat('es-CL').format(kpis.sales_today_amount)}`;
-
-        const ticketsCard = document.querySelector('.card-terreno'); // Usar Terreno para Tickets? O ajustar iconos
-        // Terreno Icon is chart-pie. Let's hijack it for Jobs or Tickets.
-        // Let's assume Card 1 is Tickets, Card 2 Sales, Card 3 Customers
-
-        // Update Card 1: Tickets
-        const card1 = document.querySelectorAll('.card')[0];
-        card1.innerHTML = `
-            <i class="fas fa-ticket-alt"></i>
-            <h2>${kpis.tickets_open} Tickets</h2>
-            <p>${kpis.tickets_critical} Críticos</p>
-        `;
-        if (kpis.tickets_critical > 0) card1.style.borderLeft = "5px solid #ff4444";
-        else card1.style.borderLeft = "none";
-
-        // Update Card 2: Sales
-        const card2 = document.querySelectorAll('.card')[1];
-        card2.innerHTML = `
-            <i class="fas fa-file-invoice-dollar"></i>
-            <h2>$${new Intl.NumberFormat('es-CL', { notation: "compact" }).format(kpis.sales_today_amount)}</h2>
-            <p>${kpis.sales_today_count} Ventas Hoy</p>
-        `;
-
-        // Update Card 3: Customers
-        const card3 = document.querySelectorAll('.card')[2];
-        card3.innerHTML = `
-            <i class="fas fa-users"></i>
-            <h2>${kpis.total_customers}</h2>
-            <p>Clientes Activos</p>
-        `;
-
-        // System Status
-        const header = document.querySelector('.section-header p');
-        header.innerHTML = `Estado: <span class="pill ${data.system_status == 'healthy' ? 'pill-success' : 'pill-error'}">${data.system_status.toUpperCase()}</span>`;
-        if (data.jobs_health.failures_24h > 0) {
-          header.innerHTML += ` &bull; ${data.jobs_health.failures_24h} Fallas en Jobs (24h)`;
-        }
-
-        // Render Recent Failures Table (Bottom)
-        let failContainer = document.getElementById('failures-container');
-        if (!failContainer) {
-          failContainer = document.createElement('div');
-          failContainer.id = 'failures-container';
-          failContainer.style.marginTop = '2rem';
-          document.querySelector('.monstruo-dashboard-grid').after(failContainer);
-        }
-
-        if (data.recent_failures && data.recent_failures.length > 0) {
-          let html = `<h4>⚠️ Alertas Recientes</h4><table class="monstruo-table" style="width:100%; margin-top:0.5rem"><thead><tr><th>Job</th><th>Error</th><th>Hora</th></tr></thead><tbody>`;
-          data.recent_failures.forEach(f => {
-            html += `<tr><td>${f.job_type}</td><td style="color:#d32f2f">${f.error_msg.substring(0, 50)}...</td><td>${f.started_at.substring(11, 16)}</td></tr>`;
-          });
-          html += `</tbody></table>`;
-          failContainer.innerHTML = html;
-        } else {
-          failContainer.innerHTML += `<div style="margin-top:2rem; opacity:0.6; text-align:center"><i class="fas fa-check-circle" style="color:#00c851"></i> Todos los sistemas operativos</div>`;
-        }
-
-        // --- Ticketera V3 Widget ---
         try {
-            const tksData = await window.fetchApi('/api/tks/dashboard/kpi');
-            let tksContainer = document.getElementById('tks-widget-container');
-            if (!tksContainer) {
-                tksContainer = document.createElement('div');
-                tksContainer.id = 'tks-widget-container';
-                tksContainer.className = 'monstruo-dashboard-grid';
-                tksContainer.style.marginTop = '2rem';
-                tksContainer.style.gridTemplateColumns = '1fr 1fr'; 
-                document.querySelector('.monstruo-dashboard-grid').after(tksContainer);
-                
-                // Add header for this section
-                const tksHeader = document.createElement('div');
-                tksHeader.innerHTML = '<h3>Ticketera 360°</h3>';
-                tksHeader.style.marginTop = '2rem';
-                tksContainer.before(tksHeader);
-            }
-
-            // Widget 1: Top Clientes
-            let clientsHtml = `
-                <div class="card" style="grid-column: span 1; cursor:default; align-items: flex-start; text-align: left;">
-                    <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:1rem">
-                        <h4 style="margin:0"><i class="fas fa-building"></i> Top Clientes (Activos)</h4>
-                    </div>
-                    <table class="monstruo-table" style="width:100%; font-size:0.9rem">
-                        <thead><tr><th>Cliente</th><th style="text-align:right">Tickets</th></tr></thead>
-                        <tbody>
-            `;
-            if (tksData.top_clientes.length === 0) {
-                clientsHtml += `<tr><td colspan="2" style="text-align:center; opacity:0.6">Sin actividad reciente</td></tr>`;
-            } else {
-                tksData.top_clientes.forEach(c => {
-                    clientsHtml += `<tr><td>${c.cliente}</td><td style="text-align:right"><strong>${c.total}</strong></td></tr>`;
-                });
-            }
-            clientsHtml += `</tbody></table></div>`;
-
-            // Widget 2: Pendientes de Respuesta
-            let emailsHtml = `
-                <div class="card" style="grid-column: span 1; cursor:default; align-items: flex-start; text-align: left;">
-                    <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:1rem">
-                        <h4 style="margin:0"><i class="fas fa-envelope-open-text"></i> Correos Pendientes</h4>
-                    </div>
-                    <table class="monstruo-table" style="width:100%; font-size:0.9rem">
-                         <thead><tr><th>Asunto</th><th>Cliente</th><th>Hace</th></tr></thead>
-                        <tbody>
-            `;
-             if (tksData.pending_emails.length === 0) {
-                emailsHtml += `<tr><td colspan="3" style="text-align:center; opacity:0.6">Todo al día 🚀</td></tr>`;
-            } else {
-                tksData.pending_emails.forEach(e => {
-                    const created = new Date(e.created_at);
-                    const now = new Date();
-                    const diffHrs = Math.round((now - created) / 36e5);
-                    const timeStr = diffHrs > 24 ? `${Math.round(diffHrs/24)}d` : `${diffHrs}h`;
-                    
-                    emailsHtml += `
-                        <tr style="cursor:pointer" onclick="window.location.href='/modulos/tks/tks.html?ticket_id=${e.id}'">
-                            <td>${e.titulo.substring(0, 25)}...</td>
-                            <td>${e.customer_id || '-'}</td>
-                            <td style="color:${diffHrs > 4 ? '#ff4444' : 'inherit'}">${timeStr}</td>
-                        </tr>`;
-                });
-            }
-            emailsHtml += `</tbody></table></div>`;
-
-            tksContainer.innerHTML = clientsHtml + emailsHtml;
-
-        } catch (e) {
-            console.warn("No se pudo cargar widget Ticketera/KPI:", e);
+          const tksData = await window.fetchApi('/api/tks/dashboard/kpi');
+          renderTicketeraWidgets(tksData || {});
+        } catch (ticketErr) {
+          console.warn('No se pudo cargar widget Ticketera/KPI:', ticketErr);
+          const tksContainer = document.getElementById('tks-widget-container');
+          if (tksContainer) {
+            tksContainer.innerHTML = '<div class="dashboard-empty-ok">No se pudo cargar Ticketera 360° en este momento.</div>';
+          }
         }
-
       } catch (err) {
-        console.error("Dashboard Error", err);
+        console.error('Dashboard Error', err);
       }
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.initLogout) window.initLogout();
+      initDashboardInteractions();
+      loadDashboard();
+      setInterval(loadDashboard, DASHBOARD_REFRESH_MS);
+    });
   </script>
-  <script src="/modulos/_compartido/js/sidebar.js?v=8"></script>
+  <script src="/modulos/_compartido/js/sidebar.js?v=11"></script>
 </body>
 
 </html>

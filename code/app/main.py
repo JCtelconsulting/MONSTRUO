@@ -8,8 +8,13 @@ from pydantic import BaseModel
 import subprocess
 import os
 import asyncio
+import json
+import time
+import secrets
+from threading import Lock
 from dotenv import load_dotenv
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
+import httpx
 
 # Cargar .env desde /srv/monstruo/.env (dos niveles arriba de cerebro.py si esta en code/sistema_gestion)
 # Path actual de cerebro.py: /srv/monstruo/code/sistema_gestion/cerebro.py
@@ -48,6 +53,15 @@ from app.api.routers import templates as rutas_templates
 PORT = int(os.environ.get("PORT", 9000))
 
 app = FastAPI(title="Monstruo API", version="2.0")
+
+_LOGIN_RATE_LOCK = Lock()
+_LOGIN_FAILS: Dict[str, List[float]] = {}
+_WEAK_SECRET_MARKERS = {
+    "",
+    "CAMBIAME_ESTO_ES_INSEGURO_F8A9",
+    "replace_me",
+    "dev_only_change_me",
+}
 
 SUBDOMAIN_MAP = {
     "login": "/modulos/login/login.html",
@@ -105,6 +119,92 @@ def _is_cookie_secure_enabled() -> bool:
     )
 
 
+def _normalize_roles_claim(primary_role: Any, secondary_roles_raw: Any = None) -> List[str]:
+    primary = str(primary_role or "").strip().lower()
+    roles: List[str] = []
+
+    secondary_source = secondary_roles_raw
+    if isinstance(secondary_source, str):
+        text = secondary_source.strip()
+        if text:
+            try:
+                secondary_source = json.loads(text)
+            except Exception:
+                secondary_source = [token.strip() for token in text.split(",") if token.strip()]
+        else:
+            secondary_source = []
+
+    if isinstance(secondary_source, list):
+        for item in secondary_source:
+            parsed = str(item or "").strip().lower()
+            if parsed and parsed not in roles:
+                roles.append(parsed)
+
+    if primary and primary not in roles:
+        roles.insert(0, primary)
+    return roles or ([primary] if primary else [])
+
+
+def _is_weak_secret(secret_key: str) -> bool:
+    normalized = str(secret_key or "").strip()
+    if normalized in _WEAK_SECRET_MARKERS:
+        return True
+    return len(normalized) < 32
+
+
+def _login_window_seconds() -> int:
+    raw = int(getattr(app_settings, "LOGIN_RATE_LIMIT_WINDOW_SECONDS", 300) or 300)
+    return max(60, min(3600, raw))
+
+
+def _login_max_attempts() -> int:
+    raw = int(getattr(app_settings, "LOGIN_RATE_LIMIT_MAX_ATTEMPTS", 10) or 10)
+    return max(3, min(100, raw))
+
+
+def _login_throttle_key(request: Request, username: str) -> str:
+    ip = (request.client.host if request.client else "unknown").strip().lower()
+    user = str(username or "").strip().lower()
+    return f"{ip}|{user}"
+
+
+def _record_login_failure(key: str) -> None:
+    now = time.time()
+    window = _login_window_seconds()
+    with _LOGIN_RATE_LOCK:
+        failures = [ts for ts in _LOGIN_FAILS.get(key, []) if (now - ts) < window]
+        failures.append(now)
+        _LOGIN_FAILS[key] = failures
+
+
+def _clear_login_failures(key: str) -> None:
+    with _LOGIN_RATE_LOCK:
+        _LOGIN_FAILS.pop(key, None)
+
+
+def _login_retry_after_seconds(key: str) -> int:
+    now = time.time()
+    window = _login_window_seconds()
+    max_attempts = _login_max_attempts()
+    with _LOGIN_RATE_LOCK:
+        failures = [ts for ts in _LOGIN_FAILS.get(key, []) if (now - ts) < window]
+        _LOGIN_FAILS[key] = failures
+        if len(failures) < max_attempts:
+            return 0
+        oldest = failures[0]
+    retry_after = int(window - (now - oldest))
+    return max(1, retry_after)
+
+
+def _parse_email_allowlist(raw_value: Any) -> set[str]:
+    out: set[str] = set()
+    for token in str(raw_value or "").split(","):
+        email = token.strip().lower()
+        if email and "@" in email:
+            out.add(email)
+    return out
+
+
 # --- JOB REGISTRY ---
 def register_all_jobs():
     # Enlazar string 'SYNC_STOCK' con la función real
@@ -130,6 +230,14 @@ def register_all_jobs():
 
 @app.on_event("startup")
 async def start_background_workers():
+    env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
+    if _is_weak_secret(getattr(app_settings, "SECRET_KEY", "")):
+        if env_type == "prod":
+            raise RuntimeError("CRITICAL: SECRET_KEY inseguro en PROD. Configura uno largo y aleatorio.")
+        generated = secrets.token_urlsafe(64)
+        app_settings.SECRET_KEY = generated
+        print("[SECURITY] WARN: SECRET_KEY inseguro/ausente. Se generó una clave efímera para este runtime.")
+
     # 0. Initialize DB
     db.init_db()
 
@@ -323,9 +431,19 @@ class LoginRequest(BaseModel):
 
 @app.post("/api/auth/login")
 def auth_login_compat(req: LoginRequest, response: Response, request: Request):
+    throttle_key = _login_throttle_key(request, req.email)
+    retry_after = _login_retry_after_seconds(throttle_key)
+    if retry_after > 0:
+        raise HTTPException(
+            status_code=429,
+            detail="Demasiados intentos de login. Intenta nuevamente en unos minutos.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     ip = request.client.host if request.client else "unknown"
     user_data = auth_service.authenticate_user(req.email, req.password)
     if not user_data:
+        _record_login_failure(throttle_key)
         audit.log_audit(
             req.email,
             "LOGIN_FAILED",
@@ -334,6 +452,7 @@ def auth_login_compat(req: LoginRequest, response: Response, request: Request):
         )
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
 
+    _clear_login_failures(throttle_key)
     audit.log_audit(
         user_data["username"],
         "LOGIN_SUCCESS",
@@ -341,7 +460,11 @@ def auth_login_compat(req: LoginRequest, response: Response, request: Request):
         metadata={"scope": "compat", "role": user_data["role"]},
     )
 
-    token = security.create_access_token(user_data["username"], user_data["role"])
+    token = security.create_access_token(
+        user_data["username"],
+        user_data["role"],
+        roles=user_data.get("roles"),
+    )
     configured_domain = os.getenv("COOKIE_DOMAIN", "").strip() or None
     cookie_domain = _resolve_cookie_domain(request)
     cookie_path = _resolve_cookie_path(request)
@@ -349,6 +472,12 @@ def auth_login_compat(req: LoginRequest, response: Response, request: Request):
     response.delete_cookie("access_token", path=cookie_path)
     if configured_domain:
         response.delete_cookie("access_token", domain=configured_domain, path=cookie_path)
+
+    # CRITICAL FIX: Always try to delete root cookie to avoid collisions with /dev or /prod
+    if cookie_path != "/":
+        response.delete_cookie("access_token", path="/")
+        if configured_domain:
+            response.delete_cookie("access_token", domain=configured_domain, path="/")
 
     response.set_cookie(
         key="access_token",
@@ -364,6 +493,7 @@ def auth_login_compat(req: LoginRequest, response: Response, request: Request):
     return {
         "ok": True,
         "role": user_data["role"],
+        "roles": user_data.get("roles") or [user_data["role"]],
         "name": user_data["username"],
         "token": token,
     }
@@ -382,11 +512,14 @@ def auth_whoami_compat(request: Request):
     payload = security.verify_token(token)
     if not payload:
         return {"logged": False}
+    roles = _normalize_roles_claim(payload.get("role"), payload.get("roles"))
+    role = roles[0] if roles else str(payload.get("role") or "").strip().lower()
 
     return {
         "logged": True,
         "email": payload["sub"],
-        "role": payload["role"],
+        "role": role,
+        "roles": roles,
         "user_id": payload["sub"],
         "name": payload["sub"],
     }
@@ -446,17 +579,174 @@ def check_session_status(
             "ok": True, 
             "user": sess["username"], 
             "role": sess["role"],
+            "roles": sess.get("roles") or [sess["role"]],
             "allowed_modules": allowed
         }
     except Exception as e:
         return {"ok": False, "detail": str(e)}
 
 
+@app.get("/api/auth/google/login")
+async def google_login(request: Request):
+    # Detectar el prefijo para la URI de redirección
+    prefix = request.headers.get("X-Forwarded-Prefix", "")
+    if prefix:
+        redirect_uri = f"https://login.telconsulting.cl{prefix}/api/auth/google/callback"
+    else:
+        redirect_uri = f"{str(request.base_url).rstrip('/')}/api/auth/google/callback"
+
+    oauth_state = secrets.token_urlsafe(32)
+    state_ttl = max(120, min(3600, int(getattr(app_settings, "GOOGLE_OAUTH_STATE_TTL_SECONDS", 600) or 600)))
+
+    params = {
+        "client_id": app_settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account",
+        "state": oauth_state,
+    }
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    login_response = RedirectResponse(url)
+    login_response.set_cookie(
+        key="oauth_state",
+        value=oauth_state,
+        httponly=True,
+        max_age=state_ttl,
+        samesite="lax",
+        secure=_is_cookie_secure_enabled(),
+        domain=_resolve_cookie_domain(request),
+        path=_resolve_cookie_path(request),
+    )
+    return login_response
+
+
+@app.get("/api/auth/google/callback")
+async def google_callback(request: Request, code: str, state: str):
+    expected_state = str(request.cookies.get("oauth_state") or "").strip()
+    if not expected_state or not state or not secrets.compare_digest(str(state).strip(), expected_state):
+        raise HTTPException(status_code=400, detail="invalid_oauth_state")
+
+    prefix = request.headers.get("X-Forwarded-Prefix", "")
+    if prefix:
+        redirect_uri = f"https://login.telconsulting.cl{prefix}/api/auth/google/callback"
+    else:
+        redirect_uri = f"{str(request.base_url).rstrip('/')}/api/auth/google/callback"
+
+    # Intercambiar código por token
+    async with httpx.AsyncClient() as client:
+        token_res = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": app_settings.GOOGLE_CLIENT_ID,
+                "client_secret": app_settings.GOOGLE_CLIENT_SECRET,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_uri,
+            }
+        )
+        token_data = token_res.json()
+        if "access_token" not in token_data:
+            raise HTTPException(status_code=400, detail=f"Failed to get token: {token_data}")
+
+        # Obtener info del usuario
+        user_res = await client.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {token_data['access_token']}"}
+        )
+        user_info = user_res.json()
+        email = user_info.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Failed to get email from Google")
+
+    # Verificar si el usuario existe en nuestra DB o auto-crear solo si está explícitamente autorizado.
+    conn = db.get_conn()
+    try:
+        row = conn.execute("SELECT username, role, secondary_roles, is_active FROM users WHERE username=?", (email,)).fetchone()
+        if not row:
+            email_lc = str(email or "").strip().lower()
+            role_map = {
+                "juan.lopez@telconsulting.cl": "admin",
+                "diego@telconsulting.cl": "gerencia",
+                "fabian.correa@telconsulting.cl": "encargado_mesa",
+            }
+            auto_allowlist = _parse_email_allowlist(getattr(app_settings, "GOOGLE_AUTO_PROVISION_ALLOWLIST", ""))
+            can_auto_provision = email_lc in role_map or email_lc in auto_allowlist
+            if not can_auto_provision:
+                raise HTTPException(status_code=403, detail="Usuario no autorizado para auto-provisión")
+
+            role = role_map.get(email_lc, "ops")
+            auth_service.create_user(email, os.urandom(24).hex(), role)
+            row = {"username": email, "role": role, "secondary_roles": "[]", "is_active": 1}
+        
+        if int(row["is_active"] or 0) != 1:
+            raise HTTPException(status_code=403, detail="Usuario inactivo")
+
+        user_data = {
+            "username": row["username"],
+            "role": str(row["role"] or "").strip().lower(),
+            "roles": _normalize_roles_claim(row.get("role"), row.get("secondary_roles")),
+        }
+    finally:
+        conn.close()
+
+    # Generar sesión
+    token = security.create_access_token(
+        user_data["username"],
+        user_data["role"],
+        roles=user_data.get("roles"),
+    )
+    
+    # Redirigir al dashboard con la cookie seteada
+    target = f"{prefix}/dashboard" if prefix else "/dashboard"
+    final_response = RedirectResponse(url=target)
+    
+    cookie_path = prefix if prefix else "/"
+    configured_domain = os.environ.get("COOKIE_DOMAIN")
+    cookie_domain = _resolve_cookie_domain(request)
+
+    # Limpieza de cookies de raíz para evitar colisiones
+    if cookie_path != "/":
+        final_response.delete_cookie("access_token", path="/")
+        final_response.delete_cookie("oauth_state", path="/")
+        if configured_domain:
+            final_response.delete_cookie("access_token", domain=configured_domain, path="/")
+            final_response.delete_cookie("oauth_state", domain=configured_domain, path="/")
+
+    final_response.delete_cookie("oauth_state", path=cookie_path)
+    if configured_domain:
+        final_response.delete_cookie("oauth_state", domain=configured_domain, path=cookie_path)
+
+    final_response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        max_age=720 * 60,
+        samesite="lax",
+        secure=_is_cookie_secure_enabled(),
+        domain=cookie_domain,
+        path=cookie_path,
+    )
+    
+    return final_response
+
+
 @app.post("/auth/login")
 def login(body: LoginIn, request: Request):
+    throttle_key = _login_throttle_key(request, body.username)
+    retry_after = _login_retry_after_seconds(throttle_key)
+    if retry_after > 0:
+        raise HTTPException(
+            status_code=429,
+            detail="too_many_login_attempts",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     ip = request.client.host if request.client else "unknown"
     user_data = auth_service.authenticate_user(body.username, body.password)
     if not user_data:
+        _record_login_failure(throttle_key)
         audit.log_audit(
             body.username,
             "LOGIN_FAILED",
@@ -465,20 +755,30 @@ def login(body: LoginIn, request: Request):
         )
         raise HTTPException(status_code=401, detail="bad_credentials")
 
+    _clear_login_failures(throttle_key)
     audit.log_audit(
         user_data["username"],
         "LOGIN_SUCCESS",
         ip=ip,
         metadata={"scope": "v1", "role": user_data["role"]},
     )
-    token = security.create_access_token(user_data["username"], user_data["role"])
-    return {"access_token": token, "token_type": "bearer", "role": user_data["role"]}
+    token = security.create_access_token(
+        user_data["username"],
+        user_data["role"],
+        roles=user_data.get("roles"),
+    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": user_data["role"],
+        "roles": user_data.get("roles") or [user_data["role"]],
+    }
 
 
 @app.get("/auth/me")
 def me(authorization: Optional[str] = Header(default=None)):
     user = auth_deps.require_session(authorization)
-    return {"username": user["username"], "role": user["role"]}
+    return {"username": user["username"], "role": user["role"], "roles": user.get("roles") or [user["role"]]}
 
 
 @app.get("/dashboard")

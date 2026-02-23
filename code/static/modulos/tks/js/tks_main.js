@@ -6,7 +6,8 @@ const TksMain = (() => {
     // ---- Estado ----
     let currentTab = 'dashboard';
     let selectedTicketId = null;
-    let filters = { status: null, q: '', categoria: null, severidad: null };
+    let selectedTicket = null;
+    let filters = { status: null, q: '', categoria: null, severidad: null, asignado_a: null };
     let notifCount = 0;
     let searchTimeout = null;
     let pollIntervalId = null;
@@ -23,10 +24,44 @@ const TksMain = (() => {
     const CACHE_TTL_MS = 15000;
     const cache = {
         dashboard: null,
+        assignment: null,
         kanban: null,
         ops: null,
         list: new Map(),
     };
+    const ROLE_ADMIN = 'admin';
+    const ROLE_MESA_MANAGER = 'encargado_mesa';
+    const ROLE_TECH = new Set(['ops', 'redes', 'sistemas', 'implementaciones', ROLE_MESA_MANAGER]);
+    const ROLE_GERENCIA = 'gerencia';
+    const ROLE_MANAGEMENT = new Set([ROLE_ADMIN, ROLE_MESA_MANAGER]);
+    const ROLE_DISPATCH = new Set(['ops', ROLE_MESA_MANAGER]);
+    const ROLE_OPS_READ = new Set([ROLE_ADMIN]);
+    let sessionCtx = {
+        user: '',
+        role: '',
+        roles: [],
+        canWrite: false,
+        canCreate: false,
+        canViewOps: false,
+        isTech: false,
+        isScopedTech: false,
+        isAdmin: false,
+    };
+    let detailActiveTab = 'note';
+    let draftLockToken = '';
+    let draftHeartbeatIntervalId = null;
+    let currentDraftSnapshot = null;
+    let currentDraftMeta = {
+        canEdit: false,
+        blockedReason: '',
+        heartbeatSeconds: 60,
+    };
+    const AUTO_PROGRESS_DELAY_MS = 60000;
+    let autoProgressTimeoutId = null;
+    let currentWorkflow = null;
+    let resueltoCountdownIntervalId = null;
+    const ASSIGNEE_CACHE_TTL_MS = 120000;
+    let assigneeDirectoryCache = { items: [], ts: 0 };
 
     // ---- Elementos clave ----
     function el(id) { return document.getElementById(id); }
@@ -35,9 +70,467 @@ const TksMain = (() => {
     }
     function clearDataCache() {
         cache.dashboard = null;
+        cache.assignment = null;
         cache.kanban = null;
         cache.ops = null;
         cache.list.clear();
+    }
+
+    function errorMessage(err) {
+        return String(err?.message || 'Error inesperado');
+    }
+
+    function errorHtml(err) {
+        return TksUI.escapeHtml(errorMessage(err));
+    }
+
+    function escapeJsSingleQuoted(text) {
+        if (typeof TksUI.escapeJsSingleQuoted === 'function') {
+            return TksUI.escapeJsSingleQuoted(text);
+        }
+        return String(text == null ? '' : text)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/\r/g, '\\r')
+            .replace(/\n/g, '\\n')
+            .replace(/<\/script/gi, '<\\/script');
+    }
+
+    function scopeAssignmentDataForSession(rawData) {
+        const base = rawData || {};
+        if (!sessionCtx.isScopedTech) {
+            return base;
+        }
+        const me = normalizeUser(sessionCtx.user);
+        const allTechs = Array.isArray(base.technicians) ? base.technicians : [];
+        const mine = allTechs.filter((tech) => normalizeUser(tech?.username) === me);
+        return {
+            ...base,
+            technicians: mine,
+            queue: [],
+            scope: 'mine',
+        };
+    }
+
+    function humanizeUsername(rawValue) {
+        const raw = String(rawValue || '').trim();
+        if (!raw) return '';
+        const local = raw.includes('@') ? raw.split('@')[0] : raw;
+        const clean = local.replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!clean) return raw;
+        return clean
+            .split(' ')
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+    }
+
+    function specialtyLabel(rawSpecialty) {
+        const key = normalizeRole(rawSpecialty);
+        return {
+            ops: 'Mesa',
+            encargado_mesa: 'Encargado Mesa',
+            redes: 'Redes',
+            sistemas: 'Sistemas',
+            implementaciones: 'Implementaciones',
+            ejecucion: 'Ejecución',
+            general: 'General',
+            admin: 'Admin',
+            finance: 'Finanzas',
+            warehouse: 'Bodega',
+            gerencia: 'Gerencia',
+        }[key] || humanizeUsername(key);
+    }
+
+    function assigneeOptionLabel(item, options = {}) {
+        const username = String(item?.username || '').trim();
+        if (!username) return '';
+        const roles = Array.isArray(item?.roles) ? item.roles.filter(Boolean) : [];
+        const specialties = Array.isArray(item?.specialties) ? item.specialties.filter(Boolean) : [];
+        const available = item?.isAvailable !== false;
+        const includeAvailability = options.includeAvailability !== false;
+        const explicitName = String(item?.display_name || item?.full_name || '').trim();
+        let label = explicitName || humanizeUsername(username) || username;
+        const capabilityKeys = roles.length > 0 ? roles : specialties;
+        const capabilityLabels = [];
+        capabilityKeys.forEach((specKey) => {
+            const specLabel = specialtyLabel(specKey);
+            if (specLabel && !capabilityLabels.includes(specLabel)) capabilityLabels.push(specLabel);
+        });
+        if (capabilityLabels.length > 0) {
+            label += ` · ${capabilityLabels.join(' + ')}`;
+        } else {
+            label += ' · Sin rol técnico';
+        }
+        if (includeAvailability && !available) {
+            label += ' · no disponible';
+        }
+        return label;
+    }
+
+    async function loadAssignableUsers(force = false) {
+        const now = Date.now();
+        if (!force && assigneeDirectoryCache.ts && (now - assigneeDirectoryCache.ts) < ASSIGNEE_CACHE_TTL_MS) {
+            return assigneeDirectoryCache.items || [];
+        }
+        const out = await TksApi.listEspecialidades();
+        const rows = Array.isArray(out?.items) ? out.items : [];
+        const byUser = new Map();
+        rows.forEach((row) => {
+            const username = normalizeUser(row?.username);
+            if (!username) return;
+            const role = normalizeRole(row?.role);
+            const secondaryRoles = normalizeRoles(row?.secondary_roles);
+            const allRoles = normalizeRoles([role, ...secondaryRoles]);
+            const specialty = normalizeRole(row?.specialty);
+            if (allRoles.includes(ROLE_ADMIN) || specialty === ROLE_ADMIN) return;
+
+            const current = byUser.get(username) || {
+                username,
+                role,
+                roles: new Set(allRoles),
+                display_name: String(row?.display_name || row?.full_name || '').trim() || humanizeUsername(username),
+                specialties: new Set(),
+                isAvailable: false,
+            };
+            allRoles.forEach((roleKey) => {
+                if (roleKey) current.roles.add(roleKey);
+            });
+            if (!current.display_name) {
+                const rowName = String(row?.display_name || row?.full_name || '').trim();
+                current.display_name = rowName || humanizeUsername(username);
+            }
+            if (specialty && specialty !== ROLE_ADMIN) {
+                current.specialties.add(specialty);
+            }
+            const isAvailable = Number(row?.is_available ?? 1) !== 0;
+            current.isAvailable = current.isAvailable || isAvailable;
+            byUser.set(username, current);
+        });
+
+        const users = Array.from(byUser.values()).map((entry) => ({
+            username: entry.username,
+            role: entry.role,
+            roles: Array.from(entry.roles).sort((a, b) => a.localeCompare(b, 'es')),
+            display_name: entry.display_name,
+            isAvailable: entry.isAvailable,
+            specialties: Array.from(entry.specialties).sort((a, b) => a.localeCompare(b, 'es')),
+        })).sort((a, b) => {
+            if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+            return String(a.display_name || a.username || '').localeCompare(String(b.display_name || b.username || ''), 'es');
+        });
+
+        assigneeDirectoryCache = { items: users, ts: now };
+        return users;
+    }
+
+    function resetListFilters() {
+        filters = {
+            status: null,
+            q: '',
+            categoria: null,
+            severidad: null,
+            asignado_a: sessionCtx.isScopedTech ? (sessionCtx.user || null) : null,
+        };
+    }
+
+    function stopDraftHeartbeat() {
+        if (draftHeartbeatIntervalId) {
+            clearInterval(draftHeartbeatIntervalId);
+            draftHeartbeatIntervalId = null;
+        }
+    }
+
+    function stopAutoProgressTimer() {
+        if (autoProgressTimeoutId) {
+            clearTimeout(autoProgressTimeoutId);
+            autoProgressTimeoutId = null;
+        }
+    }
+
+    function stopResueltoCountdown() {
+        if (resueltoCountdownIntervalId) {
+            clearInterval(resueltoCountdownIntervalId);
+            resueltoCountdownIntervalId = null;
+        }
+    }
+
+    function formatResueltoCountdown(msLike) {
+        const safeMs = Math.max(0, Number(msLike || 0));
+        const totalSeconds = Math.floor(safeMs / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+        if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+        if (minutes > 0) return `${minutes}m ${seconds}s`;
+        return `${seconds}s`;
+    }
+
+    function updateResueltoCountdownLabel() {
+        const countdownEl = el('tks-resuelto-countdown');
+        if (!countdownEl) return false;
+        const rawDeadline = String(countdownEl.dataset.deadline || '').trim();
+        if (!rawDeadline) return false;
+        const deadlineTs = Date.parse(rawDeadline);
+        if (!Number.isFinite(deadlineTs)) return false;
+
+        const remainingMs = deadlineTs - Date.now();
+        if (remainingMs <= 0) {
+            countdownEl.textContent = 'Cierre automático pendiente (se aplicará pronto)';
+            countdownEl.classList.add('is-overdue');
+            return true;
+        }
+
+        countdownEl.textContent = `Cierre automático en ${formatResueltoCountdown(remainingMs)}`;
+        countdownEl.classList.remove('is-overdue');
+        return true;
+    }
+
+    function startResueltoCountdown() {
+        stopResueltoCountdown();
+        if (!updateResueltoCountdownLabel()) return;
+        resueltoCountdownIntervalId = setInterval(() => {
+            if (currentTab !== 'lista' || !selectedTicketId) {
+                stopResueltoCountdown();
+                return;
+            }
+            if (!updateResueltoCountdownLabel()) {
+                stopResueltoCountdown();
+            }
+        }, 1000);
+    }
+
+    function scrollTimelineToBottom() {
+        const feed = el('tks-unified-feed');
+        if (!feed) return;
+        const jumpBottom = () => {
+            feed.scrollTop = feed.scrollHeight;
+        };
+        jumpBottom();
+        requestAnimationFrame(jumpBottom);
+        setTimeout(jumpBottom, 40);
+    }
+
+    function resetDraftState() {
+        stopAutoProgressTimer();
+        stopResueltoCountdown();
+        stopDraftHeartbeat();
+        draftLockToken = '';
+        currentDraftSnapshot = null;
+        currentDraftMeta = {
+            canEdit: false,
+            blockedReason: '',
+            heartbeatSeconds: 60,
+        };
+        currentWorkflow = null;
+        detailActiveTab = 'note';
+    }
+
+    function scheduleAutoProgress(ticket, permissions, workflow = {}) {
+        stopAutoProgressTimer();
+        const ticketId = Number(ticket?.id || 0);
+        if (!ticketId) return;
+        if (!permissions || permissions.isAdmin || !permissions.isTech || !permissions.canParticipate) return;
+
+        const currentSubestado = String(ticket?.subestado || workflow?.ticket?.subestado || '')
+            .trim()
+            .toLowerCase();
+        if (currentSubestado !== 'asignado') return;
+
+        const allowedNext = Array.isArray(workflow?.allowed_next)
+            ? workflow.allowed_next.map((v) => String(v || '').trim().toLowerCase()).filter(Boolean)
+            : [];
+        if (!allowedNext.includes('en_progreso')) return;
+
+        autoProgressTimeoutId = setTimeout(async () => {
+            autoProgressTimeoutId = null;
+            if (currentTab !== 'lista') return;
+            if (!selectedTicketId || Number(selectedTicketId) !== ticketId) return;
+            const liveSubestado = String(selectedTicket?.subestado || '').trim().toLowerCase();
+            if (liveSubestado && liveSubestado !== 'asignado') return;
+            await transitionSubestado(ticketId, 'en_progreso', { autoAdvance: true, silentError: true });
+        }, AUTO_PROGRESS_DELAY_MS);
+    }
+
+    function normalizeRole(role) {
+        return String(role || '').trim().toLowerCase();
+    }
+
+    function normalizeRoles(rawRoles, fallbackRole = null) {
+        const out = [];
+        const append = (value) => {
+            const role = normalizeRole(value);
+            if (!role) return;
+            if (out.includes(role)) return;
+            out.push(role);
+        };
+
+        if (Array.isArray(rawRoles)) {
+            rawRoles.forEach(append);
+        } else if (typeof rawRoles === 'string') {
+            const text = rawRoles.trim();
+            if (text.startsWith('[') && text.endsWith(']')) {
+                try {
+                    const parsed = JSON.parse(text);
+                    if (Array.isArray(parsed)) parsed.forEach(append);
+                } catch (e) {
+                    text.split(',').forEach(append);
+                }
+            } else if (text) {
+                text.split(',').forEach(append);
+            }
+        }
+
+        append(fallbackRole);
+        return out;
+    }
+
+    function normalizeUser(user) {
+        return String(user || '').trim().toLowerCase();
+    }
+
+    function buildSessionContext(sessionPayload = {}) {
+        const roles = normalizeRoles(sessionPayload.roles, sessionPayload.role);
+        const role = roles[0] || '';
+        const user = normalizeUser(sessionPayload.user);
+        const isAdmin = roles.some((item) => ROLE_MANAGEMENT.has(item));
+        const isTech = roles.some((item) => ROLE_TECH.has(item));
+        const isScopedTech = isTech && !isAdmin;
+        const canViewOps = roles.some((item) => ROLE_OPS_READ.has(item));
+        const canWrite = isAdmin || isTech;
+        return {
+            user,
+            role,
+            roles,
+            canWrite,
+            canCreate: canWrite,
+            canViewOps,
+            isTech,
+            isScopedTech,
+            isAdmin,
+        };
+    }
+
+    async function loadSessionContext() {
+        try {
+            const data = await fetchApi('/api/sesion');
+            if (data && data.ok) {
+                sessionCtx = buildSessionContext(data);
+                return;
+            }
+        } catch (e) {
+            // silent fallback
+        }
+        sessionCtx = buildSessionContext({});
+    }
+
+    function applyRoleView() {
+        document.querySelectorAll('.tks-tab-btn').forEach(btn => {
+            if (btn.dataset.tab !== 'ops') return;
+            if (sessionCtx.canViewOps) {
+                btn.style.removeProperty('display');
+                btn.hidden = false;
+                return;
+            }
+            // Hide hard: remove tab from DOM to avoid global CSS !important overrides.
+            btn.remove();
+        });
+        const createBtn = el('tks-create-btn');
+        if (createBtn) {
+            createBtn.style.display = sessionCtx.canCreate ? '' : 'none';
+        }
+        const viewBadge = el('tks-view-badge');
+        if (viewBadge) {
+            const roleLabel = (sessionCtx.roles && sessionCtx.roles.length)
+                ? sessionCtx.roles.map((r) => String(r || '').toUpperCase()).join(' + ')
+                : (sessionCtx.role ? sessionCtx.role.toUpperCase() : 'LECTURA');
+            const viewLabel = sessionCtx.role === ROLE_MESA_MANAGER
+                ? 'Encargado Mesa'
+                : sessionCtx.role === ROLE_GERENCIA
+                    ? 'Gerencia (Lectura)'
+                    : sessionCtx.isAdmin
+                        ? 'Admin Gestión'
+                        : sessionCtx.isTech
+                            ? 'Técnico'
+                            : 'Solo Lectura';
+            viewBadge.textContent = `${viewLabel} · ${roleLabel}`;
+        }
+        if (sessionCtx.isScopedTech) {
+            filters.asignado_a = sessionCtx.user || null;
+        }
+    }
+
+    function ticketPermissions(ticket) {
+        const role = normalizeRole(sessionCtx.role);
+        const roles = normalizeRoles(sessionCtx.roles, role);
+        const me = normalizeUser(sessionCtx.user);
+        const assignee = normalizeUser(ticket?.asignado_a);
+        const isUnassigned = !assignee;
+        const isMine = !!assignee && assignee === me;
+        console.log('[DEBUG] computing permissions', {
+            user: sessionCtx.user,
+            roles: sessionCtx.roles,
+            roleArg: role,
+            ticketAssignee: ticket?.asignado_a,
+            me,
+            assignee,
+            isMine
+        });
+        const isAdmin = roles.some((r) => ROLE_MANAGEMENT.has(r));
+        const isTech = roles.some((r) => ROLE_TECH.has(r));
+        const isDispatcher = isAdmin || roles.some((r) => ROLE_DISPATCH.has(r));
+        const canReassign = isAdmin;
+        const canAssignTicket = isDispatcher && (isAdmin || isMine || isUnassigned);
+        const canClaim = isTech && !isAdmin && isUnassigned;
+        const canChangeStatus = isAdmin || (isTech && isMine);
+        const canAddInternalNote = isAdmin || (isTech && isMine);
+        const canParticipate = isTech && isMine;
+        console.log('[DEBUG] permissions result', { isTech, isMine, canParticipate, roles, ROLE_TECH: Array.from(ROLE_TECH) });
+        let blockedReason = '';
+        if (!canParticipate) {
+            if (role === ROLE_GERENCIA) {
+                blockedReason = 'Gerencia: vista solo lectura en ticketera.';
+            } else if (isAdmin) {
+                blockedReason = 'Admin: puede gestionar y dejar nota interna, pero no responder correos.';
+            } else if (isTech && isUnassigned) {
+                blockedReason = 'Ticket sin asignar: toma el ticket para intervenir.';
+            } else if (isTech && assignee && !isMine) {
+                blockedReason = `Ticket asignado a ${ticket.asignado_a}.`;
+            }
+        }
+        return {
+            canReassign,
+            canAssignTicket,
+            canClaim,
+            canChangeStatus,
+            canAddInternalNote,
+            canParticipate,
+            blockedReason,
+            isAdmin,
+            isTech,
+            role,
+        };
+    }
+
+    function scopeKanbanDataForSession(rawKanban) {
+        const kanban = rawKanban || {};
+        if (!sessionCtx.isScopedTech) {
+            return kanban;
+        }
+        const me = normalizeUser(sessionCtx.user);
+        const out = {
+            abierto: [],
+            en_progreso: [],
+            resuelto: [],
+            cerrado: [],
+        };
+        Object.keys(out).forEach((estado) => {
+            const items = Array.isArray(kanban?.[estado]) ? kanban[estado] : [];
+            out[estado] = items.filter((ticket) => normalizeUser(ticket?.asignado_a) === me);
+        });
+        return out;
     }
 
     // ---- INIT ----
@@ -45,8 +538,11 @@ const TksMain = (() => {
         if (isInitialized) return;
         isInitialized = true;
 
+        await loadSessionContext();
         bindTabs();
-        loadTab('dashboard');
+        applyRoleView();
+        const initialTab = 'dashboard';
+        loadTab(initialTab);
         pollNotifications();
         if (pollIntervalId) clearInterval(pollIntervalId);
         pollIntervalId = setInterval(pollNotifications, 45000);
@@ -76,6 +572,9 @@ const TksMain = (() => {
     }
 
     function loadTab(tab, options = {}) {
+        if (tab === 'ops' && !sessionCtx.canViewOps) {
+            tab = 'lista';
+        }
         const force = options.force === true;
         const content = el('tks-content');
         if (!force && tab === currentTab && content && content.dataset.loadedTab === tab) {
@@ -93,6 +592,14 @@ const TksMain = (() => {
             detailAbortController.abort();
             detailAbortController = null;
         }
+        if (tab !== 'lista') {
+            selectedTicketId = null;
+            selectedTicket = null;
+            resetDraftState();
+            stopAutoProgressTimer();
+            const reviewModal = el('tks-draft-review-modal');
+            if (reviewModal) reviewModal.remove();
+        }
 
         currentTab = tab;
         const token = ++tabRequestToken;
@@ -106,6 +613,7 @@ const TksMain = (() => {
             content.dataset.loadedTab = tab;
         }
         if (tab === 'dashboard') loadDashboard(content, token);
+        else if (tab === 'asignacion') loadAssignmentTimeline(content, token);
         else if (tab === 'lista') loadList(content, token);
         else if (tab === 'kanban') loadKanban(content, token);
         else if (tab === 'ops') loadOps(content, token);
@@ -115,21 +623,65 @@ const TksMain = (() => {
     async function loadDashboard(container, token) {
         if (!container) return;
         if (isFresh(cache.dashboard)) {
-            container.innerHTML = TksUI.renderDashboard(cache.dashboard.data);
+            const scopedAssignment = scopeAssignmentDataForSession(cache.dashboard.data?.assignment || null);
+            container.innerHTML = TksUI.renderDashboard(
+                cache.dashboard.data?.stats || {},
+                scopedAssignment
+            );
             return;
         }
         const controller = new AbortController();
         panelAbortController = controller;
         container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:200px;margin:1.5rem"></div></div>';
         try {
-            const stats = await TksApi.getStats({ signal: controller.signal, timeoutMs: 10000 });
+            const [stats, assignmentRaw] = await Promise.all([
+                TksApi.getStats({ signal: controller.signal, timeoutMs: 10000 }),
+                TksApi.getAssignmentTimeline(
+                    { window_h: 72, limit: 500 },
+                    { signal: controller.signal, timeoutMs: 12000 }
+                ).catch(() => null),
+            ]);
+            const assignment = scopeAssignmentDataForSession(assignmentRaw);
             if (token !== tabRequestToken || currentTab !== 'dashboard') return;
-            cache.dashboard = { data: stats, ts: Date.now() };
-            container.innerHTML = TksUI.renderDashboard(stats);
+            cache.dashboard = { data: { stats, assignment }, ts: Date.now() };
+            if (assignment) {
+                cache.assignment = { data: assignment, ts: Date.now() };
+            }
+            container.innerHTML = TksUI.renderDashboard(stats, assignment);
         } catch (e) {
             if (e?.name === 'AbortError') return;
             if (token !== tabRequestToken || currentTab !== 'dashboard') return;
-            container.innerHTML = `<div class="tks-dashboard"><p style="color:red">Error cargando stats: ${e.message}</p></div>`;
+            container.innerHTML = `<div class="tks-dashboard"><p style="color:red">Error cargando stats: ${errorHtml(e)}</p></div>`;
+        } finally {
+            if (panelAbortController === controller) {
+                panelAbortController = null;
+            }
+        }
+    }
+
+    // ---- ASIGNACIÓN ----
+    async function loadAssignmentTimeline(container, token) {
+        if (!container) return;
+        if (isFresh(cache.assignment)) {
+            container.innerHTML = TksUI.renderAssignmentTimeline(scopeAssignmentDataForSession(cache.assignment.data));
+            return;
+        }
+        const controller = new AbortController();
+        panelAbortController = controller;
+        container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:240px;margin:1.5rem"></div></div>';
+        try {
+            const rawData = await TksApi.getAssignmentTimeline(
+                { window_h: 72, limit: 500 },
+                { signal: controller.signal, timeoutMs: 12000 }
+            );
+            const data = scopeAssignmentDataForSession(rawData);
+            if (token !== tabRequestToken || currentTab !== 'asignacion') return;
+            cache.assignment = { data, ts: Date.now() };
+            container.innerHTML = TksUI.renderAssignmentTimeline(data);
+        } catch (e) {
+            if (e?.name === 'AbortError') return;
+            if (token !== tabRequestToken || currentTab !== 'asignacion') return;
+            container.innerHTML = `<div class="tks-dashboard"><p style="color:red">Error cargando asignación: ${errorHtml(e)}</p></div>`;
         } finally {
             if (panelAbortController === controller) {
                 panelAbortController = null;
@@ -140,22 +692,42 @@ const TksMain = (() => {
     // ---- LISTA ----
     async function loadList(container, token) {
         if (!container) return;
-        container.innerHTML = `
-        <div class="tks-list-layout">
-            <div class="tks-detail-backdrop" id="tks-detail-backdrop" onclick="TksMain.closeDetail()"></div>
-            <div class="tks-list-panel">
+        resetDraftState();
+        if (sessionCtx.isScopedTech) {
+            filters.asignado_a = sessionCtx.user || null;
+            filters.q = '';
+            filters.status = null;
+            filters.categoria = null;
+            filters.severidad = null;
+        }
+        const showListFilters = !sessionCtx.isScopedTech;
+        const toolbarHtml = showListFilters
+            ? `
                 <div class="tks-toolbar">
                     <input class="tks-search" id="tks-search-input" placeholder="🔍 Buscar tickets por título, código o cliente..." value="${filters.q}">
                     <button class="tks-btn tks-btn-ghost tks-btn-icon" onclick="TksMain.refreshList()" title="Recargar"><i class="fas fa-sync-alt"></i></button>
                 </div>
-                <!-- Filters Row (Status) -->
-                <div class="tks-filter-row" id="tks-filters" style="padding-top:0.8rem">
+            `
+            : `
+                <div class="tks-toolbar">
+                    <div class="tks-toolbar-note">
+                        Mostrando solo tickets asignados a tu usuario
+                    </div>
+                    <button class="tks-btn tks-btn-ghost tks-btn-icon" onclick="TksMain.refreshList()" title="Recargar"><i class="fas fa-sync-alt"></i></button>
+                </div>
+            `;
+        const statusFiltersHtml = showListFilters
+            ? `
+                <div class="tks-filter-row tks-filter-row--status" id="tks-filters">
                     <button class="tks-filter-chip ${!filters.status ? 'active' : ''}" data-filter-status="">Todos</button>
                     <button class="tks-filter-chip ${filters.status === 'abierto' ? 'active' : ''}" data-filter-status="abierto">Abiertos</button>
                     <button class="tks-filter-chip ${filters.status === 'en_progreso' ? 'active' : ''}" data-filter-status="en_progreso">En Progreso</button>
                     <button class="tks-filter-chip ${filters.status === 'resuelto' ? 'active' : ''}" data-filter-status="resuelto">Resueltos</button>
                 </div>
-                 <!-- Filters Row (Category) -->
+            `
+            : '';
+        const categoryFiltersHtml = showListFilters
+            ? `
                 <div class="tks-filter-row" id="tks-cat-filters">
                     <button class="tks-filter-chip ${!filters.categoria ? 'active' : ''}" data-filter-cat="">Todas las áreas</button>
                     <button class="tks-filter-chip ${filters.categoria === 'redes' ? 'active' : ''}" data-filter-cat="redes">🌐 Redes</button>
@@ -163,55 +735,70 @@ const TksMain = (() => {
                     <button class="tks-filter-chip ${filters.categoria === 'ejecucion' ? 'active' : ''}" data-filter-cat="ejecucion">🔧 Ejecución</button>
                     <button class="tks-filter-chip ${filters.categoria === 'admin' ? 'active' : ''}" data-filter-cat="admin">📋 Admin</button>
                 </div>
+            `
+            : '';
+        container.innerHTML = `
+        <div class="tks-list-layout">
+            <div class="tks-list-panel" id="tks-list-panel">
+                ${toolbarHtml}
+                ${statusFiltersHtml}
+                ${categoryFiltersHtml}
                 <div class="tks-items-list" id="tks-items-list">
-                    <div class="tks-skeleton" style="height:60px;margin:1rem"></div>
-                    <div class="tks-skeleton" style="height:60px;margin:1rem"></div>
-                    <div class="tks-skeleton" style="height:60px;margin:1rem"></div>
+                    <div class="tks-skeleton tks-list-skeleton"></div>
+                    <div class="tks-skeleton tks-list-skeleton"></div>
+                    <div class="tks-skeleton tks-list-skeleton"></div>
                 </div>
             </div>
-            
-            <!-- DRAWER DETALLE -->
-            <div class="tks-detail-panel" id="tks-detail-panel">
-                <div class="tks-detail-empty"><span>Selecciona un ticket</span></div>
+
+            <div class="tks-full-detail-view" id="tks-detail-panel">
+                <div class="tks-detail-empty"><span>Cargando ticket...</span></div>
             </div>
         </div>`;
 
         // Bind search
         const searchInput = el('tks-search-input');
-        searchInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                filters.q = searchInput.value.trim();
-                refreshList(token);
-            }, 300);
-        });
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    filters.q = searchInput.value.trim();
+                    refreshList(token);
+                }, 300);
+            });
+        }
 
         // Bind status filters
-        el('tks-filters').querySelectorAll('.tks-filter-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
-                filters.status = chip.dataset.filterStatus || null;
-                el('tks-filters').querySelectorAll('.tks-filter-chip').forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
-                refreshList(token);
+        const statusFilters = el('tks-filters');
+        if (statusFilters) {
+            statusFilters.querySelectorAll('.tks-filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    filters.status = chip.dataset.filterStatus || null;
+                    statusFilters.querySelectorAll('.tks-filter-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    refreshList(token);
+                });
             });
-        });
+        }
 
         // Bind category filters
-        el('tks-cat-filters').querySelectorAll('.tks-filter-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
-                filters.categoria = chip.dataset.filterCat || null;
-                el('tks-cat-filters').querySelectorAll('.tks-filter-chip').forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
-                refreshList(token);
+        const categoryFilters = el('tks-cat-filters');
+        if (categoryFilters) {
+            categoryFilters.querySelectorAll('.tks-filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    filters.categoria = chip.dataset.filterCat || null;
+                    categoryFilters.querySelectorAll('.tks-filter-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    refreshList(token);
+                });
             });
-        });
+        }
 
         refreshList(token);
     }
 
     function renderListItems(listEl, items) {
         if (!items || items.length === 0) {
-            listEl.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--tks-text-muted)">Sin tickets</div>';
+            listEl.innerHTML = '<div class="tks-list-empty">Sin tickets</div>';
             return;
         }
 
@@ -239,8 +826,20 @@ const TksMain = (() => {
     async function refreshList(token = tabRequestToken) {
         const listEl = el('tks-items-list');
         if (!listEl || currentTab !== 'lista') return;
-        const listFilters = { ...filters, limit: DEFAULT_LIST_LIMIT };
-        const cacheKey = JSON.stringify(listFilters);
+        const rawFilters = { ...filters, limit: DEFAULT_LIST_LIMIT };
+        if (sessionCtx.isScopedTech) {
+            rawFilters.asignado_a = sessionCtx.user || null;
+            rawFilters.q = '';
+            rawFilters.status = null;
+            rawFilters.categoria = null;
+            rawFilters.severidad = null;
+        }
+        const cacheKey = JSON.stringify(rawFilters);
+        const listFilters = { ...rawFilters };
+        const filterUnassigned = listFilters.asignado_a === '__unassigned__';
+        if (filterUnassigned) {
+            listFilters.asignado_a = null;
+        }
         const cached = cache.list.get(cacheKey);
         if (isFresh(cached)) {
             renderListItems(listEl, cached.items);
@@ -256,7 +855,10 @@ const TksMain = (() => {
             const data = await TksApi.listTickets(listFilters, { signal: controller.signal, timeoutMs: 10000 });
             if (token !== tabRequestToken || reqToken !== listRequestToken || currentTab !== 'lista') return;
 
-            const items = data.items || [];
+            let items = data.items || [];
+            if (filterUnassigned) {
+                items = items.filter((t) => !String(t?.asignado_a || '').trim());
+            }
             cache.list.set(cacheKey, { items, ts: Date.now() });
             if (cache.list.size > 20) {
                 const latest = cache.list.get(cacheKey);
@@ -267,7 +869,7 @@ const TksMain = (() => {
         } catch (e) {
             if (e?.name === 'AbortError') return;
             if (token !== tabRequestToken || reqToken !== listRequestToken || currentTab !== 'lista') return;
-            listEl.innerHTML = `<div style="padding:1rem;color:red">Error: ${e.message}</div>`;
+            listEl.innerHTML = `<div class="tks-list-error">Error: ${errorHtml(e)}</div>`;
         } finally {
             if (listAbortController === controller) {
                 listAbortController = null;
@@ -275,28 +877,116 @@ const TksMain = (() => {
         }
     }
 
-    // ---- DETAIL ----
-    function closeDetail() {
-        const panel = el('tks-detail-panel');
-        const backdrop = el('tks-detail-backdrop');
-        if (panel) panel.classList.remove('open');
-        if (backdrop) backdrop.classList.remove('visible');
+    async function heartbeatDraftLock(ticketId) { }
 
-        // Deseleccionar
-        document.querySelectorAll('.tks-row.active').forEach(r => r.classList.remove('active'));
-        selectedTicketId = null;
+    function startDraftHeartbeat(ticketId, heartbeatSeconds = 60) {
+        stopDraftHeartbeat();
     }
 
-    async function openDetail(ticketId) {
+    // ---- DETAIL ----
+    function hasPendingDetailChanges() {
+        const noteInput = el('tks-note-input');
+        if (noteInput && String(noteInput.value || '').trim()) {
+            return true;
+        }
+
+        const canEditDraftSession = currentDraftMeta.canEdit;
+        const toInput = el('tks-draft-to');
+        const ccInput = el('tks-draft-cc');
+        const bccInput = el('tks-draft-bcc');
+        const subjectInput = el('tks-draft-subject');
+        const bodyInput = el('tks-draft-body');
+        const fileInput = el('tks-draft-files');
+
+        if (canEditDraftSession && fileInput && fileInput.files && fileInput.files.length > 0) {
+            return true;
+        }
+
+        if (canEditDraftSession && (toInput || ccInput || bccInput || subjectInput || bodyInput)) {
+            const snapshot = currentDraftSnapshot || {};
+            const currentTo = String(toInput?.value || '').trim();
+            const currentCc = String(ccInput?.value || '').trim();
+            const currentBcc = String(bccInput?.value || '').trim();
+            const currentSubject = String(subjectInput?.value || '').trim();
+            const currentBody = String(bodyInput?.value || '');
+            const snapTo = String(snapshot.to_addr || '').trim();
+            const snapCc = String(snapshot.cc_addrs || '').trim();
+            const snapBcc = String(snapshot.bcc_addrs || '').trim();
+            const snapSubject = String(snapshot.subject || '').trim();
+            const snapBody = String(snapshot.body_text || '');
+            if (
+                currentTo !== snapTo
+                || currentCc !== snapCc
+                || currentBcc !== snapBcc
+                || currentSubject !== snapSubject
+                || currentBody !== snapBody
+            ) {
+                return true;
+            }
+        }
+
+        if (canEditDraftSession && detailActiveTab === 'reply') {
+            return true;
+        }
+
+        return false;
+    }
+
+    function closeDetail(options = {}) {
+        const silent = options.silent === true;
+        const force = options.force === true;
+        if (!force && !silent && currentTab === 'lista' && hasPendingDetailChanges()) {
+            const ok = confirm('Hay cambios sin terminar en este ticket. ¿Cerrar de todas formas?');
+            if (!ok) return;
+        }
+        if (detailAbortController) {
+            detailAbortController.abort();
+            detailAbortController = null;
+        }
+        const layout = document.querySelector('.tks-list-layout');
+        if (layout) layout.classList.remove('detail-open');
+        const panel = el('tks-detail-panel');
+        if (panel) {
+            panel.style.display = 'none';
+            panel.innerHTML = '<div class="tks-detail-empty"><span>Selecciona un ticket</span></div>';
+        }
+        const reviewModal = el('tks-draft-review-modal');
+        if (reviewModal) reviewModal.remove();
+        const listPanel = el('tks-list-panel');
+        if (listPanel) listPanel.style.display = '';
+
+        stopAutoProgressTimer();
+        document.querySelectorAll('.tks-row.active').forEach(r => r.classList.remove('active'));
+        resetDraftState();
+        selectedTicketId = null;
+        selectedTicket = null;
+        if (!silent && currentTab === 'lista') {
+            resetListFilters();
+            loadTab('lista', { force: true });
+        }
+    }
+
+    async function openDetail(ticketId, options = {}) {
+        const preserveTab = options.preserveTab === true;
+        const previousTicketId = selectedTicketId;
+        if (previousTicketId && Number(previousTicketId) !== Number(ticketId)) {
+            resetDraftState();
+        }
+        stopAutoProgressTimer();
+        stopResueltoCountdown();
         selectedTicketId = ticketId;
+        if (!preserveTab) {
+            detailActiveTab = 'note';
+        }
         const reqToken = ++detailRequestToken;
         const panel = el('tks-detail-panel');
-        const backdrop = el('tks-detail-backdrop');
+        const layout = document.querySelector('.tks-list-layout');
+        const listPanel = el('tks-list-panel');
         if (!panel) return;
 
-        // Show drawer immediately (loading state)
-        panel.classList.add('open');
-        if (backdrop) backdrop.classList.add('visible');
+        if (layout) layout.classList.add('detail-open');
+        if (listPanel) listPanel.style.display = 'none';
+        panel.style.display = 'flex';
 
         if (detailAbortController) detailAbortController.abort();
         const controller = new AbortController();
@@ -304,51 +994,64 @@ const TksMain = (() => {
 
         panel.innerHTML = `
             <div class="tks-detail-header">
-                <button class="tks-btn-icon-sm" onclick="TksMain.closeDetail()" style="float:right"><i class="fas fa-times"></i></button>
+                <button class="tks-btn-icon-sm tks-detail-close" onclick="TksMain.closeDetail()" title="Volver a la lista"><i class="fas fa-times"></i></button>
                 <div class="tks-skeleton" style="height:30px;width:60%"></div>
             </div>
             <div style="padding:2rem"><div class="tks-loading-spinner">Cargando ticket...</div></div>
         `;
 
         try {
-            const [ticket, eventosData, emailsData, attachmentsData] = await Promise.all([
+            const workflowPromise = TksApi.getTicketWorkflow(ticketId, { signal: controller.signal, timeoutMs: 10000 })
+                .catch((err) => {
+                    if (err?.name === 'AbortError') throw err;
+                    return { allowed_next: [] };
+                });
+            const [ticket, eventosData, emailsData, attachmentsData, draftData, workflowData] = await Promise.all([
                 TksApi.getTicket(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 TksApi.getEventos(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 TksApi.getTicketEmails(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 TksApi.getTicketAttachments(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
+                TksApi.getEmailDraft(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
+                workflowPromise,
             ]);
             if (reqToken !== detailRequestToken || selectedTicketId !== ticketId) return;
+            selectedTicket = ticket;
+            currentWorkflow = workflowData || {};
+            const permissions = ticketPermissions(ticket);
+            currentDraftSnapshot = draftData?.draft || null;
+            currentDraftMeta = {
+                canEdit: draftData?.can_edit === true,
+                blockedReason: String(draftData?.blocked_reason || ''),
+                heartbeatSeconds: Number(draftData?.heartbeat_seconds || 60),
+            };
+            stopDraftHeartbeat();
 
-            // Render detail but inject CLOSE BUTTON
             const html = TksUI.renderDetail(
                 ticket,
                 eventosData.items || [],
                 emailsData.items || [],
-                attachmentsData.items || []
+                attachmentsData.items || [],
+                {
+                    ...permissions,
+                    currentUser: sessionCtx.user,
+                    currentRole: sessionCtx.role,
+                    composerMode: detailActiveTab,
+                    draft: currentDraftSnapshot,
+                    draftMeta: currentDraftMeta,
+                    hasDraftLockToken: !!draftLockToken,
+                    workflow: currentWorkflow,
+                }
             );
-
-            // Hacky string injection to add Close Button to header if not present (TksUI could be updated, but this works for now)
-            // or better: TksUI.renderDetail could accept a "closeAction"
-            // Let's update TksUI.renderDetail signature or just prepend the button in the header.
             panel.innerHTML = html;
-
-            // Add Close Button to header manually
-            const header = panel.querySelector('.tks-detail-header');
-            if (header) {
-                const closeBtn = document.createElement('button');
-                closeBtn.className = 'tks-btn-icon-sm';
-                closeBtn.innerHTML = '<i class="fas fa-times"></i>';
-                closeBtn.title = 'Cerrar pasarela';
-                closeBtn.style.float = 'right';
-                closeBtn.style.fontSize = '1.2rem';
-                closeBtn.onclick = closeDetail;
-                header.prepend(closeBtn);
-            }
-
+            hydrateAssigneePicker(ticket, permissions);
+            scrollTimelineToBottom();
+            switchComposerMode(detailActiveTab);
+            scheduleAutoProgress(ticket, permissions, currentWorkflow);
+            startResueltoCountdown();
         } catch (e) {
             if (e?.name === 'AbortError') return;
             if (reqToken !== detailRequestToken || selectedTicketId !== ticketId) return;
-            panel.innerHTML = `<div class="tks-detail-empty"><span style="color:red">Error: ${e.message}</span></div>`;
+            panel.innerHTML = `<div class="tks-detail-empty"><span style="color:red">Error: ${errorHtml(e)}</span></div>`;
         } finally {
             if (detailAbortController === controller) {
                 detailAbortController = null;
@@ -358,22 +1061,77 @@ const TksMain = (() => {
 
     // ---- ACTIONS ----
     async function changeStatus(ticketId, newStatus) {
+        const perms = selectedTicket && Number(selectedTicket.id) === Number(ticketId)
+            ? ticketPermissions(selectedTicket)
+            : null;
+        if (perms && !perms.canChangeStatus) {
+            if (window.showToast) window.showToast(perms.blockedReason || 'No tienes permiso para cambiar estado', 'warning');
+            return;
+        }
         try {
             await TksApi.updateTicket(ticketId, { estado: newStatus });
             clearDataCache();
             if (window.showToast) window.showToast(`Estado cambiado a ${newStatus}`, 'success');
             if (currentTab === 'lista') {
                 refreshList();
-                openDetail(ticketId);
+                openDetail(ticketId, { preserveTab: true });
             } else {
                 loadTab(currentTab, { force: true });
             }
         } catch (e) {
             if (window.showToast) window.showToast(`Error: ${e.message}`, 'error');
+            if (currentTab === 'kanban') {
+                loadTab('kanban', { force: true });
+            }
+        }
+    }
+
+    async function transitionSubestado(ticketId, toSubestado, options = {}) {
+        const target = String(toSubestado || '').trim().toLowerCase();
+        if (!target) return;
+        const autoAdvance = options.autoAdvance === true;
+        const silentError = options.silentError === true;
+        const perms = selectedTicket && Number(selectedTicket.id) === Number(ticketId)
+            ? ticketPermissions(selectedTicket)
+            : null;
+        if (perms && !perms.canChangeStatus) {
+            if (window.showToast) window.showToast(perms.blockedReason || 'No tienes permiso para cambiar subestado', 'warning');
+            return;
+        }
+        stopAutoProgressTimer();
+        try {
+            await TksApi.transitionTicket(ticketId, { to_subestado: target, motivo: 'gestion_ui' });
+            clearDataCache();
+            const labelTarget = target.replace(/_/g, ' ');
+            if (window.showToast) {
+                const msg = autoAdvance
+                    ? `Subestado avanzado automáticamente a ${labelTarget}`
+                    : `Subestado cambiado a ${labelTarget}`;
+                window.showToast(msg, 'success');
+            }
+            if (currentTab === 'lista') {
+                refreshList();
+                openDetail(ticketId, { preserveTab: true });
+            } else {
+                loadTab(currentTab, { force: true });
+            }
+        } catch (e) {
+            if (silentError) return;
+            if (window.showToast) window.showToast(`Error cambiando subestado: ${e.message}`, 'error');
+            if (!autoAdvance && selectedTicket && Number(selectedTicket.id) === Number(ticketId)) {
+                scheduleAutoProgress(selectedTicket, ticketPermissions(selectedTicket), currentWorkflow || {});
+            }
         }
     }
 
     async function addNote(ticketId) {
+        const perms = selectedTicket && Number(selectedTicket.id) === Number(ticketId)
+            ? ticketPermissions(selectedTicket)
+            : null;
+        if (perms && !perms.canAddInternalNote) {
+            if (window.showToast) window.showToast(perms.blockedReason || 'No puedes intervenir en este ticket', 'warning');
+            return;
+        }
         const input = el('tks-note-input');
         if (!input) return;
         const text = input.value.trim();
@@ -383,88 +1141,432 @@ const TksMain = (() => {
             await TksApi.addEvento(ticketId, { evento: 'nota', detalle: text });
             clearDataCache();
             input.value = '';
-            openDetail(ticketId);
+            openDetail(ticketId, { preserveTab: true });
         } catch (e) {
             if (window.showToast) window.showToast(`Error: ${e.message}`, 'error');
         }
     }
 
-    async function replyByEmail(ticketId) {
-        const input = el('tks-email-reply-input');
-        if (!input) return;
-        const mensaje = input.value.trim();
-        if (!mensaje) {
-            if (window.showToast) window.showToast('Escribe un mensaje antes de enviar el correo', 'warning');
+    async function applyStatusChange(ticketId) {
+        const select = el('tks-status-next');
+        if (!select) {
+            if (window.showToast) window.showToast('No se encontró el selector de estado', 'warning');
+            return;
+        }
+        const nextStatus = String(select.value || '').trim();
+        if (!nextStatus) {
+            if (window.showToast) window.showToast('Selecciona un estado destino', 'warning');
+            return;
+        }
+        await changeStatus(ticketId, nextStatus);
+    }
+
+    function parseNotifyEmailsInput(raw) {
+        const tokens = String(raw || '')
+            .split(/[,;\n]+/)
+            .map((v) => String(v || '').trim().toLowerCase())
+            .filter(Boolean);
+
+        const valid = [];
+        const invalid = [];
+        const seen = new Set();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        tokens.forEach((email) => {
+            if (!emailRegex.test(email)) {
+                invalid.push(email);
+                return;
+            }
+            if (seen.has(email)) return;
+            seen.add(email);
+            valid.push(email);
+        });
+
+        return { valid, invalid };
+    }
+
+    async function saveNotifyEmails(ticketId) {
+        const perms = selectedTicket && Number(selectedTicket.id) === Number(ticketId)
+            ? ticketPermissions(selectedTicket)
+            : null;
+        if (perms && !perms.canChangeStatus) {
+            if (window.showToast) window.showToast(perms.blockedReason || 'No tienes permiso para configurar copiados', 'warning');
             return;
         }
 
-        const fileInput = el('tks-email-reply-files');
-        const files = fileInput ? fileInput.files : [];
-
-        const sendBtn = el('tks-email-reply-send-btn');
-        if (sendBtn) {
-            sendBtn.disabled = true;
-            sendBtn.style.opacity = '0.7';
-            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        const input = el('tks-notify-emails');
+        if (!input) return;
+        const raw = String(input.value || '').trim();
+        const parsed = parseNotifyEmailsInput(raw);
+        if (parsed.invalid.length > 0) {
+            if (window.showToast) window.showToast(`Correos inválidos: ${parsed.invalid.slice(0, 3).join(', ')}`, 'warning');
+            return;
         }
 
         try {
-            let body;
-            // Si hay archivos, usar FormData
-            if (files.length > 0) {
-                body = new FormData();
-                body.append('mensaje', mensaje);
-                for (let i = 0; i < files.length; i++) {
-                    body.append('files', files[i]);
-                }
-            } else {
-                // Modo compatible anterior o Form Data simple
-                body = new FormData();
-                body.append('mensaje', mensaje);
-            }
-
-            const result = await TksApi.replyByEmail(ticketId, body, { timeoutMs: 60000 });
+            await TksApi.updateTicket(ticketId, { notify_emails: parsed.valid });
             clearDataCache();
-            input.value = '';
-            if (fileInput) fileInput.value = '';
-
             if (window.showToast) {
-                if (result?.duplicate_skipped) {
-                    window.showToast('Se evitó un correo duplicado; ya estaba enviado o en proceso', 'info');
-                } else {
-                    window.showToast('Correo enviado al cliente', 'success');
-                }
+                window.showToast(
+                    parsed.valid.length
+                        ? `Copiados actualizados (${parsed.valid.length})`
+                        : 'Lista de copiados vaciada',
+                    'success'
+                );
             }
-            openDetail(ticketId);
+            openDetail(ticketId, { preserveTab: true });
+            refreshList();
         } catch (e) {
-            if (window.showToast) window.showToast(`Error enviando correo: ${e.message}`, 'error');
-        } finally {
-            if (sendBtn) {
-                sendBtn.disabled = false;
-                sendBtn.style.opacity = '';
-                sendBtn.innerHTML = '<i class="fas fa-envelope"></i> Enviar correo';
-            }
+            if (window.showToast) window.showToast(`Error guardando copiados: ${e.message}`, 'error');
         }
     }
 
+    function toggleAssigneePicker(forceOpen = null) {
+        const select = el('tks-assignee-select');
+        if (!select) return;
+        try {
+            select.focus();
+            if (typeof select.showPicker === 'function') {
+                select.showPicker();
+            }
+        } catch (e) {
+            // navegadores sin showPicker: focus es suficiente
+        }
+    }
+
+    async function hydrateAssigneePicker(ticket, permissions) {
+        const canAssign = permissions?.canAssignTicket === true;
+        const pickerSelect = el('tks-assignee-select');
+        const readonlyLabelEl = el('tks-assignee-readonly-label');
+        const ticketId = Number(ticket?.id || 0);
+        if (!ticketId) return;
+        if (!pickerSelect && !readonlyLabelEl) return;
+
+        const currentAssignee = normalizeUser(ticket?.asignado_a);
+        const fallbackLabel = humanizeUsername(ticket?.asignado_a) || 'Sin asignar';
+        if (pickerSelect) {
+            pickerSelect.innerHTML = `<option value="${TksUI.escapeHtml(currentAssignee || '')}">${TksUI.escapeHtml(fallbackLabel)}</option>`;
+            pickerSelect.disabled = true;
+        }
+
+        try {
+            const users = await loadAssignableUsers();
+            if (currentTab !== 'lista' || Number(selectedTicketId) !== ticketId) return;
+
+            const currentUserEntry = users.find((item) => normalizeUser(item?.username) === currentAssignee);
+            const currentLabel = currentUserEntry
+                ? assigneeOptionLabel(currentUserEntry, { includeAvailability: false })
+                : fallbackLabel;
+            if (readonlyLabelEl) {
+                readonlyLabelEl.textContent = currentLabel || 'Sin asignar';
+            }
+            if (!canAssign || !pickerSelect) return;
+
+            const options = [];
+            const seen = new Set();
+
+            if (currentAssignee) {
+                options.push(`<option value="${TksUI.escapeHtml(currentAssignee)}">${TksUI.escapeHtml(currentLabel)}</option>`);
+                seen.add(currentAssignee);
+            }
+
+            users.forEach((item) => {
+                const username = normalizeUser(item?.username);
+                if (!username || seen.has(username)) return;
+                seen.add(username);
+                options.push(`<option value="${TksUI.escapeHtml(username)}">${TksUI.escapeHtml(assigneeOptionLabel(item) || humanizeUsername(username) || username)}</option>`);
+            });
+
+            pickerSelect.innerHTML = options.join('') || `<option value="${TksUI.escapeHtml(currentAssignee || '')}">${TksUI.escapeHtml(fallbackLabel)}</option>`;
+            if (currentAssignee) {
+                pickerSelect.value = currentAssignee;
+            }
+            pickerSelect.disabled = false;
+        } catch (e) {
+            if (pickerSelect) pickerSelect.disabled = false;
+            if (window.showToast) window.showToast(`No se pudo cargar lista de técnicos: ${e.message}`, 'warning');
+        }
+    }
+
+    async function applyAssigneeChange(ticketId) {
+        const perms = selectedTicket && Number(selectedTicket.id) === Number(ticketId)
+            ? ticketPermissions(selectedTicket)
+            : null;
+        if (perms && !perms.canAssignTicket) {
+            if (window.showToast) window.showToast(perms.blockedReason || 'No tienes permiso para reasignar este ticket', 'warning');
+            return;
+        }
+
+        const select = el('tks-assignee-select');
+        if (!select) return;
+        const nextAssignee = normalizeUser(select.value || '');
+        if (!nextAssignee) {
+            if (window.showToast) window.showToast('Selecciona una persona para asignar', 'warning');
+            return;
+        }
+
+        const currentAssignee = normalizeUser(selectedTicket?.asignado_a);
+        if (currentAssignee === nextAssignee) {
+            return;
+        }
+
+        try {
+            await TksApi.updateTicket(ticketId, { asignado_a: nextAssignee });
+            clearDataCache();
+            const selectedLabel = String(select.options?.[select.selectedIndex]?.textContent || '').trim() || (humanizeUsername(nextAssignee) || nextAssignee);
+            if (window.showToast) window.showToast(`Ticket asignado a ${selectedLabel}`, 'success');
+            if (currentTab === 'lista') {
+                refreshList();
+                openDetail(ticketId, { preserveTab: true });
+            }
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error reasignando ticket: ${e.message}`, 'error');
+        }
+    }
+
+    function switchComposerMode(modeKey) {
+        const panel = el('tks-detail-panel');
+        if (!panel) return;
+        const replyModeAvailable = !!panel.querySelector('[data-composer-mode="reply"]');
+        detailActiveTab = (modeKey === 'reply' && replyModeAvailable) ? 'reply' : 'note';
+        panel.querySelectorAll('[data-composer-mode]').forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.composerMode === detailActiveTab);
+        });
+        panel.querySelectorAll('[data-composer-pane]').forEach((pane) => {
+            pane.style.display = pane.dataset.composerPane === detailActiveTab ? '' : 'none';
+        });
+    }
+
+    // Compatibilidad temporal con código legado que aún llama switchDetailTab.
+    function switchDetailTab(tabKey) {
+        switchComposerMode(tabKey);
+    }
+
+    function readDraftEditor(ticketId) {
+        return {
+            lock_token: draftLockToken,
+            version: Number(el('tks-draft-version')?.value || currentDraftSnapshot?.version || 0),
+            to_addr: el('tks-draft-to')?.value?.trim() || '',
+            cc_addrs: el('tks-draft-cc')?.value?.trim() || '',
+            bcc_addrs: el('tks-draft-bcc')?.value?.trim() || '',
+            subject: el('tks-draft-subject')?.value?.trim() || '',
+            body_text: el('tks-draft-body')?.value || '',
+            ticket_id: ticketId,
+        };
+    }
+
+    async function acquireDraftLock(ticketId, force = false) {
+        // Obsoleto por asignacion exclusiva de tickets
+    }
+
+    async function saveEmailDraft(ticketId, options = {}) {
+        const silent = options.silent === true;
+        const refresh = options.refresh !== false;
+        const payload = readDraftEditor(ticketId);
+        if (!payload.version) {
+            if (!silent && window.showToast) window.showToast('Versión de borrador inválida; recarga el detalle', 'warning');
+            return null;
+        }
+        try {
+            const out = await TksApi.saveEmailDraft(ticketId, payload);
+            currentDraftSnapshot = out?.draft || currentDraftSnapshot;
+            if (!silent && window.showToast) window.showToast('Borrador guardado', 'success');
+            if (refresh) {
+                detailActiveTab = 'reply';
+                openDetail(ticketId, { preserveTab: true });
+            }
+            return out;
+        } catch (e) {
+            if (!silent && window.showToast) window.showToast(`Error guardando borrador: ${e.message}`, 'error');
+            return null;
+        }
+    }
+
+    async function uploadDraftAttachments(ticketId) {
+        const input = el('tks-draft-files');
+        if (!input || !input.files || input.files.length === 0) {
+            if (window.showToast) window.showToast('Selecciona uno o más archivos', 'warning');
+            return;
+        }
+        const fd = new FormData();
+        fd.append('lock_token', draftLockToken);
+        Array.from(input.files).forEach((file) => fd.append('files', file));
+        try {
+            const out = await TksApi.uploadEmailDraftAttachments(ticketId, fd, { timeoutMs: 60000 });
+            currentDraftSnapshot = out?.draft || currentDraftSnapshot;
+            input.value = '';
+            if (window.showToast) window.showToast(`Adjuntos cargados: ${Number(out?.uploaded || 0)}`, 'success');
+            detailActiveTab = 'reply';
+            openDetail(ticketId, { preserveTab: true });
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error subiendo adjuntos: ${e.message}`, 'error');
+        }
+    }
+
+    async function deleteDraftAttachment(ticketId, attachmentId) {
+        try {
+            const out = await TksApi.deleteEmailDraftAttachment(ticketId, attachmentId, draftLockToken);
+            currentDraftSnapshot = out?.draft || currentDraftSnapshot;
+            if (window.showToast) window.showToast('Adjunto eliminado', 'success');
+            detailActiveTab = 'reply';
+            openDetail(ticketId, { preserveTab: true });
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error eliminando adjunto: ${e.message}`, 'error');
+        }
+    }
+
+    function closeDraftReviewModal() {
+        const modal = el('tks-draft-review-modal');
+        if (modal) modal.remove();
+    }
+
+    function openDraftReviewModal(ticketId) {
+        const payload = readDraftEditor(ticketId);
+        if (!payload.body_text.trim()) {
+            if (window.showToast) window.showToast('El mensaje del borrador está vacío', 'warning');
+            return;
+        }
+        if (!payload.to_addr || !payload.to_addr.includes('@')) {
+            if (window.showToast) window.showToast('Correo destino inválido', 'warning');
+            return;
+        }
+
+        closeDraftReviewModal();
+        const attachments = Array.isArray(currentDraftSnapshot?.attachments) ? currentDraftSnapshot.attachments : [];
+        const ccPreview = String(payload.cc_addrs || '').trim();
+        const bccPreview = String(payload.bcc_addrs || '').trim();
+        const listItems = attachments.length
+            ? attachments.map((att) => `<li>${TksUI.escapeHtml(att.filename || 'adjunto')}</li>`).join('')
+            : '<li>Sin adjuntos</li>';
+        const html = `
+            <div class="tks-modal-overlay open" id="tks-draft-review-modal">
+                <div class="tks-modal tks-review-modal">
+                    <div class="tks-modal-header">
+                        <h3><i class="fas fa-paper-plane"></i> Confirmar envío</h3>
+                        <button class="tks-modal-close" onclick="TksMain.closeDraftReviewModal()">&times;</button>
+                    </div>
+                    <div class="tks-modal-body">
+                        <div class="tks-review-row">
+                            <span class="tks-review-label">Para</span>
+                            <span class="tks-review-value">${TksUI.escapeHtml(payload.to_addr)}</span>
+                        </div>
+                        <div class="tks-review-row">
+                            <span class="tks-review-label">CC</span>
+                            <span class="tks-review-value">${TksUI.escapeHtml(ccPreview || '-')}</span>
+                        </div>
+                        <div class="tks-review-row">
+                            <span class="tks-review-label">CCO</span>
+                            <span class="tks-review-value">${TksUI.escapeHtml(bccPreview || '-')}</span>
+                        </div>
+                        <div class="tks-review-row">
+                            <span class="tks-review-label">Asunto</span>
+                            <span class="tks-review-value">${TksUI.escapeHtml(payload.subject || '(sin asunto)')}</span>
+                        </div>
+                        <div class="tks-review-block">
+                            <div class="tks-review-label">Descripción</div>
+                            <div class="tks-review-body">${TksUI.escapeHtml(payload.body_text)}</div>
+                        </div>
+                        <div class="tks-review-block">
+                            <div class="tks-review-label">Adjuntos (${attachments.length})</div>
+                            <ul class="tks-review-list">${listItems}</ul>
+                        </div>
+                    </div>
+                    <div class="tks-modal-footer">
+                        <button class="tks-btn tks-btn-ghost" onclick="TksMain.closeDraftReviewModal()">Cancelar</button>
+                        <button class="tks-btn tks-btn-primary" onclick="TksMain.confirmSendDraft(${Number(ticketId)})">
+                            <i class="fas fa-envelope"></i> Confirmar envío
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    async function reviewSendDraft(ticketId) {
+        const out = await saveEmailDraft(ticketId, { silent: false, refresh: false });
+        if (!out) return;
+        openDraftReviewModal(ticketId);
+    }
+
+    async function confirmSendDraft(ticketId) {
+        const version = Number(currentDraftSnapshot?.version || el('tks-draft-version')?.value || 0);
+        if (!version) {
+            if (window.showToast) window.showToast('Versión de borrador inválida', 'warning');
+            return;
+        }
+        try {
+            await TksApi.sendEmailDraft(ticketId, { lock_token: draftLockToken, version }, { timeoutMs: 60000 });
+            closeDraftReviewModal();
+            clearDataCache();
+            stopDraftHeartbeat();
+            draftLockToken = '';
+            detailActiveTab = 'reply';
+            if (window.showToast) window.showToast('Correo enviado al cliente', 'success');
+            openDetail(ticketId, { preserveTab: true });
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error enviando correo: ${e.message}`, 'error');
+        }
+    }
+
+    async function discardEmailDraft(ticketId) {
+        if (!confirm('¿Descartar borrador activo?')) return;
+        try {
+            await TksApi.discardEmailDraft(ticketId, draftLockToken);
+            stopDraftHeartbeat();
+            draftLockToken = '';
+            currentDraftSnapshot = null;
+            if (window.showToast) window.showToast('Borrador descartado', 'success');
+            detailActiveTab = 'reply';
+            openDetail(ticketId, { preserveTab: true });
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error descartando borrador: ${e.message}`, 'error');
+        }
+    }
+
+    async function replyByEmail(ticketId) {
+        await reviewSendDraft(ticketId);
+    }
+
     function openReassign(ticketId) {
+        if (!sessionCtx.isAdmin) {
+            if (window.showToast) window.showToast('Solo admin o encargado de mesa puede reasignar tickets', 'warning');
+            return;
+        }
         const user = prompt('Nombre de usuario para reasignar:');
         if (!user) return;
         TksApi.updateTicket(ticketId, { asignado_a: user.trim() }).then(() => {
             clearDataCache();
             if (window.showToast) window.showToast(`Reasignado a ${user}`, 'success');
-            openDetail(ticketId);
+            openDetail(ticketId, { preserveTab: true });
             refreshList();
         }).catch(e => {
             if (window.showToast) window.showToast(`Error: ${e.message}`, 'error');
         });
     }
 
+    async function takeTicket(ticketId) {
+        try {
+            await TksApi.claimTicket(ticketId);
+            clearDataCache();
+            if (window.showToast) window.showToast('Ticket tomado correctamente', 'success');
+            if (currentTab === 'lista') {
+                refreshList();
+                openDetail(ticketId, { preserveTab: true });
+            }
+        } catch (e) {
+            if (window.showToast) window.showToast(`No se pudo tomar ticket: ${e.message}`, 'error');
+        }
+    }
+
     // ---- KANBAN ----
     async function loadKanban(container, token) {
         if (!container) return;
         if (isFresh(cache.kanban)) {
-            container.innerHTML = TksUI.renderKanban(cache.kanban.data);
+            container.innerHTML = TksUI.renderKanban(
+                scopeKanbanDataForSession(cache.kanban.data),
+                { canDrag: sessionCtx.isAdmin }
+            );
             bindKanbanDrop();
             return;
         }
@@ -474,13 +1576,15 @@ const TksMain = (() => {
         try {
             const data = await TksApi.getTablero({ signal: controller.signal, timeoutMs: 10000 });
             if (token !== tabRequestToken || currentTab !== 'kanban') return;
-            cache.kanban = { data: data.kanban, ts: Date.now() };
-            container.innerHTML = TksUI.renderKanban(data.kanban);
+            container.innerHTML = TksUI.renderKanban(
+                scopeKanbanDataForSession(data.kanban),
+                { canDrag: sessionCtx.isAdmin }
+            );
             bindKanbanDrop();
         } catch (e) {
             if (e?.name === 'AbortError') return;
             if (token !== tabRequestToken || currentTab !== 'kanban') return;
-            container.innerHTML = `<div style="padding:1rem;color:red">Error: ${e.message}</div>`;
+            container.innerHTML = `<div style="padding:1rem;color:red">Error: ${errorHtml(e)}</div>`;
         } finally {
             if (panelAbortController === controller) {
                 panelAbortController = null;
@@ -491,11 +1595,9 @@ const TksMain = (() => {
     // ---- OPS ----
     async function loadOps(container, token) {
         const renderOpsContainer = (data) => `
-            <div style="display:flex;justify-content:flex-end;gap:.5rem;margin:.5rem 0 1rem 0;">
-                <button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="TksMain.recoverStaleJobs()">Recuperar huérfanos</button>
-                <button class="tks-btn tks-btn-primary tks-btn-sm" onclick="TksMain.refreshOps()">Actualizar</button>
+            <div style="position: relative; padding-top: 0.5rem; overflow: visible;">
+                ${TksUI.renderOps(data)}
             </div>
-            ${TksUI.renderOps(data)}
         `;
         if (!container) return;
         if (isFresh(cache.ops)) {
@@ -504,7 +1606,7 @@ const TksMain = (() => {
         }
         const controller = new AbortController();
         panelAbortController = controller;
-        container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:220px;margin:1.5rem"></div></div>';
+        container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:220px;"></div></div>';
         try {
             const settled = await Promise.allSettled([
                 TksApi.getQueueHealth({ signal: controller.signal, timeoutMs: 12000 }),
@@ -531,7 +1633,7 @@ const TksMain = (() => {
         } catch (e) {
             if (e?.name === 'AbortError') return;
             if (token !== tabRequestToken || currentTab !== 'ops') return;
-            container.innerHTML = `<div class="tks-dashboard"><p style="color:red">Error cargando Operación: ${e.message}</p></div>`;
+            container.innerHTML = `<div class="tks-dashboard"><p style="color:red">Error cargando Operación: ${errorHtml(e)}</p></div>`;
         } finally {
             if (panelAbortController === controller) {
                 panelAbortController = null;
@@ -564,7 +1666,7 @@ const TksMain = (() => {
         try {
             const out = await TksApi.recoverStaleJobs(staleMinutes);
             const recovered = Number(out?.recovered?.recovered || 0);
-            if (window.showToast) window.showToast(`Recover stale ejecutado: ${recovered} jobs`, 'success');
+            if (window.showToast) window.showToast(`Recuperación de huérfanos ejecutada: ${recovered} trabajos`, 'success');
             refreshOps();
         } catch (e) {
             if (window.showToast) window.showToast(`Error al recuperar huérfanos: ${e.message}`, 'error');
@@ -577,6 +1679,7 @@ const TksMain = (() => {
     }
 
     function bindKanbanDrop() {
+        if (!sessionCtx.isAdmin) return;
         document.querySelectorAll('.tks-kanban-col-body').forEach(col => {
             col.addEventListener('dragover', e => { e.preventDefault(); col.style.background = 'rgba(99,102,241,0.06)'; });
             col.addEventListener('dragleave', () => { col.style.background = ''; });
@@ -593,6 +1696,10 @@ const TksMain = (() => {
 
     // ---- MODAL CREAR ----
     function openCreateModal() {
+        if (!sessionCtx.canCreate) {
+            if (window.showToast) window.showToast('Tu rol es de solo lectura para creación de tickets', 'warning');
+            return;
+        }
         const modal = el('tks-create-modal');
         if (modal) modal.classList.add('open');
     }
@@ -604,6 +1711,9 @@ const TksMain = (() => {
 
     // ---- CLIENT ASSOCIATION ----
     let assocEmail = '';
+    let assocSearchTimeout = null;
+    let assocSearchAbortController = null;
+    let assocSearchSeq = 0;
 
     function openAssociateClientModal(email) {
         assocEmail = email;
@@ -623,11 +1733,32 @@ const TksMain = (() => {
         // Focus search
         setTimeout(() => {
             const input = el('tks-assoc-search');
-            if (input) input.focus();
+            if (input) {
+                input.focus();
+                input.addEventListener('input', () => {
+                    if (assocSearchTimeout) clearTimeout(assocSearchTimeout);
+                    assocSearchTimeout = setTimeout(() => {
+                        searchClients({ silent: true });
+                    }, 140);
+                });
+            }
         }, 100);
+
+        // Cargar listado base al abrir para selección rápida.
+        setTimeout(() => {
+            searchClients({ silent: true });
+        }, 120);
     }
 
     function closeAssociateModal() {
+        if (assocSearchTimeout) {
+            clearTimeout(assocSearchTimeout);
+            assocSearchTimeout = null;
+        }
+        if (assocSearchAbortController) {
+            assocSearchAbortController.abort();
+            assocSearchAbortController = null;
+        }
         const modal = el('tks-associate-modal');
         if (modal) {
             modal.classList.remove('open');
@@ -635,31 +1766,47 @@ const TksMain = (() => {
         }
     }
 
-    async function searchClients() {
-        const q = el('tks-assoc-search').value.trim();
+    async function searchClients(options = {}) {
+        const silent = options.silent === true;
+        const input = el('tks-assoc-search');
         const resultsEl = el('tks-assoc-results');
-        if (!q || q.length < 2) {
-            if (window.showToast) window.showToast('Escribe al menos 2 caracteres', 'warning');
-            return;
-        }
+        const countEl = el('tks-assoc-count');
+        if (!resultsEl || !input) return;
+        const q = input.value.trim();
 
         resultsEl.style.display = 'block';
-        resultsEl.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--tks-text-muted)">Buscando...</div>';
+        resultsEl.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--tks-text-muted)">Cargando clientes...</div>';
+        if (countEl) countEl.textContent = 'Cargando...';
+
+        if (assocSearchAbortController) assocSearchAbortController.abort();
+        const controller = new AbortController();
+        assocSearchAbortController = controller;
+        const reqId = ++assocSearchSeq;
 
         try {
-            const data = await fetchApi(`/api/tks/customers/search?q=${encodeURIComponent(q)}`);
+            const primaryQs = q ? `?q=${encodeURIComponent(q)}&limit=100` : '?limit=0';
+            let data;
+            try {
+                data = await fetchApi(`/api/tks/customers/search${primaryQs}`, { signal: controller.signal, timeoutMs: 12000 });
+            } catch (primaryErr) {
+                // Compatibilidad: backend antiguo puede rechazar limit=0 con 422.
+                const needsFallback = !q && String(primaryErr?.message || '').includes('greater_than_equal');
+                if (!needsFallback) throw primaryErr;
+                data = await fetchApi('/api/tks/customers/search?limit=100', { signal: controller.signal, timeoutMs: 12000 });
+            }
+            if (reqId !== assocSearchSeq) return;
             const items = data.items || [];
 
             if (items.length === 0) {
                 resultsEl.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--tks-text-muted)">No se encontraron clientes</div>';
+                if (countEl) countEl.textContent = '0 clientes';
                 return;
             }
 
             resultsEl.innerHTML = items.map(c => `
-                <div class="tks-assoc-item" onclick="TksMain.selectClient('${c.id}', '${escapeHtml(c.name).replace(/'/g, "\\'")}')" 
-                     style="padding:0.8rem;border-bottom:1px solid var(--tks-border);cursor:pointer;transition:background 0.2s">
-                    <div style="font-weight:600;color:var(--tks-text-main)">${escapeHtml(c.name)}</div>
-                    <div style="font-size:0.8rem;color:var(--tks-text-muted)">RUT: ${escapeHtml(c.vat_id || 'N/A')}</div>
+                <div class="tks-assoc-item" onclick="TksMain.selectClient('${escapeJsSingleQuoted(c.id)}', '${escapeJsSingleQuoted(c.name)}')">
+                    <div style="font-weight:600;color:var(--tks-text-main)">${TksUI.escapeHtml(c.name)}</div>
+                    <div style="font-size:0.8rem;color:var(--tks-text-muted)">RUT: ${TksUI.escapeHtml(c.vat_id || 'N/A')}</div>
                 </div>
             `).join('');
 
@@ -668,9 +1815,17 @@ const TksMain = (() => {
                 div.addEventListener('mouseenter', () => div.style.background = 'rgba(255,255,255,0.05)');
                 div.addEventListener('mouseleave', () => div.style.background = 'transparent');
             });
+            if (countEl) countEl.textContent = `${items.length} cliente${items.length === 1 ? '' : 's'}`;
 
         } catch (e) {
-            resultsEl.innerHTML = `<div style="padding:1rem;color:red">Error: ${e.message}</div>`;
+            if (e?.name === 'AbortError') return;
+            resultsEl.innerHTML = `<div style="padding:1rem;color:red">Error: ${errorHtml(e)}</div>`;
+            if (countEl) countEl.textContent = 'Error de carga';
+            if (!silent && window.showToast) window.showToast(`Error buscando clientes: ${e.message}`, 'error');
+        } finally {
+            if (assocSearchAbortController === controller) {
+                assocSearchAbortController = null;
+            }
         }
     }
 
@@ -696,6 +1851,10 @@ const TksMain = (() => {
     }
 
     async function submitCreate() {
+        if (!sessionCtx.canCreate) {
+            if (window.showToast) window.showToast('No tienes permisos para crear tickets', 'warning');
+            return;
+        }
         const titulo = el('tks-new-titulo')?.value?.trim();
         if (!titulo) {
             if (window.showToast) window.showToast('El título es obligatorio', 'error');
@@ -755,10 +1914,28 @@ const TksMain = (() => {
         init,
         loadTab,
         openDetail,
+        closeDetail,
+        refreshList,
+        switchComposerMode,
+        switchDetailTab,
+        applyStatusChange,
+        toggleAssigneePicker,
+        applyAssigneeChange,
+        saveNotifyEmails,
         changeStatus,
+        transitionSubestado,
         addNote,
         replyByEmail,
+        acquireDraftLock,
+        saveEmailDraft,
+        uploadDraftAttachments,
+        deleteDraftAttachment,
+        reviewSendDraft,
+        confirmSendDraft,
+        discardEmailDraft,
+        closeDraftReviewModal,
         openReassign,
+        takeTicket,
         onDragStart,
         openCreateModal,
         closeCreateModal,
@@ -767,7 +1944,6 @@ const TksMain = (() => {
         refreshOps,
         recoverStaleJobs,
         loadCustomer360,
-        closeDetail,
         generatePaymentLink,
         openAssociateClientModal,
         closeAssociateModal,
@@ -820,15 +1996,25 @@ async function loadCustomer360(customerId, ticketId) {
 
     } catch (e) {
         loading.style.display = 'none';
-        content.innerHTML = `<p style="color:red">Error cargando datos: ${e.message}</p>`;
+        content.innerHTML = `<p style="color:red">Error cargando datos: ${errorHtml(e)}</p>`;
         content.style.display = 'block';
     }
 }
 
-async function generatePaymentLink(customerId, amount) {
-    const btn = event.target.closest('button');
+async function generatePaymentLink(customerId, amount, triggerEl = null) {
+    const btn = (triggerEl && typeof triggerEl.closest === 'function')
+        ? triggerEl.closest('button')
+        : null;
+    if (!btn) {
+        if (window.showToast) window.showToast('No se pudo identificar el botón de acción.', 'error');
+        return;
+    }
     const originalText = btn.innerHTML;
     const resultDiv = document.getElementById('payment-link-result');
+    if (!resultDiv) {
+        if (window.showToast) window.showToast('No se encontró el contenedor de resultado.', 'error');
+        return;
+    }
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
@@ -840,15 +2026,20 @@ async function generatePaymentLink(customerId, amount) {
             method: 'POST',
             body: JSON.stringify(payload)
         });
+        const paymentUrl = String(response?.payment_url || '').trim();
+        const paymentUrlHtml = TksUI.escapeHtml(paymentUrl);
+        const paymentUrlJs = escapeJsSingleQuoted(paymentUrl);
+        const expiresLabel = response?.expires_at ? new Date(response.expires_at).toLocaleString() : '-';
+        const expiresHtml = TksUI.escapeHtml(expiresLabel);
 
         resultDiv.innerHTML = `
             <div style="background:rgba(0,255,100,0.1); border:1px solid #00c851; padding:1rem; border-radius:6px; margin-top:1rem">
                 <div style="font-weight:bold; color:#00c851; margin-bottom:0.5rem"><i class="fas fa-check-circle"></i> Link generado</div>
                 <div style="display:flex; gap:0.5rem">
-                    <input type="text" readonly value="${response.payment_url}" style="flex:1; background:#111; border:1px solid #333; color:#eee; padding:4px; border-radius:4px" onclick="this.select()">
-                    <button class="tks-btn tks-btn-sm" onclick="navigator.clipboard.writeText('${response.payment_url}')"><i class="fas fa-copy"></i></button>
+                    <input type="text" readonly value="${paymentUrlHtml}" style="flex:1; background:#111; border:1px solid #333; color:#eee; padding:4px; border-radius:4px" onclick="this.select()">
+                    <button class="tks-btn tks-btn-sm" onclick="navigator.clipboard.writeText('${paymentUrlJs}')"><i class="fas fa-copy"></i></button>
                 </div>
-                <div style="font-size:0.75rem; opacity:0.7; margin-top:0.5rem">Expira: ${new Date(response.expires_at).toLocaleString()}</div>
+                <div style="font-size:0.75rem; opacity:0.7; margin-top:0.5rem">Expira: ${expiresHtml}</div>
             </div>
         `;
         resultDiv.style.display = 'block';

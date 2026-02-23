@@ -332,20 +332,26 @@ def init_db() -> None:
             role TEXT NOT NULL DEFAULT 'ops',  -- admin|finance|ops|warehouse
             is_active INTEGER NOT NULL DEFAULT 1,
             allowed_modules TEXT DEFAULT '[]',
+            secondary_roles TEXT DEFAULT '[]',
             phone_number TEXT,
             created_at TEXT DEFAULT ''
         );
         """)
         
-        # MIGRATION: Ensure allowed_modules and phone_number exist (for existing DBs)
+        # MIGRATION: Ensure allowed_modules, secondary_roles and phone_number exist (for existing DBs)
         try:
             if is_postgres():
                 conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT DEFAULT '[]'")
+                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS secondary_roles TEXT DEFAULT '[]'")
                 conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number TEXT")
             else:
                 # SQLite fallback
                 try:
                     conn.execute("ALTER TABLE users ADD COLUMN allowed_modules TEXT DEFAULT '[]'")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE users ADD COLUMN secondary_roles TEXT DEFAULT '[]'")
                 except Exception:
                     pass
                 try:
@@ -587,6 +593,7 @@ def init_db() -> None:
             ("categoria",       "TEXT DEFAULT 'general'", True),
             ("origen_email",    "TEXT",                True),
             ("cliente_nombre",  "TEXT",                True),
+            ("notify_emails",   "TEXT DEFAULT ''",     False),
             ("prioridad",       "INTEGER DEFAULT 3",   True),
             ("sla_horas",       "INTEGER DEFAULT 72",  True),
             ("email_thread_id", "TEXT",                False),
@@ -595,7 +602,7 @@ def init_db() -> None:
             ("ticket_security_class", "TEXT DEFAULT 'internal'", False),
             ("retention_until", "TEXT",                False),
             ("retention_days_snapshot", "INTEGER DEFAULT 1095", False),
-            ("subestado", "TEXT DEFAULT 'nuevo'", False),
+            ("subestado", "TEXT DEFAULT 'recibido'", False),
             ("first_response_at", "TEXT", False),
             ("frt_due_at", "TEXT", False),
             ("ttr_due_at", "TEXT", False),
@@ -654,7 +661,31 @@ def init_db() -> None:
                        WHEN estado = 'en_progreso' THEN 'en_progreso'
                        WHEN estado = 'resuelto' THEN 'resuelto'
                        WHEN estado = 'cerrado' THEN 'cerrado'
-                       ELSE 'nuevo'
+                       WHEN COALESCE(asignado_a, '') <> '' THEN 'asignado'
+                       ELSE 'recibido'
+                   END
+                   WHERE LOWER(COALESCE(subestado, '')) IN ('nuevo', 'triage')"""
+            )
+            conn.execute(
+                """UPDATE tickets
+                   SET subestado = 'cerrado'
+                   WHERE estado = 'cerrado'
+                     AND LOWER(COALESCE(subestado, '')) <> 'cerrado'"""
+            )
+            conn.execute(
+                """UPDATE tickets
+                   SET subestado = 'resuelto'
+                   WHERE estado = 'resuelto'
+                     AND LOWER(COALESCE(subestado, '')) <> 'resuelto'"""
+            )
+            conn.execute(
+                """UPDATE tickets
+                   SET subestado = CASE
+                       WHEN estado = 'en_progreso' THEN 'en_progreso'
+                       WHEN estado = 'resuelto' THEN 'resuelto'
+                       WHEN estado = 'cerrado' THEN 'cerrado'
+                       WHEN COALESCE(asignado_a, '') <> '' THEN 'asignado'
+                       ELSE 'recibido'
                    END
                    WHERE COALESCE(subestado, '') = ''"""
             )
@@ -882,6 +913,8 @@ def init_db() -> None:
             direction TEXT NOT NULL,
             from_addr TEXT,
             to_addr TEXT,
+            cc_addrs TEXT DEFAULT '',
+            bcc_addrs TEXT DEFAULT '',
             subject TEXT,
             body_html TEXT,
             attachments_json TEXT DEFAULT '[]',
@@ -897,6 +930,89 @@ def init_db() -> None:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_tk_emails_idempotency ON ticket_emails(idempotency_key);")
         except Exception as _e:
             print(f"[DB-MIGRATION] WARN ticket_emails.idempotency_key: {_e}")
+        try:
+            conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS cc_addrs TEXT DEFAULT '';")
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN ticket_emails.cc_addrs: {_e}")
+        try:
+            conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS bcc_addrs TEXT DEFAULT '';")
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN ticket_emails.bcc_addrs: {_e}")
+
+        # --- Ticketera V3: Borradores de respuesta por correo ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_email_drafts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            to_addr TEXT DEFAULT '',
+            cc_addrs TEXT DEFAULT '',
+            bcc_addrs TEXT DEFAULT '',
+            subject TEXT DEFAULT '',
+            body_text TEXT DEFAULT '',
+            version INTEGER NOT NULL DEFAULT 1,
+            lock_owner TEXT,
+            lock_token_hash TEXT,
+            lock_expires_at TEXT,
+            created_by TEXT NOT NULL,
+            updated_by TEXT NOT NULL,
+            sent_by TEXT,
+            sent_email_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            sent_at TEXT,
+            FOREIGN KEY(ticket_id) REFERENCES tickets(id),
+            FOREIGN KEY(sent_email_id) REFERENCES ticket_emails(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_ticket ON ticket_email_drafts(ticket_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_status ON ticket_email_drafts(status);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_lock_expires ON ticket_email_drafts(lock_expires_at);"
+        )
+        conn.execute(
+            """CREATE UNIQUE INDEX IF NOT EXISTS idx_tk_email_drafts_active
+               ON ticket_email_drafts(ticket_id)
+               WHERE status = 'active'"""
+        )
+        try:
+            conn.execute("ALTER TABLE ticket_email_drafts ADD COLUMN IF NOT EXISTS cc_addrs TEXT DEFAULT '';")
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN ticket_email_drafts.cc_addrs: {_e}")
+        try:
+            conn.execute("ALTER TABLE ticket_email_drafts ADD COLUMN IF NOT EXISTS bcc_addrs TEXT DEFAULT '';")
+        except Exception as _e:
+            print(f"[DB-MIGRATION] WARN ticket_email_drafts.bcc_addrs: {_e}")
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_email_draft_attachments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            draft_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            size_bytes INTEGER DEFAULT 0,
+            content_type TEXT DEFAULT 'application/octet-stream',
+            sha256 TEXT DEFAULT '',
+            uploaded_by TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            sent_email_id INTEGER,
+            FOREIGN KEY(draft_id) REFERENCES ticket_email_drafts(id) ON DELETE CASCADE,
+            FOREIGN KEY(sent_email_id) REFERENCES ticket_emails(id)
+        );
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_draft ON ticket_email_draft_attachments(draft_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_sent_email ON ticket_email_draft_attachments(sent_email_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_sha256 ON ticket_email_draft_attachments(sha256);"
+        )
 
         # --- Workflow de transiciones por ticket ---
         conn.execute("""

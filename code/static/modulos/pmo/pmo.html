@@ -7,21 +7,12 @@
     <title>Oficina Técnica | Monstruo</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.6" />
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=68.0" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Estilos específicos que sobrescriban o complementen */
         body {
             overflow-x: hidden;
-        }
-
-        main {
-            padding: 2rem 2.5rem;
-        }
-
-        .main-inner {
-            max-width: 1200px;
-            margin: 0 auto;
         }
 
         /* Status Badges */
@@ -150,6 +141,12 @@
         .close-btn:hover {
             color: #fff;
         }
+
+        /* Alinea tabs con el header para mantener la misma línea visual del Dashboard */
+        .module-shell>.tab-bar {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
     </style>
 </head>
 
@@ -178,14 +175,14 @@
     </header>
 
     <main>
-        <div class="main-inner">
+        <div class="main-inner module-shell">
             <!-- Header Section Style ERP -->
-            <div class="section-header" style="border:none; padding-bottom:0;">
-                <div>
-                    <h2 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px;">Oficina Técnica (PMO)</h2>
-                    <p style="opacity:0.6;">Gestión de Proyectos, Costos y Tareas</p>
+            <div class="section-header module-tabs-header module-shell-header">
+                <div class="module-shell-title">
+                    <h2 class="module-page-title">Oficina Técnica (PMO)</h2>
+                    <p class="module-shell-subtitle">Gestión de Proyectos, Costos y Tareas</p>
                 </div>
-                <div>
+                <div class="module-shell-actions">
                     <button class="btn-primary" onclick="window.pmoDashboard.openCreateModal()">
                         <i class="fas fa-plus"></i> Nuevo Proyecto
                     </button>
@@ -194,11 +191,12 @@
 
             <!-- Tabs Style ERP -->
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="window.pmoDashboard.switchTab('resumen')">Resumen</button>
-                <button class="tab-btn" onclick="window.pmoDashboard.switchTab('proyectos')">Proyectos</button>
-                <button class="tab-btn" onclick="window.pmoDashboard.switchTab('tareas')">Tareas</button>
+                <button class="tab-btn active" onclick="window.pmoDashboard.switchTab('resumen')">&#x1F4CA; Resumen</button>
+                <button class="tab-btn" onclick="window.pmoDashboard.switchTab('proyectos')">&#x1F4C1; Proyectos</button>
+                <button class="tab-btn" onclick="window.pmoDashboard.switchTab('tareas')">&#x2705; Tareas</button>
             </div>
 
+            <section class="section-block module-shell-content">
             <!-- VIEW: RESUMEN -->
             <div id="view-resumen" class="view-section active">
                 <div class="kpi-row">
@@ -375,6 +373,7 @@
                     <p>Aquí se listarán las tareas extraídas por la IA.</p>
                 </div>
             </div>
+            </section>
 
         </div>
     </main>
@@ -387,8 +386,8 @@
         <i class="fas fa-magic"></i>
     </button>
 
-    <script src="/modulos/_compartido/js/utilidades.js"></script>
-    <script src="/modulos/_compartido/js/sidebar.js?v=8"></script>
+    <script src="/modulos/_compartido/js/utilidades.js?v=203"></script>
+    <script src="/modulos/_compartido/js/sidebar.js?v=11"></script>
 
     <!-- Modal Create Project -->
     <dialog id="modal-create-project" class="modal">

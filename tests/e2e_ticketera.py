@@ -16,8 +16,12 @@ THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
+CODE_ROOT = PROJECT_ROOT / "code"
+if str(CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(CODE_ROOT))
 
 from _helpers import as_json, build_session, env_str, guard_prod_target, require_credentials
+from app.core.security import create_access_token
 
 
 def parse_args() -> argparse.Namespace:
@@ -184,7 +188,346 @@ def main() -> int:
         return fail(str(exc))
 
     # ------------------------------------------------------------
-    # 2) Reply + dedupe + incoming thread match
+    # 2) Ownership / Claim / Anti-cruce por asignación
+    # ------------------------------------------------------------
+    try:
+        inner_ownership = f"""
+from app.core import tickets_service
+
+ticket = tickets_service.create_ticket(
+    titulo="E2E Ownership Assigned",
+    descripcion="Validación anti-cruce por asignación",
+    creador_id="e2e_owner",
+    categoria="sistemas",
+    severidad="media",
+    tipo="incidencia",
+)
+ticket_id = int(ticket["id"])
+tickets_service.update_ticket(ticket_id, {{"asignado_a": "tecnico_owner"}}, actor_id="system")
+
+try:
+    tickets_service.add_comment(ticket_id, "tecnico_otro", "No debería pasar", "nota", actor_role="redes")
+    print("FAIL_NON_ASSIGNED_COMMENT")
+    raise SystemExit(1)
+except PermissionError:
+    pass
+
+try:
+    tickets_service.add_comment(ticket_id, "admin_user", "No debería pasar", "nota", actor_role="admin")
+    print("FAIL_ADMIN_COMMENT")
+    raise SystemExit(1)
+except PermissionError:
+    pass
+
+tickets_service.add_comment(ticket_id, "tecnico_owner", "Comentario válido", "nota", actor_role="sistemas")
+tickets_service.update_ticket(ticket_id, {{"estado": "en_progreso"}}, actor_id="admin_user", actor_role="admin")
+
+try:
+    tickets_service.update_ticket(ticket_id, {{"estado": "resuelto"}}, actor_id="tecnico_otro", actor_role="redes")
+    print("FAIL_NON_ASSIGNED_STATUS")
+    raise SystemExit(1)
+except PermissionError:
+    pass
+
+ticket_claim = tickets_service.create_ticket(
+    titulo="E2E Ownership Claim",
+    descripcion="Claim controlado",
+    creador_id="e2e_owner",
+    categoria="sistemas",
+    severidad="media",
+    tipo="incidencia",
+)
+claim_id = int(ticket_claim["id"])
+tickets_service.update_ticket(claim_id, {{"asignado_a": None}}, actor_id="system")
+
+claim_ok = tickets_service.claim_ticket(claim_id, "tecnico_owner", "sistemas")
+if not claim_ok.get("ticket") or str(claim_ok["ticket"].get("asignado_a") or "").strip().lower() != "tecnico_owner":
+    print("FAIL_CLAIM_OWNER", claim_ok)
+    raise SystemExit(1)
+
+try:
+    tickets_service.claim_ticket(claim_id, "tecnico_otro", "redes")
+    print("FAIL_CLAIM_STEAL")
+    raise SystemExit(1)
+except PermissionError:
+    pass
+
+ticket_claim_admin = tickets_service.create_ticket(
+    titulo="E2E Ownership Claim Admin",
+    descripcion="Admin no puede tomar",
+    creador_id="e2e_owner",
+    categoria="sistemas",
+    severidad="media",
+    tipo="incidencia",
+)
+claim_admin_id = int(ticket_claim_admin["id"])
+tickets_service.update_ticket(claim_admin_id, {{"asignado_a": None}}, actor_id="system")
+
+try:
+    tickets_service.claim_ticket(claim_admin_id, "admin_user", "admin")
+    print("FAIL_ADMIN_CLAIM")
+    raise SystemExit(1)
+except PermissionError:
+    pass
+
+print("SUCCESS")
+"""
+        cmd_ownership = [
+            "docker", "compose", "--env-file", ".env.server.dev",
+            "exec", "-T", "api", "python3", "-c", inner_ownership
+        ]
+        proc_ownership = subprocess.run(cmd_ownership, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
+        if proc_ownership.returncode != 0 or "SUCCESS" not in proc_ownership.stdout:
+            return fail(f"Error validando ownership/claim ticketera: {proc_ownership.stdout} // {proc_ownership.stderr}")
+        print("[OK] Ownership/claim anti-cruce validado")
+    except Exception as exc:
+        return fail(str(exc))
+
+    # ------------------------------------------------------------
+    # 3) API Smoke Draft Reply (lock/version/takeover/send)
+    # ------------------------------------------------------------
+    temp_draft_path = None
+    try:
+        admin_token = create_access_token("e2e_draft_admin", "admin")
+        tech_a_token = create_access_token("e2e_draft_tech_a", "sistemas")
+        tech_b_token = create_access_token("e2e_draft_tech_b", "redes")
+
+        def auth_headers(token: str) -> Dict[str, str]:
+            return {"Authorization": f"Bearer {token}"}
+
+        draft_ticket_resp = session.post(
+            f"{base_url}/api/tks/tickets",
+            json={
+                "titulo": f"E2E Draft API {int(time.time())}",
+                "descripcion": "Smoke API draft lock/version/send",
+                "tipo": "incidencia",
+                "severidad": "media",
+                "categoria": "sistemas",
+                "origen_email": "draft.api.e2e@example.com",
+                "cliente_nombre": "Cliente Draft API",
+            },
+            headers=auth_headers(admin_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Crear ticket draft API", draft_ticket_resp.status_code, draft_ticket_resp.text, {200})
+        draft_ticket = as_json(draft_ticket_resp)
+        draft_ticket_id = int(draft_ticket["id"])
+
+        assign_resp = session.patch(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}",
+            json={"asignado_a": "e2e_draft_tech_a", "estado": "en_progreso"},
+            headers=auth_headers(admin_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Asignar ticket draft API", assign_resp.status_code, assign_resp.text, {200})
+
+        admin_lock = session.post(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft/lock",
+            json={"force": False},
+            headers=auth_headers(admin_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Admin lock draft bloqueado", admin_lock.status_code, admin_lock.text, {403})
+
+        get_draft = session.get(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft",
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Get draft ticket", get_draft.status_code, get_draft.text, {200})
+
+        lock_a = session.post(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft/lock",
+            json={"force": False},
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Lock draft técnico A", lock_a.status_code, lock_a.text, {200})
+        lock_a_payload = as_json(lock_a)
+        lock_a_token = lock_a_payload.get("lock_token")
+        if not lock_a_token:
+            return fail(f"Lock técnico A sin token: {lock_a_payload}")
+        v1 = int(lock_a_payload.get("draft", {}).get("version") or 0)
+        if v1 <= 0:
+            return fail(f"Lock técnico A sin versión válida: {lock_a_payload}")
+
+        save_a = session.put(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft",
+            json={
+                "lock_token": lock_a_token,
+                "version": v1,
+                "to_addr": "draft.api.e2e@example.com",
+                "subject": "Re: E2E Draft API",
+                "body_text": "Mensaje borrador técnico A",
+            },
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Guardar draft técnico A", save_a.status_code, save_a.text, {200})
+        save_a_payload = as_json(save_a)
+        v2 = int(save_a_payload.get("draft", {}).get("version") or 0)
+        if v2 <= v1:
+            return fail(f"Guardar draft no incrementó versión: {save_a_payload}")
+
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as tmp_draft:
+            tmp_draft.write("Adjunto borrador E2E")
+            temp_draft_path = tmp_draft.name
+
+        with open(temp_draft_path, "rb") as handle:
+            upload_draft = session.post(
+                f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft/attachments",
+                headers=auth_headers(tech_a_token),
+                data={"lock_token": lock_a_token},
+                files=[("files", ("draft_attachment.txt", handle, "text/plain"))],
+                timeout=args.timeout,
+            )
+        ensure_status("Upload adjunto draft", upload_draft.status_code, upload_draft.text, {200})
+        upload_payload = as_json(upload_draft)
+        if int(upload_payload.get("uploaded") or 0) < 1:
+            return fail(f"No se subieron adjuntos en draft: {upload_payload}")
+
+        stale_save = session.put(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft",
+            json={
+                "lock_token": lock_a_token,
+                "version": v1,
+                "body_text": "Intento con versión antigua",
+            },
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Conflicto versión draft", stale_save.status_code, stale_save.text, {409})
+
+        lock_b_conflict = session.post(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft/lock",
+            json={"force": False},
+            headers=auth_headers(tech_b_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Técnico no asignado bloqueado en lock draft", lock_b_conflict.status_code, lock_b_conflict.text, {403})
+
+        lock_b = session.post(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft/lock",
+            json={"force": True},
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Takeover lock técnico asignado", lock_b.status_code, lock_b.text, {200})
+        lock_b_payload = as_json(lock_b)
+        lock_b_token = lock_b_payload.get("lock_token")
+        v3 = int(lock_b_payload.get("draft", {}).get("version") or 0)
+        if not lock_b_token or v3 <= 0:
+            return fail(f"Takeover lock inválido: {lock_b_payload}")
+
+        save_b = session.put(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft",
+            json={
+                "lock_token": lock_b_token,
+                "version": v3,
+                "body_text": "Mensaje final técnico asignado",
+            },
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Guardar draft takeover técnico asignado", save_b.status_code, save_b.text, {200})
+        save_b_payload = as_json(save_b)
+        v4 = int(save_b_payload.get("draft", {}).get("version") or 0)
+        if v4 <= v3:
+            return fail(f"Guardar draft takeover sin versión nueva: {save_b_payload}")
+
+        send_draft = session.post(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/email-draft/send",
+            json={"lock_token": lock_b_token, "version": v4},
+            headers=auth_headers(tech_a_token),
+            timeout=max(args.timeout, 45),
+        )
+        ensure_status("Enviar draft ticket", send_draft.status_code, send_draft.text, {200})
+        send_payload = as_json(send_draft)
+        if send_payload.get("ok") is not True:
+            return fail(f"Send draft sin ok=true: {send_payload}")
+
+        attachments_after_send = session.get(
+            f"{base_url}/api/tks/tickets/{draft_ticket_id}/attachments",
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Adjuntos ticket post send draft", attachments_after_send.status_code, attachments_after_send.text, {200})
+        if len(as_json(attachments_after_send).get("items") or []) < 1:
+            return fail("Send draft no persistió adjuntos en ticket_attachments")
+
+        closed_ticket_resp = session.post(
+            f"{base_url}/api/tks/tickets",
+            json={
+                "titulo": f"E2E Draft Closed {int(time.time())}",
+                "descripcion": "Bloqueo draft en cerrado",
+                "tipo": "incidencia",
+                "severidad": "media",
+                "categoria": "sistemas",
+                "origen_email": "draft.closed.e2e@example.com",
+            },
+            headers=auth_headers(admin_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Crear ticket draft closed", closed_ticket_resp.status_code, closed_ticket_resp.text, {200})
+        closed_ticket = as_json(closed_ticket_resp)
+        closed_ticket_id = int(closed_ticket["id"])
+
+        assign_closed_resp = session.patch(
+            f"{base_url}/api/tks/tickets/{closed_ticket_id}",
+            json={"asignado_a": "e2e_draft_tech_a", "estado": "en_progreso"},
+            headers=auth_headers(admin_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Asignar ticket closed", assign_closed_resp.status_code, assign_closed_resp.text, {200})
+
+        lock_closed = session.post(
+            f"{base_url}/api/tks/tickets/{closed_ticket_id}/email-draft/lock",
+            json={"force": False},
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Lock draft ticket closed setup", lock_closed.status_code, lock_closed.text, {200})
+        lock_closed_payload = as_json(lock_closed)
+        lock_closed_token = lock_closed_payload.get("lock_token")
+        lock_closed_version = int(lock_closed_payload.get("draft", {}).get("version") or 0)
+
+        close_ticket = session.patch(
+            f"{base_url}/api/tks/tickets/{closed_ticket_id}",
+            json={"estado": "cerrado"},
+            headers=auth_headers(admin_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Cerrar ticket draft closed", close_ticket.status_code, close_ticket.text, {200})
+
+        save_closed = session.put(
+            f"{base_url}/api/tks/tickets/{closed_ticket_id}/email-draft",
+            json={
+                "lock_token": lock_closed_token,
+                "version": lock_closed_version,
+                "body_text": "No debería poder guardar en cerrado",
+            },
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Bloqueo save draft en cerrado", save_closed.status_code, save_closed.text, {400})
+
+        send_closed = session.post(
+            f"{base_url}/api/tks/tickets/{closed_ticket_id}/email-draft/send",
+            json={"lock_token": lock_closed_token, "version": lock_closed_version},
+            headers=auth_headers(tech_a_token),
+            timeout=args.timeout,
+        )
+        ensure_status("Bloqueo send draft en cerrado", send_closed.status_code, send_closed.text, {400})
+
+        print("[OK] API draft reply validada (lock/version/takeover/send + bloqueos)")
+    except Exception as exc:
+        return fail(str(exc))
+    finally:
+        if temp_draft_path and os.path.exists(temp_draft_path):
+            os.remove(temp_draft_path)
+
+    # ------------------------------------------------------------
+    # 4) Reply + dedupe + incoming thread match
     # ------------------------------------------------------------
     temp_path = None
     attachment_name = "ticketera_e2e.txt"
@@ -199,6 +542,12 @@ def main() -> int:
             "cliente_nombre": "Cliente E2E",
         })
         ticket_id = email_ticket["id"]
+        assign_reply = session.patch(
+            f"{base_url}/api/tks/tickets/{ticket_id}",
+            json={"asignado_a": args.user, "estado": "en_progreso"},
+            timeout=args.timeout,
+        )
+        ensure_status("Asignar ticket reply", assign_reply.status_code, assign_reply.text, {200})
 
         with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as tmp:
             tmp.write("Adjunto de prueba E2E Ticketera.")
@@ -323,7 +672,7 @@ except Exception as e:
             os.remove(temp_path)
 
     # ------------------------------------------------------------
-    # 3) Auto-Respuesta segura (allowlist + antiloop + one-shot)
+    # 4) Auto-Respuesta segura (allowlist + antiloop + one-shot)
     # ------------------------------------------------------------
     try:
         inner_auto_reply = f"""
@@ -497,7 +846,7 @@ finally:
         return fail(str(exc))
 
     # ------------------------------------------------------------
-    # 4) SLA metrics/breaches API contract
+    # 5) SLA metrics/breaches API contract
     # ------------------------------------------------------------
     try:
         metrics = session.get(f"{base_url}/api/tks/sla/metrics", timeout=args.timeout)
@@ -526,7 +875,7 @@ finally:
         return fail(str(exc))
 
     # ------------------------------------------------------------
-    # 5) Compliance core (retención + legal hold + export + hash-chain)
+    # 6) Compliance core (retención + legal hold + export + hash-chain)
     # ------------------------------------------------------------
     try:
         cmp_ticket = create_ticket(session, base_url, args.timeout, {
@@ -671,7 +1020,7 @@ print("SUCCESS")
         return fail(str(exc))
 
     # ------------------------------------------------------------
-    # 6) Worker real de canales (dry_run + retry controlado)
+    # 7) Worker real de canales (dry_run + retry controlado)
     # ------------------------------------------------------------
     try:
         channels_status = session.get(f"{base_url}/api/tks/channels/status", timeout=args.timeout)
@@ -813,7 +1162,7 @@ print("SUCCESS")
         return fail(str(exc))
 
     # ------------------------------------------------------------
-    # 7) Cola jobs: queue-health + recover stale + dedupe recurrentes
+    # 8) Cola jobs: queue-health + recover stale + dedupe recurrentes
     # ------------------------------------------------------------
     try:
         inner_queue_seed = f"""
@@ -909,7 +1258,7 @@ print("SUCCESS")
         return fail(str(exc))
 
     # ------------------------------------------------------------
-    # 8) Paralelo Jira + MONSTRUO (bootstrap/delta/runs/kpi/go-no-go)
+    # 9) Paralelo Jira + MONSTRUO (bootstrap/delta/runs/kpi/go-no-go)
     # ------------------------------------------------------------
     try:
         jira_key = f"E2E-JIRA-{int(time.time())}"

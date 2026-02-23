@@ -28,6 +28,15 @@ jobs:
       - name: Compile (syntax check)
         run: |
           python -m compileall -q code/app
+      - name: Hardening (repo checks)
+        run: |
+          python tests/verify_hardening.py
+      - name: Ticketera core policy tests
+        run: |
+          python tests/unit_ticketera_core.py
+      - name: Ticketera frontend security tests
+        run: |
+          python tests/unit_ticketera_frontend_security.py
 
   deploy:
     needs: tests

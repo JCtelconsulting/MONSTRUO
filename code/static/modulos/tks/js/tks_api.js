@@ -32,6 +32,8 @@ const TksApi = (() => {
 
         updateTicket: (id, body) => _fetch(`${BASE}/tickets/${id}`, { method: 'PATCH', body }),
 
+        claimTicket: (id) => _fetch(`${BASE}/tickets/${id}/claim`, { method: 'POST' }),
+
         // --- Eventos/Timeline ---
         getEventos: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/eventos`, requestOpts || {}),
 
@@ -40,6 +42,11 @@ const TksApi = (() => {
 
         getTicketEmails: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/emails`, requestOpts || {}),
         getTicketWorkflow: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/workflow`, requestOpts || {}),
+        transitionTicket: (ticketId, body, requestOpts = null) =>
+            _fetch(
+                `${BASE}/tickets/${ticketId}/transitions`,
+                requestOpts ? { method: 'POST', body, ...requestOpts } : { method: 'POST', body }
+            ),
         getTicketApprovals: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/approvals`, requestOpts || {}),
         getTicketAttachments: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/attachments`, requestOpts || {}),
         getTicketAttachmentDownloadUrl: (ticketId, attachmentId) => `${BASE}/tickets/${ticketId}/attachments/${attachmentId}/download`,
@@ -57,11 +64,57 @@ const TksApi = (() => {
             );
         },
 
+        // --- Borradores de respuesta por correo ---
+        getEmailDraft: (ticketId, requestOpts = null) =>
+            _fetch(`${BASE}/tickets/${ticketId}/email-draft`, requestOpts || {}),
+        lockEmailDraft: (ticketId, force = false, requestOpts = null) =>
+            _fetch(
+                `${BASE}/tickets/${ticketId}/email-draft/lock`,
+                requestOpts ? { method: 'POST', body: { force: !!force }, ...requestOpts } : { method: 'POST', body: { force: !!force } }
+            ),
+        heartbeatEmailDraftLock: (ticketId, lockToken, requestOpts = null) =>
+            _fetch(
+                `${BASE}/tickets/${ticketId}/email-draft/lock/heartbeat`,
+                requestOpts ? { method: 'POST', body: { lock_token: lockToken }, ...requestOpts } : { method: 'POST', body: { lock_token: lockToken } }
+            ),
+        saveEmailDraft: (ticketId, body, requestOpts = null) =>
+            _fetch(
+                `${BASE}/tickets/${ticketId}/email-draft`,
+                requestOpts ? { method: 'PUT', body, ...requestOpts } : { method: 'PUT', body }
+            ),
+        uploadEmailDraftAttachments: (ticketId, formData, requestOpts = null) =>
+            _fetch(
+                `${BASE}/tickets/${ticketId}/email-draft/attachments`,
+                requestOpts ? { method: 'POST', body: formData, ...requestOpts } : { method: 'POST', body: formData }
+            ),
+        deleteEmailDraftAttachment: (ticketId, attachmentId, lockToken, requestOpts = null) =>
+            _fetch(
+                `${BASE}/tickets/${ticketId}/email-draft/attachments/${attachmentId}`,
+                requestOpts ? { method: 'DELETE', body: { lock_token: lockToken }, ...requestOpts } : { method: 'DELETE', body: { lock_token: lockToken } }
+            ),
+        sendEmailDraft: (ticketId, body, requestOpts = null) =>
+            _fetch(
+                `${BASE}/tickets/${ticketId}/email-draft/send`,
+                requestOpts ? { method: 'POST', body, ...requestOpts } : { method: 'POST', body }
+            ),
+        discardEmailDraft: (ticketId, lockToken, requestOpts = null) =>
+            _fetch(
+                `${BASE}/tickets/${ticketId}/email-draft/discard`,
+                requestOpts ? { method: 'POST', body: { lock_token: lockToken }, ...requestOpts } : { method: 'POST', body: { lock_token: lockToken } }
+            ),
+
         // --- Kanban ---
         getTablero: (requestOpts = null) => _fetch(`${BASE}/tablero`, requestOpts || {}),
 
         // --- Stats ---
         getStats: (requestOpts = null) => _fetch(`${BASE}/stats`, requestOpts || {}),
+        getAssignmentTimeline: (params = {}, requestOpts = null) => {
+            const qs = new URLSearchParams();
+            if (params.window_h) qs.set('window_h', params.window_h);
+            if (params.limit) qs.set('limit', params.limit);
+            const query = qs.toString();
+            return _fetch(`${BASE}/asignacion/timeline${query ? '?' + query : ''}`, requestOpts || {});
+        },
 
         // --- Notificaciones ---
         getNotificaciones: (requestOpts = null) => _fetch(`${BASE}/notificaciones`, requestOpts || {}),

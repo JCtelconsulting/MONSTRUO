@@ -7,9 +7,9 @@
     <title>Bodega | Monstruo</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.6" />
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=68.0" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="css/bodega-shared.css?v=67.0" />
+    <link rel="stylesheet" href="css/bodega-shared.css?v=67.1" />
 </head>
 
 <body class="sidebar-collapsed bodega-shell">
@@ -34,23 +34,22 @@
     </header>
 
     <main>
-        <div class="main-inner">
-            <section class="section-block" style="height: 100%; display:flex; flex-direction:column;">
-                <div class="section-header" style="border:none; padding-bottom:0;">
-                    <div>
-                        <h2 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px;">Bodega Maestra (WMS)
-                        </h2>
-                        <p style="opacity:0.6;">Gestión de Inventario y Catálogo</p>
-                    </div>
+        <div class="main-inner module-shell">
+            <div class="section-header module-tabs-header module-shell-header">
+                <div class="module-shell-title">
+                    <h2 class="module-page-title">Bodega Maestra (WMS)</h2>
+                    <p class="module-shell-subtitle">Gestión de Inventario y Catálogo</p>
                 </div>
+            </div>
 
-                <div class="tab-bar">
-                    <button class="tab-btn active" data-tab="inventario" onclick="loadBodegaTab('inventario', this)"
-                        id="tab-inventario">Inventario</button>
-                    <button class="tab-btn" data-tab="catalogo" onclick="loadBodegaTab('catalogo', this)"
-                        id="tab-catalogo">Catálogo</button>
-                </div>
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="inventario" onclick="loadBodegaTab('inventario', this)"
+                    id="tab-inventario">&#x1F4E6; Inventario</button>
+                <button class="tab-btn" data-tab="catalogo" onclick="loadBodegaTab('catalogo', this)"
+                    id="tab-catalogo">&#x1F5C3; Catálogo</button>
+            </div>
 
+            <section class="section-block module-shell-content module-shell-content-fill">
                 <!-- Tab Content Container -->
                 <div id="tab-content" style="flex:1; overflow:hidden; display:flex; flex-direction:column;"></div>
             </section>
@@ -124,8 +123,7 @@
             style="padding:10px 15px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2);">
             <h4 id="modal-title" style="margin:0;">Resultado</h4>
             <button onclick="document.getElementById('modal-dialog').close()"
-                style="background:none; border:none; color:#aaa; cursor:pointer;"><i
-                    class="fas fa-times"></i></button>
+                style="background:none; border:none; color:#aaa; cursor:pointer;"><i class="fas fa-times"></i></button>
         </div>
         <div id="modal-content" style="padding:15px; max-height:70vh; overflow-y:auto;"></div>
     </dialog>
@@ -311,7 +309,7 @@
 
             try {
                 // Load HTML
-                const htmlResp = await fetch(`/modulos/bodega/${normalized}/${normalized}.html`);
+                const htmlResp = await fetch(`${normalized}/${normalized}.html`);
                 if (!htmlResp.ok) throw new Error(`HTTP ${htmlResp.status}`);
                 const html = await htmlResp.text();
                 container.innerHTML = html;
@@ -321,7 +319,7 @@
                 if (!loadedResources.has(cssKey)) {
                     const link = document.createElement('link');
                     link.rel = 'stylesheet';
-                    link.href = `/modulos/bodega/${normalized}/${normalized}.css?v=66.7`;
+                    link.href = `${normalized}/${normalized}.css?v=66.7`;
                     document.head.appendChild(link);
                     loadedResources.add(cssKey);
                 }
@@ -330,7 +328,7 @@
                 const jsKey = `js-${normalized}`;
                 if (!loadedResources.has(jsKey)) {
                     const script = document.createElement('script');
-                    script.src = `/modulos/bodega/${normalized}/${normalized}.js?v=66.7`;
+                    script.src = `${normalized}/${normalized}.js?v=66.7`;
                     document.body.appendChild(script);
                     loadedResources.add(jsKey);
 

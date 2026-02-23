@@ -3,13 +3,13 @@
 Estas instrucciones aplican a cualquier agente ejecutado en este repositorio.
 
 ## Regla de carga obligatoria
-- Cargar y obedecer: `.agent/rules/monstruo-dev-reglas.md`.
+- Cargar y obedecer: `.agents/rules/reglas-monstruo-dev.md`.
 - Si no se puede leer ese archivo, detener ejecucion y reportar bloqueo.
 
 ## Orden de autoridad
 1. `docs/PLAN_MAESTRO_MONSTRUO.md`
 2. `docs/PROYECTO_CONTEXTO.md`
-3. `.agent/rules/monstruo-dev-reglas.md`
+3. `.agents/rules/reglas-monstruo-dev.md`
 4. Instruccion puntual del usuario (si no contradice 1-3)
 
 ## Prioridad de negocio

@@ -30,7 +30,7 @@ Este archivo es solo un **bootstrap**. No reemplaza la documentacion canonica.
 Orden de autoridad obligatorio:
 1. `docs/PLAN_MAESTRO_MONSTRUO.md`
 2. `docs/PROYECTO_CONTEXTO.md`
-3. `.agent/rules/monstruo-dev-reglas.md`
+3. `.agents/rules/reglas-monstruo-dev.md`
 4. `docs/ESTANDARES.md`
 5. Instruccion puntual del usuario (si no contradice 1-4)
 
@@ -43,7 +43,7 @@ Hito mas reciente detectado:
 Antes de proponer o ejecutar cambios, el agente debe cargar:
 - `docs/PLAN_MAESTRO_MONSTRUO.md`
 - `docs/PROYECTO_CONTEXTO.md`
-- `.agent/rules/monstruo-dev-reglas.md`
+- `.agents/rules/reglas-monstruo-dev.md`
 - `docs/ESTANDARES.md`
 - `docs/.README.md`
 - `.README.md` de cada carpeta que vaya a tocar (allowlist local)

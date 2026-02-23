@@ -7,7 +7,7 @@
     <title>ERP & Finanzas | Monstruo</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=66.6" />
+    <link rel="stylesheet" href="/modulos/_compartido/css/monstruo.css?v=68.0" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="css/erp-shared.css" />
 </head>
@@ -34,45 +34,28 @@
     </header>
 
     <main>
-        <div class="main-inner">
-            <div class="section-header" style="border:none; padding-bottom:0;">
-                <div>
-                    <h2 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px;">ERP & Finanzas</h2>
-                    <p style="opacity:0.6;">Gestión centralizada de operaciones financieras</p>
-                </div>
-            </div>
-
-            <!-- KPIs Globales (Always Visible) -->
-            <div class="kpi-row" style="margin-bottom: 20px; display: flex; gap: 15px;">
-                <div class="kpi-card">
-                    <div class="kpi-val" id="kpi-sales" style="color:var(--neon); animation: pulse 2s infinite;">--
-                    </div>
-                    <div class="kpi-lbl">Facturado (30d)</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-val" id="kpi-debt" style="color:#ff3333;">--</div>
-                    <div class="kpi-lbl">Vencido (>30d)</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-val" id="kpi-cash" style="color:#00cc66;">--</div>
-                    <div class="kpi-lbl">Recaudado (30d)</div>
+        <div class="main-inner module-shell">
+            <div class="section-header module-tabs-header module-shell-header">
+                <div class="module-shell-title">
+                    <h2 class="module-page-title">ERP & Finanzas</h2>
+                    <p class="module-shell-subtitle">Gestión centralizada de operaciones financieras</p>
                 </div>
             </div>
 
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchTab('clientes')"><i class="fas fa-users"></i>
-                    Clientes</button>
-                <button class="tab-btn" onclick="switchTab('facturacion')">Facturación</button>
-                <button class="tab-btn" onclick="switchTab('prefactura')">Pre‑Factura</button>
-                <button class="tab-btn" onclick="switchTab('conciliacion')">Conciliación</button>
-                <button class="tab-btn" onclick="switchTab('cobranza')">Cobranza</button>
-
-                <button class="tab-btn" onclick="switchTab('bancos')"><i
-                        class="fas fa-mobile-alt mr-2"></i>Bancos</button>
+                <button class="tab-btn active" onclick="switchTab('resumen')">&#x1F4CA; Resumen</button>
+                <button class="tab-btn" onclick="switchTab('clientes')">&#x1F465; Clientes</button>
+                <button class="tab-btn" onclick="switchTab('facturacion')">&#x1F9FE; Facturación</button>
+                <button class="tab-btn" onclick="switchTab('prefactura')">&#x1F4DD; Pre‑Factura</button>
+                <button class="tab-btn" onclick="switchTab('conciliacion')">&#x1F501; Conciliación</button>
+                <button class="tab-btn" onclick="switchTab('cobranza')">&#x1F4B0; Cobranza</button>
+                <button class="tab-btn" onclick="switchTab('bancos')">&#x1F3E6; Bancos</button>
             </div>
 
-            <!-- Tab Content Container -->
-            <div id="tab-content-container"></div>
+            <section class="section-block module-shell-content">
+                <!-- Tab Content Container -->
+                <div id="tab-content-container"></div>
+            </section>
         </div>
     </main>
 
@@ -83,32 +66,11 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (window.initLogout) window.initLogout();
-            loadTopKPIs();
-            switchTab('clientes');
+            switchTab('resumen');
         });
 
         let currentTab = null;
         const loadedResources = new Set();
-
-        async function loadTopKPIs() {
-            try {
-                const data = await window.fetchApi('/api/sales/kpis');
-                if (data) {
-                    const fmt = (n) => `$${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0, notation: "compact" }).format(n)}`;
-
-                    const elSales = document.getElementById('kpi-sales');
-                    if (elSales) elSales.innerText = fmt(data.sales_month);
-
-                    const elDebt = document.getElementById('kpi-debt');
-                    if (elDebt) elDebt.innerText = fmt(data.debt_overdue);
-
-                    const elCash = document.getElementById('kpi-cash');
-                    if (elCash) elCash.innerText = fmt(data.collected_month);
-                }
-            } catch (e) {
-                console.error("Error loading KPIs", e);
-            }
-        }
 
         function switchTab(tabId) {
             // Update active button
@@ -130,7 +92,7 @@
 
             try {
                 // Load HTML
-                const htmlResp = await fetch(`/modulos/erp/${tabName}/${tabName}.html?v=${Date.now()}`);
+                const htmlResp = await fetch(`${tabName}/${tabName}.html?v=${Date.now()}`);
                 if (!htmlResp.ok) throw new Error(`HTTP ${htmlResp.status}`);
                 const html = await htmlResp.text();
                 container.innerHTML = html;
@@ -140,17 +102,17 @@
                 if (!loadedResources.has(cssKey)) {
                     const link = document.createElement('link');
                     link.rel = 'stylesheet';
-                    link.href = `/modulos/erp/${tabName}/${tabName}.css?v=${Date.now()}`;
+                    link.href = `${tabName}/${tabName}.css?v=${Date.now()}`;
                     document.head.appendChild(link);
                     loadedResources.add(cssKey);
                 }
 
                 // Load JS (Always reload for dev)
-                const existingScript = document.querySelector(`script[src^="/modulos/erp/${tabName}/${tabName}.js"]`);
+                const existingScript = document.querySelector(`script[src*="${tabName}/${tabName}.js"]`);
                 if (existingScript) existingScript.remove();
 
                 const script = document.createElement('script');
-                script.src = `/modulos/erp/${tabName}/${tabName}.js?v=${Date.now()}`;
+                script.src = `${tabName}/${tabName}.js?v=${Date.now()}`;
 
                 // IMPORTANT: Append to body to execute
                 document.body.appendChild(script);
@@ -162,6 +124,7 @@
                 });
 
                 // Call init functions
+                if (tabName === 'resumen' && typeof window.initResumen === 'function') window.initResumen();
                 if (tabName === 'clientes' && typeof window.initClientes === 'function') window.initClientes();
                 if (tabName === 'facturacion' && typeof loadInvoices === 'function') loadInvoices();
                 if (tabName === 'conciliacion' && typeof initBancos === 'function') initBancos();
