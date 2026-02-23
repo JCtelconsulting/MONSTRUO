@@ -2,6 +2,32 @@
 **Fecha de actualizacion:** 23 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-23 - EPIC 11 Ticketera: reset operativo + eliminación de usuarios de prueba (DEV)
+- **Solicitud**: resetear ticketera y eliminar usuarios de pruebas creados durante validaciones.
+- **Acción ejecutada**:
+  - truncado transaccional con `RESTART IDENTITY CASCADE` en:
+    - `tickets`, `ticket_comments`, `ticket_emails`, `ticket_attachments`,
+    - `ticket_email_drafts`, `ticket_email_draft_attachments`,
+    - `ticket_notifications`, `ticket_notification_attempts`,
+    - `ticket_transitions`, `ticket_approvals`, `ticket_legal_holds`,
+    - `jira_issue_map`, `jira_sync_runs`, `jira_sync_cursor`,
+    - `parallel_kpi_daily`, `parallel_decisions`,
+    - `compliance_export_runs`, `compliance_purge_runs`, `evidence_events`.
+  - reinicio de carga técnica: `user_specialties.current_load = 0`.
+  - eliminación de usuarios de pruebas:
+    - `qa_epic11_local`
+    - `qa_epic11_runner`
+    - `qa_epic11_all`
+  - limpieza de adjuntos DEV en filesystem:
+    - `/srv/monstruo_dev/data/tickets` -> limpio.
+- **Verificación**:
+  - `tickets_after = 0`.
+  - `non_zero_load_after = 0`.
+  - `test_users_after = 0`.
+  - tablas de paralelo/compliance ticketera en `0` (`jira_sync_runs`, `jira_sync_cursor`, `parallel_kpi_daily`, `parallel_decisions`, `compliance_export_runs`, `compliance_purge_runs`, `evidence_events`).
+  - adjuntos DEV: `0` elementos en `/srv/monstruo_dev/data/tickets`.
+- **Estado**: CERRADO.
+
 ## HITO: 2026-02-23 - Hotfix CI/CD: despliegue PROD por Actions falla por POSTGRES_PASSWORD faltante
 - **Incidente**:
   - PR `#8` de Ticketera se mergeó correctamente a `main`, pero el workflow `CI + Deploy` falló en job `deploy`.
@@ -110,7 +136,6 @@
 - **Causa raíz**: el contenedor `monstruo-dev-api` quedó en estado "zombie" (proceso bloqueado sin logs nuevos ni respuesta HTTP). Espacio en disco y DB normales.
 - **Acción**: reinicio forzado del contenedor del API.
 - **Estado**: RESTAURADO. Se verificó respuesta HTTP 200/404 y flujo de logs activo.
-
 ## HITO: 2026-02-20 - EPIC 11 Ticketera: eliminación de descripción duplicada y normalización visual (DEV)
 - **Solicitud**: en la vista de lista, al abrir el detalle del ticket, la descripción aparecía redundante arriba de la línea de tiempo. Además, se pidió ajustar los colores del bloque de detalle para que fuera coherente con el resto de la aplicación (menos gris puro, más soporte al CSS global transparente de paneles). También, se indicó que el contenido de las 4 pestañas iniciaba a diferentes alturas.
 - **Entregable**:

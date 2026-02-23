@@ -216,9 +216,11 @@ async def update_smtp_config(
                     VALUES (?, ?, 'smtp', ?, ?)
                     ON CONFLICT(key) DO UPDATE SET
                         value = excluded.value,
+                        group_name = excluded.group_name,
+                        is_sensitive = excluded.is_sensitive,
                         updated_at = excluded.updated_at
                 """
-                conn.execute(sql, (k, str(v), int(is_sensitive), now))
+                conn.execute(sql, (k, str(v), bool(is_sensitive), now))
                 
         conn.commit()
         return {"ok": True}
