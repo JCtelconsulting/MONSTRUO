@@ -35,7 +35,7 @@ const TksMain = (() => {
     const ROLE_GERENCIA = 'gerencia';
     const ROLE_MANAGEMENT = new Set([ROLE_ADMIN, ROLE_MESA_MANAGER]);
     const ROLE_DISPATCH = new Set(['ops', ROLE_MESA_MANAGER]);
-    const ROLE_OPS_READ = new Set([ROLE_ADMIN, ROLE_MESA_MANAGER]);
+    const ROLE_OPS_READ = new Set([ROLE_ADMIN]);
     let sessionCtx = {
         user: '',
         role: '',
@@ -428,9 +428,14 @@ const TksMain = (() => {
 
     function applyRoleView() {
         document.querySelectorAll('.tks-tab-btn').forEach(btn => {
-            if (btn.dataset.tab === 'ops') {
-                btn.style.display = sessionCtx.canViewOps ? '' : 'none';
+            if (btn.dataset.tab !== 'ops') return;
+            if (sessionCtx.canViewOps) {
+                btn.style.removeProperty('display');
+                btn.hidden = false;
+                return;
             }
+            // Hide hard: remove tab from DOM to avoid global CSS !important overrides.
+            btn.remove();
         });
         const createBtn = el('tks-create-btn');
         if (createBtn) {
@@ -1661,7 +1666,7 @@ const TksMain = (() => {
         try {
             const out = await TksApi.recoverStaleJobs(staleMinutes);
             const recovered = Number(out?.recovered?.recovered || 0);
-            if (window.showToast) window.showToast(`Recover stale ejecutado: ${recovered} jobs`, 'success');
+            if (window.showToast) window.showToast(`Recuperación de huérfanos ejecutada: ${recovered} trabajos`, 'success');
             refreshOps();
         } catch (e) {
             if (window.showToast) window.showToast(`Error al recuperar huérfanos: ${e.message}`, 'error');

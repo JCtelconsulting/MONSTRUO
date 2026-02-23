@@ -12,13 +12,13 @@ Su fin es evitar desorden, cruces DEV/PROD y perdida de foco en la meta de negoc
 Cuando haya conflicto, obedecer en este orden:
 1. `docs/PLAN_MAESTRO_MONSTRUO.md`
 2. `docs/PROYECTO_CONTEXTO.md`
-3. `.agent/rules/monstruo-dev-reglas.md` (este archivo)
+3. `.agents/rules/reglas-monstruo-dev.md` (este archivo)
 4. Instruccion puntual del usuario (si no contradice 1-3)
 
 ## 2) Carga obligatoria
 - Todo agente debe cargar este archivo al iniciar.
 - Si no puede leerlo, debe detenerse y reportar bloqueo antes de ejecutar cambios.
-- Frase de control recomendada al iniciar: `Reglas cargadas: monstruo-dev-reglas.md`.
+- Frase de control recomendada al iniciar: `Reglas cargadas: reglas-monstruo-dev.md`.
 
 ## 3) Prioridad de negocio vigente
 - EPIC 11 (Ticketera) es prioridad maxima absoluta.
