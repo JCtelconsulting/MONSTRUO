@@ -2,6 +2,20 @@
 **Fecha de actualizacion:** 23 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-23 - EPIC 11 Ticketera: revisión integral de flujos y smoke técnico (DEV)
+- **Solicitud**: revisar Ticketera completa (código + flujos) y validar que opere correctamente antes de subida a GitHub.
+- **Verificación ejecutada**:
+  - `python3 tests/verify_hardening.py --check-api --base-url http://127.0.0.1:9001 --user qa_epic11_local --password '***' --timeout 60` ✅
+  - `python3 tests/e2e_api_full.py --base-url http://127.0.0.1:9001 --user qa_epic11_all --password '***' --timeout 60` ✅
+  - `python3 tests/e2e_ticketera.py --base-url http://127.0.0.1:9001 --user qa_epic11_all --password '***' --timeout 60` ✅
+  - `python3 tests/unit_ticketera_core.py` ✅
+  - `python3 tests/unit_ticketera_frontend_security.py` ✅
+  - `node --check code/static/modulos/tks/js/tks_ui.js` ✅
+  - `node --check code/static/modulos/tks/js/tks_main.js` ✅
+- **Hallazgo operativo**:
+  - ejecución de `e2e_api_full` con usuario `admin` puro falla por política vigente (admin no participa en comentarios/correo/adjuntos). Se valida PASS con rol técnico-compliance (`ops+admin`).
+- **Estado**: CERRADO. Ticketera validada en DEV para avance de publicación.
+
 ## HITO: 2026-02-23 - EPIC 11 Ticketera: Operación traducida a español legible (DEV)
 - **Solicitud**: traducir la UI de la pestaña `Operación` porque mostraba términos técnicos en inglés difíciles de entender.
 - **Entregable**:
