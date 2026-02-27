@@ -374,6 +374,17 @@ def init_db() -> None:
         );
         """)
 
+        # MIGRATION: Ensure system_settings columns exist
+        for col_name, col_def in [
+            ("group_name", "TEXT DEFAULT 'general'"),
+            ("is_sensitive", "BOOLEAN DEFAULT FALSE"),
+            ("updated_at", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS {col_name} {col_def}")
+            except Exception as _e:
+                print(f"[DB-MIGRATION] INFO col {col_name} might already exist or error: {_e}")
+
         conn.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,

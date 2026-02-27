@@ -2,9 +2,13 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
 import subprocess
 import time
-import shutil
+import tempfile
+import uuid
 import os
 from app.core import deps
+
+
+MAX_APK_SIZE_BYTES = 200 * 1024 * 1024  # 200 MB
 
 router = APIRouter(prefix="/api/bancos", tags=["bancos"])
 
@@ -119,35 +123,80 @@ async def install_apk(
     Recibe un archivo APK y lo instala en el emulador vía ADB.
     """
     # 1. Verificar Lock
-    if current_lock["user"] != sess["username"]:
+    now = time.time()
+    if current_lock["user"] != sess["username"] or now > current_lock["expires_at"]:
         raise HTTPException(status_code=403, detail="No tienes el control del banco")
 
-    # 2. Guardar temporalmente
-    temp_path = f"/tmp/{file.filename}"
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Keep-alive del lock para mantener comportamiento de sesión activa
+    current_lock["expires_at"] = now + LOCK_TTL
+
+    # Validación opcional de extensión declarada
+    if file.filename and not file.filename.lower().endswith(".apk"):
+        raise HTTPException(status_code=400, detail="El archivo debe tener extensión .apk")
+
+    # 2. Guardar temporalmente de forma segura (ignora filename del usuario)
+    temp_path: str | None = None
+    bytes_written = 0
 
     try:
+        unique_name = f"installer-{uuid.uuid4().hex}.apk"
+        with tempfile.NamedTemporaryFile(
+            mode="wb", prefix=unique_name + "-", suffix=".apk", delete=False
+        ) as tmp:
+            temp_path = tmp.name
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1MB
+                if not chunk:
+                    break
+                bytes_written += len(chunk)
+                if bytes_written > MAX_APK_SIZE_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            "APK excede tamaño máximo permitido "
+                            f"({MAX_APK_SIZE_BYTES // (1024 * 1024)} MB)"
+                        ),
+                    )
+                tmp.write(chunk)
+
+        if bytes_written == 0:
+            raise HTTPException(status_code=400, detail="APK vacío")
+
         # 3. Copiar al contenedor
-        # Usamos docker cp desde el host
-        cmd_cp = f"docker cp {temp_path} monstruo-bancos-01:/tmp/installer.apk"
-        ret_cp = os.system(cmd_cp)
-        if ret_cp != 0:
-            raise Exception("Error copiando APK al contenedor")
+        subprocess.run(
+            ["docker", "cp", temp_path, "monstruo-bancos-01:/tmp/installer.apk"],
+            check=True,
+            timeout=30,
+        )
 
         # 4. Instalar
-        cmd_install = "docker exec monstruo-bancos-01 adb install -r /tmp/installer.apk"
-        ret_install = os.system(cmd_install)
+        subprocess.run(
+            [
+                "docker",
+                "exec",
+                "monstruo-bancos-01",
+                "adb",
+                "install",
+                "-r",
+                "/tmp/installer.apk",
+            ],
+            check=True,
+            timeout=120,
+        )
 
-        if ret_install != 0:
-            raise Exception("Error al ejecutar adb install")
+        return {"status": "ok", "message": "APK instalado correctamente"}
 
-        return {"status": "ok", "message": f"Instalado {file.filename} correctamente"}
-
+    except HTTPException:
+        raise
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Timeout instalando APK")
+    except subprocess.CalledProcessError as e:
+        print(f"Error instalando APK (subprocess): {e}")
+        raise HTTPException(status_code=500, detail="Error al instalar APK")
     except Exception as e:
         print(f"Error instalando APK: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno instalando APK")
     finally:
-        # Cleanup
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        await file.close()
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)

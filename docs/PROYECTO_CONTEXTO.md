@@ -1,7 +1,141 @@
 # PROYECTO CONTEXTO: MONSTRUO
-**Fecha de actualizacion:** 20 Febrero 2026
+**Fecha de actualizacion:** 23 Febrero 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-02-23 - EPIC 11 Ticketera: reset operativo + eliminación de usuarios de prueba (DEV)
+- **Solicitud**: resetear ticketera y eliminar usuarios de pruebas creados durante validaciones.
+- **Acción ejecutada**:
+  - truncado transaccional con `RESTART IDENTITY CASCADE` en:
+    - `tickets`, `ticket_comments`, `ticket_emails`, `ticket_attachments`,
+    - `ticket_email_drafts`, `ticket_email_draft_attachments`,
+    - `ticket_notifications`, `ticket_notification_attempts`,
+    - `ticket_transitions`, `ticket_approvals`, `ticket_legal_holds`,
+    - `jira_issue_map`, `jira_sync_runs`, `jira_sync_cursor`,
+    - `parallel_kpi_daily`, `parallel_decisions`,
+    - `compliance_export_runs`, `compliance_purge_runs`, `evidence_events`.
+  - reinicio de carga técnica: `user_specialties.current_load = 0`.
+  - eliminación de usuarios de pruebas:
+    - `qa_epic11_local`
+    - `qa_epic11_runner`
+    - `qa_epic11_all`
+  - limpieza de adjuntos DEV en filesystem:
+    - `/srv/monstruo_dev/data/tickets` -> limpio.
+- **Verificación**:
+  - `tickets_after = 0`.
+  - `non_zero_load_after = 0`.
+  - `test_users_after = 0`.
+  - tablas de paralelo/compliance ticketera en `0` (`jira_sync_runs`, `jira_sync_cursor`, `parallel_kpi_daily`, `parallel_decisions`, `compliance_export_runs`, `compliance_purge_runs`, `evidence_events`).
+  - adjuntos DEV: `0` elementos en `/srv/monstruo_dev/data/tickets`.
+- **Estado**: CERRADO.
+
+## HITO: 2026-02-23 - Hotfix CI/CD: despliegue PROD por Actions falla por POSTGRES_PASSWORD faltante
+- **Incidente**:
+  - PR `#8` de Ticketera se mergeó correctamente a `main`, pero el workflow `CI + Deploy` falló en job `deploy`.
+  - Error exacto en step `Deploy to server`: `required variable POSTGRES_PASSWORD is missing`.
+- **Causa raíz**:
+  - en algunos entornos, el despliegue dispone de `DB_URL` pero no de `POSTGRES_PASSWORD` explícito para la interpolación de `docker-compose`.
+- **Corrección aplicada**:
+  - `ops/herramientas/deploy/deploy.sh`:
+    - se agrega fallback para derivar `POSTGRES_PASSWORD` desde `DB_URL` cuando no viene definido.
+    - mantiene comportamiento previo cuando `POSTGRES_PASSWORD` ya existe.
+- **Verificación**:
+  - `bash -n ops/herramientas/deploy/deploy.sh` ✅
+- **Estado**: HOTFIX IMPLEMENTADO EN CÓDIGO (pendiente re-ejecución de workflow para confirmar deploy en PROD).
+
+## HITO: 2026-02-23 - EPIC 11 Ticketera: revisión integral de flujos y smoke técnico (DEV)
+- **Solicitud**: revisar Ticketera completa (código + flujos) y validar que opere correctamente antes de subida a GitHub.
+- **Verificación ejecutada**:
+  - `python3 tests/verify_hardening.py --check-api --base-url http://127.0.0.1:9001 --user qa_epic11_local --password '***' --timeout 60` ✅
+  - `python3 tests/e2e_api_full.py --base-url http://127.0.0.1:9001 --user qa_epic11_all --password '***' --timeout 60` ✅
+  - `python3 tests/e2e_ticketera.py --base-url http://127.0.0.1:9001 --user qa_epic11_all --password '***' --timeout 60` ✅
+  - `python3 tests/unit_ticketera_core.py` ✅
+  - `python3 tests/unit_ticketera_frontend_security.py` ✅
+  - `node --check code/static/modulos/tks/js/tks_ui.js` ✅
+  - `node --check code/static/modulos/tks/js/tks_main.js` ✅
+- **Hallazgo operativo**:
+  - ejecución de `e2e_api_full` con usuario `admin` puro falla por política vigente (admin no participa en comentarios/correo/adjuntos). Se valida PASS con rol técnico-compliance (`ops+admin`).
+- **Estado**: CERRADO. Ticketera validada en DEV para avance de publicación.
+
+## HITO: 2026-02-23 - EPIC 11 Ticketera: Operación traducida a español legible (DEV)
+- **Solicitud**: traducir la UI de la pestaña `Operación` porque mostraba términos técnicos en inglés difíciles de entender.
+- **Entregable**:
+  - `code/static/modulos/tks/js/tks_ui.js`:
+    - normalización de etiquetas dinámicas en español para:
+      - estados operativos (`pending`, `running`, etc.),
+      - modos de adaptador (`disabled`, `dry_run`, `live`),
+      - canales (`whatsapp`, `3cx`, etc.),
+      - tipos de trabajo de cola (`by_job_type`),
+      - tipos de corrida Jira (`run_type`).
+    - fallback genérico para humanizar valores no mapeados (`snake_case/kebab-case` -> frase legible).
+    - tablas de Operación renderizan etiquetas traducidas (no claves crudas).
+  - `code/static/modulos/tks/js/tks_main.js`:
+    - toast de recuperación de huérfanos traducido a español completo.
+  - `code/static/modulos/tks/tks.html`:
+    - cache-bust actualizado: `tks_ui.js?v=71`, `tks_main.js?v=53`.
+- **Verificación**:
+  - `node --check code/static/modulos/tks/js/tks_ui.js` ✅
+  - `node --check code/static/modulos/tks/js/tks_main.js` ✅
+- **Estado**: IMPLEMENTADO EN CÓDIGO (DEV), pendiente validación visual/manual por usuario en runtime.
+
+## HITO: 2026-02-23 - EPIC 11 Ticketera: ocultamiento definitivo de pestaña Operación para no-admin (DEV)
+- **Solicitud**: aunque redirigía, la pestaña `Operación` seguía visible para no-admin; se pidió que no se vea derechamente.
+- **Causa raíz**:
+  - el ocultamiento previo usaba `style.display = 'none'`, pero era vulnerable a reglas globales de tabs con `display: inline-flex !important`.
+- **Entregable**:
+  - `code/static/modulos/tks/js/tks_main.js`:
+    - en `applyRoleView()`, para no-admin el botón `data-tab="ops"` se elimina del DOM (`btn.remove()`).
+    - para admin se conserva visibilidad normal.
+  - `code/static/modulos/tks/tks.html`:
+    - cache-bust actualizado a `tks_main.js?v=52`.
+- **Verificación**:
+  - `node --check code/static/modulos/tks/js/tks_main.js` ✅
+  - no-admin: no ve el tab `Operación` en la barra.
+  - admin: mantiene tab `Operación` visible.
+- **Estado**: IMPLEMENTADO EN CÓDIGO (DEV), pendiente validación visual/manual por usuario en runtime.
+
+## HITO: 2026-02-23 - EPIC 11 Ticketera: pestaña Operación visible solo para ADMIN (DEV)
+- **Solicitud**: ocultar la pestaña `Operación` para usuarios no admin porque genera confusión.
+- **Entregable**:
+  - `code/static/modulos/tks/js/tks_main.js`:
+    - `ROLE_OPS_READ` restringido a `admin` exclusivamente.
+    - efecto: `sessionCtx.canViewOps` deja de habilitar `Operación` para `encargado_mesa` u otros roles.
+    - se mantiene guard de seguridad en navegación: si un no-admin intenta `loadTab('ops')`, se redirige a `lista`.
+  - `code/static/modulos/tks/tks.html`:
+    - cache-bust de script actualizado a `tks_main.js?v=51`.
+- **Verificación**:
+  - `node --check code/static/modulos/tks/js/tks_main.js` ✅
+  - validación funcional esperada:
+    - admin: ve pestaña `Operación`.
+    - no-admin: pestaña `Operación` oculta y bloqueo por navegación directa al tab.
+- **Estado**: IMPLEMENTADO EN CÓDIGO (DEV), pendiente validación visual/manual por usuario en runtime.
+
+## HITO: 2026-02-23 - EPIC 11 Ticketera: reset operativo a 0 en DEV + normalización de ruta de reglas
+- **Solicitud**: dejar la ticketera en 0 tickets y alinear la gobernanza para usar `.agents` en vez de `.agent`.
+- **Entregable**:
+  - reset de tablas operativas de Ticketera en `monstruo-dev-postgres`:
+    - `ticket_notification_attempts`, `ticket_notifications`, `ticket_email_draft_attachments`,
+    - `ticket_email_drafts`, `ticket_attachments`, `ticket_emails`, `ticket_comments`,
+    - `ticket_transitions`, `ticket_approvals`, `ticket_legal_holds`, `jira_issue_map`, `tickets`
+    - con `RESTART IDENTITY CASCADE`.
+  - reinicio de carga técnica: `user_specialties.current_load = 0`.
+  - ajuste de rutas canónicas de reglas:
+    - `AGENTS.md` -> `.agents/rules/reglas-monstruo-dev.md`
+    - `.agents/rules/reglas-monstruo-dev.md` (autorreferencia y frase de control)
+    - `docs/PLAN_MAESTRO_MONSTRUO.md` sección 0.7 y bitácora.
+    - `docs/PROMPT_CHAT_UNIVERSAL.md` (orden de autoridad y carga obligatoria).
+    - `ops/herramientas/deploy/generate_universal_prompt.py` (plantilla base de generación).
+- **Verificación**:
+  - `tickets_before = 3` y `non_zero_load_before = 2`.
+  - post reset: `tickets_after = 0`.
+  - post reset: `non_zero_load_after = 0`.
+  - adjuntos DEV en filesystem (`/srv/monstruo_dev/data/tickets`) ya estaban en `0` elementos.
+- **Estado**: CERRADO.
+
+## HITO: 2026-02-23 - Restauración de servicio API DEV tras bloqueo (Incidente)
+- **Solicitud**: reportada caída de la aplicación.
+- **Causa raíz**: el contenedor `monstruo-dev-api` quedó en estado "zombie" (proceso bloqueado sin logs nuevos ni respuesta HTTP). Espacio en disco y DB normales.
+- **Acción**: reinicio forzado del contenedor del API.
+- **Estado**: RESTAURADO. Se verificó respuesta HTTP 200/404 y flujo de logs activo.
 ## HITO: 2026-02-20 - EPIC 11 Ticketera: eliminación de descripción duplicada y normalización visual (DEV)
 - **Solicitud**: en la vista de lista, al abrir el detalle del ticket, la descripción aparecía redundante arriba de la línea de tiempo. Además, se pidió ajustar los colores del bloque de detalle para que fuera coherente con el resto de la aplicación (menos gris puro, más soporte al CSS global transparente de paneles). También, se indicó que el contenido de las 4 pestañas iniciaba a diferentes alturas.
 - **Entregable**:
@@ -1823,7 +1957,7 @@
 - **Solicitud**: Subir Plan Maestro actualizado y formalizar reglas de agentes para entorno DEV, dejando obligatorio el uso de `monstruo-dev-reglas.md`.
 - **Entregable**:
   - Agregado `AGENTS.md` en la raiz para obligar bootstrap de reglas en agentes compatibles.
-  - Creado archivo canonico: `.agent/rules/monstruo-dev-reglas.md`.
+  - Creado archivo canonico: `.agents/rules/reglas-monstruo-dev.md`.
   - Regla legacy eliminada para evitar ambiguedad; queda un unico archivo canonico de reglas en DEV.
   - Plan Maestro actualizado con seccion de gobernanza obligatoria para agentes (`0.7`) y prioridad de EPIC 11 para reemplazo de mesa externa.
   - Criterio explicito: no se abre desarrollo neto de EPIC 12+ hasta cerrar EPIC 11 con Go/No-Go profesional.

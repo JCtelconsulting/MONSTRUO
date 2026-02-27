@@ -72,6 +72,34 @@ if grep -Eq '^DB_URL=.*(localhost|127\.0\.0\.1|::1)' "$DEPLOY_ENV_FILE"; then
   echo "[deploy] WARN: DB_URL local detectado en env. Se fuerza host docker: $DB_URL"
 fi
 
+# Compose requiere POSTGRES_PASSWORD para interpolar docker-compose.yaml.
+# Si no viene en el env file, intentamos derivarlo desde DB_URL.
+if [ -z "${POSTGRES_PASSWORD:-}" ]; then
+  EFFECTIVE_DB_URL="${DB_URL:-$(awk -F= '/^DB_URL=/{sub(/^[^=]*=/,""); print; exit}' "$DEPLOY_ENV_FILE")}"
+  if [ -n "$EFFECTIVE_DB_URL" ]; then
+    DERIVED_POSTGRES_PASSWORD="$(python3 - "$EFFECTIVE_DB_URL" <<'PY'
+import sys
+from urllib.parse import urlparse
+
+raw = (sys.argv[1] if len(sys.argv) > 1 else "").strip()
+if not raw:
+    print("")
+    raise SystemExit(0)
+
+try:
+    parsed = urlparse(raw)
+    print(parsed.password or "")
+except Exception:
+    print("")
+PY
+)"
+    if [ -n "$DERIVED_POSTGRES_PASSWORD" ]; then
+      export POSTGRES_PASSWORD="$DERIVED_POSTGRES_PASSWORD"
+      echo "[deploy] INFO: POSTGRES_PASSWORD derivado desde DB_URL para interpolación de compose."
+    fi
+  fi
+fi
+
 APP_GIT_SHA="unknown"
 APP_GIT_BRANCH="$BRANCH"
 APP_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

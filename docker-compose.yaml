@@ -1,6 +1,7 @@
 volumes:
   monstruo_pgdata:
 
+
 services:
   db:
     image: postgres:16
@@ -11,8 +12,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}
     volumes:
       - monstruo_pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     restart: unless-stopped
 
   api:

@@ -114,28 +114,118 @@ const TksUI = (() => {
         return { critica: 'Crítica', alta: 'Alta', media: 'Media', baja: 'Baja' }[s] || escapeHtml(s);
     }
 
+    function sentenceCase(text) {
+        const value = String(text || '').trim();
+        if (!value) return '-';
+        return value.charAt(0).toUpperCase() + value.slice(1);
+    }
+
+    function humanizeMachineText(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '-';
+        const normalized = raw
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+        const dictionary = {
+            queue: 'cola',
+            job: 'trabajo',
+            jobs: 'trabajos',
+            channel: 'canal',
+            channels: 'canales',
+            notification: 'notificación',
+            notifications: 'notificaciones',
+            dispatch: 'despacho',
+            recover: 'recuperación',
+            stale: 'huérfano',
+            running: 'ejecutando',
+            failed: 'fallido',
+            pending: 'pendiente',
+            created: 'creado',
+            daily: 'diario',
+            sync: 'sincronización',
+            export: 'exportación',
+            compliance: 'cumplimiento',
+            incoming: 'entrante',
+            outgoing: 'saliente',
+            email: 'correo',
+            poll: 'lectura',
+            retry: 'reintento',
+            retries: 'reintentos',
+        };
+        const translated = normalized
+            .split(' ')
+            .map((token) => dictionary[token] || token)
+            .join(' ');
+        return sentenceCase(translated);
+    }
+
     function opsStatusLabel(value) {
         const normalized = String(value || '').trim().toLowerCase();
         return {
-            pending: 'pendiente',
-            dispatching: 'despachando',
-            sent: 'enviado',
-            failed: 'fallido',
-            cancelled: 'cancelado',
-            running: 'ejecutando',
-            retry: 'reintento',
-            completed: 'completado',
-            completed_with_errors: 'completado con errores',
-        }[normalized] || escapeHtml(value || '-');
+            pending: 'Pendiente',
+            dispatching: 'Despachando',
+            sent: 'Enviado',
+            failed: 'Fallido',
+            cancelled: 'Cancelado',
+            running: 'Ejecutando',
+            retry: 'Reintento',
+            completed: 'Completado',
+            completed_with_errors: 'Completado con errores',
+            queued: 'En cola',
+            in_progress: 'En progreso',
+            success: 'Exitoso',
+            error: 'Error',
+            done: 'Finalizado',
+        }[normalized] || humanizeMachineText(value);
     }
 
     function adapterModeLabel(value) {
         const normalized = String(value || '').trim().toLowerCase();
         return {
-            disabled: 'deshabilitado',
-            dry_run: 'simulación',
-            live: 'activo',
-        }[normalized] || escapeHtml(value || '-');
+            disabled: 'Deshabilitado',
+            dry_run: 'Simulación',
+            live: 'Activo',
+        }[normalized] || humanizeMachineText(value);
+    }
+
+    function channelLabel(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        return {
+            whatsapp: 'WhatsApp',
+            '3cx': '3CX',
+            email: 'Correo',
+            sms: 'SMS',
+            teams: 'Microsoft Teams',
+            slack: 'Slack',
+        }[normalized] || humanizeMachineText(value);
+    }
+
+    function jobTypeLabel(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        return {
+            ticket_channels_dispatch: 'Despacho de notificaciones de canales',
+            ticket_email_incoming_poll: 'Lectura de correo entrante',
+            ticket_email_reconcile: 'Conciliación de correo de tickets',
+            jira_delta_sync_daily: 'Sincronización diaria Jira (delta)',
+            jira_bootstrap_open: 'Carga inicial Jira (tickets abiertos)',
+            compliance_export_run: 'Ejecución de exportación de cumplimiento',
+            compliance_purge_run: 'Depuración de datos de cumplimiento',
+            auto_reply_dispatch: 'Despacho de autorrespuestas',
+            jobs_recover_stale: 'Recuperación de ejecuciones huérfanas',
+        }[normalized] || humanizeMachineText(value);
+    }
+
+    function jiraRunTypeLabel(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        return {
+            bootstrap: 'Carga inicial',
+            delta: 'Sincronización delta',
+            bootstrap_open: 'Carga inicial (abiertos)',
+            delta_sync: 'Sincronización delta',
+            daily: 'Ejecución diaria',
+        }[normalized] || humanizeMachineText(value);
     }
 
     function parseEmailIdentity(raw) {
@@ -1179,7 +1269,7 @@ const TksUI = (() => {
         const queue = data?.queue || {};
         const queueRows = Object.entries(queue.by_job_type || {}).map(([job, metrics]) => `
             <tr>
-                <td>${escapeHtml(job)}</td>
+                <td>${escapeHtml(jobTypeLabel(job))}</td>
                 <td class="td-num">${Number(metrics.due_now || 0)}</td>
                 <td class="td-num">${Number(metrics.stale_running || 0)}</td>
                 <td class="td-num">${Number(metrics.created_last_hour || 0)}</td>
@@ -1190,7 +1280,7 @@ const TksUI = (() => {
         const adapters = channels.adapters || {};
         const adapterRows = Object.entries(adapters).map(([name, info]) => `
             <tr>
-                <td>${escapeHtml(name)}</td>
+                <td>${escapeHtml(channelLabel(name))}</td>
                 <td>${adapterModeLabel(info.mode)}</td>
                 <td>${escapeHtml(info.provider || '-')}</td>
                 <td>${info.configured ? 'Sí' : 'No'}</td>
@@ -1201,7 +1291,7 @@ const TksUI = (() => {
         const notifRows = notifs.slice(0, 10).map(n => `
             <tr>
                 <td>${escapeHtml(n.codigo || `#${n.ticket_id}`)}</td>
-                <td>${escapeHtml(n.channel || '-')}</td>
+                <td>${escapeHtml(channelLabel(n.channel || '-'))}</td>
                 <td>${opsStatusLabel(n.status)}</td>
                 <td>${Number(n.attempt_count || 0)}/${Number(n.max_attempts || 0)}</td>
                 <td>${escapeHtml(n.last_error || '')}</td>
@@ -1216,7 +1306,7 @@ const TksUI = (() => {
         const jiraRuns = data?.jiraRuns?.items || [];
         const jiraRows = jiraRuns.slice(0, 8).map(r => `
             <tr>
-                <td>${escapeHtml(r.run_type || '-')}</td>
+                <td>${escapeHtml(jiraRunTypeLabel(r.run_type || '-'))}</td>
                 <td>${opsStatusLabel(r.status)}</td>
                 <td>${escapeHtml(r.started_at || '-')}</td>
                 <td>${escapeHtml(r.ended_at || '-')}</td>
