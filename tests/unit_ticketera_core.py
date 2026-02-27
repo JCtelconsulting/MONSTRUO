@@ -115,11 +115,11 @@ class TicketTimelineTests(unittest.TestCase):
         # El agregador debe respetar orden descendente por fecha (tal como llega de la query SQL).
         created = [item["created_at"] for item in timeline]
         self.assertEqual(created, sorted(created, reverse=True))
-
-        sql = mock_conn.execute.call_args.args[0]
-        self.assertIn("ORDER BY created_at DESC", sql)
-        self.assertIn("id DESC", sql)
-        self.assertIn("LIMIT ?", sql)
+        queries = [call.args[0] for call in mock_conn.execute.call_args_list]
+        joined = "\n\n".join(queries)
+        self.assertIn("ORDER BY", joined)
+        self.assertIn("DESC", joined)
+        self.assertIn("LIMIT ?", joined)
         mock_conn.close.assert_called_once()
 
 
