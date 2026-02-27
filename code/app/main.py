@@ -119,6 +119,20 @@ def _is_cookie_secure_enabled() -> bool:
     )
 
 
+def _is_env_flag_enabled(env_var_name: str, default: bool = False) -> bool:
+    raw = os.getenv(env_var_name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in ("1", "true", "t", "yes", "y", "on", "si")
+
+
+def _is_env_flag_enabled(env_var_name: str, default: bool = False) -> bool:
+    raw = os.getenv(env_var_name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in ("1", "true", "t", "yes", "y", "on", "si")
+
+
 def _normalize_roles_claim(primary_role: Any, secondary_roles_raw: Any = None) -> List[str]:
     primary = str(primary_role or "").strip().lower()
     roles: List[str] = []
@@ -350,11 +364,12 @@ try:
 except ImportError:
     pass
 
-try:
-    from app.api.routers import admin_chat as rutas_admin_chat
-    app.include_router(rutas_admin_chat.router)
-except ImportError:
-    pass
+if _is_env_flag_enabled("ADMIN_CHAT_ENABLED", default=False):
+    try:
+        from app.api.routers import admin_chat as rutas_admin_chat
+        app.include_router(rutas_admin_chat.router)
+    except ImportError:
+        pass
 
 try:
     from app.api.routers import cobranza as rutas_cobranza
