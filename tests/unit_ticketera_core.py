@@ -102,7 +102,7 @@ class TicketTimelineTests(unittest.TestCase):
         with patch("app.core.tickets_service.db.get_conn", return_value=mock_conn):
             timeline = tickets_service.get_timeline(ticket_id=123, limit=10, include_emails=False)
 
-        self.assertEqual(len(timeline), 3)
+        self.assertEqual(len(timeline), 2)
         self.assertEqual(timeline[0]["evento"], "Transicion")
         self.assertIn("asignado -> en_progreso", timeline[0]["detalle"])
         self.assertEqual(timeline[1]["evento"], "Nota")
@@ -118,6 +118,7 @@ class TicketTimelineTests(unittest.TestCase):
 
         sql = mock_conn.execute.call_args.args[0]
         self.assertIn("ORDER BY created_at DESC", sql)
+        self.assertIn("id DESC", sql)
         self.assertIn("LIMIT ?", sql)
         mock_conn.close.assert_called_once()
 
