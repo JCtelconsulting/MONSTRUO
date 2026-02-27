@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import sys
 import unittest
+from datetime import datetime
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parent
@@ -66,6 +68,64 @@ class TicketWorkflowPolicyTests(unittest.TestCase):
     def test_workflow_legacy_direct_close_from_validation(self) -> None:
         self.assertTrue(ticket_workflow.can_transition("requerimiento", "en_validacion", "cerrado"))
         self.assertTrue(ticket_workflow.can_transition("cambio", "en_validacion", "cerrado"))
+
+
+class TicketTimelineTests(unittest.TestCase):
+    @staticmethod
+    def _assert_iso8601(value: str) -> None:
+        normalized = value.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        assert parsed is not None
+
+    def test_get_timeline_includes_non_null_iso_timestamps_and_consistent_order(self) -> None:
+        rows = [
+            {
+                "created_at": "2026-02-26T21:02:11+00:00",
+                "type": "comment",
+                "author": "tecnico1",
+                "detail": "[TRANSICION] asignado -> en_progreso",
+                "email_subject": None,
+            },
+            {
+                "created_at": "2026-02-26T21:01:05+00:00",
+                "type": "comment",
+                "author": "cliente1",
+                "detail": "Cliente aporta más contexto",
+                "email_subject": None,
+            },
+            {
+                "created_at": "2026-02-26T21:00:00+00:00",
+                "type": "comment",
+                "author": "system",
+                "detail": "[CREACION] Ticket creado",
+                "email_subject": None,
+            },
+        ]
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = rows
+
+        with patch("app.core.tickets_service.db.get_conn", return_value=mock_conn):
+            timeline = tickets_service.get_timeline(ticket_id=123, limit=10, include_emails=False)
+
+        self.assertEqual(len(timeline), 3)
+        self.assertEqual(timeline[0]["evento"], "Transicion")
+        self.assertIn("asignado -> en_progreso", timeline[0]["detalle"])
+        self.assertEqual(timeline[1]["evento"], "Nota")
+        self.assertEqual(timeline[1]["detalle"], "Cliente aporta más contexto")
+
+        for item in timeline:
+            self.assertTrue(item.get("created_at"), f"Evento sin created_at: {item}")
+            self._assert_iso8601(item["created_at"])
+
+        # El agregador debe respetar orden descendente por fecha (tal como llega de la query SQL).
+        created = [item["created_at"] for item in timeline]
+        self.assertEqual(created, sorted(created, reverse=True))
+
+        sql = mock_conn.execute.call_args.args[0]
+        self.assertIn("ORDER BY created_at DESC", sql)
+        self.assertIn("LIMIT ?", sql)
+        mock_conn.close.assert_called_once()
 
 
 if __name__ == "__main__":

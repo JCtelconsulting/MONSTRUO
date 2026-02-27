@@ -80,10 +80,8 @@ TICKET_READONLY_ESTADOS = {"cerrado"}
 TICKET_EMAIL_BLOCKED_ESTADOS = {"resuelto", "cerrado"}
 REPLY_BLOCKED_ESTADOS = TICKET_EMAIL_BLOCKED_ESTADOS  # Alias legacy
 
-
 class ConflictError(Exception):
     """Conflicto de concurrencia (lock/version) para borradores de correo."""
-
 
 def _clamp_int(value: Any, default_value: int, min_value: int, max_value: int) -> int:
     try:
@@ -91,7 +89,6 @@ def _clamp_int(value: Any, default_value: int, min_value: int, max_value: int) -
     except Exception:
         parsed = default_value
     return max(min_value, min(max_value, parsed))
-
 
 def _parse_business_days(raw_value: Any) -> set[int]:
     default_days = {0, 1, 2, 3, 4}
@@ -110,7 +107,6 @@ def _parse_business_days(raw_value: Any) -> set[int]:
         if 0 <= day <= 6:
             parsed.add(day)
     return parsed or default_days
-
 
 def _parse_escalation_windows(raw_value: Any) -> List[int]:
     default_windows = [80, 100]
@@ -133,7 +129,6 @@ def _parse_escalation_windows(raw_value: Any) -> List[int]:
         parsed.add(100)
     return sorted(parsed)
 
-
 def _parse_tz_offset(raw_value: Any) -> timezone:
     value = str(raw_value or "+00:00").strip()
     match = re.match(r"^([+-])(\d{2}):(\d{2})$", value)
@@ -144,7 +139,6 @@ def _parse_tz_offset(raw_value: Any) -> timezone:
     minutes = _clamp_int(match.group(3), 0, 0, 59)
     offset = timedelta(hours=hours, minutes=minutes) * sign
     return timezone(offset)
-
 
 SLA_MODE = str(getattr(app_settings, "TICKET_SLA_MODE", "24x7") or "24x7").strip().lower()
 if SLA_MODE not in {"24x7", "business_hours"}:
@@ -177,7 +171,6 @@ RESUELTO_AUTO_CLOSE_HOURS = _clamp_int(
     max_value=720,
 )
 
-
 def _parse_timezone_name(raw_value: Any) -> timezone | ZoneInfo:
     value = str(raw_value or "UTC").strip() or "UTC"
     try:
@@ -185,20 +178,17 @@ def _parse_timezone_name(raw_value: Any) -> timezone | ZoneInfo:
     except Exception:
         return timezone.utc
 
-
 def _default_compliance_export_dir() -> str:
     env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
     if env_type == "prod":
         return "/srv/monstruo/data/compliance"
     return "/srv/monstruo_dev/data/compliance"
 
-
 def _default_ticket_attachments_dir() -> str:
     env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
     if env_type == "prod":
         return "/srv/monstruo/data/tickets"
     return "/srv/monstruo_dev/data/tickets"
-
 
 COMPLIANCE_TZ = _parse_timezone_name(getattr(app_settings, "COMPLIANCE_TZ", "America/Santiago"))
 COMPLIANCE_EXPORT_DIR = (
@@ -255,10 +245,8 @@ CHANNELS_RETRY_MAX_SECONDS = _clamp_int(
 if CHANNELS_RETRY_MAX_SECONDS < CHANNELS_RETRY_BASE_SECONDS:
     CHANNELS_RETRY_MAX_SECONDS = CHANNELS_RETRY_BASE_SECONDS
 
-
 def _channels_enabled() -> bool:
     return bool(getattr(app_settings, "CHANNELS_ENABLED", CHANNELS_ENABLED))
-
 
 def _attachment_roots() -> List[Path]:
     roots: List[Path] = []
@@ -277,7 +265,6 @@ def _attachment_roots() -> List[Path]:
             roots.append(p)
     return roots
 
-
 def _is_safe_attachment_path(path: Path) -> bool:
     try:
         resolved = path.resolve()
@@ -290,7 +277,6 @@ def _is_safe_attachment_path(path: Path) -> bool:
         except Exception:
             continue
     return False
-
 
 def _attachment_storage_name(filename: str) -> str:
     safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(filename or "attachment.bin"))
@@ -341,7 +327,6 @@ JIRA_SYNC_DAILY_HOUR = _clamp_int(
 JIRA_SYNC_TZ = _parse_timezone_name(getattr(app_settings, "JIRA_SYNC_TZ", "America/Santiago"))
 AUTO_REPLY_MAX_REFERENCES = 20
 
-
 def _parse_csv_lower_set(raw_value: Any, strip_prefix: str = "") -> set[str]:
     values: set[str] = set()
     for token in str(raw_value or "").split(","):
@@ -351,7 +336,6 @@ def _parse_csv_lower_set(raw_value: Any, strip_prefix: str = "") -> set[str]:
         if normalized:
             values.add(normalized)
     return values
-
 
 def _normalize_email_address(raw_email: Optional[str]) -> str:
     _, parsed = parseaddr(str(raw_email or ""))
@@ -363,13 +347,11 @@ def _normalize_email_address(raw_email: Optional[str]) -> str:
         return ""
     return f"{local_part}@{domain}"
 
-
 def _sender_identity(sender: str) -> tuple[str, str]:
     name, addr = parseaddr(str(sender or ""))
     email_addr = _normalize_email_address(addr or sender)
     display_name = (name or "").strip() or (email_addr or str(sender or "").strip())
     return display_name, email_addr
-
 
 def _auto_reply_delay_minutes() -> int:
     return _clamp_int(
@@ -379,18 +361,14 @@ def _auto_reply_delay_minutes() -> int:
         max_value=1440,
     )
 
-
 def _auto_reply_require_allowlist() -> bool:
     return bool(getattr(app_settings, "TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST", True))
-
 
 def _auto_reply_allowlist_emails() -> set[str]:
     return _parse_csv_lower_set(getattr(app_settings, "TICKET_AUTO_REPLY_ALLOWLIST_EMAILS", ""))
 
-
 def _auto_reply_allowlist_domains() -> set[str]:
     return _parse_csv_lower_set(getattr(app_settings, "TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS", ""), strip_prefix="@")
-
 
 def _auto_reply_blocked_localparts() -> set[str]:
     raw = getattr(
@@ -399,7 +377,6 @@ def _auto_reply_blocked_localparts() -> set[str]:
         "noreply,no-reply,mailer-daemon,postmaster",
     )
     return _parse_csv_lower_set(raw)
-
 
 def _auto_reply_sender_allowed(to_email: str) -> tuple[bool, str]:
     normalized_email = _normalize_email_address(to_email)
@@ -424,11 +401,9 @@ def _auto_reply_sender_allowed(to_email: str) -> tuple[bool, str]:
 
     return True, "allowed"
 
-
 def _auto_reply_idempotency_key(ticket_id: int, to_email: str) -> str:
     digest = hashlib.sha256(f"{ticket_id}|{to_email.lower()}".encode("utf-8")).hexdigest()[:24]
     return f"auto_reply:{int(ticket_id)}:{digest}"
-
 
 def normalize_ticket_security_class(value: Optional[str]) -> str:
     normalized = (value or "internal").strip().lower()
@@ -436,42 +411,32 @@ def normalize_ticket_security_class(value: Optional[str]) -> str:
         return "internal"
     return normalized
 
-
 def normalize_ticket_type(value: Optional[str]) -> str:
     return ticket_workflow.normalize_ticket_type(value)
-
 
 def normalize_subestado(value: Optional[str], default_value: str = "recibido") -> str:
     return ticket_workflow.normalize_subestado(value, default_value)
 
-
 def _normalize_roles(value: Optional[Any]) -> List[str]:
     return ticket_roles.normalize_roles(value)
-
 
 def _normalize_role(value: Optional[Any]) -> str:
     return ticket_roles.normalize_role(value)
 
-
 def _normalize_username(value: Optional[str]) -> str:
     return ticket_roles.normalize_username(value)
-
 
 def _scope_enforced(actor_role: Optional[Any]) -> bool:
     return ticket_roles.scope_enforced(actor_role)
 
-
 def _is_admin_management_role(actor_role: Optional[Any]) -> bool:
     return ticket_roles.is_admin_management_role(actor_role)
-
 
 def _is_tech_role(actor_role: Optional[Any]) -> bool:
     return ticket_roles.is_tech_execution_role(actor_role)
 
-
 def _is_dispatcher_role(actor_role: Optional[Any]) -> bool:
     return ticket_roles.is_dispatcher_role(actor_role)
-
 
 def _can_dispatch_reassign(
     ticket: Dict[str, Any],
@@ -480,10 +445,8 @@ def _can_dispatch_reassign(
 ) -> bool:
     return ticket_roles.can_dispatch_reassign(ticket, actor_id, actor_role)
 
-
 def _ticket_assignee_username(ticket: Dict[str, Any]) -> str:
     return ticket_roles.ticket_assignee_username(ticket)
-
 
 def _ensure_can_manage_ticket(
     ticket: Dict[str, Any],
@@ -493,7 +456,6 @@ def _ensure_can_manage_ticket(
 ) -> None:
     ticket_roles.require_can_manage(ticket, actor_id, actor_role, action_label)
 
-
 def _ensure_can_participate_ticket(
     ticket: Dict[str, Any],
     actor_id: str,
@@ -502,28 +464,23 @@ def _ensure_can_participate_ticket(
 ) -> None:
     ticket_roles.require_can_participate(ticket, actor_id, actor_role, action_label)
 
-
 def _is_reply_blocked_by_estado(ticket: Dict[str, Any]) -> bool:
     estado = str(ticket.get("estado") or "").strip().lower()
     return estado in TICKET_EMAIL_BLOCKED_ESTADOS
 
-
 def _is_readonly_blocked_by_estado(ticket: Dict[str, Any]) -> bool:
     estado = str(ticket.get("estado") or "").strip().lower()
     return estado in TICKET_READONLY_ESTADOS
-
 
 def _ensure_reply_allowed_estado(ticket: Dict[str, Any], action_label: str) -> None:
     if _is_reply_blocked_by_estado(ticket):
         estado = str(ticket.get("estado") or "").strip().lower() or "-"
         raise ValueError(f"No se puede {action_label} cuando el ticket está en estado '{estado}'.")
 
-
 def _extract_ticket_target_email(ticket: Dict[str, Any]) -> str:
     _, parsed_addr = parseaddr(ticket.get("origen_email") or "")
     to_email = parsed_addr.strip() if parsed_addr else (ticket.get("origen_email") or "").strip()
     return str(to_email or "").strip()
-
 
 def _tokenize_email_values(raw_value: Any) -> List[str]:
     if raw_value is None:
@@ -545,7 +502,6 @@ def _tokenize_email_values(raw_value: Any) -> List[str]:
                 tokens.append(clean)
     return tokens
 
-
 def _normalize_notify_emails(raw_value: Any) -> tuple[List[str], List[str]]:
     valid: List[str] = []
     invalid: List[str] = []
@@ -562,7 +518,6 @@ def _normalize_notify_emails(raw_value: Any) -> tuple[List[str], List[str]]:
         valid.append(normalized)
     return valid, invalid
 
-
 def _serialize_notify_emails(raw_value: Any, *, strict: bool = True) -> str:
     valid, invalid = _normalize_notify_emails(raw_value)
     if strict and invalid:
@@ -570,11 +525,9 @@ def _serialize_notify_emails(raw_value: Any, *, strict: bool = True) -> str:
         raise ValueError(f"Correos inválidos en notificación: {invalid_text}")
     return ", ".join(valid)
 
-
 def _notify_emails_from_ticket(ticket: Dict[str, Any]) -> List[str]:
     valid, _ = _normalize_notify_emails(ticket.get("notify_emails") or "")
     return valid
-
 
 def _normalize_recipient_emails(raw_value: Any, *, label: str) -> List[str]:
     valid, invalid = _normalize_notify_emails(raw_value)
@@ -582,7 +535,6 @@ def _normalize_recipient_emails(raw_value: Any, *, label: str) -> List[str]:
         invalid_text = ", ".join(invalid[:5])
         raise ValueError(f"Correos inválidos en {label}: {invalid_text}")
     return valid
-
 
 def _compose_reply_recipients(
     ticket: Dict[str, Any],
@@ -618,7 +570,6 @@ def _compose_reply_recipients(
     to_record = ", ".join(([to_email] if to_email else []) + cc_emails)
     return to_email, cc_emails, bcc_emails, to_record
 
-
 def _estado_label(estado: Optional[str]) -> str:
     value = str(estado or "").strip().lower()
     mapping = {
@@ -628,7 +579,6 @@ def _estado_label(estado: Optional[str]) -> str:
         "cerrado": "Cerrado",
     }
     return mapping.get(value, value.replace("_", " ").capitalize() or "-")
-
 
 def _send_ticket_status_update_to_notify_emails(
     ticket: Dict[str, Any],
@@ -709,7 +659,6 @@ def _send_ticket_status_update_to_notify_emails(
         "subject": subject,
     }
 
-
 def _build_ticket_reply_subject(ticket: Dict[str, Any], asunto: Optional[str] = None) -> str:
     if asunto and str(asunto).strip():
         subject = str(asunto).strip()
@@ -721,15 +670,12 @@ def _build_ticket_reply_subject(ticket: Dict[str, Any], asunto: Optional[str] = 
         subject = f"Re: {subject}"
     return subject
 
-
 def _hash_draft_lock_token(lock_token: str) -> str:
     return hashlib.sha256(str(lock_token or "").encode("utf-8")).hexdigest()
-
 
 def _lock_expiry_iso(now_iso: str, minutes: int = EMAIL_DRAFT_LOCK_MINUTES) -> str:
     now_dt = _parse_dt(now_iso) or _now_dt()
     return (now_dt + timedelta(minutes=max(1, minutes))).isoformat()
-
 
 def _is_draft_lock_active(lock_expires_at: Optional[str], now_dt: Optional[datetime] = None) -> bool:
     if not lock_expires_at:
@@ -737,7 +683,6 @@ def _is_draft_lock_active(lock_expires_at: Optional[str], now_dt: Optional[datet
     now_dt = now_dt or _now_dt()
     exp_dt = _parse_dt(lock_expires_at)
     return bool(exp_dt and exp_dt > now_dt)
-
 
 def _draft_lock_info(draft: Dict[str, Any], actor_id: str, now_dt: Optional[datetime] = None) -> Dict[str, Any]:
     now_dt = now_dt or _now_dt()
@@ -751,15 +696,12 @@ def _draft_lock_info(draft: Dict[str, Any], actor_id: str, now_dt: Optional[date
         "mine": bool(active and owner and _normalize_username(owner) == _normalize_username(actor_id)),
     }
 
-
 def _new_draft_lock_token() -> str:
     return secrets.token_urlsafe(32)
-
 
 def _drafts_base_path(ticket_id: int, draft_id: int) -> Path:
     base_root = str(getattr(app_settings, "TICKET_ATTACHMENTS_DIR", "") or _default_ticket_attachments_dir())
     return Path(base_root) / str(ticket_id) / "drafts" / str(draft_id)
-
 
 def estado_from_subestado(subestado: str, current_estado: str = "abierto") -> str:
     s = normalize_subestado(subestado, "recibido")
@@ -773,13 +715,11 @@ def estado_from_subestado(subestado: str, current_estado: str = "abierto") -> st
         return "abierto"
     return "abierto"
 
-
 def normalize_adapter_mode(value: Optional[str], default_mode: str = "disabled") -> str:
     mode = (value or default_mode).strip().lower()
     if mode not in CHANNEL_ADAPTER_MODES:
         return default_mode
     return mode
-
 
 def normalize_channel_name(value: Optional[str]) -> str:
     raw = (value or "").strip().lower()
@@ -787,13 +727,11 @@ def normalize_channel_name(value: Optional[str]) -> str:
         return raw
     return ""
 
-
 def normalize_notification_status(value: Optional[str], default_status: str = "pending") -> str:
     status = (value or default_status).strip().lower()
     if status not in CHANNEL_NOTIFICATION_STATUSES:
         return default_status
     return status
-
 
 def _channel_adapter_mode(channel: str) -> str:
     normalized = normalize_channel_name(channel)
@@ -803,7 +741,6 @@ def _channel_adapter_mode(channel: str) -> str:
         return normalize_adapter_mode(getattr(app_settings, "THREECX_ADAPTER_MODE", "disabled"), "disabled")
     return "disabled"
 
-
 def _channel_provider_name(channel: str) -> str:
     normalized = normalize_channel_name(channel)
     if normalized == "whatsapp":
@@ -812,12 +749,10 @@ def _channel_provider_name(channel: str) -> str:
         return "threecx_http"
     return ""
 
-
 def _channel_retry_delay_seconds(next_attempt: int) -> int:
     safe_attempt = max(1, int(next_attempt))
     delay = CHANNELS_RETRY_BASE_SECONDS * (2 ** max(0, safe_attempt - 1))
     return min(CHANNELS_RETRY_MAX_SECONDS, delay)
-
 
 def _enqueue_job_async_safe(job_type: str, payload: Dict[str, Any], max_retries: int = 0) -> None:
     try:
@@ -826,27 +761,22 @@ def _enqueue_job_async_safe(job_type: str, payload: Dict[str, Any], max_retries:
     except RuntimeError:
         asyncio.run(jobs_engine.enqueue_job(job_type, payload, max_retries=max_retries))
 
-
 def _stable_json(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
 
 def _build_chain_hash(prev_hash: str, payload: Dict[str, Any]) -> str:
     raw = f"{prev_hash or ''}|{_stable_json(payload or {})}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
-
 def _retention_days_for_class(security_class: Optional[str]) -> int:
     normalized = normalize_ticket_security_class(security_class)
     return int(RETENTION_POLICY_DAYS.get(normalized, RETENTION_POLICY_DAYS["internal"]))
-
 
 def _retention_until_iso(base_iso: Optional[str], security_class: Optional[str]) -> Optional[str]:
     base_dt = _parse_dt(base_iso) if base_iso else None
     if not base_dt:
         return None
     return (_ensure_utc(base_dt) + timedelta(days=_retention_days_for_class(security_class))).isoformat()
-
 
 def _recompute_ticket_retention(conn, ticket_id: int) -> None:
     row = conn.execute(
@@ -877,7 +807,6 @@ def _recompute_ticket_retention(conn, ticket_id: int) -> None:
         (security_class, days, retention_until, ticket_id),
     )
 
-
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as fh:
@@ -888,7 +817,6 @@ def _sha256_file(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-
 def _parse_dt(value: Optional[str]) -> Optional[datetime]:
     if not value:
         return None
@@ -897,16 +825,13 @@ def _parse_dt(value: Optional[str]) -> Optional[datetime]:
     except Exception:
         return None
 
-
 def _now_dt() -> datetime:
     return datetime.fromisoformat(db.now_utc_iso().replace("Z", "+00:00"))
-
 
 def _ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
-
 
 def _business_bounds(local_dt: datetime) -> tuple[datetime, datetime]:
     start = local_dt.replace(hour=SLA_BUSINESS_START_HOUR, minute=0, second=0, microsecond=0)
@@ -916,10 +841,8 @@ def _business_bounds(local_dt: datetime) -> tuple[datetime, datetime]:
         end = local_dt.replace(hour=SLA_BUSINESS_END_HOUR, minute=0, second=0, microsecond=0)
     return start, end
 
-
 def _is_business_day(local_dt: datetime) -> bool:
     return local_dt.weekday() in SLA_BUSINESS_DAYS
-
 
 def _align_to_business_start(local_dt: datetime) -> datetime:
     probe = local_dt
@@ -946,7 +869,6 @@ def _align_to_business_start(local_dt: datetime) -> datetime:
         return probe
     return probe
 
-
 def _add_business_minutes(start_dt: datetime, minutes: int) -> datetime:
     remaining = max(0, int(minutes))
     local = _ensure_utc(start_dt).astimezone(SLA_BUSINESS_TZ)
@@ -971,14 +893,12 @@ def _add_business_minutes(start_dt: datetime, minutes: int) -> datetime:
 
     return local.astimezone(timezone.utc)
 
-
 def _frt_due_iso(now_dt: datetime, severidad: str) -> str:
     minutes = int(FRT_MINUTOS.get(severidad, 120))
     base_utc = _ensure_utc(now_dt)
     if SLA_MODE == "business_hours":
         return _add_business_minutes(base_utc, minutes).isoformat()
     return (base_utc + timedelta(minutes=minutes)).isoformat()
-
 
 def _ttr_due_iso(now_dt: datetime, severidad: str) -> str:
     hours = int(SLA_HORAS.get(severidad, 72))
@@ -1014,7 +934,6 @@ KEYWORDS_CATEGORIAS = {
     ],
 }
 
-
 # ==========================================================================
 # CLASIFICACIÓN AUTOMÁTICA
 # ==========================================================================
@@ -1031,7 +950,6 @@ def clasificar_ticket(titulo: str, descripcion: str) -> str:
         return "general"
 
     return max(scores, key=scores.get)
-
 
 # ==========================================================================
 # AUTO-ASIGNACIÓN
@@ -1149,7 +1067,6 @@ def auto_asignar(categoria: str) -> Optional[str]:
     finally:
         conn.close()
 
-
 def incrementar_carga(username: str, specialty: Optional[str] = None) -> None:
     """Incrementa la carga del técnico al asignar un ticket. Si se especifica especialidad, solo incrementa esa."""
     if not username:
@@ -1197,7 +1114,6 @@ def incrementar_carga(username: str, specialty: Optional[str] = None) -> None:
         conn.commit()
     finally:
         conn.close()
-
 
 def decrementar_carga(username: str, specialty: Optional[str] = None) -> None:
     """Decrementa la carga del técnico. Si se especifica especialidad, intenta decretar esa."""
@@ -1247,7 +1163,6 @@ def decrementar_carga(username: str, specialty: Optional[str] = None) -> None:
     finally:
         conn.close()
 
-
 # ==========================================================================
 # NOTIFICACIONES ESCALONADAS
 # ==========================================================================
@@ -1294,7 +1209,6 @@ def programar_notificaciones(ticket_id: int, user_id: str) -> None:
     finally:
         conn.close()
 
-
 def marcar_notificacion_vista(ticket_id: int, user_id: str) -> None:
     """Cuando el técnico ve el ticket, cancela las notificaciones pendientes."""
     conn = db.get_conn()
@@ -1308,7 +1222,6 @@ def marcar_notificacion_vista(ticket_id: int, user_id: str) -> None:
         conn.commit()
     finally:
         conn.close()
-
 
 def get_notificaciones_pendientes(user_id: str) -> List[Dict[str, Any]]:
     """Obtiene notificaciones in-app pendientes para un usuario."""
@@ -1326,7 +1239,6 @@ def get_notificaciones_pendientes(user_id: str) -> List[Dict[str, Any]]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
-
 
 def log_notification_attempt(
     notification_id: int,
@@ -1373,7 +1285,6 @@ def log_notification_attempt(
     finally:
         conn.close()
 
-
 async def _schedule_next_process_notifications(delay_seconds: int = 60) -> None:
     next_run = (datetime.now(timezone.utc) + timedelta(seconds=max(5, int(delay_seconds or 60)))).isoformat()
     await jobs_engine.enqueue_unique_job(
@@ -1383,7 +1294,6 @@ async def _schedule_next_process_notifications(delay_seconds: int = 60) -> None:
         next_run_at=next_run,
         update_existing_next_run=False,
     )
-
 
 async def process_pending_notifications(payload: Dict[str, Any] = None):
     """
@@ -1496,7 +1406,6 @@ async def process_pending_notifications(payload: Dict[str, Any] = None):
     if recurring:
         await _schedule_next_process_notifications(delay_seconds=60)
 
-
 def get_jobs_queue_health() -> Dict[str, Any]:
     """
     Métricas operativas de cola para jobs críticos de Ticketera.
@@ -1546,7 +1455,6 @@ def get_jobs_queue_health() -> Dict[str, Any]:
         }
     finally:
         conn.close()
-
 
 def get_channels_status() -> Dict[str, Any]:
     now = db.now_utc_iso()
@@ -1603,7 +1511,6 @@ def get_channels_status() -> Dict[str, Any]:
         "generated_at": now,
     }
 
-
 def list_channel_notifications(
     status: Optional[str] = None,
     channel: Optional[str] = None,
@@ -1655,7 +1562,6 @@ def list_channel_notifications(
         "offset": offset,
         "filters": {"status": status_norm or None, "channel": channel_norm or None},
     }
-
 
 def retry_channel_notification(
     notification_id: int,
@@ -1751,7 +1657,6 @@ def retry_channel_notification(
     _enqueue_job_async_safe("PROCESS_NOTIFICATIONS", {"recurring": False}, max_retries=0)
     return {"ok": True, "item": result_item, "queued": True, "duplicate_skipped": False}
 
-
 # ==========================================================================
 # GENERADOR DE CÓDIGO DE TICKET
 # ==========================================================================
@@ -1760,28 +1665,22 @@ def generar_codigo(ticket_id: int) -> str:
     now = datetime.now()
     return f"TK-{now.strftime('%d-%m-%Y')}-{ticket_id:04d}"
 
-
 def _workflow_next(tipo: str, subestado: str) -> List[str]:
     return ticket_workflow.workflow_next(tipo, subestado)
-
 
 def _workflow_can_transition(tipo: str, from_subestado: str, to_subestado: str) -> bool:
     return ticket_workflow.can_transition(tipo, from_subestado, to_subestado)
 
-
 def _normalize_transition_target(from_subestado: str, requested_subestado: Optional[str]) -> str:
     return ticket_workflow.normalize_transition_target(from_subestado, requested_subestado)
 
-
 def _is_estado_en_progreso(estado: Optional[str]) -> bool:
     return str(estado or "").strip().lower() == "en_progreso"
-
 
 def _filter_waiting_subestados(allowed_next: List[str], estado_actual: Optional[str]) -> List[str]:
     if _is_estado_en_progreso(estado_actual):
         return list(allowed_next or [])
     return [s for s in (allowed_next or []) if normalize_subestado(s, "") not in SUBESTADOS_ESPERA]
-
 
 def _comment_with_prefix_exists(conn, ticket_id: int, prefix: str) -> bool:
     row = conn.execute(
@@ -1795,14 +1694,12 @@ def _comment_with_prefix_exists(conn, ticket_id: int, prefix: str) -> bool:
     ).fetchone()
     return bool(row)
 
-
 def _emit_system_comment(conn, ticket_id: int, content: str, now_iso: str, author_id: str = "system") -> None:
     conn.execute(
         """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
            VALUES (?, ?, ?, ?)""",
         (ticket_id, author_id, content, now_iso),
     )
-
 
 def _latest_approval_decisions(conn, ticket_id: int) -> Dict[int, str]:
     rows = conn.execute(
@@ -1819,10 +1716,8 @@ def _latest_approval_decisions(conn, ticket_id: int) -> Dict[int, str]:
             latest[step] = str(row["decision"]).lower()
     return latest
 
-
 def _is_open_estado(estado: str) -> bool:
     return (estado or "").lower() not in {"resuelto", "cerrado"}
-
 
 def _evaluate_ticket_sla(conn, ticket_id: int, now_iso: Optional[str] = None) -> None:
     now_iso = now_iso or db.now_utc_iso()
@@ -1954,7 +1849,6 @@ def _evaluate_ticket_sla(conn, ticket_id: int, now_iso: Optional[str] = None) ->
             )
             _recompute_ticket_retention(conn, ticket_id)
 
-
 def run_sla_evaluation_batch(limit: int = 500) -> Dict[str, Any]:
     """
     Evalúa SLA en lote para tickets que pueden requerir actualización de breach/alertas.
@@ -1992,7 +1886,6 @@ def run_sla_evaluation_batch(limit: int = 500) -> Dict[str, Any]:
     finally:
         conn.close()
 
-
 def _maybe_mark_first_response(conn, ticket_id: int, by_user: str, now_iso: Optional[str] = None) -> None:
     if not by_user:
         return
@@ -2020,7 +1913,6 @@ def _maybe_mark_first_response(conn, ticket_id: int, by_user: str, now_iso: Opti
             "UPDATE tickets SET first_response_at = ? WHERE id = ?",
             (now_iso, ticket_id),
         )
-
 
 def _hydrate_ticket_runtime(ticket: Dict[str, Any], now_dt: Optional[datetime] = None) -> Dict[str, Any]:
     now_dt = now_dt or _now_dt()
@@ -2074,7 +1966,6 @@ def _hydrate_ticket_runtime(ticket: Dict[str, Any], now_dt: Optional[datetime] =
         t["frt_minutes_overdue"] = 0
 
     return t
-
 
 # ==========================================================================
 # CRUD PRINCIPAL
@@ -2134,7 +2025,6 @@ def create_ticket(
                 # Para simplificar y cumplir el requerimiento: forzamos Desconocido si no está mapeado.
                 cliente_nombre = "Desconocido"
 
-
         # Normalizar severidad
         severidad = severidad.lower() if severidad else "media"
         if severidad not in SEVERIDADES_VALIDAS:
@@ -2183,7 +2073,6 @@ def create_ticket(
                 customer_id = _find_customer_by_email(conn, email_addr)
                 if customer_id:
                      logger.info(f"[create_ticket] Cliente auto-detectado por email '{email_addr}': {customer_id}")
-
 
         try:
             cursor = conn.execute(
@@ -2264,7 +2153,6 @@ def create_ticket(
     finally:
         conn.close()
 
-
 def get_ticket(ticket_id: int) -> Optional[Dict[str, Any]]:
     """Obtener un ticket por ID."""
     conn = db.get_conn()
@@ -2276,7 +2164,6 @@ def get_ticket(ticket_id: int) -> Optional[Dict[str, Any]]:
     finally:
         conn.close()
 
-
 def list_tickets(
     estado: Optional[str] = None,
     q: Optional[str] = None,
@@ -2287,6 +2174,7 @@ def list_tickets(
     offset: int = 0,
     include_full: bool = False,
     include_total: bool = True,
+    ver_resueltos: bool = False,
 ) -> Dict[str, Any]:
     """Listar tickets con filtros avanzados. Retorna {items, total}."""
     conn = db.get_conn()
@@ -2307,8 +2195,12 @@ def list_tickets(
             params.append(categoria.lower())
 
         if asignado_a:
-            where_clauses.append("asignado_a = ?")
-            params.append(asignado_a)
+            if ver_resueltos:
+                where_clauses.append("(asignado_a = ? OR estado IN ('resuelto', 'cerrado'))")
+                params.append(asignado_a)
+            else:
+                where_clauses.append("asignado_a = ?")
+                params.append(asignado_a)
 
         if severidad:
             where_clauses.append("severidad = ?")
@@ -2351,7 +2243,6 @@ def list_tickets(
         return {"items": items, "total": total if include_total else len(items)}
     finally:
         conn.close()
-
 
 def claim_ticket(ticket_id: int, actor_id: str, actor_role: str = "") -> Dict[str, Any]:
     ticket = get_ticket(ticket_id)
@@ -2430,7 +2321,6 @@ def claim_ticket(ticket_id: int, actor_id: str, actor_role: str = "") -> Dict[st
         logger.warning(f"[claim_ticket] Falló programar_notificaciones para {actor_username}: {e}")
 
     return {"ok": True, "claimed": True, "ticket": get_ticket(ticket_id)}
-
 
 def update_ticket(
     ticket_id: int,
@@ -2702,7 +2592,6 @@ def update_ticket(
 
     return updated_ticket
 
-
 def add_comment(
     ticket_id: int,
     user_id: str,
@@ -2738,7 +2627,6 @@ def add_comment(
     finally:
         conn.close()
 
-
 def _get_active_email_draft_row(conn, ticket_id: int) -> Optional[Dict[str, Any]]:
     row = conn.execute(
         """SELECT *
@@ -2750,7 +2638,6 @@ def _get_active_email_draft_row(conn, ticket_id: int) -> Optional[Dict[str, Any]
     ).fetchone()
     return dict(row) if row else None
 
-
 def _list_email_draft_attachments(conn, draft_id: int) -> List[Dict[str, Any]]:
     rows = conn.execute(
         """SELECT id, draft_id, filename, file_path, size_bytes, content_type, sha256,
@@ -2761,7 +2648,6 @@ def _list_email_draft_attachments(conn, draft_id: int) -> List[Dict[str, Any]]:
         (int(draft_id),),
     ).fetchall()
     return [dict(r) for r in rows]
-
 
 def _ensure_active_email_draft(conn, ticket: Dict[str, Any], actor_id: str) -> Dict[str, Any]:
     ticket_id = int(ticket.get("id") or 0)
@@ -2798,7 +2684,6 @@ def _ensure_active_email_draft(conn, ticket: Dict[str, Any], actor_id: str) -> D
     if not created:
         raise ValueError("No fue posible crear borrador activo.")
     return dict(created)
-
 
 def _serialize_email_draft(conn, draft: Dict[str, Any], actor_id: str) -> Dict[str, Any]:
     draft_id = int(draft.get("id") or 0)
@@ -2840,7 +2725,6 @@ def _serialize_email_draft(conn, draft: Dict[str, Any], actor_id: str) -> Dict[s
     }
     return out
 
-
 def _ensure_can_edit_email_draft(
     ticket: Dict[str, Any],
     actor_id: str,
@@ -2850,14 +2734,12 @@ def _ensure_can_edit_email_draft(
     _ensure_can_participate_ticket(ticket, actor_id, actor_role, action_label)
     _ensure_reply_allowed_estado(ticket, action_label)
 
-
 def _validate_draft_lock(
     draft: Dict[str, Any],
     actor_id: str,
     lock_token: str,
 ) -> None:
     pass
-
 
 def _acquire_draft_lock(
     conn,
@@ -2891,7 +2773,6 @@ def _acquire_draft_lock(
         raise ValueError("No fue posible refrescar lock del borrador.")
     return lock_token, dict(row)
 
-
 def _normalize_draft_to_email(value: Optional[str]) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -2899,7 +2780,6 @@ def _normalize_draft_to_email(value: Optional[str]) -> str:
     _, parsed = parseaddr(raw)
     out = parsed.strip() if parsed else raw
     return out
-
 
 def get_ticket_email_draft(
     ticket_id: int,
@@ -2936,7 +2816,6 @@ def get_ticket_email_draft(
     finally:
         conn.close()
 
-
 def acquire_ticket_email_draft_lock(
     ticket_id: int,
     actor_id: str,
@@ -2965,7 +2844,6 @@ def acquire_ticket_email_draft_lock(
         }
     finally:
         conn.close()
-
 
 def heartbeat_ticket_email_draft_lock(
     ticket_id: int,
@@ -3005,7 +2883,6 @@ def heartbeat_ticket_email_draft_lock(
         }
     finally:
         conn.close()
-
 
 def save_ticket_email_draft(
     ticket_id: int,
@@ -3083,7 +2960,6 @@ def save_ticket_email_draft(
         return {"ok": True, "ticket_id": int(ticket_id), "draft": payload}
     finally:
         conn.close()
-
 
 def upload_ticket_email_draft_attachments(
     ticket_id: int,
@@ -3169,7 +3045,6 @@ def upload_ticket_email_draft_attachments(
     finally:
         conn.close()
 
-
 def delete_ticket_email_draft_attachment(
     ticket_id: int,
     attachment_id: int,
@@ -3229,7 +3104,6 @@ def delete_ticket_email_draft_attachment(
 
     return {"ok": True, "ticket_id": int(ticket_id), "draft": payload}
 
-
 def discard_ticket_email_draft(
     ticket_id: int,
     actor_id: str,
@@ -3263,7 +3137,6 @@ def discard_ticket_email_draft(
         return {"ok": True, "ticket_id": int(ticket_id), "discarded": True}
     finally:
         conn.close()
-
 
 def send_ticket_email_draft(
     ticket_id: int,
@@ -3482,7 +3355,6 @@ def send_ticket_email_draft(
         "ticket": get_ticket(ticket_id),
     }
 
-
 def get_dashboard_kpi() -> Dict[str, Any]:
     """
     Retorna KPIs para el Dashboard V3:
@@ -3527,7 +3399,6 @@ def get_dashboard_kpi() -> Dict[str, Any]:
         }
     finally:
         conn.close()
-
 
 def transition_ticket(
     ticket_id: int,
@@ -3665,7 +3536,6 @@ def transition_ticket(
         "ticket": result_ticket or get_ticket(ticket_id),
     }
 
-
 def approve_ticket_change(
     ticket_id: int,
     step: int,
@@ -3785,7 +3655,6 @@ def approve_ticket_change(
     finally:
         conn.close()
 
-
 def list_ticket_approvals(ticket_id: int) -> List[Dict[str, Any]]:
     conn = db.get_conn()
     try:
@@ -3799,7 +3668,6 @@ def list_ticket_approvals(ticket_id: int) -> List[Dict[str, Any]]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
-
 
 def get_ticket_workflow(ticket_id: int) -> Dict[str, Any]:
     ticket = get_ticket(ticket_id)
@@ -3847,7 +3715,6 @@ def get_ticket_workflow(ticket_id: int) -> Dict[str, Any]:
         "transitions": [dict(r) for r in transitions],
         "approvals": [dict(r) for r in approvals],
     }
-
 
 def reply_ticket_email(
     ticket_id: int,
@@ -4176,13 +4043,11 @@ def reply_ticket_email(
         "idempotency_key": normalized_idempotency_key,
     }
 
-
 def _html_to_text(raw_html: str) -> str:
     text = raw_html or ""
     text = re.sub(r"<\s*br\s*/?\s*>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", "", text)
     return html.unescape(text).strip()
-
 
 def _parse_attachments_json(raw_value: Any) -> List[Dict[str, Any]]:
     if not raw_value:
@@ -4196,7 +4061,6 @@ def _parse_attachments_json(raw_value: Any) -> List[Dict[str, Any]]:
     except Exception:
         pass
     return []
-
 
 def _persist_incoming_attachments(
     conn,
@@ -4283,7 +4147,6 @@ def _persist_incoming_attachments(
         )
     return saved
 
-
 def get_ticket_emails(ticket_id: int, format_human: bool = False) -> List[Dict[str, Any]]:
     """Obtiene el historial de correos de un ticket; opcionalmente en formato legible."""
     conn = db.get_conn()
@@ -4321,7 +4184,6 @@ def get_ticket_emails(ticket_id: int, format_human: bool = False) -> List[Dict[s
         return out
     finally:
         conn.close()
-
 
 def upload_ticket_attachments(
     ticket_id: int,
@@ -4412,7 +4274,6 @@ def upload_ticket_attachments(
 
     return {"ok": True, "ticket_id": ticket_id, "uploaded": uploaded, "items": list_ticket_attachments(ticket_id)}
 
-
 def list_ticket_attachments(ticket_id: int) -> List[Dict[str, Any]]:
     conn = db.get_conn()
     try:
@@ -4426,7 +4287,6 @@ def list_ticket_attachments(ticket_id: int) -> List[Dict[str, Any]]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
-
 
 def get_ticket_attachment_for_download(ticket_id: int, attachment_id: int) -> Dict[str, Any]:
     conn = db.get_conn()
@@ -4457,38 +4317,166 @@ def get_ticket_attachment_for_download(ticket_id: int, attachment_id: int) -> Di
     item["resolved_path"] = str(path.resolve())
     return item
 
+def get_timeline(ticket_id: int, limit: int = 120, include_emails: bool = False) -> List[Dict[str, Any]]:
+    """Línea de tiempo unificada para la UI.
 
-def get_timeline(ticket_id: int, limit: int = 120) -> List[Dict[str, Any]]:
-    """Línea de tiempo unificada para la UI."""
+    Salida normalizada por evento:
+      - event_type
+      - event_at (UTC ISO)
+      - actor
+      - detail
+      - source_table
+      - source_id
+
+    Compatibilidad: mantiene `created_at` como alias de `event_at`.
+    """
     conn = db.get_conn()
     try:
         limit = max(1, min(int(limit or 120), 500))
-        cursor = conn.execute(
-            "SELECT * FROM ticket_comments WHERE ticket_id = ? ORDER BY created_at DESC LIMIT ?",
-            (ticket_id, limit)
-        )
-        rows = cursor.fetchall()
-        result = []
-        for r in rows:
-            content = r["content"]
-            event_name = "Nota"
+
+        comment_rows = conn.execute(
+            """SELECT id, user_id, content, created_at
+               FROM ticket_comments
+               WHERE ticket_id = ?
+               ORDER BY created_at DESC, id DESC
+               LIMIT ?""",
+            (ticket_id, limit),
+        ).fetchall()
+
+        transition_rows = conn.execute(
+            """SELECT id, from_subestado, to_subestado, actor, reason, created_at
+               FROM ticket_transitions
+               WHERE ticket_id = ?
+               ORDER BY created_at DESC, id DESC
+               LIMIT ?""",
+            (ticket_id, limit),
+        ).fetchall()
+
+        approval_rows = conn.execute(
+            """SELECT id, step, approver, decision, decision_note, decided_at
+               FROM ticket_approvals
+               WHERE ticket_id = ?
+               ORDER BY decided_at DESC, id DESC
+               LIMIT ?""",
+            (ticket_id, limit),
+        ).fetchall()
+
+        email_rows = []
+        if include_emails:
+            email_rows = conn.execute(
+                """SELECT id, direction, subject, from_addr, to_addr, created_at
+               FROM ticket_emails
+               WHERE ticket_id = ?
+               ORDER BY created_at DESC, id DESC
+               LIMIT ?""",
+                (ticket_id, limit),
+            ).fetchall()
+
+        def _to_event_at(raw_value: Optional[str]) -> str:
+            dt = _parse_dt(raw_value) or _now_dt()
+            return _ensure_utc(dt).isoformat()
+
+        events: List[Dict[str, Any]] = []
+
+        for row in comment_rows:
+            content = str(row["content"] or "")
+            event_type = "comment"
             detail = content
-            
-            if content.startswith("["):
+            if content.startswith("[") and "]" in content:
                 parts = content.split("]", 1)
-                event_name = parts[0][1:].capitalize()
+                inferred = parts[0][1:].strip().lower()
+                if inferred:
+                    event_type = inferred
                 detail = parts[1].strip()
 
-            result.append({
-                "created_at": r["created_at"],
-                "evento": event_name,
-                "detalle": detail,
-                "usuario": r["user_id"]
-            })
-        return result
+            event_at = _to_event_at(row["created_at"])
+            events.append(
+                {
+                    "event_type": event_type,
+                    "event_at": event_at,
+                    "created_at": event_at,
+                    "actor": str(row["user_id"] or "system"),
+                    "detail": detail,
+                    "source_table": "ticket_comments",
+                    "source_id": int(row["id"]),
+                }
+            )
+
+        for row in transition_rows:
+            from_sub = str(row["from_subestado"] or "-")
+            to_sub = str(row["to_subestado"] or "-")
+            reason = str(row["reason"] or "").strip()
+            detail = f"{from_sub} -> {to_sub}" + (f" | reason: {reason}" if reason else "")
+
+            event_at = _to_event_at(row["created_at"])
+            events.append(
+                {
+                    "event_type": "transition",
+                    "event_at": event_at,
+                    "created_at": event_at,
+                    "actor": str(row["actor"] or "system"),
+                    "detail": detail,
+                    "source_table": "ticket_transitions",
+                    "source_id": int(row["id"]),
+                }
+            )
+
+        for row in approval_rows:
+            step = int(row["step"] or 0)
+            decision = str(row["decision"] or "pending")
+            note = str(row["decision_note"] or "").strip()
+            detail = f"step={step} decision={decision}" + (f" | note: {note}" if note else "")
+
+            event_at = _to_event_at(row["decided_at"])
+            events.append(
+                {
+                    "event_type": "approval",
+                    "event_at": event_at,
+                    "created_at": event_at,
+                    "actor": str(row["approver"] or "system"),
+                    "detail": detail,
+                    "source_table": "ticket_approvals",
+                    "source_id": int(row["id"]),
+                }
+            )
+
+        # include_emails se mantiene por compatibilidad de firma; la timeline unificada
+        # ahora siempre incorpora correos para tener trazabilidad completa.
+        if include_emails:
+            for row in email_rows:
+                direction = str(row["direction"] or "").strip().lower()
+                subject = str(row["subject"] or "").strip()
+                from_addr = str(row["from_addr"] or "").strip()
+                to_addr = str(row["to_addr"] or "").strip()
+    
+                parts = [f"direction={direction or '-'}"]
+                if subject:
+                    parts.append(f"subject={subject}")
+                if from_addr:
+                    parts.append(f"from={from_addr}")
+                if to_addr:
+                    parts.append(f"to={to_addr}")
+    
+                event_at = _to_event_at(row["created_at"])
+                events.append(
+                    {
+                        "event_type": "email",
+                        "event_at": event_at,
+                        "created_at": event_at,
+                        "actor": from_addr or to_addr or "system",
+                        "detail": " | ".join(parts),
+                        "source_table": "ticket_emails",
+                        "source_id": int(row["id"]),
+                    }
+                )
+    
+        events.sort(
+            key=lambda item: (item.get("event_at") or "", int(item.get("source_id") or 0)),
+            reverse=True,
+        )
+        return events[:limit]
     finally:
         conn.close()
-
 
 def get_stats(asignado_a: Optional[str] = None) -> Dict[str, Any]:
     """Obtener métricas para Dashboard."""
@@ -4567,7 +4555,6 @@ def get_stats(asignado_a: Optional[str] = None) -> Dict[str, Any]:
     finally:
         conn.close()
 
-
 def _assignment_phase_from_subestado(subestado: Optional[str]) -> Optional[str]:
     raw = str(subestado or "").strip().lower()
     normalized = SUBESTADOS_LEGACY_MAP.get(raw, raw)
@@ -4578,7 +4565,6 @@ def _assignment_phase_from_subestado(subestado: Optional[str]) -> Optional[str]:
     if normalized == "resuelto":
         return "resuelto"
     return None
-
 
 def _build_assignment_segments(
     ticket: Dict[str, Any],
@@ -4670,7 +4656,6 @@ def _build_assignment_segments(
             continue
         merged.append(seg)
     return merged
-
 
 def get_assignment_timeline(
     window_hours: int = 72,
@@ -4882,7 +4867,6 @@ def get_assignment_timeline(
         "queue": queue,
     }
 
-
 # ==========================================================================
 # SLA / BREACHES / AUTOMATIONS / EVIDENCE / JIRA IMPORT
 # ==========================================================================
@@ -5027,7 +5011,6 @@ def get_sla_metrics(
     finally:
         conn.close()
 
-
 def list_sla_breaches(
     severity: Optional[str] = None,
     assignee: Optional[str] = None,
@@ -5108,7 +5091,6 @@ def list_sla_breaches(
     finally:
         conn.close()
 
-
 def upsert_automation_rule(
     name: str,
     match_json: Dict[str, Any],
@@ -5147,7 +5129,6 @@ def upsert_automation_rule(
     finally:
         conn.close()
 
-
 def list_automation_rules(only_active: bool = False) -> List[Dict[str, Any]]:
     conn = db.get_conn()
     try:
@@ -5160,7 +5141,6 @@ def list_automation_rules(only_active: bool = False) -> List[Dict[str, Any]]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
-
 
 def create_evidence_event(
     control_id: str,
@@ -5214,7 +5194,6 @@ def create_evidence_event(
     finally:
         conn.close()
 
-
 def list_evidence_events(
     control_id: Optional[str] = None,
     owner: Optional[str] = None,
@@ -5250,7 +5229,6 @@ def list_evidence_events(
     finally:
         conn.close()
 
-
 def _normalize_iso_utc(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
@@ -5259,13 +5237,11 @@ def _normalize_iso_utc(value: Optional[str]) -> Optional[str]:
         raise ValueError(f"Fecha inválida: {value}")
     return _ensure_utc(parsed).isoformat()
 
-
 def _normalize_compliance_scope(scope: Optional[str]) -> str:
     normalized = (scope or "both").strip().lower()
     if normalized not in {"audit", "evidence", "both"}:
         return "both"
     return normalized
-
 
 def _artifact_exists_with_hash(manifest_path: str, artifact_hash: str) -> bool:
     path = Path(str(manifest_path or "").strip())
@@ -5278,7 +5254,6 @@ def _artifact_exists_with_hash(manifest_path: str, artifact_hash: str) -> bool:
         return _sha256_file(path) == expected_hash
     except Exception:
         return False
-
 
 def _compliance_run_duplicate_decision(run: Dict[str, Any]) -> Tuple[bool, str]:
     """
@@ -5300,7 +5275,6 @@ def _compliance_run_duplicate_decision(run: Dict[str, Any]) -> Tuple[bool, str]:
         return False, "artifact_missing_or_invalid"
     return False, "allow_rerun"
 
-
 def _retention_case_sql() -> str:
     return (
         f"CASE "
@@ -5308,7 +5282,6 @@ def _retention_case_sql() -> str:
         f"WHEN COALESCE(ticket_security_class, 'internal') = 'restricted' THEN {RETENTION_POLICY_DAYS['restricted']} "
         f"ELSE {RETENTION_POLICY_DAYS['internal']} END"
     )
-
 
 def list_ticket_legal_holds(
     ticket_id: Optional[int] = None,
@@ -5350,7 +5323,6 @@ def list_ticket_legal_holds(
         }
     finally:
         conn.close()
-
 
 def create_ticket_legal_hold(
     ticket_id: int,
@@ -5397,7 +5369,6 @@ def create_ticket_legal_hold(
     except Exception as e:
         logger.warning(f"[create_ticket_legal_hold] evidence_event no crítico falló: {e}")
     return result
-
 
 def release_ticket_legal_hold(
     hold_id: int,
@@ -5446,7 +5417,6 @@ def release_ticket_legal_hold(
     except Exception as e:
         logger.warning(f"[release_ticket_legal_hold] evidence_event no crítico falló: {e}")
     return result
-
 
 def run_compliance_export(
     actor: str,
@@ -5644,7 +5614,6 @@ def run_compliance_export(
         "duplicate_skipped_reason": "",
     }
 
-
 def list_compliance_export_runs(
     status: Optional[str] = None,
     limit: int = 100,
@@ -5686,7 +5655,6 @@ def list_compliance_export_runs(
     finally:
         conn.close()
 
-
 def _list_purge_candidates(conn, as_of_iso: str, max_tickets: Optional[int] = None) -> List[Dict[str, Any]]:
     query = f"""
         SELECT t.id, t.codigo, t.estado, t.ticket_security_class, t.retention_until
@@ -5708,7 +5676,6 @@ def _list_purge_candidates(conn, as_of_iso: str, max_tickets: Optional[int] = No
         params.append(int(max_tickets))
     rows = conn.execute(query, params).fetchall()
     return [dict(r) for r in rows]
-
 
 def run_compliance_purge(
     actor: str,
@@ -5859,7 +5826,6 @@ def run_compliance_purge(
         "duplicate_skipped_reason": "",
     }
 
-
 def list_compliance_purge_runs(
     status: Optional[str] = None,
     limit: int = 100,
@@ -5891,7 +5857,6 @@ def list_compliance_purge_runs(
         return {"items": [dict(r) for r in rows], "total": int(total["c"] or 0), "limit": limit, "offset": offset}
     finally:
         conn.close()
-
 
 def verify_hash_chain(
     stream: str,
@@ -5989,7 +5954,6 @@ def verify_hash_chain(
         }
     finally:
         conn.close()
-
 
 def import_jira_issues(
     issues: List[Dict[str, Any]],
@@ -6107,26 +6071,21 @@ def import_jira_issues(
 
     return result
 
-
 def _jira_project_keys_from_raw(raw_value: Optional[str]) -> List[str]:
     items = [x.strip() for x in str(raw_value or "").split(",")]
     return [x for x in items if x]
-
 
 def _jira_effective_project_keys(project_keys: Optional[List[str]] = None) -> List[str]:
     if project_keys:
         return [x.strip() for x in project_keys if str(x).strip()]
     return _jira_project_keys_from_raw(JIRA_PROJECT_KEYS)
 
-
 def _jira_is_live_configured() -> bool:
     return bool(JIRA_BASE_URL and JIRA_USER and JIRA_API_TOKEN)
-
 
 def _jira_build_auth_header() -> str:
     token = base64.b64encode(f"{JIRA_USER}:{JIRA_API_TOKEN}".encode("utf-8")).decode("ascii")
     return f"Basic {token}"
-
 
 def _jira_description_to_text(value: Any) -> str:
     if value is None:
@@ -6153,7 +6112,6 @@ def _jira_description_to_text(value: Any) -> str:
         return _stable_json(value)
     return str(value)
 
-
 def _jira_comment_body_to_text(value: Any) -> str:
     if value is None:
         return ""
@@ -6162,7 +6120,6 @@ def _jira_comment_body_to_text(value: Any) -> str:
     if isinstance(value, dict):
         return _jira_description_to_text(value)
     return str(value)
-
 
 def _jira_issue_author(issue_like: Any) -> str:
     if isinstance(issue_like, str):
@@ -6174,11 +6131,9 @@ def _jira_issue_author(issue_like: Any) -> str:
                 return str(raw).strip()
     return ""
 
-
 def _jira_status_to_estado(status_name: str) -> str:
     raw = (status_name or "").strip().lower()
     return JIRA_STATUS_MAP.get(raw, "abierto")
-
 
 def _jira_issue_type_to_tipo(issue_type: str) -> str:
     normalized = (issue_type or "incidencia").strip().lower()
@@ -6193,7 +6148,6 @@ def _jira_issue_type_to_tipo(issue_type: str) -> str:
         "story": "requerimiento",
     }
     return mapping.get(normalized, "incidencia")
-
 
 def _jira_request_json(path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     if not _jira_is_live_configured():
@@ -6224,12 +6178,10 @@ def _jira_request_json(path: str, params: Optional[Dict[str, Any]] = None) -> Di
     except Exception as e:
         raise ValueError(f"Jira API error: {e}")
 
-
 def _jira_jql_timestamp(iso_value: str) -> str:
     dt = _parse_dt(iso_value) or _now_dt()
     dt = _ensure_utc(dt)
     return dt.strftime("%Y-%m-%d %H:%M")
-
 
 def _jira_fetch_issues_live(
     *,
@@ -6280,7 +6232,6 @@ def _jira_fetch_issues_live(
             break
 
     return out[:max_rows]
-
 
 def _normalize_jira_issue_payload(issue: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(issue, dict):
@@ -6342,7 +6293,6 @@ def _normalize_jira_issue_payload(issue: Dict[str, Any]) -> Dict[str, Any]:
         "updated_at": (issue.get("updated_at") or issue.get("updated") or db.now_utc_iso()).strip(),
     }
 
-
 def _jira_get_cursor(cursor_name: str = JIRA_SYNC_CURSOR_NAME) -> Optional[str]:
     conn = db.get_conn()
     try:
@@ -6356,7 +6306,6 @@ def _jira_get_cursor(cursor_name: str = JIRA_SYNC_CURSOR_NAME) -> Optional[str]:
         return value or None
     finally:
         conn.close()
-
 
 def _jira_set_cursor(cursor_value: str, cursor_name: str = JIRA_SYNC_CURSOR_NAME) -> None:
     now = db.now_utc_iso()
@@ -6373,7 +6322,6 @@ def _jira_set_cursor(cursor_value: str, cursor_name: str = JIRA_SYNC_CURSOR_NAME
         conn.commit()
     finally:
         conn.close()
-
 
 def _jira_start_sync_run(run_type: str, actor: str, context: Dict[str, Any], cursor_before: Optional[str]) -> int:
     normalized = (run_type or "").strip().lower()
@@ -6400,7 +6348,6 @@ def _jira_start_sync_run(run_type: str, actor: str, context: Dict[str, Any], cur
         return int(row["id"]) if row else 0
     finally:
         conn.close()
-
 
 def _jira_finish_sync_run(
     run_id: int,
@@ -6435,7 +6382,6 @@ def _jira_finish_sync_run(
         conn.commit()
     finally:
         conn.close()
-
 
 def _jira_upsert_map_row(
     *,
@@ -6474,7 +6420,6 @@ def _jira_upsert_map_row(
     finally:
         conn.close()
 
-
 def _jira_load_existing_map(jira_issue_key: str) -> Optional[Dict[str, Any]]:
     conn = db.get_conn()
     try:
@@ -6485,7 +6430,6 @@ def _jira_load_existing_map(jira_issue_key: str) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
     finally:
         conn.close()
-
 
 def _jira_apply_issue_to_ticket(issue: Dict[str, Any], actor: str, existing_ticket_id: Optional[int] = None) -> Dict[str, Any]:
     issue_key = (issue.get("key") or "").strip()
@@ -6553,7 +6497,6 @@ def _jira_apply_issue_to_ticket(issue: Dict[str, Any], actor: str, existing_tick
         "ticket_code": refreshed.get("codigo"),
         "estado": refreshed.get("estado"),
     }
-
 
 def _run_jira_sync(
     *,
@@ -6770,7 +6713,6 @@ def _run_jira_sync(
         "errors": error_items[:200],
     }
 
-
 def run_jira_bootstrap_open(
     actor: str,
     dry_run: bool = False,
@@ -6787,7 +6729,6 @@ def run_jira_bootstrap_open(
         limit=limit,
         since=None,
     )
-
 
 def run_jira_delta_sync(
     actor: str,
@@ -6806,7 +6747,6 @@ def run_jira_delta_sync(
         limit=limit,
         since=since,
     )
-
 
 def list_jira_sync_runs(
     run_type: Optional[str] = None,
@@ -6848,7 +6788,6 @@ def list_jira_sync_runs(
     finally:
         conn.close()
 
-
 def _normalized_snapshot_date(value: Optional[str]) -> str:
     if not value:
         return datetime.now(JIRA_SYNC_TZ).date().isoformat()
@@ -6859,7 +6798,6 @@ def _normalized_snapshot_date(value: Optional[str]) -> str:
     if re.match(r"^\d{4}-\d{2}-\d{2}$", raw):
         return raw
     raise ValueError(f"snapshot_date inválida: {value}")
-
 
 def _jira_count_open_live(project_keys: List[str]) -> Optional[int]:
     if not JIRA_SYNC_ENABLED or not _jira_is_live_configured():
@@ -6882,7 +6820,6 @@ def _jira_count_open_live(project_keys: List[str]) -> Optional[int]:
         return int(total)
     except Exception:
         return None
-
 
 def record_parallel_kpi_snapshot(
     snapshot_date: Optional[str] = None,
@@ -7003,7 +6940,6 @@ def record_parallel_kpi_snapshot(
     finally:
         conn2.close()
 
-
 def list_parallel_kpi_daily(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
@@ -7032,7 +6968,6 @@ def list_parallel_kpi_daily(
         return {"items": [dict(r) for r in rows], "total": len(rows)}
     finally:
         conn.close()
-
 
 def get_jira_reconciliation_daily(snapshot_date: Optional[str] = None) -> Dict[str, Any]:
     snap = _normalized_snapshot_date(snapshot_date)
@@ -7071,7 +7006,6 @@ def get_jira_reconciliation_daily(snapshot_date: Optional[str] = None) -> Dict[s
         "missing_items": [dict(r) for r in missing],
         "runs": [dict(r) for r in latest_runs],
     }
-
 
 def record_parallel_go_no_go_decision(
     *,
@@ -7140,7 +7074,6 @@ def record_parallel_go_no_go_decision(
         logger.warning(f"[parallel_go_no_go] evidence_event no crítico falló: {e}")
     return result
 
-
 # ==========================================================================
 # GESTIÓN DE ESPECIALIDADES
 # ==========================================================================
@@ -7151,7 +7084,6 @@ def _resolve_role_specialties(role_value: Any, secondary_roles_value: Any) -> Li
         if mapped and mapped not in out:
             out.append(mapped)
     return out
-
 
 def _active_ticket_load_map(conn) -> Dict[str, int]:
     rows = conn.execute(
@@ -7170,7 +7102,6 @@ def _active_ticket_load_map(conn) -> Dict[str, int]:
             continue
         out[username] = int(row.get("active_count") or 0)
     return out
-
 
 def _list_specialties_with_role_fallback(conn) -> List[Dict[str, Any]]:
     base_rows = conn.execute(
@@ -7229,7 +7160,6 @@ def _list_specialties_with_role_fallback(conn) -> List[Dict[str, Any]]:
     items.sort(key=lambda row: (str(row.get("specialty") or ""), str(row.get("username") or "")))
     return items
 
-
 def list_specialties() -> List[Dict[str, Any]]:
     """Lista especialidades reales + fallback derivado de roles técnicos."""
     conn = db.get_conn()
@@ -7237,7 +7167,6 @@ def list_specialties() -> List[Dict[str, Any]]:
         return _list_specialties_with_role_fallback(conn)
     finally:
         conn.close()
-
 
 def upsert_specialty(username: str, specialty: str, max_load: int = 10) -> Dict[str, Any]:
     """Crear o actualizar especialidad de usuario."""
@@ -7260,7 +7189,6 @@ def upsert_specialty(username: str, specialty: str, max_load: int = 10) -> Dict[
     finally:
         conn.close()
 
-
 def toggle_availability(username: str, is_available: bool) -> None:
     """Activar/desactivar disponibilidad de un técnico."""
     conn = db.get_conn()
@@ -7274,7 +7202,6 @@ def toggle_availability(username: str, is_available: bool) -> None:
     finally:
         conn.close()
 
-
 def delete_specialty(username: str, specialty: str) -> None:
     """Eliminar una especialidad de un técnico."""
     conn = db.get_conn()
@@ -7287,7 +7214,6 @@ def delete_specialty(username: str, specialty: str) -> None:
     finally:
         conn.close()
 
-
 # ==========================================================================
 # PROCESAMIENTO DE CORREOS (INCOMING)
 # ==========================================================================
@@ -7298,7 +7224,6 @@ def _extract_message_ids(raw_header: str) -> List[str]:
     if found:
         return found
     return [p.strip() for p in raw_header.split() if p.strip()]
-
 
 def _message_id_variants(message_id: str) -> List[str]:
     raw = (message_id or "").strip()
@@ -7314,7 +7239,6 @@ def _message_id_variants(message_id: str) -> List[str]:
             variants.append(bracketed)
     return variants
 
-
 def _normalize_message_id(message_id: Optional[str]) -> str:
     raw = str(message_id or "").strip()
     if not raw:
@@ -7324,7 +7248,6 @@ def _normalize_message_id(message_id: Optional[str]) -> str:
         return ""
     return f"<{core}>"
 
-
 def _normalize_message_ids(raw_header: Optional[str]) -> List[str]:
     out: List[str] = []
     for token in _extract_message_ids(str(raw_header or "")):
@@ -7332,7 +7255,6 @@ def _normalize_message_ids(raw_header: Optional[str]) -> List[str]:
         if normalized:
             out.append(normalized)
     return out
-
 
 def _merge_reference_chain(*raw_headers: Optional[str], max_items: int = AUTO_REPLY_MAX_REFERENCES) -> str:
     dedupe: set[str] = set()
@@ -7348,7 +7270,6 @@ def _merge_reference_chain(*raw_headers: Optional[str], max_items: int = AUTO_RE
         ordered = ordered[-max_items:]
     return " ".join(ordered)
 
-
 def _build_ticket_thread_headers(ticket: Dict[str, Any]) -> Dict[str, str]:
     thread_id = _normalize_message_id(ticket.get("email_thread_id"))
     references = _merge_reference_chain(ticket.get("email_references"), thread_id)
@@ -7358,7 +7279,6 @@ def _build_ticket_thread_headers(ticket: Dict[str, Any]) -> Dict[str, str]:
     if references:
         headers["References"] = references
     return headers
-
 
 def _update_ticket_thread_metadata(
     conn,
@@ -7394,7 +7314,6 @@ def _update_ticket_thread_metadata(
             (next_thread, merged_refs, db.now_utc_iso(), ticket_id),
         )
 
-
 def _find_ticket_by_thread_headers(in_reply_to: str, references: str) -> Optional[int]:
     conn = db.get_conn()
     try:
@@ -7422,7 +7341,6 @@ def _find_ticket_by_thread_headers(in_reply_to: str, references: str) -> Optiona
         return None
     finally:
         conn.close()
-
 
 def _find_ticket_by_subject(subject: str) -> Optional[int]:
     conn = db.get_conn()
@@ -7453,11 +7371,9 @@ def _find_ticket_by_subject(subject: str) -> Optional[int]:
     finally:
         conn.close()
 
-
 def _auto_reply_subject(ticket: Dict[str, Any]) -> str:
     code = str(ticket.get("codigo") or f"TK-{ticket.get('id', '')}").strip() or "Ticket"
     return f"Re: {code} - Comprobante de Recepción"
-
 
 def _auto_reply_body(nombre: str, code: str, asignado_a: str) -> str:
     safe_name = html.escape((nombre or "cliente").strip() or "cliente")
@@ -7477,7 +7393,6 @@ def _auto_reply_body(nombre: str, code: str, asignado_a: str) -> str:
         )
     lines.append("<p>Responderemos a este mismo correo con actualizaciones.</p>")
     return "\n".join(lines)
-
 
 def should_schedule_auto_reply(conn, ticket_id: int, to_email: str) -> tuple[bool, str, Optional[str]]:
     # 1. Traer de settings de DB
@@ -7512,7 +7427,6 @@ def should_schedule_auto_reply(conn, ticket_id: int, to_email: str) -> tuple[boo
         return False, "already_scheduled_or_sent", idem_key
 
     return True, "allowed", idem_key
-
 
 def schedule_auto_reply_for_ticket(
     conn,
@@ -7575,7 +7489,6 @@ def schedule_auto_reply_for_ticket(
         "delay_minutes": delay_minutes,
     }
 
-
 def handle_incoming_email(msg: Dict[str, Any]) -> None:
     """
     Procesa un mensaje de correo entrante.
@@ -7609,7 +7522,6 @@ def handle_incoming_email(msg: Dict[str, Any]) -> None:
         logger.error(f"[EMAIL] Error matching by subject: {e}")
 
     _process_new_email_ticket(subject, sender, body, msg_id, in_reply_to, references, attachments)
-
 
 def _process_reply_email(
     ticket_id: int,
@@ -7676,7 +7588,6 @@ def _process_reply_email(
         conn.commit()
     finally:
         conn.close()
-
 
 def _process_new_email_ticket(
     subject: str,
