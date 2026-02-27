@@ -26,17 +26,6 @@ const TksUI = (() => {
             .replace(/<\/script/gi, "<\\/script");
     }
 
-    function timeAgo(dateStr) {
-        if (!dateStr) return '';
-        const d = new Date(dateStr);
-        const now = new Date();
-        const diff = Math.floor((now - d) / 1000);
-        if (diff < 60) return 'ahora';
-        if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-        if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-        return `${Math.floor(diff / 86400)}d`;
-    }
-
     function slaStatus(venceAt) {
         if (!venceAt) return { class: '', label: '' };
         const now = new Date();
@@ -364,6 +353,29 @@ const TksUI = (() => {
         }
     }
 
+    function formatExactDateTime(value) {
+        const ts = toTs(value);
+        if (!ts) return '-';
+        try {
+            const d = new Date(ts);
+            const formatter = new Intl.DateTimeFormat('es-CL', {
+                timeZone: 'America/Santiago',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+            const parts = formatter.formatToParts(d);
+            const p = {};
+            parts.forEach(part => p[part.type] = part.value);
+            return `${p.day}-${p.month}-${p.year} ${p.hour}:${p.minute}`;
+        } catch (e) {
+            return String(value || '-');
+        }
+    }
+
     function formatMinutesLabel(minutesLike) {
         const minutes = Math.max(0, Number(minutesLike || 0));
         if (minutes < 60) return `${Math.round(minutes)}m`;
@@ -669,7 +681,7 @@ const TksUI = (() => {
                     ${sla.class === 'tks-sla-breached' ? '<i class="fas fa-exclamation-triangle"></i>' : ''} 
                     ${sla.label}
                 </td>
-                <td class="td-min tks-created-cell">${timeAgo(t.created_at)}</td>
+                <td class="td-min tks-created-cell">${formatExactDateTime(t.created_at)}</td>
                 <td class="td-min tks-action-cell">
                     <button class="tks-btn-icon-sm" title="Ver detalle"><i class="fas fa-chevron-right"></i></button>
                 </td>
@@ -858,7 +870,8 @@ const TksUI = (() => {
             const isManualSystem = ['Transicion', 'Asignacion', 'Cambio_estado', 'Reasignacion', 'Escalamiento'].includes(ev.evento);
             return {
                 kind: 'event',
-                created_at: ev.created_at || ev.creado_at,
+                event_at: ev.event_at || '',
+                created_at: ev.created_at || ev.creado_at || '',
                 evento: ev.evento || 'Nota',
                 detalle: ev.detalle || '',
                 usuario: ev.usuario || '-',
@@ -868,7 +881,8 @@ const TksUI = (() => {
 
         const emailItems = (emails || []).map((em) => ({
             kind: 'email',
-            created_at: em.created_at,
+            event_at: em.event_at || '',
+            created_at: em.created_at || '',
             direction: em.direction === 'incoming' ? 'incoming' : 'outgoing',
             subject: em.subject || '',
             body_html: em.body_html || '',
@@ -879,7 +893,8 @@ const TksUI = (() => {
             attachments: parseAttachmentsJson(em.attachments_json),
         }));
 
-        const unifiedFeed = [...eventItems, ...emailItems].sort((a, b) => toTs(a.created_at) - toTs(b.created_at));
+        const feedTimestamp = (item) => item.event_at || item.created_at;
+        const unifiedFeed = [...eventItems, ...emailItems].sort((a, b) => toTs(feedTimestamp(a)) - toTs(feedTimestamp(b)));
 
         const feedHtml = unifiedFeed.map((item) => {
             if (item.kind === 'event') {
@@ -892,7 +907,7 @@ const TksUI = (() => {
                     <div class="tks-feed-item-head compact">
                         <div class="tks-feed-head-side tks-feed-actor">${escapeHtml(actorName)}</div>
                         <div class="tks-feed-head-center"><span class="tks-feed-badge">${kindLabel}</span></div>
-                        <div class="tks-feed-head-side tks-feed-time right">${timeAgo(item.created_at)}</div>
+                        <div class="tks-feed-head-side tks-feed-time right">${formatExactDateTime(feedTimestamp(item))}</div>
                     </div>
                     <div class="tks-feed-content ${item.isSystem ? 'system-movement' : ''}">
                         ${item.isSystem
@@ -927,7 +942,7 @@ const TksUI = (() => {
                 <div class="tks-feed-item-head compact">
                     <div class="tks-feed-head-side tks-feed-actor">${escapeHtml(senderName)}</div>
                     <div class="tks-feed-head-center"><span class="tks-feed-badge">${tag}</span></div>
-                    <div class="tks-feed-head-side tks-feed-time right">${timeAgo(item.created_at)}</div>
+                    <div class="tks-feed-head-side tks-feed-time right">${formatExactDateTime(feedTimestamp(item))}</div>
                 </div>
                 <div class="tks-feed-content">
                     <h4 class="tks-feed-title">${escapeHtml(item.subject || '(sin asunto)')}</h4>
@@ -1483,7 +1498,6 @@ const TksUI = (() => {
         renderKanban,
         renderOps,
         renderCreateModal,
-        timeAgo,
         slaStatus,
         catLabel,
         statusLabel,
