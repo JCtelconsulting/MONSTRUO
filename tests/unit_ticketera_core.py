@@ -80,30 +80,24 @@ class TicketTimelineTests(unittest.TestCase):
     def test_get_timeline_includes_non_null_iso_timestamps_and_consistent_order(self) -> None:
         rows = [
             {
+                "id": 1,
+                "user_id": "tecnico1",
+                "content": "[TRANSICION] asignado -> en_progreso",
                 "created_at": "2026-02-26T21:02:11+00:00",
-                "type": "comment",
-                "author": "tecnico1",
-                "detail": "[TRANSICION] asignado -> en_progreso",
-                "email_subject": None,
             },
             {
+                "id": 2,
+                "user_id": "cliente1",
+                "content": "Cliente aporta más contexto",
                 "created_at": "2026-02-26T21:01:05+00:00",
-                "type": "comment",
-                "author": "cliente1",
-                "detail": "Cliente aporta más contexto",
-                "email_subject": None,
-            },
-            {
-                "created_at": "2026-02-26T21:00:00+00:00",
-                "type": "comment",
-                "author": "system",
-                "detail": "[CREACION] Ticket creado",
-                "email_subject": None,
             },
         ]
 
         mock_conn = MagicMock()
-        mock_conn.execute.return_value.fetchall.return_value = rows
+        # 4 queries: comments, transitions, approvals, (emails only if include_emails)
+        comment_cursor = MagicMock(); comment_cursor.fetchall.return_value = rows
+        empty_cursor = MagicMock(); empty_cursor.fetchall.return_value = []
+        mock_conn.execute.side_effect = [comment_cursor, empty_cursor, empty_cursor]
 
         with patch("app.core.tickets_service.db.get_conn", return_value=mock_conn):
             timeline = tickets_service.get_timeline(ticket_id=123, limit=10, include_emails=False)
