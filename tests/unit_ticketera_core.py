@@ -103,10 +103,10 @@ class TicketTimelineTests(unittest.TestCase):
             timeline = tickets_service.get_timeline(ticket_id=123, limit=10, include_emails=False)
 
         self.assertEqual(len(timeline), 2)
-        self.assertEqual(timeline[0]["evento"], "Transicion")
-        self.assertIn("asignado -> en_progreso", timeline[0]["detalle"])
-        self.assertEqual(timeline[1]["evento"], "Nota")
-        self.assertEqual(timeline[1]["detalle"], "Cliente aporta más contexto")
+        self.assertEqual(timeline[0]["event_type"], "transicion")
+        self.assertIn("asignado -> en_progreso", timeline[0]["detail"])
+        self.assertEqual(timeline[1]["event_type"], "comment")
+        self.assertEqual(timeline[1]["detail"], "Cliente aporta más contexto")
 
         for item in timeline:
             self.assertTrue(item.get("created_at"), f"Evento sin created_at: {item}")
