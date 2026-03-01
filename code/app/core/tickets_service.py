@@ -2011,18 +2011,18 @@ def create_ticket(
 
         # Auto-resolver cliente por email si existe mapeo
         if origen_email:
-            # Primero buscamos si hay asociación explícita
             client_map = get_client_for_email(origen_email)
             if client_map:
-                cliente_nombre = client_map.get("customer_name")
+                # Si el caller no fijó customer_id explícitamente, lo inferimos desde el mapeo (Laudus customerId).
+                if not customer_id:
+                    customer_id = (client_map.get("customer_id") or "").strip() or None
+                # Nombre mostrado (si existe)
+                mapped_name = (client_map.get("customer_name") or "").strip()
+                if mapped_name:
+                    cliente_nombre = mapped_name
             else:
-                # Si NO hay asociación, indicamos "Desconocido" para permitir vincular
-                # (aunque venga un nombre en el header del correo, queremos que el usuario lo asocie)
-                # Excepción: si ya venía un cliente_nombre explícito (ej: creación manual), lo respetamos
-                # pero si viene del procesador de correo, a veces trae el nombre.
-                # Asumimos: si tiene origen_email y no está mapeado -> Desconocido
-                # A menos que sea un ticket interno o el nombre sea muy distinto.
-                # Para simplificar y cumplir el requerimiento: forzamos Desconocido si no está mapeado.
+                # Si NO hay asociación, marcamos como Desconocido para que Mesa/Admin asocien luego.
+                # (No inventamos cliente basándonos en headers del correo.)
                 cliente_nombre = "Desconocido"
 
         # Normalizar severidad
@@ -7766,11 +7766,12 @@ def associate_email_to_client(email: str, customer_id: str, customer_name: str, 
     # El usuario pidió "que en un futuro asocie", pero usualmente se espera que retroactivamente
     # arregle lo que se ve FEO ahora. Vamos a actualizar tickets abiertos que tengan ese origen_email.
     conn.execute("""
-        UPDATE tickets 
-        SET cliente_nombre = ? 
-        WHERE lower(origen_email) = ? 
-          AND (cliente_nombre IS NULL OR cliente_nombre = '' OR cliente_nombre = 'Desconocido')
-    """, (customer_name, email))
+        UPDATE tickets
+        SET customer_id = ?,
+            cliente_nombre = ?
+        WHERE lower(origen_email) = ?
+          AND (customer_id IS NULL OR customer_id = '' OR cliente_nombre IS NULL OR cliente_nombre = '' OR cliente_nombre = 'Desconocido')
+    """, (customer_id, customer_name, email))
     
     conn.commit()
     conn.close()
