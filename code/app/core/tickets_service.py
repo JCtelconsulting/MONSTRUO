@@ -7770,7 +7770,8 @@ def associate_email_to_client(email: str, customer_id: str, customer_name: str, 
         SET customer_id = ?,
             cliente_nombre = ?
         WHERE lower(origen_email) = ?
-          AND (customer_id IS NULL OR customer_id = '' OR cliente_nombre IS NULL OR cliente_nombre = '' OR cliente_nombre = 'Desconocido')
+          AND (customer_id IS NULL OR customer_id = '')
+          AND estado <> 'cerrado'
     """, (customer_id, customer_name, email))
     
     conn.commit()
