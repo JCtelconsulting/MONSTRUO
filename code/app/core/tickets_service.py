@@ -1695,10 +1695,33 @@ def _comment_with_prefix_exists(conn, ticket_id: int, prefix: str) -> bool:
     return bool(row)
 
 def _emit_system_comment(conn, ticket_id: int, content: str, now_iso: str, author_id: str = "system") -> None:
+    action = "SISTEMA"
+    estado = "N/A"
+    motivo = "Actualización de sistema"
+    
+    if content.startswith("["):
+        parts = content.split("]", 1)
+        action = parts[0][1:].strip()
+        rest = parts[1].strip()
+        if "Motivo:" in rest:
+            estado_part, motivo_part = rest.split("Motivo:", 1)
+            estado = estado_part.strip(" |")
+            motivo = motivo_part.strip()
+        elif " | " in rest:
+            estado_part, motivo_part = rest.split(" | ", 1)
+            estado = estado_part.strip()
+            motivo = motivo_part.strip()
+        else:
+            estado = rest
+    else:
+        estado = content
+
+    formatted_content = f"[{action}] Estado: {estado} | Motivo: {motivo}"
+
     conn.execute(
-        """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-           VALUES (?, ?, ?, ?)""",
-        (ticket_id, author_id, content, now_iso),
+        """INSERT INTO ticket_comments (ticket_id, user_id, content, is_internal, created_at)
+           VALUES (?, ?, ?, 1, ?)""",
+        (ticket_id, author_id, formatted_content, now_iso),
     )
 
 def _latest_approval_decisions(conn, ticket_id: int) -> Dict[int, str]:
@@ -2003,6 +2026,7 @@ def create_ticket(
     customer_id: Optional[str] = None,
     contact_role: Optional[str] = None,
     notify_emails: Optional[List[str]] = None,
+    auto_assign: bool = False,
 ) -> Dict[str, Any]:
     """Crear un nuevo ticket con auto-clasificación y auto-asignación."""
     conn = db.get_conn()
@@ -7468,6 +7492,12 @@ def schedule_auto_reply_for_ticket(
     body_html = _auto_reply_body(nombre, ticket_code, asignado_a or "")
     subject = _auto_reply_subject(ticket)
 
+    # Nunca enviar en línea durante el procesamiento de correo entrante.
+    # Incluso con delay=0, encolamos el job para evitar bloquear el ciclo de ingestión
+    # y mantener tiempos de respuesta estables.
+    if delay_minutes <= 0:
+        run_at = datetime.utcnow().isoformat()
+
     conn.execute(
         """INSERT INTO ticket_emails
            (ticket_id, direction, from_addr, to_addr, subject, body_html, attachments_json, idempotency_key, created_at)
@@ -7606,7 +7636,7 @@ def _process_new_email_ticket(
     # 2. Triaje (Mesa vs Especialista)
     asignado_a = None
     if categoria == "general":
-        asignado_a = "mesa_ayuda" 
+        asignado_a = None
     else:
         try:
             asignado_a = auto_asignar(categoria)
@@ -7662,6 +7692,13 @@ def _process_new_email_ticket(
 
         # Registrar correo entrante en historial de correos.
         conn = db.get_conn()
+        _emit_system_comment(
+            conn,
+            ticket_id,
+            "[INGESTA_CORREO] Estado: sin_asignar | Motivo: Ticket creado desde correo entrante con auto_assign=False para triage manual.",
+            now,
+            author_id="system",
+        )
         saved_attachments = _persist_incoming_attachments(
             conn,
             ticket_id,
@@ -7712,6 +7749,16 @@ def _process_new_email_ticket(
             asignado_a,
             in_reply_to,
             references,
+        )
+        _emit_system_comment(
+            conn,
+            ticket_id,
+            (
+                f"[AUTO_RESPUESTA] Estado: {auto_result.get('reason')} | "
+                f"Motivo: destino={origen_email} idempotency={auto_result.get('idempotency_key','')}"
+            ),
+            now,
+            author_id="system",
         )
         conn.commit()
         if auto_result.get("scheduled"):

@@ -349,33 +349,38 @@ async def worker_loop():
 # EMAIL JOBS IMPL
 # ==========================================================================
 async def poll_email_job(payload: dict):
+    import asyncio
     from app.core import email_integration, tickets_service
 
     print("[JobEngine] Polling emails...")
     payload = payload or {}
-    processor = email_integration.EmailProcessor()
     interval = 120
-    try:
-        processor.connect()
-        emails = processor.fetch_unread()
-        print(f"[JobEngine] Found {len(emails)} unread emails.")
 
-        for email_data in emails:
+    def _sync_poll():
+        processor = email_integration.EmailProcessor()
+        found_interval = 120
+        try:
+            processor.connect()
+            emails = processor.fetch_unread()
+            print(f"[JobEngine] Found {len(emails)} unread emails.")
+
+            for email_data in emails:
+                try:
+                    tickets_service.handle_incoming_email(email_data)
+                except Exception as e:
+                    print(f"[JobEngine] Error handling email {email_data.get('message_id')}: {e}")
+        except Exception as e:
+            print(f"[JobEngine] Email polling error: {e}")
+        finally:
+            processor.close()
             try:
-                tickets_service.handle_incoming_email(email_data)
-            except Exception as e:
-                print(f"[JobEngine] Error handling email {email_data.get('message_id')}: {e}")
+                if processor.config:
+                    found_interval = int(processor.config.get("email_polling_interval", 120) or 120)
+            except Exception:
+                pass
+        return found_interval
 
-    except Exception as e:
-        print(f"[JobEngine] Email polling error: {e}")
-    finally:
-        processor.close()
-
-    try:
-        if processor.config:
-            interval = int(processor.config.get("email_polling_interval", 120) or 120)
-    except Exception:
-        interval = 120
+    interval = await asyncio.to_thread(_sync_poll)
     interval = max(30, min(interval, 1800))
     if bool(payload.get("recurring", True)):
         await enqueue_unique_job(
@@ -502,7 +507,7 @@ async def send_auto_response_job(payload: dict):
         body = tickets_service._auto_reply_body(
             str(payload.get("nombre") or ticket.get("cliente_nombre") or "cliente"),
             code,
-            str(payload.get("asignado_a") or ticket.get("asignado_a") or "mesa_ayuda"),
+            str(payload.get("asignado_a") or ticket.get("asignado_a") or ""),
         )
 
         base_headers = tickets_service._build_ticket_thread_headers(ticket)

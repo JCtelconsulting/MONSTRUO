@@ -560,6 +560,7 @@ def init_db() -> None:
             ticket_id INTEGER NOT NULL,
             user_id TEXT NOT NULL,
             content TEXT NOT NULL,
+            is_internal INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
             FOREIGN KEY(ticket_id) REFERENCES tickets(id)
         );
@@ -567,6 +568,12 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_comments_ticket ON ticket_comments(ticket_id);"
         )
+
+        # Migración is_internal
+        try:
+            conn.execute("ALTER TABLE ticket_comments ADD COLUMN is_internal INTEGER DEFAULT 0")
+        except Exception:
+            pass
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS ticket_attachments (
