@@ -22,9 +22,6 @@ class Settings(BaseSettings):
     # Configuración de Ticketera y Entorno
     TICKET_AUTO_REPLY_ENABLED: bool = False
     TICKET_AUTO_REPLY_DELAY_MINUTES: int = 15
-    TICKET_AUTO_REPLY_ALLOWLIST_EMAILS: str = ""
-    TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS: str = ""
-    TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST: bool = True
     TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS: str = "noreply,no-reply,mailer-daemon,postmaster"
     ENV_TYPE: str = "dev"  # dev, prod, staging
     COMPLIANCE_EXPORT_DIR: str = ""

@@ -361,15 +361,6 @@ def _auto_reply_delay_minutes() -> int:
         max_value=1440,
     )
 
-def _auto_reply_require_allowlist() -> bool:
-    return bool(getattr(app_settings, "TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST", True))
-
-def _auto_reply_allowlist_emails() -> set[str]:
-    return _parse_csv_lower_set(getattr(app_settings, "TICKET_AUTO_REPLY_ALLOWLIST_EMAILS", ""))
-
-def _auto_reply_allowlist_domains() -> set[str]:
-    return _parse_csv_lower_set(getattr(app_settings, "TICKET_AUTO_REPLY_ALLOWLIST_DOMAINS", ""), strip_prefix="@")
-
 def _auto_reply_blocked_localparts() -> set[str]:
     raw = getattr(
         app_settings,
@@ -384,20 +375,9 @@ def _auto_reply_sender_allowed(to_email: str) -> tuple[bool, str]:
         return False, "invalid_email"
     if "@" not in normalized_email:
         return False, "invalid_email"
-    local_part, domain = normalized_email.split("@", 1)
+    local_part, _ = normalized_email.split("@", 1)
     if local_part in _auto_reply_blocked_localparts():
         return False, "blocked_localpart"
-
-    allow_emails = _auto_reply_allowlist_emails()
-    allow_domains = _auto_reply_allowlist_domains()
-    require_allowlist = _auto_reply_require_allowlist()
-
-    if require_allowlist and not allow_emails and not allow_domains:
-        return False, "allowlist_empty"
-
-    if allow_emails or allow_domains:
-        if normalized_email not in allow_emails and domain not in allow_domains:
-            return False, "not_allowlisted"
 
     return True, "allowed"
 
