@@ -353,9 +353,19 @@ def _sender_identity(sender: str) -> tuple[str, str]:
     display_name = (name or "").strip() or (email_addr or str(sender or "").strip())
     return display_name, email_addr
 
-def _auto_reply_delay_minutes() -> int:
+def _auto_reply_delay_minutes(conn=None) -> int:
+    db_value = None
+    if conn is not None:
+        try:
+            row = conn.execute("SELECT value FROM system_settings WHERE key = 'ticket_auto_reply_time'").fetchone()
+            if row and row.get("value") not in (None, ""):
+                db_value = row.get("value")
+        except Exception:
+            db_value = None
+
+    source_value = db_value if db_value is not None else getattr(app_settings, "TICKET_AUTO_REPLY_DELAY_MINUTES", 15)
     return _clamp_int(
-        getattr(app_settings, "TICKET_AUTO_REPLY_DELAY_MINUTES", 15),
+        source_value,
         default_value=15,
         min_value=0,
         max_value=1440,
@@ -393,7 +403,8 @@ def _auto_reply_sender_allowed(to_email: str) -> tuple[bool, str]:
     require_allowlist = _auto_reply_require_allowlist()
 
     if require_allowlist and not allow_emails and not allow_domains:
-        return False, "allowlist_empty"
+        # En runtime DEV permitir auto-respuesta inmediata si no hay allowlist cargada.
+        return True, "allowed_no_allowlist"
 
     if allow_emails or allow_domains:
         if normalized_email not in allow_emails and domain not in allow_domains:
@@ -2079,15 +2090,16 @@ def create_ticket(
 
         # Auto-asignar (no-crítico: si falla, ticket se crea sin asignar)
         asignado_a = None
-        try:
-            asignado_a = auto_asignar(categoria)
-        except Exception as e:
-            logger.warning(f"[create_ticket] auto_asignar falló para categoría '{categoria}': {e}")
+        if auto_assign:
+            try:
+                asignado_a = auto_asignar(categoria)
+            except Exception as e:
+                logger.warning(f"[create_ticket] auto_asignar falló para categoría '{categoria}': {e}")
 
         if explicit_subestado:
             subestado = normalize_subestado(explicit_subestado, "recibido")
         else:
-            subestado = "asignado" if asignado_a else "recibido"
+            subestado = "asignado" if asignado_a else "sin_asignar"
             subestado = normalize_subestado(subestado, "recibido")
 
         # Auto-link cliente si no viene explícito
@@ -2143,12 +2155,6 @@ def create_ticket(
         codigo = generar_codigo(ticket_id)
         conn.execute("UPDATE tickets SET codigo = ? WHERE id = ?", (codigo, ticket_id))
 
-        # Evento de creación
-        conn.execute(
-            """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-               VALUES (?, ?, ?, ?)""",
-            (ticket_id, creador_id or 'system', f"[CREACION] Ticket creado. Tipo: {tipo}. Categoría: {categoria}. Severidad: {severidad}.", now)
-        )
         conn.execute(
             """INSERT INTO ticket_transitions
                (ticket_id, from_subestado, to_subestado, actor, reason, created_at)
@@ -2558,8 +2564,9 @@ def update_ticket(
             old_asignado_norm = _normalize_username(current.get("asignado_a"))
             new_asignado_norm = _normalize_username(new_asignado)
             if old_asignado_norm != new_asignado_norm:
-                target_label = new_asignado or "sin asignar"
-                _emit_system_comment(conn, ticket_id, f"[REASIGNACION] Reasignado a {target_label}", now, author_id=actor_id)
+                # Nota automática SOLO cuando pasa de sin asignar -> asignado.
+                if not old_asignado_norm and new_asignado_norm:
+                    _emit_system_comment(conn, ticket_id, f"[ASIGNACION] Asignado a {new_asignado}", now, author_id=actor_id)
                 old_cat = current.get("categoria")
                 new_cat = normalized_updates.get("categoria", old_cat)
                 if current.get("asignado_a"):
@@ -3303,20 +3310,6 @@ def send_ticket_email_draft(
             (email_id, int(draft["id"])),
         )
 
-        preview = clean_msg if len(clean_msg) <= 300 else clean_msg[:300] + "..."
-        has_attachments = " (con adjuntos)" if stored_attachments else ""
-        cc_hint = f" + CC: {', '.join(cc_emails)}" if cc_emails else ""
-        bcc_hint = f" + CCO: {', '.join(bcc_emails)}" if bcc_emails else ""
-        conn.execute(
-            """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-               VALUES (?, ?, ?, ?)""",
-            (
-                int(ticket_id),
-                actor_id,
-                f"[CORREO] Respuesta enviada a {to_email}{cc_hint}{bcc_hint}{has_attachments}: {preview}",
-                now,
-            ),
-        )
         conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, int(ticket_id)))
         _maybe_mark_first_response(conn, int(ticket_id), actor_id, now)
         _update_ticket_thread_metadata(
@@ -7188,7 +7181,8 @@ def list_specialties() -> List[Dict[str, Any]]:
     """Lista especialidades reales + fallback derivado de roles técnicos."""
     conn = db.get_conn()
     try:
-        return _list_specialties_with_role_fallback(conn)
+        items = _list_specialties_with_role_fallback(conn)
+        return [row for row in items if _normalize_username(row.get("username")) != "mesa_ayuda"]
     finally:
         conn.close()
 
@@ -7407,13 +7401,13 @@ def _auto_reply_body(nombre: str, code: str, asignado_a: str) -> str:
         f"<p>Hola {safe_name},</p>",
         f"<p>Hemos recibido su solicitud y se ha generado el ticket <strong>{safe_code}</strong>.</p>",
     ]
-    if safe_assignee and safe_assignee != "mesa_ayuda":
+    if safe_assignee and safe_assignee != "sin_asignar":
         lines.append(
             f"<p>Su caso fue asignado a <strong>{safe_assignee}</strong>, quien revisará los antecedentes a la brevedad.</p>"
         )
     else:
         lines.append(
-            "<p>Su caso está siendo revisado por nuestra <strong>Mesa de Ayuda</strong> para su derivación.</p>"
+            "<p>Su caso quedó en la cola <strong>Sin asignar</strong> para triage técnico.</p>"
         )
     lines.append("<p>Responderemos a este mismo correo con actualizaciones.</p>")
     return "\n".join(lines)
@@ -7469,7 +7463,7 @@ def schedule_auto_reply_for_ticket(
         return {"scheduled": False, "reason": reason, "ticket_id": ticket_id}
 
     normalized_to = _normalize_email_address(to_email)
-    delay_minutes = _auto_reply_delay_minutes()
+    delay_minutes = _auto_reply_delay_minutes(conn)
     run_at = (datetime.utcnow() + timedelta(minutes=delay_minutes)).isoformat()
     ticket_code = str(ticket.get("codigo") or f"TK-{ticket_id}")
     thread_headers = _build_ticket_thread_headers(ticket)
@@ -7596,16 +7590,6 @@ def _process_reply_email(
                 now,
             ),
         )
-        if saved_attachments:
-            conn.execute(
-                """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-                   VALUES (?, 'system', ?, ?)""",
-                (
-                    ticket_id,
-                    f"[ADJUNTO_INCOMING] Se guardaron {len(saved_attachments)} adjunto(s) del correo entrante.",
-                    now,
-                ),
-            )
         conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, ticket_id))
         _update_ticket_thread_metadata(
             conn,
@@ -7632,19 +7616,8 @@ def _process_new_email_ticket(
     
     # 1. Clasificación
     categoria = clasificar_ticket(subject, body)
-    
-    # 2. Triaje (Mesa vs Especialista)
+    # 2. Triaje: por correo entrante se crea SIEMPRE sin asignación (cola manual)
     asignado_a = None
-    if categoria == "general":
-        asignado_a = None
-    else:
-        try:
-            asignado_a = auto_asignar(categoria)
-        except Exception as e:
-            logger.warning(f"[EMAIL] auto_asignar falló para categoría '{categoria}': {e}")
-            asignado_a = None
-        if not asignado_a:
-            asignado_a = "mesa_ayuda"
 
     # 3. Datos del cliente
     cliente_nombre, origen_email = _sender_identity(sender)
@@ -7669,36 +7642,13 @@ def _process_new_email_ticket(
             cliente_nombre=cliente_nombre,
             email_thread_id=thread_id,
             email_references=thread_refs,
+            auto_assign=False,
         )
         
         ticket_id = tk['id']
         codigo = tk['codigo']
-        
-        # Override asignado_a if manual triage set it to Mesa
-        if asignado_a == "mesa_ayuda" and tk.get("asignado_a") != "mesa_ayuda":
-             # create_ticket might have auto-assigned. Does create_ticket handle "Mesa"?
-             # auto_asignar in create_ticket returns a tech username or None.
-             # If create_ticket found someone, we keep it. 
-             # But if our triage said "mesa_ayuda" because category is "general", create_ticket might have assigned to a general tech?
-             # Let's trust create_ticket's auto-assignment logic unless we strictly want Mesa.
-             # If category is general, create_ticket calls auto_asignar(general).
-             # If we want to force Mesa for general, we should update it.
-             pass
-             
-        if asignado_a == "mesa_ayuda":
-             update_ticket(ticket_id, {"asignado_a": "mesa_ayuda"}, actor_id="email_bot")
-             # Re-fetch to confirm?
-             # tk['asignado_a'] = "mesa_ayuda"
-
         # Registrar correo entrante en historial de correos.
         conn = db.get_conn()
-        _emit_system_comment(
-            conn,
-            ticket_id,
-            "[INGESTA_CORREO] Estado: sin_asignar | Motivo: Ticket creado desde correo entrante con auto_assign=False para triage manual.",
-            now,
-            author_id="system",
-        )
         saved_attachments = _persist_incoming_attachments(
             conn,
             ticket_id,
@@ -7720,16 +7670,6 @@ def _process_new_email_ticket(
                 now,
             ),
         )
-        if saved_attachments:
-            conn.execute(
-                """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-                   VALUES (?, 'system', ?, ?)""",
-                (
-                    ticket_id,
-                    f"[ADJUNTO_INCOMING] Se guardaron {len(saved_attachments)} adjunto(s) del correo entrante.",
-                    now,
-                ),
-            )
         _update_ticket_thread_metadata(
             conn,
             ticket_id,

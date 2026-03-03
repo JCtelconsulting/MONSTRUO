@@ -282,7 +282,7 @@
        - cambia solo esta linea para subir/bajar el maximo global del modulo. */
     --tks-module-min-height: clamp(720px, 78vh, 980px);
     --tks-module-max-height: 3000px;
-    --tks-timeline-max-height: clamp(560px, 70vh, 1200px);
+    --tks-timeline-max-height: clamp(1120px, 84vh, 1800px);
 }
 
 /* ==========================================================================
@@ -935,10 +935,27 @@
 }
 
 .tks-filter-chip.active {
-    background: var(--tks-accent);
-    /* Active state color */
-    border-color: var(--tks-accent);
-    color: #fff;
+    /* Verde más oscuro para contraste AA con texto blanco */
+    background: #15803d;
+    border-color: #166534;
+    color: #ffffff;
+}
+
+.tks-filter-chip.active:hover {
+    background: #166534;
+    border-color: #14532d;
+    color: #ffffff;
+}
+
+.tks-filter-chip:focus-visible {
+    outline: none;
+    border-color: #22c55e;
+    box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.35);
+}
+
+.tks-filter-chip.active:active {
+    background: #14532d;
+    border-color: #14532d;
 }
 
 .tks-detail-empty {
@@ -2525,7 +2542,8 @@
 }
 
 .tks-th-code {
-    width: 80px;
+    width: 180px;
+    min-width: 180px;
 }
 
 .tks-th-cat {
@@ -2540,17 +2558,6 @@
     width: 100px;
 }
 
-.tks-th-sla {
-    width: 120px;
-}
-
-.tks-th-created {
-    width: 100px;
-}
-
-.tks-th-action {
-    width: 40px;
-}
 
 .tks-table td {
     padding: 0.8rem 1rem;
@@ -2581,9 +2588,38 @@
     border-left: 3px solid var(--tks-accent);
 }
 
+
+.tks-table .tks-td-code {
+    width: 180px;
+    min-width: 180px;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.tks-codigo {
+    display: inline-block;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
 .tks-table .td-min {
     white-space: normal;
     width: auto;
+}
+
+.tks-table .td-min.tks-td-code {
+    white-space: nowrap;
+}
+
+.tks-table .td-ticket-code {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+    word-break: normal;
+    max-width: 130px;
 }
 
 .tks-ticket-title {
@@ -2605,31 +2641,6 @@
     color: var(--tks-text-muted);
 }
 
-.tks-sla-cell {
-    font-size: 0.8rem;
-    white-space: nowrap;
-}
-
-.tks-sla-cell.is-breached {
-    color: var(--tks-critica);
-}
-
-.tks-sla-cell.is-warning {
-    color: var(--tks-alta);
-}
-
-.tks-sla-cell.is-ok {
-    color: var(--tks-text-muted);
-}
-
-.tks-created-cell {
-    font-size: 0.8rem;
-    color: var(--tks-text-muted);
-}
-
-.tks-action-cell {
-    text-align: right;
-}
 
 .tks-btn-icon-sm {
     background: none;
