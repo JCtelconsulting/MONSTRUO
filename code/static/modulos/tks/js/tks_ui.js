@@ -681,10 +681,6 @@ const TksUI = (() => {
                     ${sla.class === 'tks-sla-breached' ? '<i class="fas fa-exclamation-triangle"></i>' : ''} 
                     ${sla.label}
                 </td>
-                <td class="td-min tks-created-cell">${formatExactDateTime(t.created_at)}</td>
-                <td class="td-min tks-action-cell">
-                    <button class="tks-btn-icon-sm" title="Ver detalle"><i class="fas fa-chevron-right"></i></button>
-                </td>
             </tr>`;
         }).join('');
 
@@ -700,8 +696,6 @@ const TksUI = (() => {
                         <th class="tks-th-sev">Sev</th>
                         <th class="tks-th-status">Estado</th>
                         <th class="tks-th-sla">SLA</th>
-                        <th class="tks-th-created">Creado</th>
-                        <th class="tks-th-action"></th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
@@ -857,8 +851,8 @@ const TksUI = (() => {
         }
 
         const filteredEvents = (eventos || []).filter((ev) => {
-            const rawEvent = String(ev?.evento || '').trim().toLowerCase().replace(/\s+/g, '_');
-            const rawDetail = String(ev?.detalle || '').trim().toLowerCase();
+            const rawEvent = String(ev?.evento || ev?.event_type || '').trim().toLowerCase().replace(/\s+/g, '_');
+            const rawDetail = String(ev?.detalle || ev?.detail || '').trim().toLowerCase();
             if (rawEvent.startsWith('correo')) return false;
             if (rawEvent.includes('adjunto_incoming')) return false;
             if (rawDetail.startsWith('respuesta enviada a ')) return false;
@@ -867,15 +861,29 @@ const TksUI = (() => {
         });
 
         const eventItems = filteredEvents.map((ev) => {
-            const isManualSystem = ['Transicion', 'Asignacion', 'Cambio_estado', 'Reasignacion', 'Escalamiento'].includes(ev.evento);
+            const eventType = String(ev?.event_type || "").trim().toLowerCase();
+            const isManualSystem = ["Transicion", "Asignacion", "Cambio_estado", "Reasignacion", "Escalamiento"].includes(ev.evento);
+
+            const fallbackLabelByType = {
+                transition: "Cambio de estado",
+                status_change: "Cambio de estado",
+                assignment: "Asignación",
+                reassignment: "Reasignación",
+                escalation: "Escalamiento",
+                email: "Correo",
+                attachment: "Adjunto",
+            };
+
+            const resolvedLabel = String(ev?.evento || ev?.event_label || "").trim() || (fallbackLabelByType[eventType] || "");
+
             return {
-                kind: 'event',
-                event_at: ev.event_at || '',
-                created_at: ev.created_at || ev.creado_at || '',
-                evento: ev.evento || 'Nota',
-                detalle: ev.detalle || '',
-                usuario: ev.usuario || '-',
-                isSystem: String(ev.usuario || '').trim().toLowerCase() === 'system' || isManualSystem,
+                kind: "event",
+                event_at: ev.event_at || "",
+                created_at: ev.created_at || ev.creado_at || "",
+                evento: resolvedLabel || String(ev?.event_type || "").trim(),
+                detalle: ev.detalle || ev.detail || "",
+                usuario: ev.usuario || ev.actor || "-",
+                isSystem: String(ev.usuario || ev.actor || "").trim().toLowerCase() === "system" || isManualSystem || ["transition","approval","email"].includes(eventType),
             };
         });
 
