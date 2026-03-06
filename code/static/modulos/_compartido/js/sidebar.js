@@ -29,7 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'tks', label: 'TKs', icon: 'fas fa-ticket-alt', link: `https://ticketera.telconsulting.cl${envPrefix}/`, title: 'Ticketera' },
         { id: 'ia', label: 'IA (ULTRON)', icon: 'fas fa-robot', link: `https://ia.telconsulting.cl${envPrefix}/`, title: 'Asistente IA' },
         { id: 'zabbix', label: 'Zabbix', icon: 'fas fa-signal', link: `https://zabbix.telconsulting.cl${envPrefix}/`, title: 'Monitoreo' },
-        { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: `https://config.telconsulting.cl${envPrefix}/`, title: 'Configuración' }
+        { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: `https://config.telconsulting.cl${envPrefix}/`, title: 'Configuración' },
+        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: `https://login.telconsulting.cl${envPrefix}/fundacion`, title: 'Fundación' }
     ] : [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', link: '/modulos/dashboard/dashboard.html', title: 'Dashboard' },
         { id: 'pmo', label: 'Proyectos (PMO)', icon: 'fas fa-helmet-safety', link: '/modulos/pmo/pmo.html', title: 'Oficina Técnica' },
@@ -39,7 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'tks', label: 'TKs', icon: 'fas fa-ticket-alt', link: '/modulos/tks/tks.html', title: 'Ticketera' },
         { id: 'ia', label: 'IA (ULTRON)', icon: 'fas fa-robot', link: '/modulos/ultron/ultron.html', title: 'Asistente IA' },
         { id: 'zabbix', label: 'Zabbix', icon: 'fas fa-signal', link: '/modulos/zabbix/zabbix.html', title: 'Monitoreo' },
-        { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: '/modulos/configuracion/configuracion.html', title: 'Configuración' }
+        { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: '/modulos/configuracion/configuracion.html', title: 'Configuración' },
+        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: '/modulos/fundacion/fundacion.html', title: 'Fundación' }
     ];
 
     const currentPath = window.location.pathname;
@@ -84,12 +86,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // MEJORA: Si allowed es null/undefined se usa el rol. Si es [], es acceso restringido.
         if (!allowed || allowed.length === 0) {
             const ROLE_MAP = {
-                'admin': ['*'],
+                'admin': ['*', 'fundacion'],
                 'encargado_mesa': ['dashboard', 'tks', 'config'],
                 'redes': ['dashboard', 'tks'],
                 'sistemas': ['dashboard', 'tks'],
                 'implementaciones': ['dashboard', 'tks', 'pmo'],
-                'gerencia': ['dashboard', 'tks', 'pmo', 'erp', 'crm', 'ia', 'zabbix'],
+                'gerencia': ['dashboard', 'tks', 'pmo', 'erp', 'crm', 'ia', 'zabbix', 'fundacion'],
                 'ops': ['dashboard', 'tks', 'crm', 'bodega', 'zabbix', 'config'],
                 'finance': ['dashboard', 'erp', 'crm'],
                 'warehouse': ['bodega']
