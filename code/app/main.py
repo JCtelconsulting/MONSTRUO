@@ -103,10 +103,10 @@ def _resolve_cookie_domain(request: Request) -> Optional[str]:
 
 
 def _resolve_cookie_path(request: Request) -> str:
-    """Isolate cookie scope for /dev and /prod when behind reverse proxy."""
+    """Isolate cookie scope for /dev and root when behind reverse proxy."""
     prefix = (request.headers.get("x-forwarded-prefix") or "").strip().rstrip("/")
-    if prefix in ("/dev", "/prod"):
-        return prefix
+    if prefix == "/dev":
+        return "/dev"
     return "/"
 
 
@@ -808,8 +808,8 @@ def dashboard_root(
     try:
         auth_deps.require_session_hybrid(authorization, access_token)
     except Exception:
-        # Usar X-Forwarded-Prefix inyectado por Nginx para saber si es /prod o /dev
-        prefix = request.headers.get("x-forwarded-prefix", "/prod")
+        # Usar X-Forwarded-Prefix inyectado por Nginx para saber si es /dev o raiz
+        prefix = (request.headers.get("x-forwarded-prefix") or "").strip().rstrip("/")
         login_url = f"https://login.telconsulting.cl{prefix}/"
         return RedirectResponse(login_url, status_code=302)
 
@@ -825,7 +825,7 @@ def fundacion_root(
     try:
         auth_deps.require_permission("fundacion:read")(authorization, access_token)
     except Exception:
-        prefix = request.headers.get("x-forwarded-prefix", "/prod")
+        prefix = (request.headers.get("x-forwarded-prefix") or "").strip().rstrip("/")
         login_url = f"https://login.telconsulting.cl{prefix}/"
         return RedirectResponse(login_url, status_code=302)
 
