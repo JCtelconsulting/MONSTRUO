@@ -11,26 +11,17 @@ const IS_PROD_DOMAIN = window.location.hostname.endsWith('.telconsulting.cl');
  * @returns {string} The base URL for API requests (e.g., '/api', '/dev/api', '/prod/api').
  */
 function getApiBase() {
-  // 1. Path prefix has priority when running behind reverse proxy.
-  // This avoids crossing environments if someone opens http://127.0.0.1/dev/... manually.
   const isDev = window.location.pathname.startsWith('/dev');
-  const isProd = window.location.pathname.startsWith('/prod');
   if (isDev) return '/dev/api';
-  if (isProd) return '/prod/api';
 
-  // 2. Local Development (no prefix)
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return '/api';
-  }
-
-  // 3. Server default
-  return '/prod/api';
+  // Producción o Local (sin prefijo /prod)
+  return '/api';
 }
 
 // Expose global for legacy/other modules
 window.getApiBase = getApiBase;
 
-const LOGIN_URL = IS_PROD_DOMAIN ? `https://login.telconsulting.cl${window.location.pathname.startsWith('/dev') ? '/dev' : '/prod'}/` : '/login.html';
+const LOGIN_URL = IS_PROD_DOMAIN ? `https://login.telconsulting.cl${window.location.pathname.startsWith('/dev') ? '/dev' : ''}/` : '/login.html';
 
 function redirectToLogin() {
   window.location.href = LOGIN_URL;

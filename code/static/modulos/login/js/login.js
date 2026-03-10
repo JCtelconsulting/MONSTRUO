@@ -18,16 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- API BASE URL ---
   const IS_DEV = window.location.pathname.startsWith('/dev');
-  const IS_PROD = window.location.pathname.startsWith('/prod');
-  const API_BASE = IS_DEV ? '/dev' : (IS_PROD ? '/prod' : '');
+  const API_BASE = IS_DEV ? '/dev' : '';
 
   function getPostLoginTarget() {
     const isProdHost = window.location.hostname.toLowerCase().endsWith('.telconsulting.cl');
     if (!isProdHost) {
       return '/modulos/dashboard/dashboard.html';
     }
-    // Detectar si estamos en /dev/ o /prod/ y mantener el prefijo
-    const prefix = IS_DEV ? '/dev' : '/prod';
+    // Detectar si estamos en /dev/ y mantener el prefijo, de lo contrario raiz
+    const prefix = IS_DEV ? '/dev' : '';
     return `${prefix}/dashboard`;
   }
 
