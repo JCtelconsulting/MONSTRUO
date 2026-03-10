@@ -607,8 +607,9 @@ def check_session_status(
 @app.get("/api/auth/google/login")
 async def google_login(request: Request):
     # Detectar el prefijo para la URI de redirección
-    prefix = request.headers.get("X-Forwarded-Prefix", "")
-    if prefix:
+    prefix = (request.headers.get("X-Forwarded-Prefix") or "").strip().rstrip("/")
+    # Si estamos tras el proxy (detectado por Host o X-Forwarded-Host), forzar HTTPS y dominio público
+    if "telconsulting.cl" in request.headers.get("host", ""):
         redirect_uri = f"https://login.telconsulting.cl{prefix}/api/auth/google/callback"
     else:
         redirect_uri = f"{str(request.base_url).rstrip('/')}/api/auth/google/callback"
@@ -646,8 +647,8 @@ async def google_callback(request: Request, code: str, state: str):
     if not expected_state or not state or not secrets.compare_digest(str(state).strip(), expected_state):
         raise HTTPException(status_code=400, detail="invalid_oauth_state")
 
-    prefix = request.headers.get("X-Forwarded-Prefix", "")
-    if prefix:
+    prefix = (request.headers.get("X-Forwarded-Prefix") or "").strip().rstrip("/")
+    if "telconsulting.cl" in request.headers.get("host", ""):
         redirect_uri = f"https://login.telconsulting.cl{prefix}/api/auth/google/callback"
     else:
         redirect_uri = f"{str(request.base_url).rstrip('/')}/api/auth/google/callback"
