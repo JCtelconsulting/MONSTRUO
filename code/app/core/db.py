@@ -2205,6 +2205,13 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_fundacion", _migrate_fundacion_section)
 
+        # Automated Migrations Engine
+        try:
+            from app.core import migrations
+            migrations.run_migrations()
+        except Exception as e:
+            print(f"[DB] ERROR running automated migrations: {e}")
+
         conn.commit()
     finally:
         conn.close()
