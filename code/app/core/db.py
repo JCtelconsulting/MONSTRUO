@@ -113,10 +113,14 @@ def get_conn():
 
     if _HAVE_PSYCOPG3:
         conn = psycopg.connect(DB_URL, row_factory=dict_row)
-        return PgConn(conn, use_psycopg3=True)
+        pg_conn = PgConn(conn, use_psycopg3=True)
+        pg_conn.execute("SET search_path TO public, auth, tks, erp, crm, bodega, core, cat, pmo, ia, ops, fundacion;")
+        return pg_conn
     if _HAVE_PSYCOPG2:
         conn = psycopg2.connect(DB_URL)
-        return PgConn(conn, use_psycopg3=False)
+        pg_conn = PgConn(conn, use_psycopg3=False)
+        pg_conn.execute("SET search_path TO public, auth, tks, erp, crm, bodega, core, cat, pmo, ia, ops, fundacion;")
+        return pg_conn
 
     raise RuntimeError("PostgreSQL driver not installed. Install psycopg or psycopg2.")
 
