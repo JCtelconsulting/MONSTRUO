@@ -248,7 +248,7 @@ def init_db() -> None:
     try:
         # Customers
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS laudus_customers (
+        CREATE TABLE IF NOT EXISTS erp.laudus_customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             laudus_customer_id TEXT NOT NULL UNIQUE,
             name TEXT DEFAULT '',
@@ -259,12 +259,12 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_laudus_customers_vat ON laudus_customers(vat_id);"
+            "CREATE INDEX IF NOT EXISTS idx_laudus_customers_vat ON erp.laudus_customers(vat_id);"
         )
 
         # Invoices
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS laudus_invoices (
+        CREATE TABLE IF NOT EXISTS erp.laudus_invoices (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             laudus_invoice_id TEXT NOT NULL UNIQUE,
             customer_id TEXT DEFAULT '',
@@ -278,15 +278,15 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_laudus_invoices_customer ON laudus_invoices(customer_id);"
+            "CREATE INDEX IF NOT EXISTS idx_laudus_invoices_customer ON erp.laudus_invoices(customer_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_laudus_invoices_due ON laudus_invoices(due_date);"
+            "CREATE INDEX IF NOT EXISTS idx_laudus_invoices_due ON erp.laudus_invoices(due_date);"
         )
 
         # Payments
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS laudus_payments (
+        CREATE TABLE IF NOT EXISTS erp.laudus_payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             laudus_payment_id TEXT NOT NULL UNIQUE,
             invoice_id TEXT DEFAULT '',
@@ -298,18 +298,18 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_laudus_payments_invoice ON laudus_payments(invoice_id);"
+            "CREATE INDEX IF NOT EXISTS idx_laudus_payments_invoice ON erp.laudus_payments(invoice_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_laudus_payments_customer ON laudus_payments(customer_id);"
+            "CREATE INDEX IF NOT EXISTS idx_laudus_payments_customer ON erp.laudus_payments(customer_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_laudus_payments_date ON laudus_payments(payment_date);"
+            "CREATE INDEX IF NOT EXISTS idx_laudus_payments_date ON erp.laudus_payments(payment_date);"
         )
 
         # Alerts (created by compute_alerts.py, but ensure exists)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS alerts (
+        CREATE TABLE IF NOT EXISTS core.alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             rule TEXT NOT NULL,
             severity TEXT NOT NULL,
@@ -325,11 +325,11 @@ def init_db() -> None:
             UNIQUE(rule, entity_type, entity_id)
         );
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_status ON core.alerts(status);")
 
         # Auth: users + sessions
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE IF NOT EXISTS auth.users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
@@ -344,31 +344,31 @@ def init_db() -> None:
         
         def _migrate_users_section() -> None:
             if is_postgres():
-                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT DEFAULT '[]'")
-                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS secondary_roles TEXT DEFAULT '[]'")
-                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number TEXT")
+                conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS allowed_modules TEXT DEFAULT '[]'")
+                conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS secondary_roles TEXT DEFAULT '[]'")
+                conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS phone_number TEXT")
             else:
                 # SQLite fallback
                 try:
-                    conn.execute("ALTER TABLE users ADD COLUMN allowed_modules TEXT DEFAULT '[]'")
+                    conn.execute("ALTER TABLE auth.users ADD COLUMN allowed_modules TEXT DEFAULT '[]'")
                 except Exception:
                     pass
                 try:
-                    conn.execute("ALTER TABLE users ADD COLUMN secondary_roles TEXT DEFAULT '[]'")
+                    conn.execute("ALTER TABLE auth.users ADD COLUMN secondary_roles TEXT DEFAULT '[]'")
                 except Exception:
                     pass
                 try:
-                    conn.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
+                    conn.execute("ALTER TABLE auth.users ADD COLUMN phone_number TEXT")
                 except Exception:
                     pass
 
         _run_guarded_pg_section(conn, "migrate_users", _migrate_users_section)
 
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON auth.users(role);")
 
         # System Settings (EPIC Config)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS system_settings (
+        CREATE TABLE IF NOT EXISTS core.system_settings (
             key TEXT PRIMARY KEY,
             value TEXT,
             group_name TEXT DEFAULT 'general',
@@ -383,12 +383,12 @@ def init_db() -> None:
                 ("is_sensitive", "BOOLEAN DEFAULT FALSE"),
                 ("updated_at", "TEXT"),
             ]:
-                conn.execute(f"ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS {col_name} {col_def}")
+                conn.execute(f"ALTER TABLE core.system_settings ADD COLUMN IF NOT EXISTS {col_name} {col_def}")
 
         _run_guarded_pg_section(conn, "migrate_system_settings", _migrate_system_settings_section)
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
+        CREATE TABLE IF NOT EXISTS auth.sessions (
             token TEXT PRIMARY KEY,
             username TEXT NOT NULL,
             role TEXT NOT NULL,
@@ -397,15 +397,15 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(username);"
+            "CREATE INDEX IF NOT EXISTS idx_sessions_user ON auth.sessions(username);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_exp ON sessions(expires_at);"
+            "CREATE INDEX IF NOT EXISTS idx_sessions_exp ON auth.sessions(expires_at);"
         )
 
         # Audit Logs (EPIC 02/03)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS audit_logs (
+        CREATE TABLE IF NOT EXISTS core.audit_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
             actor TEXT NOT NULL,      -- Username or 'anonymous'
@@ -416,32 +416,32 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs(timestamp);"
+            "CREATE INDEX IF NOT EXISTS idx_audit_ts ON core.audit_logs(timestamp);"
         )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON core.audit_logs(actor);")
         def _migrate_audit_logs_section() -> None:
             conn.execute(
-                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'info'"
+                "ALTER TABLE core.audit_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'info'"
             )
             conn.execute(
-                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_prev_hash TEXT DEFAULT ''"
+                "ALTER TABLE core.audit_logs ADD COLUMN IF NOT EXISTS chain_prev_hash TEXT DEFAULT ''"
             )
             conn.execute(
-                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_hash TEXT DEFAULT ''"
+                "ALTER TABLE core.audit_logs ADD COLUMN IF NOT EXISTS chain_hash TEXT DEFAULT ''"
             )
             conn.execute(
-                f"ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_algo TEXT DEFAULT '{CHAIN_ALGO}'"
+                f"ALTER TABLE core.audit_logs ADD COLUMN IF NOT EXISTS chain_algo TEXT DEFAULT '{CHAIN_ALGO}'"
             )
             conn.execute(
-                f"ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_version INTEGER DEFAULT {CHAIN_VERSION}"
+                f"ALTER TABLE core.audit_logs ADD COLUMN IF NOT EXISTS chain_version INTEGER DEFAULT {CHAIN_VERSION}"
             )
 
         _run_guarded_pg_section(conn, "migrate_audit_logs", _migrate_audit_logs_section)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_chain_hash ON audit_logs(chain_hash);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_chain_hash ON core.audit_logs(chain_hash);")
 
         # Jobs Engine (EPIC 04)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS sys_jobs (
+        CREATE TABLE IF NOT EXISTS core.sys_jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             job_type TEXT NOT NULL,
             status TEXT DEFAULT 'PENDING',  -- PENDING, RUNNING, COMPLETED, FAILED, RETRY
@@ -454,18 +454,18 @@ def init_db() -> None:
             updated_at TEXT NOT NULL
         );
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON sys_jobs(status);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON core.sys_jobs(status);")
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jobs_next_run ON sys_jobs(next_run_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jobs_next_run ON core.sys_jobs(next_run_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jobs_type_status_next ON sys_jobs(job_type, status, next_run_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jobs_type_status_next ON core.sys_jobs(job_type, status, next_run_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jobs_status_updated ON sys_jobs(status, updated_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jobs_status_updated ON core.sys_jobs(status, updated_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON sys_jobs(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON core.sys_jobs(created_at);"
         )
         # Limpiar duplicados históricos antes de crear índices únicos parciales.
         try:
@@ -522,13 +522,13 @@ def init_db() -> None:
         try:
             conn.execute(
                 """CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_jobs_unique_pending_email
-                   ON sys_jobs(job_type)
+                   ON core.sys_jobs(job_type)
                    WHERE job_type = 'EMAIL_POLLING'
                      AND status IN ('PENDING', 'RETRY')"""
             )
             conn.execute(
                 """CREATE UNIQUE INDEX IF NOT EXISTS idx_sys_jobs_unique_pending_notifications
-                   ON sys_jobs(job_type)
+                   ON core.sys_jobs(job_type)
                    WHERE job_type = 'PROCESS_NOTIFICATIONS'
                      AND status IN ('PENDING', 'RETRY')"""
             )
@@ -537,7 +537,7 @@ def init_db() -> None:
 
         # Ticketera (EPIC 11)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS tickets (
+        CREATE TABLE IF NOT EXISTS tks.tickets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             titulo TEXT NOT NULL,
             descripcion TEXT DEFAULT '',
@@ -552,15 +552,15 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(estado);"
+            "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tks.tickets(estado);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets(asignado_a);"
+            "CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tks.tickets(asignado_a);"
         )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_tickets_due ON tickets(vence_at);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tickets_due ON tks.tickets(vence_at);")
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_comments (
+        CREATE TABLE IF NOT EXISTS tks.ticket_comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id INTEGER NOT NULL,
             user_id TEXT NOT NULL,
@@ -571,17 +571,17 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_comments_ticket ON ticket_comments(ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_comments_ticket ON tks.ticket_comments(ticket_id);"
         )
 
         # Migración is_internal
         def _migrate_ticket_comments_section() -> None:
-            conn.execute("ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS is_internal INTEGER DEFAULT 0")
+            conn.execute("ALTER TABLE tks.ticket_comments ADD COLUMN IF NOT EXISTS is_internal INTEGER DEFAULT 0")
 
         _run_guarded_pg_section(conn, "migrate_ticket_comments", _migrate_ticket_comments_section)
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_attachments (
+        CREATE TABLE IF NOT EXISTS tks.ticket_attachments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id INTEGER NOT NULL,
             filename TEXT NOT NULL,
@@ -592,7 +592,7 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_attach_ticket ON ticket_attachments(ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_attach_ticket ON tks.ticket_attachments(ticket_id);"
         )
 
         # --- Ticketera: metadata adicional de adjuntos ---
@@ -602,11 +602,11 @@ def init_db() -> None:
                 ("content_type", "TEXT"),
                 ("sha256", "TEXT"),
             ]:
-                conn.execute(f"ALTER TABLE ticket_attachments ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
+                conn.execute(f"ALTER TABLE tks.ticket_attachments ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
 
         _run_guarded_pg_section(conn, "migrate_ticket_attachments", _migrate_ticket_attachments_section)
         try:
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_attach_sha256 ON ticket_attachments(sha256);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_attach_sha256 ON tks.ticket_attachments(sha256);")
         except Exception as _e:
             print(f"[DB-MIGRATION] WARN índice idx_attach_sha256: {_e}")
 
@@ -639,7 +639,7 @@ def init_db() -> None:
         def _migrate_tickets_v3_section() -> None:
             for col_name, col_def, is_critical in _v3_columns:
                 try:
-                    conn.execute(f"ALTER TABLE tickets ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
+                    conn.execute(f"ALTER TABLE tks.tickets ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
                 except Exception as _e:
                     if is_critical:
                         # FAIL-FAST: Si es columna crítica para V3, no permitir arranque a medias
@@ -662,17 +662,17 @@ def init_db() -> None:
              raise RuntimeError(f"[DB-MIGRATION] FATAL: Las columnas críticas de V3 no son accesibles tras migración. {_e}")
 
         for idx_sql in [
-            "CREATE INDEX IF NOT EXISTS idx_tickets_codigo ON tickets(codigo);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_categoria ON tickets(categoria);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_prioridad ON tickets(prioridad);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_security_class ON tickets(ticket_security_class);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_subestado ON tickets(subestado);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_frt_due ON tickets(frt_due_at);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_ttr_due ON tickets(ttr_due_at);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_list_status_prio_created ON tickets(estado, prioridad, created_at DESC);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_list_cat_status_prio_created ON tickets(categoria, estado, prioridad, created_at DESC);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_list_assignee_status_prio_created ON tickets(asignado_a, estado, prioridad, created_at DESC);",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_list_sev_status_prio_created ON tickets(severidad, estado, prioridad, created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_codigo ON tks.tickets(codigo);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_categoria ON tks.tickets(categoria);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_prioridad ON tks.tickets(prioridad);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_security_class ON tks.tickets(ticket_security_class);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_subestado ON tks.tickets(subestado);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_frt_due ON tks.tickets(frt_due_at);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_ttr_due ON tks.tickets(ttr_due_at);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_list_status_prio_created ON tks.tickets(estado, prioridad, created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_list_cat_status_prio_created ON tks.tickets(categoria, estado, prioridad, created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_list_assignee_status_prio_created ON tks.tickets(asignado_a, estado, prioridad, created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_list_sev_status_prio_created ON tks.tickets(severidad, estado, prioridad, created_at DESC);",
         ]:
             try:
                 conn.execute(idx_sql)
@@ -763,7 +763,7 @@ def init_db() -> None:
 
         # --- Ticketera V3: Especialidades de Usuarios ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS user_specialties (
+        CREATE TABLE IF NOT EXISTS tks.user_specialties (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
             specialty TEXT NOT NULL,
@@ -776,15 +776,15 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_user_spec_user ON user_specialties(username);"
+            "CREATE INDEX IF NOT EXISTS idx_user_spec_user ON tks.user_specialties(username);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_user_spec_specialty ON user_specialties(specialty);"
+            "CREATE INDEX IF NOT EXISTS idx_user_spec_specialty ON tks.user_specialties(specialty);"
         )
 
         # --- Ticketera V3: Notificaciones Escalonadas ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_notifications (
+        CREATE TABLE IF NOT EXISTS tks.ticket_notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id INTEGER NOT NULL,
             user_id TEXT NOT NULL,
@@ -818,29 +818,29 @@ def init_db() -> None:
                 ("locked_at", "TEXT"),
                 ("updated_at", "TEXT"),
             ]:
-                conn.execute(f"ALTER TABLE ticket_notifications ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
+                conn.execute(f"ALTER TABLE tks.ticket_notifications ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
 
         _run_guarded_pg_section(conn, "migrate_ticket_notifications", _migrate_ticket_notifications_section)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_ticket ON ticket_notifications(ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_ticket ON tks.ticket_notifications(ticket_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_user ON ticket_notifications(user_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_user ON tks.ticket_notifications(user_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status ON ticket_notifications(status);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status ON tks.ticket_notifications(status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_sched ON ticket_notifications(scheduled_at);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_sched ON tks.ticket_notifications(scheduled_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status_sched ON ticket_notifications(status, scheduled_at);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status_sched ON tks.ticket_notifications(status, scheduled_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status_retry ON ticket_notifications(status, next_retry_at);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_status_retry ON tks.ticket_notifications(status, next_retry_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_channel_status ON ticket_notifications(channel, status);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_channel_status ON tks.ticket_notifications(channel, status);"
         )
 
         try:
@@ -862,7 +862,7 @@ def init_db() -> None:
 
         # --- PMO (Proyectos y Bitacora) ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS pmo_proyectos (
+        CREATE TABLE IF NOT EXISTS pmo.pmo_proyectos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL,
             cliente_nombre TEXT,
@@ -875,11 +875,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pmo_proyectos_estado ON pmo_proyectos(estado);"
+            "CREATE INDEX IF NOT EXISTS idx_pmo_proyectos_estado ON pmo.pmo_proyectos(estado);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS pmo_bitacora_ia (
+        CREATE TABLE IF NOT EXISTS pmo.pmo_bitacora_ia (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             proyecto_id INTEGER NOT NULL,
             origen TEXT DEFAULT 'manual',
@@ -893,12 +893,12 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pmo_bitacora_proyecto ON pmo_bitacora_ia(proyecto_id);"
+            "CREATE INDEX IF NOT EXISTS idx_pmo_bitacora_proyecto ON pmo.pmo_bitacora_ia(proyecto_id);"
         )
 
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_notification_attempts (
+        CREATE TABLE IF NOT EXISTS tks.ticket_notification_attempts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             notification_id INTEGER NOT NULL,
             attempt_no INTEGER NOT NULL DEFAULT 0,
@@ -917,23 +917,23 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_notif ON ticket_notification_attempts(notification_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_notif ON tks.ticket_notification_attempts(notification_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_created ON ticket_notification_attempts(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_created ON tks.ticket_notification_attempts(created_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_status ON ticket_notification_attempts(status);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_notif_attempts_status ON tks.ticket_notification_attempts(status);"
         )
         conn.execute(
             """CREATE UNIQUE INDEX IF NOT EXISTS idx_tk_notif_attempts_idem
-               ON ticket_notification_attempts(notification_id, attempt_type, idempotency_key)
+               ON tks.ticket_notification_attempts(notification_id, attempt_type, idempotency_key)
                WHERE idempotency_key <> ''"""
         )
 
         # --- Ticketera V3: Historial de Emails ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_emails (
+        CREATE TABLE IF NOT EXISTS tks.ticket_emails (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id INTEGER NOT NULL,
             direction TEXT NOT NULL,
@@ -949,19 +949,19 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_emails_ticket ON ticket_emails(ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_emails_ticket ON tks.ticket_emails(ticket_id);"
         )
         def _migrate_ticket_emails_section() -> None:
-            conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS idempotency_key TEXT;")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_tk_emails_idempotency ON ticket_emails(idempotency_key);")
-            conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS cc_addrs TEXT DEFAULT '';")
-            conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS bcc_addrs TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE tks.ticket_emails ADD COLUMN IF NOT EXISTS idempotency_key TEXT;")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_tk_emails_idempotency ON tks.ticket_emails(idempotency_key);")
+            conn.execute("ALTER TABLE tks.ticket_emails ADD COLUMN IF NOT EXISTS cc_addrs TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE tks.ticket_emails ADD COLUMN IF NOT EXISTS bcc_addrs TEXT DEFAULT '';")
 
         _run_guarded_pg_section(conn, "migrate_ticket_emails", _migrate_ticket_emails_section)
 
         # --- Ticketera V3: Borradores de respuesta por correo ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_email_drafts (
+        CREATE TABLE IF NOT EXISTS tks.ticket_email_drafts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id INTEGER NOT NULL,
             status TEXT NOT NULL DEFAULT 'active',
@@ -986,27 +986,27 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_ticket ON ticket_email_drafts(ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_ticket ON tks.ticket_email_drafts(ticket_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_status ON ticket_email_drafts(status);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_status ON tks.ticket_email_drafts(status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_lock_expires ON ticket_email_drafts(lock_expires_at);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_drafts_lock_expires ON tks.ticket_email_drafts(lock_expires_at);"
         )
         conn.execute(
             """CREATE UNIQUE INDEX IF NOT EXISTS idx_tk_email_drafts_active
-               ON ticket_email_drafts(ticket_id)
+               ON tks.ticket_email_drafts(ticket_id)
                WHERE status = 'active'"""
         )
         def _migrate_ticket_email_drafts_section() -> None:
-            conn.execute("ALTER TABLE ticket_email_drafts ADD COLUMN IF NOT EXISTS cc_addrs TEXT DEFAULT '';")
-            conn.execute("ALTER TABLE ticket_email_drafts ADD COLUMN IF NOT EXISTS bcc_addrs TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE tks.ticket_email_drafts ADD COLUMN IF NOT EXISTS cc_addrs TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE tks.ticket_email_drafts ADD COLUMN IF NOT EXISTS bcc_addrs TEXT DEFAULT '';")
 
         _run_guarded_pg_section(conn, "migrate_ticket_email_drafts", _migrate_ticket_email_drafts_section)
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_email_draft_attachments (
+        CREATE TABLE IF NOT EXISTS tks.ticket_email_draft_attachments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             draft_id INTEGER NOT NULL,
             filename TEXT NOT NULL,
@@ -1022,18 +1022,18 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_draft ON ticket_email_draft_attachments(draft_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_draft ON tks.ticket_email_draft_attachments(draft_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_sent_email ON ticket_email_draft_attachments(sent_email_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_sent_email ON tks.ticket_email_draft_attachments(sent_email_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_sha256 ON ticket_email_draft_attachments(sha256);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_draft_att_sha256 ON tks.ticket_email_draft_attachments(sha256);"
         )
 
         # --- Workflow de transiciones por ticket ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_transitions (
+        CREATE TABLE IF NOT EXISTS tks.ticket_transitions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id INTEGER NOT NULL,
             from_subestado TEXT,
@@ -1046,18 +1046,18 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_ticket ON ticket_transitions(ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_ticket ON tks.ticket_transitions(ticket_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_created ON ticket_transitions(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_created ON tks.ticket_transitions(created_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_idem ON ticket_transitions(idempotency_key);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_transitions_idem ON tks.ticket_transitions(idempotency_key);"
         )
 
         # --- Aprobaciones de cambios ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_approvals (
+        CREATE TABLE IF NOT EXISTS tks.ticket_approvals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id INTEGER NOT NULL,
             step INTEGER NOT NULL,
@@ -1070,21 +1070,21 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_ticket ON ticket_approvals(ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_ticket ON tks.ticket_approvals(ticket_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_step ON ticket_approvals(step);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_step ON tks.ticket_approvals(step);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_decided ON ticket_approvals(decided_at);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_decided ON tks.ticket_approvals(decided_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_idem ON ticket_approvals(idempotency_key);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_approvals_idem ON tks.ticket_approvals(idempotency_key);"
         )
 
         # --- Reglas de automatización Ticketera ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_automation_rules (
+        CREATE TABLE IF NOT EXISTS tks.ticket_automation_rules (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             is_active INTEGER DEFAULT 1,
@@ -1096,12 +1096,12 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_auto_rules_active ON ticket_automation_rules(is_active);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_auto_rules_active ON tks.ticket_automation_rules(is_active);"
         )
 
         # --- Evidencias para trazabilidad ISO ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS evidence_events (
+        CREATE TABLE IF NOT EXISTS core.evidence_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             control_id TEXT NOT NULL,
             artifact_ref TEXT NOT NULL,
@@ -1112,30 +1112,30 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_evidence_control ON evidence_events(control_id);"
+            "CREATE INDEX IF NOT EXISTS idx_evidence_control ON core.evidence_events(control_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_evidence_created ON evidence_events(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_evidence_created ON core.evidence_events(created_at);"
         )
         conn.execute(
-            "ALTER TABLE evidence_events ADD COLUMN IF NOT EXISTS chain_prev_hash TEXT DEFAULT ''"
+            "ALTER TABLE core.evidence_events ADD COLUMN IF NOT EXISTS chain_prev_hash TEXT DEFAULT ''"
         )
         conn.execute(
-            "ALTER TABLE evidence_events ADD COLUMN IF NOT EXISTS chain_hash TEXT DEFAULT ''"
+            "ALTER TABLE core.evidence_events ADD COLUMN IF NOT EXISTS chain_hash TEXT DEFAULT ''"
         )
         conn.execute(
-            f"ALTER TABLE evidence_events ADD COLUMN IF NOT EXISTS chain_algo TEXT DEFAULT '{CHAIN_ALGO}'"
+            f"ALTER TABLE core.evidence_events ADD COLUMN IF NOT EXISTS chain_algo TEXT DEFAULT '{CHAIN_ALGO}'"
         )
         conn.execute(
-            f"ALTER TABLE evidence_events ADD COLUMN IF NOT EXISTS chain_version INTEGER DEFAULT {CHAIN_VERSION}"
+            f"ALTER TABLE core.evidence_events ADD COLUMN IF NOT EXISTS chain_version INTEGER DEFAULT {CHAIN_VERSION}"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_evidence_chain_hash ON evidence_events(chain_hash);"
+            "CREATE INDEX IF NOT EXISTS idx_evidence_chain_hash ON core.evidence_events(chain_hash);"
         )
 
         # --- Compliance Core ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ticket_legal_holds (
+        CREATE TABLE IF NOT EXISTS tks.ticket_legal_holds (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticket_id INTEGER NOT NULL,
             reason TEXT NOT NULL,
@@ -1150,14 +1150,14 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_legal_holds_ticket ON ticket_legal_holds(ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_legal_holds_ticket ON tks.ticket_legal_holds(ticket_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tk_legal_holds_active ON ticket_legal_holds(is_active);"
+            "CREATE INDEX IF NOT EXISTS idx_tk_legal_holds_active ON tks.ticket_legal_holds(is_active);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS compliance_export_runs (
+        CREATE TABLE IF NOT EXISTS ops.compliance_export_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             scope TEXT NOT NULL DEFAULT 'both',
             from_ts TEXT,
@@ -1176,17 +1176,17 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_compliance_export_status ON compliance_export_runs(status);"
+            "CREATE INDEX IF NOT EXISTS idx_compliance_export_status ON ops.compliance_export_runs(status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_compliance_export_created ON compliance_export_runs(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_compliance_export_created ON ops.compliance_export_runs(created_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_compliance_export_idem ON compliance_export_runs(idempotency_key);"
+            "CREATE INDEX IF NOT EXISTS idx_compliance_export_idem ON ops.compliance_export_runs(idempotency_key);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS compliance_purge_runs (
+        CREATE TABLE IF NOT EXISTS ops.compliance_purge_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             dry_run INTEGER NOT NULL DEFAULT 0,
             as_of TEXT,
@@ -1201,13 +1201,13 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_status ON compliance_purge_runs(status);"
+            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_status ON ops.compliance_purge_runs(status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_created ON compliance_purge_runs(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_created ON ops.compliance_purge_runs(created_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_idem ON compliance_purge_runs(idempotency_key);"
+            "CREATE INDEX IF NOT EXISTS idx_compliance_purge_idem ON ops.compliance_purge_runs(idempotency_key);"
         )
 
         # Backfill hash-chain previo a activar triggers append-only.
@@ -1284,7 +1284,7 @@ def init_db() -> None:
 
         # --- Importaciones Jira para trazabilidad de migración ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS jira_import_runs (
+        CREATE TABLE IF NOT EXISTS ops.jira_import_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             imported_by TEXT NOT NULL,
             payload_json TEXT NOT NULL DEFAULT '{}',
@@ -1293,12 +1293,12 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_import_runs_created ON jira_import_runs(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_import_runs_created ON ops.jira_import_runs(created_at);"
         )
 
         # --- Paralelo Jira + MONSTRUO ---
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS jira_issue_map (
+        CREATE TABLE IF NOT EXISTS ops.jira_issue_map (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             jira_issue_key TEXT NOT NULL UNIQUE,
             jira_updated_at TEXT NOT NULL,
@@ -1312,20 +1312,20 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_ticket ON jira_issue_map(monstruo_ticket_id);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_ticket ON ops.jira_issue_map(monstruo_ticket_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_status ON jira_issue_map(sync_status);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_status ON ops.jira_issue_map(sync_status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_key_updated ON jira_issue_map(jira_issue_key, jira_updated_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_key_updated ON ops.jira_issue_map(jira_issue_key, jira_updated_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_sync_at ON jira_issue_map(last_sync_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_sync_at ON ops.jira_issue_map(last_sync_at);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS jira_sync_runs (
+        CREATE TABLE IF NOT EXISTS ops.jira_sync_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             run_type TEXT NOT NULL, -- bootstrap | delta
             actor TEXT NOT NULL,
@@ -1341,17 +1341,17 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_type_started ON jira_sync_runs(run_type, started_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_type_started ON ops.jira_sync_runs(run_type, started_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_status ON jira_sync_runs(status);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_status ON ops.jira_sync_runs(status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_created ON jira_sync_runs(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_created ON ops.jira_sync_runs(created_at);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS jira_sync_cursor (
+        CREATE TABLE IF NOT EXISTS ops.jira_sync_cursor (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             cursor_name TEXT NOT NULL UNIQUE,
             cursor_value TEXT NOT NULL DEFAULT '',
@@ -1359,11 +1359,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_sync_cursor_name ON jira_sync_cursor(cursor_name);"
+            "CREATE INDEX IF NOT EXISTS idx_jira_sync_cursor_name ON ops.jira_sync_cursor(cursor_name);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS parallel_kpi_daily (
+        CREATE TABLE IF NOT EXISTS ops.parallel_kpi_daily (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             snapshot_date TEXT NOT NULL UNIQUE,
             source TEXT NOT NULL DEFAULT 'parallel_daily',
@@ -1380,11 +1380,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_parallel_kpi_date ON parallel_kpi_daily(snapshot_date);"
+            "CREATE INDEX IF NOT EXISTS idx_parallel_kpi_date ON ops.parallel_kpi_daily(snapshot_date);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS parallel_decisions (
+        CREATE TABLE IF NOT EXISTS ops.parallel_decisions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             decision TEXT NOT NULL, -- go | no_go
             decided_at TEXT NOT NULL,
@@ -1397,15 +1397,15 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_parallel_decisions_at ON parallel_decisions(decided_at);"
+            "CREATE INDEX IF NOT EXISTS idx_parallel_decisions_at ON ops.parallel_decisions(decided_at);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_parallel_decisions_decision ON parallel_decisions(decision);"
+            "CREATE INDEX IF NOT EXISTS idx_parallel_decisions_decision ON ops.parallel_decisions(decision);"
         )
 
         # Sales ERP (EPIC 05)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS invoices (
+        CREATE TABLE IF NOT EXISTS erp.invoices (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id TEXT NOT NULL,
             type TEXT NOT NULL,         -- FACTURA, BOLETA, NC, ND
@@ -1422,12 +1422,12 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_invoices_cust ON invoices(customer_id);"
+            "CREATE INDEX IF NOT EXISTS idx_invoices_cust ON erp.invoices(customer_id);"
         )
 
         # CRM (EPIC 06)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS customers (
+        CREATE TABLE IF NOT EXISTS erp.customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             rut TEXT UNIQUE NOT NULL,
             name TEXT NOT NULL,
@@ -1443,14 +1443,14 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_customers_ext ON customers(external_id);"
+            "CREATE INDEX IF NOT EXISTS idx_customers_ext ON erp.customers(external_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);"
+            "CREATE INDEX IF NOT EXISTS idx_customers_name ON erp.customers(name);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS crm_interactions (
+        CREATE TABLE IF NOT EXISTS crm.crm_interactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER NOT NULL,
             type TEXT DEFAULT 'nota', -- nota, llamada, correo
@@ -1461,11 +1461,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_crm_interactions_cust ON crm_interactions(customer_id);"
+            "CREATE INDEX IF NOT EXISTS idx_crm_interactions_cust ON crm.crm_interactions(customer_id);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS collection_actions (
+        CREATE TABLE IF NOT EXISTS erp.collection_actions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id TEXT NOT NULL, -- Link to invoices.customer_id (Laudus ID)
             action_type TEXT NOT NULL, -- CALL, EMAIL, WHATSAPP, NOTE
@@ -1477,12 +1477,12 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_coll_actions_cust ON collection_actions(customer_id);"
+            "CREATE INDEX IF NOT EXISTS idx_coll_actions_cust ON erp.collection_actions(customer_id);"
         )
 
         # Bodega (EPIC 09)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS products (
+        CREATE TABLE IF NOT EXISTS bodega.products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sku TEXT UNIQUE NOT NULL,
             name TEXT NOT NULL,
@@ -1498,16 +1498,16 @@ def init_db() -> None:
             updated_at TEXT NOT NULL
         );
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_products_sku ON bodega.products(sku);")
 
         def _migrate_products_section() -> None:
-            conn.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_currency TEXT DEFAULT 'CLP';")
-            conn.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_parity REAL DEFAULT 1.0;")
+            conn.execute("ALTER TABLE bodega.products ADD COLUMN IF NOT EXISTS price_currency TEXT DEFAULT 'CLP';")
+            conn.execute("ALTER TABLE bodega.products ADD COLUMN IF NOT EXISTS price_parity REAL DEFAULT 1.0;")
 
         _run_guarded_pg_section(conn, "migrate_products", _migrate_products_section)
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS invoice_items (
+        CREATE TABLE IF NOT EXISTS erp.invoice_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             invoice_id INTEGER NOT NULL,
             product_sku TEXT NOT NULL,
@@ -1519,11 +1519,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_inv_items_inv ON invoice_items(invoice_id);"
+            "CREATE INDEX IF NOT EXISTS idx_inv_items_inv ON erp.invoice_items(invoice_id);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS inventory_movements (
+        CREATE TABLE IF NOT EXISTS bodega.inventory_movements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             product_id INTEGER NOT NULL,
             quantity INTEGER NOT NULL, -- Positivo (entrada) o Negativo (salida)
@@ -1535,7 +1535,7 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_movements_prod ON inventory_movements(product_id);"
+            "CREATE INDEX IF NOT EXISTS idx_movements_prod ON bodega.inventory_movements(product_id);"
         )
 
         # -----------------------------
@@ -1543,7 +1543,7 @@ def init_db() -> None:
         # -----------------------------
         # Invoices
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS parrotfy_invoices (
+        CREATE TABLE IF NOT EXISTS erp.parrotfy_invoices (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             parrotfy_invoice_id TEXT NOT NULL UNIQUE,
             invoice_number TEXT DEFAULT '',
@@ -1556,15 +1556,15 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pf_inv_number ON parrotfy_invoices(invoice_number);"
+            "CREATE INDEX IF NOT EXISTS idx_pf_inv_number ON erp.parrotfy_invoices(invoice_number);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pf_inv_customer ON parrotfy_invoices(customer_id);"
+            "CREATE INDEX IF NOT EXISTS idx_pf_inv_customer ON erp.parrotfy_invoices(customer_id);"
         )
 
         # Payments
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS parrotfy_payments (
+        CREATE TABLE IF NOT EXISTS erp.parrotfy_payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             parrotfy_payment_id TEXT NOT NULL UNIQUE,
             parrotfy_invoice_id TEXT DEFAULT '',
@@ -1576,15 +1576,15 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pf_pay_invoice ON parrotfy_payments(parrotfy_invoice_id);"
+            "CREATE INDEX IF NOT EXISTS idx_pf_pay_invoice ON erp.parrotfy_payments(parrotfy_invoice_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pf_pay_date ON parrotfy_payments(payment_date);"
+            "CREATE INDEX IF NOT EXISTS idx_pf_pay_date ON erp.parrotfy_payments(payment_date);"
         )
 
         # Inventory
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS parrotfy_inventory (
+        CREATE TABLE IF NOT EXISTS bodega.parrotfy_inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             parrotfy_move_id TEXT NOT NULL UNIQUE,
             product_id TEXT DEFAULT '',
@@ -1596,17 +1596,17 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pf_inv_prod ON parrotfy_inventory(product_id);"
+            "CREATE INDEX IF NOT EXISTS idx_pf_inv_prod ON bodega.parrotfy_inventory(product_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pf_inv_date ON parrotfy_inventory(date);"
+            "CREATE INDEX IF NOT EXISTS idx_pf_inv_date ON bodega.parrotfy_inventory(date);"
         )
 
         # -----------------------------
         # Phase 3: Snapshots & Conciliation
         # -----------------------------
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS parrotfy_stock_snapshot (
+        CREATE TABLE IF NOT EXISTS bodega.parrotfy_stock_snapshot (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             snapshot_id TEXT NOT NULL,
             product_id TEXT,
@@ -1617,11 +1617,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pf_stock_snap ON parrotfy_stock_snapshot(snapshot_id);"
+            "CREATE INDEX IF NOT EXISTS idx_pf_stock_snap ON bodega.parrotfy_stock_snapshot(snapshot_id);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS laudus_stock_snapshot (
+        CREATE TABLE IF NOT EXISTS bodega.laudus_stock_snapshot (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             snapshot_id TEXT NOT NULL,
             product_id TEXT,
@@ -1632,11 +1632,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_lau_stock_snap ON laudus_stock_snapshot(snapshot_id);"
+            "CREATE INDEX IF NOT EXISTS idx_lau_stock_snap ON bodega.laudus_stock_snapshot(snapshot_id);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS conciliacion_bodega_runs (
+        CREATE TABLE IF NOT EXISTS bodega.conciliacion_bodega_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             run_id TEXT NOT NULL UNIQUE,
             status TEXT,
@@ -1649,7 +1649,7 @@ def init_db() -> None:
         """)
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS conciliacion_bodega_diffs (
+        CREATE TABLE IF NOT EXISTS bodega.conciliacion_bodega_diffs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             run_id TEXT NOT NULL,
             sku TEXT,
@@ -1661,11 +1661,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_concil_diff_run ON conciliacion_bodega_diffs(run_id);"
+            "CREATE INDEX IF NOT EXISTS idx_concil_diff_run ON bodega.conciliacion_bodega_diffs(run_id);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ia_eventos (
+        CREATE TABLE IF NOT EXISTS ia.ia_eventos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_type TEXT,
             severity TEXT,
@@ -1679,7 +1679,7 @@ def init_db() -> None:
         # Phase 4 (Hito Cache): Snapshots Headers & Training
         # -----------------------------
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS stock_snapshots (
+        CREATE TABLE IF NOT EXISTS bodega.stock_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             proveedor TEXT NOT NULL,      -- 'parrotfy' | 'laudus'
             creado_ts TEXT NOT NULL,      -- ISO
@@ -1691,14 +1691,14 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_stock_snap_prov ON stock_snapshots(proveedor);"
+            "CREATE INDEX IF NOT EXISTS idx_stock_snap_prov ON bodega.stock_snapshots(proveedor);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_stock_snap_ts ON stock_snapshots(creado_ts);"
+            "CREATE INDEX IF NOT EXISTS idx_stock_snap_ts ON bodega.stock_snapshots(creado_ts);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ia_bodega_casos (
+        CREATE TABLE IF NOT EXISTS ia.ia_bodega_casos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             creado_ts TEXT NOT NULL,
             proveedor_stock TEXT DEFAULT '',
@@ -1712,14 +1712,14 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ia_casos_ts ON ia_bodega_casos(creado_ts);"
+            "CREATE INDEX IF NOT EXISTS idx_ia_casos_ts ON ia.ia_bodega_casos(creado_ts);"
         )
 
         # -----------------------------
         # Bridge & AI
         # -----------------------------
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS bridge_messages (
+        CREATE TABLE IF NOT EXISTS ops.bridge_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             thread_id TEXT DEFAULT 'jarvis',
             from_agent TEXT NOT NULL,
@@ -1736,17 +1736,17 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_bridge_to ON bridge_messages(to_agent);"
+            "CREATE INDEX IF NOT EXISTS idx_bridge_to ON ops.bridge_messages(to_agent);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_bridge_approval ON bridge_messages(approval_status);"
+            "CREATE INDEX IF NOT EXISTS idx_bridge_approval ON ops.bridge_messages(approval_status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_bridge_thread ON bridge_messages(thread_id);"
+            "CREATE INDEX IF NOT EXISTS idx_bridge_thread ON ops.bridge_messages(thread_id);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ai_event_queue (
+        CREATE TABLE IF NOT EXISTS ia.ai_event_queue (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source TEXT NOT NULL,
             kind TEXT NOT NULL,
@@ -1760,7 +1760,7 @@ def init_db() -> None:
         """)
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS ai_recommendations (
+        CREATE TABLE IF NOT EXISTS ia.ai_recommendations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_id INTEGER,
             source TEXT NOT NULL,
@@ -1780,23 +1780,23 @@ def init_db() -> None:
         """)
 
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_event_status ON ai_event_queue(status);"
+            "CREATE INDEX IF NOT EXISTS idx_ai_event_status ON ia.ai_event_queue(status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_event_kind ON ai_event_queue(kind);"
+            "CREATE INDEX IF NOT EXISTS idx_ai_event_kind ON ia.ai_event_queue(kind);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_rec_status ON ai_recommendations(status);"
+            "CREATE INDEX IF NOT EXISTS idx_ai_rec_status ON ia.ai_recommendations(status);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_rec_event ON ai_recommendations(event_id);"
+            "CREATE INDEX IF NOT EXISTS idx_ai_rec_event ON ia.ai_recommendations(event_id);"
         )
 
         # -----------------------------
         # EPIC 07: Bank Reconciliation
         # -----------------------------
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS bank_accounts (
+        CREATE TABLE IF NOT EXISTS erp.bank_accounts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             laudus_account_id INTEGER UNIQUE NOT NULL, -- ID contable en Laudus (ej: 8)
@@ -1808,11 +1808,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_bank_acc_laudus ON bank_accounts(laudus_account_id);"
+            "CREATE INDEX IF NOT EXISTS idx_bank_acc_laudus ON erp.bank_accounts(laudus_account_id);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS bank_statements (
+        CREATE TABLE IF NOT EXISTS erp.bank_statements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             bank_account_id INTEGER NOT NULL,
             filename TEXT NOT NULL,
@@ -1827,11 +1827,11 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_bs_account ON bank_statements(bank_account_id);"
+            "CREATE INDEX IF NOT EXISTS idx_bs_account ON erp.bank_statements(bank_account_id);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS bank_statement_lines (
+        CREATE TABLE IF NOT EXISTS erp.bank_statement_lines (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             statement_id INTEGER NOT NULL,
             date TEXT NOT NULL,          -- Fecha movimiento
@@ -1845,17 +1845,17 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_bsl_statement ON bank_statement_lines(statement_id);"
+            "CREATE INDEX IF NOT EXISTS idx_bsl_statement ON erp.bank_statement_lines(statement_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_bsl_hash ON bank_statement_lines(hash);"
+            "CREATE INDEX IF NOT EXISTS idx_bsl_hash ON erp.bank_statement_lines(hash);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_bsl_date ON bank_statement_lines(date);"
+            "CREATE INDEX IF NOT EXISTS idx_bsl_date ON erp.bank_statement_lines(date);"
         )
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS bank_reconciliations (
+        CREATE TABLE IF NOT EXISTS erp.bank_reconciliations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             statement_line_id INTEGER NOT NULL,
             match_type TEXT NOT NULL,    -- 'payment', 'ledger', 'manual'
@@ -1868,7 +1868,7 @@ def init_db() -> None:
         );
         """)
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_br_line ON bank_reconciliations(statement_line_id);"
+            "CREATE INDEX IF NOT EXISTS idx_br_line ON erp.bank_reconciliations(statement_line_id);"
         )
 
         # -----------------------------
@@ -1877,7 +1877,7 @@ def init_db() -> None:
         def _migrate_cat_billing_section() -> None:
             # Catalogo: multi-categoria (m:n)
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS cat_categorias (
+            CREATE TABLE IF NOT EXISTS cat.cat_categorias (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tipo TEXT NOT NULL,
                 nombre TEXT NOT NULL,
@@ -1889,14 +1889,14 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_categorias_parent ON cat_categorias(parent_id);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_categorias_parent ON cat.cat_categorias(parent_id);"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_categorias_tipo ON cat_categorias(tipo);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_categorias_tipo ON cat.cat_categorias(tipo);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS cat_items (
+            CREATE TABLE IF NOT EXISTS cat.cat_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT NOT NULL,
                 categoria_id INTEGER,
@@ -1913,14 +1913,14 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_items_categoria ON cat_items(categoria_id);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_items_categoria ON cat.cat_items(categoria_id);"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_items_sku ON cat_items(sku_canonico);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_items_sku ON cat.cat_items(sku_canonico);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS cat_match_queue (
+            CREATE TABLE IF NOT EXISTS cat.cat_match_queue (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               fuente TEXT NOT NULL,
               fuente_item_id TEXT NOT NULL,
@@ -1937,14 +1937,14 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_mq_score ON cat_match_queue(score);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_mq_score ON cat.cat_match_queue(score);"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_mq_estado ON cat_match_queue(estado);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_mq_estado ON cat.cat_match_queue(estado);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS cat_fuente_map (
+            CREATE TABLE IF NOT EXISTS cat.cat_fuente_map (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               fuente TEXT NOT NULL,
               fuente_item_id TEXT NOT NULL,
@@ -1960,11 +1960,11 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_fuente_map_fuente ON cat_fuente_map(fuente);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_fuente_map_fuente ON cat.cat_fuente_map(fuente);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS cat_item_categories (
+            CREATE TABLE IF NOT EXISTS cat.cat_item_categories (
                 item_id INTEGER NOT NULL,
                 categoria_id INTEGER NOT NULL,
                 created_at TEXT DEFAULT '',
@@ -1974,14 +1974,14 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_item_categories_item ON cat_item_categories(item_id);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_item_categories_item ON cat.cat_item_categories(item_id);"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_cat_item_categories_cat ON cat_item_categories(categoria_id);"
+                "CREATE INDEX IF NOT EXISTS idx_cat_item_categories_cat ON cat.cat_item_categories(categoria_id);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS billing_rules (
+            CREATE TABLE IF NOT EXISTS erp.billing_rules (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 customer_id TEXT NOT NULL,
                 description TEXT DEFAULT '',
@@ -2000,17 +2000,17 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_billing_rules_cust ON billing_rules(customer_id);"
+                "CREATE INDEX IF NOT EXISTS idx_billing_rules_cust ON erp.billing_rules(customer_id);"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_billing_rules_next ON billing_rules(next_billing_date);"
+                "CREATE INDEX IF NOT EXISTS idx_billing_rules_next ON erp.billing_rules(next_billing_date);"
             )
 
             # -----------------------------
             # EPIC 22: Templates / Billing Profiles / Dispatch Tracking
             # -----------------------------
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS invoice_templates (
+            CREATE TABLE IF NOT EXISTS erp.invoice_templates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 customer_id TEXT, -- Laudus customerId (optional, NULL = global)
@@ -2022,17 +2022,17 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_invoice_templates_customer ON invoice_templates(customer_id);"
+                "CREATE INDEX IF NOT EXISTS idx_invoice_templates_customer ON erp.invoice_templates(customer_id);"
             )
             # Backfill columns if DB existed before
-            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'CLP';")
-            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 1;")
-            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS created_by TEXT DEFAULT '';")
-            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';")
-            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE erp.invoice_templates ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'CLP';")
+            conn.execute("ALTER TABLE erp.invoice_templates ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 1;")
+            conn.execute("ALTER TABLE erp.invoice_templates ADD COLUMN IF NOT EXISTS created_by TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE erp.invoice_templates ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE erp.invoice_templates ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT '';")
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS invoice_template_items (
+            CREATE TABLE IF NOT EXISTS erp.invoice_template_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 template_id INTEGER NOT NULL,
                 sku TEXT NOT NULL,
@@ -2045,14 +2045,14 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_template_items_template ON invoice_template_items(template_id);"
+                "CREATE INDEX IF NOT EXISTS idx_template_items_template ON erp.invoice_template_items(template_id);"
             )
             # Backfill columns if DB existed before
-            conn.execute("ALTER TABLE invoice_template_items ADD COLUMN IF NOT EXISTS sku TEXT;")
-            conn.execute("ALTER TABLE invoice_template_items ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE erp.invoice_template_items ADD COLUMN IF NOT EXISTS sku TEXT;")
+            conn.execute("ALTER TABLE erp.invoice_template_items ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';")
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS billing_profiles (
+            CREATE TABLE IF NOT EXISTS erp.billing_profiles (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 customer_id TEXT NOT NULL,          -- Laudus customerId
                 name TEXT NOT NULL,                 -- Ej: 'Soporte TI - Proyecto X'
@@ -2078,14 +2078,14 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_billing_profiles_customer ON billing_profiles(customer_id);"
+                "CREATE INDEX IF NOT EXISTS idx_billing_profiles_customer ON erp.billing_profiles(customer_id);"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_billing_profiles_next ON billing_profiles(next_billing_date);"
+                "CREATE INDEX IF NOT EXISTS idx_billing_profiles_next ON erp.billing_profiles(next_billing_date);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS customer_contacts (
+            CREATE TABLE IF NOT EXISTS crm.customer_contacts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 customer_id TEXT NOT NULL,              -- Laudus customerId
                 external_contact_id TEXT,               -- Laudus contactId (optional)
@@ -2103,11 +2103,11 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_customer_contacts_customer ON customer_contacts(customer_id);"
+                "CREATE INDEX IF NOT EXISTS idx_customer_contacts_customer ON crm.customer_contacts(customer_id);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS billing_profile_recipients (
+            CREATE TABLE IF NOT EXISTS erp.billing_profile_recipients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 profile_id INTEGER NOT NULL,
                 contact_id INTEGER NOT NULL,
@@ -2119,11 +2119,11 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_profile_recipients_profile ON billing_profile_recipients(profile_id);"
+                "CREATE INDEX IF NOT EXISTS idx_profile_recipients_profile ON erp.billing_profile_recipients(profile_id);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS invoice_dispatches (
+            CREATE TABLE IF NOT EXISTS erp.invoice_dispatches (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 invoice_id INTEGER NOT NULL,
                 profile_id INTEGER,
@@ -2143,11 +2143,11 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_invoice_dispatches_invoice ON invoice_dispatches(invoice_id);"
+                "CREATE INDEX IF NOT EXISTS idx_invoice_dispatches_invoice ON erp.invoice_dispatches(invoice_id);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS invoice_events (
+            CREATE TABLE IF NOT EXISTS erp.invoice_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 invoice_id INTEGER NOT NULL,
                 event_type TEXT NOT NULL,
@@ -2158,18 +2158,18 @@ def init_db() -> None:
             );
             """)
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_invoice_events_invoice ON invoice_events(invoice_id);"
+                "CREATE INDEX IF NOT EXISTS idx_invoice_events_invoice ON erp.invoice_events(invoice_id);"
             )
 
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS uf_rates (
+            CREATE TABLE IF NOT EXISTS erp.uf_rates (
                 uf_date TEXT PRIMARY KEY, -- YYYY-MM-DD
                 uf_value REAL NOT NULL,
                 source TEXT DEFAULT 'mindicador',
                 fetched_at TEXT NOT NULL
             );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_uf_rates_date ON uf_rates(uf_date);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_uf_rates_date ON erp.uf_rates(uf_date);")
 
         _run_guarded_pg_section(conn, "migrate_cat_billing", _migrate_cat_billing_section)
 
@@ -2178,7 +2178,7 @@ def init_db() -> None:
         # -----------------------------
         def _migrate_fundacion_section() -> None:
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS fundacion_tareas (
+            CREATE TABLE IF NOT EXISTS fundacion.fundacion_tareas (
                 id SERIAL PRIMARY KEY,
                 titulo TEXT NOT NULL,
                 descripcion TEXT,
@@ -2196,12 +2196,12 @@ def init_db() -> None:
             );
             """)
             # Migraciones incrementales para tablas existentes
-            conn.execute("ALTER TABLE fundacion_tareas ADD COLUMN IF NOT EXISTS reporte TEXT;")
-            conn.execute("ALTER TABLE fundacion_tareas ADD COLUMN IF NOT EXISTS imprevistos TEXT;")
-            conn.execute("ALTER TABLE fundacion_tareas ADD COLUMN IF NOT EXISTS reportado_at TIMESTAMP;")
+            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS reporte TEXT;")
+            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS imprevistos TEXT;")
+            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS reportado_at TIMESTAMP;")
             
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_asignado ON fundacion_tareas(asignado_a);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_fecha ON fundacion_tareas(fecha_inicio);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_asignado ON fundacion.fundacion_tareas(asignado_a);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_fecha ON fundacion.fundacion_tareas(fecha_inicio);")
 
         _run_guarded_pg_section(conn, "migrate_fundacion", _migrate_fundacion_section)
 
