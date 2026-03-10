@@ -455,6 +455,12 @@
             color: #ffd8d8;
         }
 
+        .cfg-scope-pill.scope-mod-fundacion {
+            background: rgba(79, 172, 254, 0.16);
+            border-color: rgba(79, 172, 254, 0.38);
+            color: #d1ecff;
+        }
+
         .cfg-scope-pill.scope-mod-default {
             background: rgba(255, 255, 255, 0.1);
             border-color: rgba(255, 255, 255, 0.24);
@@ -809,15 +815,7 @@
         <nav id="dynamic-sidebar" class="side-nav">
         </nav>
         <div class="header-actions">
-            <span id="who" class="pill cfg-who-pill">Usuario</span>
-            <div class="footer-buttons-container">
-                <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
-                    <i class="fas fa-key"></i> <span>Cuenta</span>
-                </button>
-                <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
-                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
-                </button>
-            </div>
+            <!-- Sidebar footer will be injected here by sidebar.js -->
         </div>
     </header>
 
@@ -1097,25 +1095,11 @@
                     <input type="email" id="inpUsername" class="cfg-input input-dark" required>
                 </div>
                 <div class="cfg-form-row">
-                    <label class="cfg-label">Rol</label>
-                    <select id="selRole" class="cfg-input input-dark" required>
-                        <option value="admin">Admin</option>
-                        <option value="encargado_mesa">Encargado Mesa Ayuda</option>
-                        <option value="redes">Redes</option>
-                        <option value="sistemas">Sistemas</option>
-                        <option value="implementaciones">Implementaciones</option>
-                        <option value="gerencia">Gerencia</option>
-                        <option value="ops">Operaciones</option>
-                        <option value="finance">Finanzas</option>
-                        <option value="warehouse">Bodega</option>
-                    </select>
-                </div>
-                <div class="cfg-form-row">
-                    <label class="cfg-label">Roles adicionales (multi-rol)</label>
-                    <div id="containerSecondaryRoles" class="cfg-scroll-grid">
+                    <label class="cfg-label">Roles del Usuario</label>
+                    <div id="containerSecondaryRoles" class="cfg-scroll-grid" style="max-height: 200px;">
                     </div>
                     <div class="cfg-form-help">
-                        El rol principal define el acceso base. Los adicionales suman permisos.
+                        Puedes seleccionar uno o varios roles. Los permisos se sumarán automáticamente.
                     </div>
                 </div>
                 <div class="cfg-form-row">

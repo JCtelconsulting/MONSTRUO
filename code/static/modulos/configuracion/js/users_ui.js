@@ -19,7 +19,9 @@ const UsersUI = (() => {
         { id: 'gerencia', label: 'Gerencia' },
         { id: 'ops', label: 'Operaciones' },
         { id: 'finance', label: 'Finanzas' },
-        { id: 'warehouse', label: 'Bodega' }
+        { id: 'warehouse', label: 'Bodega' },
+        { id: 'monitora', label: 'Monitora Fundación' },
+        { id: 'ejecutiva', label: 'Ejecutiva Fundación' }
     ];
 
     const ROLE_SCOPE_FALLBACK = {
@@ -108,6 +110,22 @@ const UsersUI = (() => {
                 'Auditoria: lectura',
                 'Reportes: lectura'
             ]
+        },
+        monitora: {
+            description: 'Planificación global y gestión de todas las tareas de la Fundación.',
+            permissions: [
+                'Dashboard: lectura',
+                'Fundacion: lectura',
+                'Fundacion: escritura',
+                'Auditoria: lectura'
+            ]
+        },
+        ejecutiva: {
+            description: 'Acceso a la planificación propia y reporte de actividades.',
+            permissions: [
+                'Dashboard: lectura',
+                'Fundacion: lectura'
+            ]
         }
     };
 
@@ -120,6 +138,7 @@ const UsersUI = (() => {
         { id: 'bodega', label: 'Bodega' },
         { id: 'ia', label: 'IA (Ultron)' },
         { id: 'zabbix', label: 'Zabbix' },
+        { id: 'fundacion', label: 'Fundación' },
         { id: 'config', label: 'Configuracion' }
     ];
 
@@ -142,6 +161,7 @@ const UsersUI = (() => {
         finanzas: 80,
         auditoria: 90,
         reportes: 100,
+        fundacion: 105,
         configuracion_administrativa: 110,
     });
 
@@ -171,6 +191,7 @@ const UsersUI = (() => {
         'finanzas',
         'auditoria',
         'reportes',
+        'fundacion',
         'configuracion_administrativa',
         'acceso_total_del_sistema',
     ]);
@@ -252,6 +273,8 @@ const UsersUI = (() => {
             'pmo:read': 'PMO: lectura',
             'pmo:write': 'PMO: edicion',
             'reports:read': 'Reportes: lectura',
+            'fundacion:read': 'Fundacion: lectura',
+            'fundacion:write': 'Fundacion: escritura',
             'finanzas:read': 'Finanzas: lectura'
         };
         if (map[normalized]) return map[normalized];
@@ -526,8 +549,8 @@ const UsersUI = (() => {
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 ${username !== PROTECTED_USER
-                                    ? `<button class="btn-icon-sm btn-icon-danger" data-action="delete" data-username="${encodedUsername}" title="Eliminar usuario"><i class="fas fa-trash"></i></button>`
-                                    : ''}
+                        ? `<button class="btn-icon-sm btn-icon-danger" data-action="delete" data-username="${encodedUsername}" title="Eliminar usuario"><i class="fas fa-trash"></i></button>`
+                        : ''}
                             </div>
                         </td>
                     </tr>
@@ -580,7 +603,6 @@ const UsersUI = (() => {
         const userInput = document.getElementById('inpUsername');
         const container = document.getElementById('containerModules');
         const secondaryContainer = document.getElementById('containerSecondaryRoles');
-        const roleSelect = document.getElementById('selRole');
 
         form.reset();
         container.innerHTML = '';
@@ -595,12 +617,13 @@ const UsersUI = (() => {
             title.textContent = 'Editar Usuario';
             userInput.value = user.username;
             userInput.disabled = true;
-            roleSelect.value = user.role;
             document.getElementById('chkActive').checked = user.is_active;
             document.getElementById('inpPassword').placeholder = '(Dejar en blanco para no cambiar)';
             form.dataset.mode = 'edit';
             userModules = user.allowed_modules || [];
-            _secondaryRolesDraft = Array.isArray(user.secondary_roles) ? [...user.secondary_roles] : [];
+
+            // Combinar rol primario y secundarios en el draft
+            _secondaryRolesDraft = normalizeRoleList(user.role, user.secondary_roles);
         } else {
             title.textContent = 'Nuevo Usuario';
             userInput.value = '';
@@ -612,6 +635,7 @@ const UsersUI = (() => {
             _secondaryRolesDraft = [];
         }
 
+        // Renderizar Módulos
         MODULES.forEach((mod) => {
             const checked = userModules.includes(mod.id);
             const div = document.createElement('div');
@@ -656,42 +680,29 @@ const UsersUI = (() => {
         });
 
         const renderSecondaryRoleChecks = () => {
-            const primary = normalizeKey(roleSelect.value);
             secondaryContainer.innerHTML = '';
 
-            ROLE_OPTIONS
-                .filter((item) => item.id !== primary)
-                .forEach((item) => {
-                    const roleId = item.id;
-                    const selected = _secondaryRolesDraft.includes(roleId);
-                    const button = document.createElement('button');
-                    button.type = 'button';
-                    button.className = `role-square-btn ${selected ? 'is-selected' : ''}`;
-                    button.dataset.role = roleId;
-                    button.innerHTML = `
+            ROLE_OPTIONS.forEach((item) => {
+                const roleId = item.id;
+                const selected = _secondaryRolesDraft.includes(roleId);
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = `role-square-btn ${selected ? 'is-selected' : ''}`;
+                button.dataset.role = roleId;
+                button.innerHTML = `
                         <span class="role-square-label">${item.label}</span>
                         <span class="role-square-mark">${selected ? '✓' : ''}</span>
                     `;
-                    button.addEventListener('click', () => {
-                        if (_secondaryRolesDraft.includes(roleId)) {
-                            _secondaryRolesDraft = _secondaryRolesDraft.filter((r) => r !== roleId);
-                        } else {
-                            _secondaryRolesDraft.push(roleId);
-                        }
-                        renderSecondaryRoleChecks();
-                    });
-                    secondaryContainer.appendChild(button);
-                });
-        };
-
-        roleSelect.onchange = () => {
-            const primary = normalizeKey(roleSelect.value);
-            _secondaryRolesDraft = _secondaryRolesDraft
-                .map((r) => normalizeKey(r))
-                .filter(Boolean)
-                .filter((value, idx, arr) => arr.indexOf(value) === idx)
-                .filter((r) => r !== primary);
-            renderSecondaryRoleChecks();
+                button.onclick = () => {
+                    if (_secondaryRolesDraft.includes(roleId)) {
+                        _secondaryRolesDraft = _secondaryRolesDraft.filter((r) => r !== roleId);
+                    } else {
+                        _secondaryRolesDraft.push(roleId);
+                    }
+                    renderSecondaryRoleChecks();
+                };
+                secondaryContainer.appendChild(button);
+            });
         };
 
         renderSecondaryRoleChecks();
@@ -716,7 +727,6 @@ const UsersUI = (() => {
         const mode = form.dataset.mode;
 
         const username = String(document.getElementById('inpUsername').value || '').trim();
-        const role = normalizeKey(document.getElementById('selRole').value);
         const password = String(document.getElementById('inpPassword').value || '');
         const isActive = Boolean(document.getElementById('chkActive').checked);
 
@@ -726,14 +736,18 @@ const UsersUI = (() => {
             if (check.checked) allowedModules.push(check.value);
         });
 
-        const secondaryRoles = _secondaryRolesDraft
-            .map((r) => normalizeKey(r))
-            .filter(Boolean)
-            .filter((value, idx, arr) => arr.indexOf(value) === idx)
-            .filter((r) => r !== role);
+        // Mapear roles: el primero es 'role', el resto son 'secondary_roles'
+        const allRoles = [..._secondaryRolesDraft];
+        if (allRoles.length === 0) {
+            alert('Debe seleccionar al menos un rol.');
+            return;
+        }
 
-        if (!username || !role) {
-            alert('Campos obligatorios faltantes');
+        const role = allRoles[0];
+        const secondaryRoles = allRoles.slice(1);
+
+        if (!username) {
+            alert('El nombre de usuario es obligatorio');
             return;
         }
 

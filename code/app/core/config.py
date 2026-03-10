@@ -118,6 +118,23 @@ class Settings(BaseSettings):
             "audit:read",
             "reports:read"
         ],
+        # Fundación
+        "monitora": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+            "audit:read"
+        ],
+        "ejecutiva": [
+            "dashboard:read",
+            "fundacion:read"
+        ],
+        "fundacion": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+            "audit:read"
+        ],
     }
 
     class Config:

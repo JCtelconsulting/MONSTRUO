@@ -338,8 +338,7 @@ def init_db() -> None:
         );
         """)
         
-        # MIGRATION: Ensure allowed_modules, secondary_roles and phone_number exist (for existing DBs)
-        try:
+        def _migrate_users_section() -> None:
             if is_postgres():
                 conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_modules TEXT DEFAULT '[]'")
                 conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS secondary_roles TEXT DEFAULT '[]'")
@@ -358,8 +357,8 @@ def init_db() -> None:
                     conn.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
                 except Exception:
                     pass
-        except Exception as e:
-            print(f"Warning migrating users columns: {e}")
+
+        _run_guarded_pg_section(conn, "migrate_users", _migrate_users_section)
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);")
 
@@ -374,16 +373,15 @@ def init_db() -> None:
         );
         """)
 
-        # MIGRATION: Ensure system_settings columns exist
-        for col_name, col_def in [
-            ("group_name", "TEXT DEFAULT 'general'"),
-            ("is_sensitive", "BOOLEAN DEFAULT FALSE"),
-            ("updated_at", "TEXT"),
-        ]:
-            try:
+        def _migrate_system_settings_section() -> None:
+            for col_name, col_def in [
+                ("group_name", "TEXT DEFAULT 'general'"),
+                ("is_sensitive", "BOOLEAN DEFAULT FALSE"),
+                ("updated_at", "TEXT"),
+            ]:
                 conn.execute(f"ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS {col_name} {col_def}")
-            except Exception as _e:
-                print(f"[DB-MIGRATION] INFO col {col_name} might already exist or error: {_e}")
+
+        _run_guarded_pg_section(conn, "migrate_system_settings", _migrate_system_settings_section)
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
@@ -417,21 +415,24 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs(timestamp);"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor);")
-        conn.execute(
-            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'info'"
-        )
-        conn.execute(
-            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_prev_hash TEXT DEFAULT ''"
-        )
-        conn.execute(
-            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_hash TEXT DEFAULT ''"
-        )
-        conn.execute(
-            f"ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_algo TEXT DEFAULT '{CHAIN_ALGO}'"
-        )
-        conn.execute(
-            f"ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_version INTEGER DEFAULT {CHAIN_VERSION}"
-        )
+        def _migrate_audit_logs_section() -> None:
+            conn.execute(
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS severity TEXT DEFAULT 'info'"
+            )
+            conn.execute(
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_prev_hash TEXT DEFAULT ''"
+            )
+            conn.execute(
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_hash TEXT DEFAULT ''"
+            )
+            conn.execute(
+                f"ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_algo TEXT DEFAULT '{CHAIN_ALGO}'"
+            )
+            conn.execute(
+                f"ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_version INTEGER DEFAULT {CHAIN_VERSION}"
+            )
+
+        _run_guarded_pg_section(conn, "migrate_audit_logs", _migrate_audit_logs_section)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_chain_hash ON audit_logs(chain_hash);")
 
         # Jobs Engine (EPIC 04)
@@ -570,10 +571,10 @@ def init_db() -> None:
         )
 
         # Migración is_internal
-        try:
-            conn.execute("ALTER TABLE ticket_comments ADD COLUMN is_internal INTEGER DEFAULT 0")
-        except Exception:
-            pass
+        def _migrate_ticket_comments_section() -> None:
+            conn.execute("ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS is_internal INTEGER DEFAULT 0")
+
+        _run_guarded_pg_section(conn, "migrate_ticket_comments", _migrate_ticket_comments_section)
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS ticket_attachments (
@@ -591,15 +592,15 @@ def init_db() -> None:
         )
 
         # --- Ticketera: metadata adicional de adjuntos ---
-        for col_name, col_def in [
-            ("size_bytes", "INTEGER"),
-            ("content_type", "TEXT"),
-            ("sha256", "TEXT"),
-        ]:
-            try:
+        def _migrate_ticket_attachments_section() -> None:
+            for col_name, col_def in [
+                ("size_bytes", "INTEGER"),
+                ("content_type", "TEXT"),
+                ("sha256", "TEXT"),
+            ]:
                 conn.execute(f"ALTER TABLE ticket_attachments ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
-            except Exception as _e:
-                print(f"[DB-MIGRATION] WARN columna ticket_attachments.{col_name}: {_e}")
+
+        _run_guarded_pg_section(conn, "migrate_ticket_attachments", _migrate_ticket_attachments_section)
         try:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_attach_sha256 ON ticket_attachments(sha256);")
         except Exception as _e:
@@ -631,17 +632,20 @@ def init_db() -> None:
             ("customer_id", "TEXT", False),       # Link a Laudus/CRM
             ("contact_role", "TEXT", False),      # Gerente, Tecnico, etc.
         ]
-        for col_name, col_def, is_critical in _v3_columns:
-            try:
-                conn.execute(f"ALTER TABLE tickets ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
-            except Exception as _e:
-                if is_critical:
-                    # FAIL-FAST: Si es columna crítica para V3, no permitir arranque a medias
-                    err_msg = f"[DB-MIGRATION] CRITICAL ERROR: No se pudo crear columna '{col_name}' necesaria para V3. Detalle: {_e}"
-                    print(err_msg)
-                    raise RuntimeError(err_msg) from _e
-                else:
-                    print(f"[DB-MIGRATION] WARN columna '{col_name}' ya existe o no se pudo crear: {_e}")
+        def _migrate_tickets_v3_section() -> None:
+            for col_name, col_def, is_critical in _v3_columns:
+                try:
+                    conn.execute(f"ALTER TABLE tickets ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
+                except Exception as _e:
+                    if is_critical:
+                        # FAIL-FAST: Si es columna crítica para V3, no permitir arranque a medias
+                        err_msg = f"[DB-MIGRATION] CRITICAL ERROR: No se pudo crear columna '{col_name}' necesaria para V3. Detalle: {_e}"
+                        print(err_msg)
+                        raise RuntimeError(err_msg) from _e
+                    else:
+                        print(f"[DB-MIGRATION] WARN columna '{col_name}' ya existe o no se pudo crear: {_e}")
+
+        _run_guarded_pg_section(conn, "migrate_tickets_v3", _migrate_tickets_v3_section)
 
         # Validar existencia de columnas críticas (Safety Check final)
         # Esto cubre el caso donde "ADD COLUMN IF NOT EXISTS" no falla pero la columna igual no está accesible por alguna razón rara
@@ -799,20 +803,20 @@ def init_db() -> None:
             FOREIGN KEY(ticket_id) REFERENCES tickets(id)
         );
         """)
-        for col_name, col_def in [
-            ("provider", "TEXT DEFAULT ''"),
-            ("provider_ref", "TEXT DEFAULT ''"),
-            ("last_error", "TEXT DEFAULT ''"),
-            ("attempt_count", "INTEGER DEFAULT 0"),
-            ("max_attempts", "INTEGER DEFAULT 3"),
-            ("next_retry_at", "TEXT"),
-            ("locked_at", "TEXT"),
-            ("updated_at", "TEXT"),
-        ]:
-            try:
+        def _migrate_ticket_notifications_section() -> None:
+            for col_name, col_def in [
+                ("provider", "TEXT DEFAULT ''"),
+                ("provider_ref", "TEXT DEFAULT ''"),
+                ("last_error", "TEXT DEFAULT ''"),
+                ("attempt_count", "INTEGER DEFAULT 0"),
+                ("max_attempts", "INTEGER DEFAULT 3"),
+                ("next_retry_at", "TEXT"),
+                ("locked_at", "TEXT"),
+                ("updated_at", "TEXT"),
+            ]:
                 conn.execute(f"ALTER TABLE ticket_notifications ADD COLUMN IF NOT EXISTS {col_name} {col_def};")
-            except Exception as _e:
-                print(f"[DB-MIGRATION] WARN columna ticket_notifications.{col_name}: {_e}")
+
+        _run_guarded_pg_section(conn, "migrate_ticket_notifications", _migrate_ticket_notifications_section)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_tk_notif_ticket ON ticket_notifications(ticket_id);"
         )
@@ -943,19 +947,13 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_tk_emails_ticket ON ticket_emails(ticket_id);"
         )
-        try:
+        def _migrate_ticket_emails_section() -> None:
             conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS idempotency_key TEXT;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_tk_emails_idempotency ON ticket_emails(idempotency_key);")
-        except Exception as _e:
-            print(f"[DB-MIGRATION] WARN ticket_emails.idempotency_key: {_e}")
-        try:
             conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS cc_addrs TEXT DEFAULT '';")
-        except Exception as _e:
-            print(f"[DB-MIGRATION] WARN ticket_emails.cc_addrs: {_e}")
-        try:
             conn.execute("ALTER TABLE ticket_emails ADD COLUMN IF NOT EXISTS bcc_addrs TEXT DEFAULT '';")
-        except Exception as _e:
-            print(f"[DB-MIGRATION] WARN ticket_emails.bcc_addrs: {_e}")
+
+        _run_guarded_pg_section(conn, "migrate_ticket_emails", _migrate_ticket_emails_section)
 
         # --- Ticketera V3: Borradores de respuesta por correo ---
         conn.execute("""
@@ -997,14 +995,11 @@ def init_db() -> None:
                ON ticket_email_drafts(ticket_id)
                WHERE status = 'active'"""
         )
-        try:
+        def _migrate_ticket_email_drafts_section() -> None:
             conn.execute("ALTER TABLE ticket_email_drafts ADD COLUMN IF NOT EXISTS cc_addrs TEXT DEFAULT '';")
-        except Exception as _e:
-            print(f"[DB-MIGRATION] WARN ticket_email_drafts.cc_addrs: {_e}")
-        try:
             conn.execute("ALTER TABLE ticket_email_drafts ADD COLUMN IF NOT EXISTS bcc_addrs TEXT DEFAULT '';")
-        except Exception as _e:
-            print(f"[DB-MIGRATION] WARN ticket_email_drafts.bcc_addrs: {_e}")
+
+        _run_guarded_pg_section(conn, "migrate_ticket_email_drafts", _migrate_ticket_email_drafts_section)
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS ticket_email_draft_attachments (
@@ -1501,12 +1496,11 @@ def init_db() -> None:
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);")
 
-        # Backfill columns if DB existed before (PostgreSQL)
-        try:
+        def _migrate_products_section() -> None:
             conn.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_currency TEXT DEFAULT 'CLP';")
             conn.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_parity REAL DEFAULT 1.0;")
-        except Exception:
-            pass
+
+        _run_guarded_pg_section(conn, "migrate_products", _migrate_products_section)
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS invoice_items (
@@ -1873,8 +1867,11 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_br_line ON bank_reconciliations(statement_line_id);"
         )
 
-        # Catalogo: multi-categoria (m:n)
-        try:
+        # -----------------------------
+        # EPIC 21: Automatic Billing (Rules)
+        # -----------------------------
+        def _migrate_cat_billing_section() -> None:
+            # Catalogo: multi-categoria (m:n)
             conn.execute("""
             CREATE TABLE IF NOT EXISTS cat_categorias (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1979,9 +1976,6 @@ def init_db() -> None:
                 "CREATE INDEX IF NOT EXISTS idx_cat_item_categories_cat ON cat_item_categories(categoria_id);"
             )
 
-            # -----------------------------
-            # EPIC 21: Automatic Billing (Rules)
-            # -----------------------------
             conn.execute("""
             CREATE TABLE IF NOT EXISTS billing_rules (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2026,15 +2020,12 @@ def init_db() -> None:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_invoice_templates_customer ON invoice_templates(customer_id);"
             )
-            # Backfill columns if DB existed before (PostgreSQL)
-            try:
-                conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'CLP';")
-                conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 1;")
-                conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS created_by TEXT DEFAULT '';")
-                conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';")
-                conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT '';")
-            except Exception:
-                pass
+            # Backfill columns if DB existed before
+            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'CLP';")
+            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS is_active INTEGER NOT NULL DEFAULT 1;")
+            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS created_by TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';")
+            conn.execute("ALTER TABLE invoice_templates ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT '';")
 
             conn.execute("""
             CREATE TABLE IF NOT EXISTS invoice_template_items (
@@ -2052,12 +2043,9 @@ def init_db() -> None:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_template_items_template ON invoice_template_items(template_id);"
             )
-            # Backfill columns if DB existed before (PostgreSQL)
-            try:
-                conn.execute("ALTER TABLE invoice_template_items ADD COLUMN IF NOT EXISTS sku TEXT;")
-                conn.execute("ALTER TABLE invoice_template_items ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';")
-            except Exception:
-                pass
+            # Backfill columns if DB existed before
+            conn.execute("ALTER TABLE invoice_template_items ADD COLUMN IF NOT EXISTS sku TEXT;")
+            conn.execute("ALTER TABLE invoice_template_items ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT '';")
 
             conn.execute("""
             CREATE TABLE IF NOT EXISTS billing_profiles (
@@ -2179,9 +2167,39 @@ def init_db() -> None:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_uf_rates_date ON uf_rates(uf_date);")
 
-        except Exception as e:
-            print(f"Error in init_db (cat/billing): {e}")
-            pass
+        _run_guarded_pg_section(conn, "migrate_cat_billing", _migrate_cat_billing_section)
+
+        # -----------------------------
+        # EPIC: Fundación (Planificación)
+        # -----------------------------
+        def _migrate_fundacion_section() -> None:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS fundacion_tareas (
+                id SERIAL PRIMARY KEY,
+                titulo TEXT NOT NULL,
+                descripcion TEXT,
+                fecha_inicio TIMESTAMP NOT NULL,
+                fecha_fin TIMESTAMP,
+                asignado_a TEXT, -- username del ejecutivo
+                creado_by TEXT,
+                estado TEXT DEFAULT 'pendiente', -- pendiente, en_progreso, completado, cancelado
+                color TEXT DEFAULT '#4facfe', -- Para visualización en calendario
+                reporte TEXT, -- Feedback de la monitora
+                imprevistos TEXT, -- Problemas surgidos
+                reportado_at TIMESTAMP, -- Momento del reporte
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Migraciones incrementales para tablas existentes
+            conn.execute("ALTER TABLE fundacion_tareas ADD COLUMN IF NOT EXISTS reporte TEXT;")
+            conn.execute("ALTER TABLE fundacion_tareas ADD COLUMN IF NOT EXISTS imprevistos TEXT;")
+            conn.execute("ALTER TABLE fundacion_tareas ADD COLUMN IF NOT EXISTS reportado_at TIMESTAMP;")
+            
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_asignado ON fundacion_tareas(asignado_a);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_fecha ON fundacion_tareas(fecha_inicio);")
+
+        _run_guarded_pg_section(conn, "migrate_fundacion", _migrate_fundacion_section)
 
         conn.commit()
     finally:

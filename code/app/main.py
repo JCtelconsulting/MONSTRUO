@@ -48,6 +48,7 @@ from app.api.routers import crm as rutas_crm
 from app.api.routers import ops as rutas_ops
 from app.api.routers import pmo as rutas_pmo
 from app.api.routers import templates as rutas_templates
+from app.api.routers.fundacion import fundacion_router as rutas_fundacion
 
 # --- CONFIGURACION DE PUERTO (9000 por defecto) ---
 PORT = int(os.environ.get("PORT", 9000))
@@ -73,6 +74,7 @@ SUBDOMAIN_MAP = {
     "ia": "/modulos/ultron/ultron.html",
     "zabbix": "/modulos/zabbix/zabbix.html",
     "config": "/modulos/configuracion/configuracion.html",
+    "fundacion": "/modulos/fundacion/fundacion.html",
 }
 
 # --- STATIC FILES ---
@@ -326,6 +328,7 @@ app.include_router(rutas_crm.router)
 app.include_router(rutas_ops.router)
 app.include_router(rutas_pmo.router)
 app.include_router(rutas_templates.router)
+app.include_router(rutas_fundacion.router)
 
 # Optional Routers
 try:
@@ -811,6 +814,22 @@ def dashboard_root(
         return RedirectResponse(login_url, status_code=302)
 
     return _serve_module_html("/modulos/dashboard/dashboard.html")
+
+
+@app.get("/fundacion")
+def fundacion_root(
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
+    access_token: Optional[str] = Cookie(default=None),
+):
+    try:
+        auth_deps.require_permission("fundacion:read")(authorization, access_token)
+    except Exception:
+        prefix = request.headers.get("x-forwarded-prefix", "/prod")
+        login_url = f"https://login.telconsulting.cl{prefix}/"
+        return RedirectResponse(login_url, status_code=302)
+
+    return _serve_module_html("/modulos/fundacion/fundacion.html")
 
 
 @app.get("/")

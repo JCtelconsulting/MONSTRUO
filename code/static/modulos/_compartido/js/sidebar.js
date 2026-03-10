@@ -70,10 +70,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         displayName = displayName.replace(/\b\w/g, l => l.toUpperCase()); // Capitalize
                     }
 
-                    whoEl.textContent = `${displayName} (${userRole})`;
+                    whoEl.innerHTML = `
+                        <div style="font-size: 0.85rem; font-weight: 700;">${displayName}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.7; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px;">${userRole}</div>
+                    `;
                     whoEl.style.opacity = '1';
-                    whoEl.style.fontWeight = '600';
-                    whoEl.title = userName; // Tooltip con email original
+                    whoEl.title = userName;
                 }
             }
         } catch (e) {
@@ -94,7 +96,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 'gerencia': ['dashboard', 'tks', 'pmo', 'erp', 'crm', 'ia', 'zabbix', 'fundacion'],
                 'ops': ['dashboard', 'tks', 'crm', 'bodega', 'zabbix', 'config'],
                 'finance': ['dashboard', 'erp', 'crm'],
-                'warehouse': ['bodega']
+                'warehouse': ['bodega'],
+                'monitora': ['dashboard', 'fundacion'],
+                'ejecutiva': ['dashboard', 'fundacion']
             };
             // Si data.allowed_modules venia null (no migrado), usamos map.
             // Si venia [], es que se guardo vacio. Pero por seguridad ahora, asumimos rol si vacio.
@@ -159,8 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 whoEl = document.createElement('span');
                 whoEl.id = 'who';
                 whoEl.className = 'pill';
-                whoEl.style.cssText = 'display:block; margin-bottom:10px; font-size:0.8rem; opacity:0.7;';
-                whoEl.textContent = 'Usuario';
+                whoEl.style.cssText = 'display:flex; flex-direction:column; gap:2px; margin-bottom:15px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);';
+                whoEl.innerHTML = '<div style="font-size:0.85rem;">Usuario</div><div style="font-size:0.7rem; opacity:0.5;">Cargando...</div>';
                 headerActions.insertBefore(whoEl, headerActions.firstChild);
             }
 
