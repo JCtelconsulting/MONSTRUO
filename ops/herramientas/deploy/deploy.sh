@@ -43,9 +43,10 @@ if [ ! -d ".git" ] && [ -n "$REPO_URL" ]; then
   git checkout -f "$BRANCH"
 fi
 
-if [ -z "$DEPLOY_ENV_FILE" ]; then
-  if [ -f "$APP_DIR/.env.server" ]; then
-    DEPLOY_ENV_FILE="$APP_DIR/.env.server"
+  if [ -f "$APP_DIR/ops/env/.env.server" ]; then
+    DEPLOY_ENV_FILE="$APP_DIR/ops/env/.env.server"
+  elif [ -f "$APP_DIR/ops/env/.env" ]; then
+    DEPLOY_ENV_FILE="$APP_DIR/ops/env/.env"
   elif [ -f "$APP_DIR/.env" ]; then
     DEPLOY_ENV_FILE="$APP_DIR/.env"
   else

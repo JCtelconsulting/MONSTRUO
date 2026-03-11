@@ -29,8 +29,8 @@ Cuando haya conflicto, obedecer en este orden:
 - Rama de trabajo base: `dev` (salvo instruccion explicita del usuario).
 - Prohibido desplegar a `main/prod` sin autorizacion explicita.
 - Nombres canonicos de entorno:
-  - PROD: `project=monstruo`, `stack=monstruo`, `env_file=/srv/monstruo/.env.server`
-  - DEV: `project=monstruo_dev`, `stack=monstruo-dev`, `env_file=/srv/monstruo_dev/.env.server.dev`
+  - PROD: `project=monstruo`, `stack=monstruo`, `env_file=/srv/monstruo_dev/ops/env/.env.server`
+  - DEV: `project=monstruo_dev`, `stack=monstruo-dev`, `env_file=/srv/monstruo_dev/ops/env/.env.server.dev`
 - Prohibido mezclar credenciales, URLs o jobs entre DEV y PROD.
 
 ## 5) Flujo de trabajo obligatorio

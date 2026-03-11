@@ -54,14 +54,14 @@ jobs:
           set -euo pipefail
           if [ "${GITHUB_REF_NAME}" = "main" ]; then
             echo "branch=main" >> "$GITHUB_OUTPUT"
-            echo "env_file=/srv/monstruo/.env.server" >> "$GITHUB_OUTPUT"
+            echo "env_file=/srv/monstruo/ops/env/.env.server" >> "$GITHUB_OUTPUT"
             echo "project=monstruo" >> "$GITHUB_OUTPUT"
             echo "stack=monstruo" >> "$GITHUB_OUTPUT"
             echo "health=http://127.0.0.1:9000/health" >> "$GITHUB_OUTPUT"
             echo "deploy_path=/srv/monstruo" >> "$GITHUB_OUTPUT"
           else
             echo "branch=dev" >> "$GITHUB_OUTPUT"
-            echo "env_file=/srv/monstruo_dev/.env.server.dev" >> "$GITHUB_OUTPUT"
+            echo "env_file=/srv/monstruo_dev/ops/env/.env.server.dev" >> "$GITHUB_OUTPUT"
             # Mantener project estable evita conflictos de labels/ownership en contenedores existentes.
             echo "project=monstruo_dev" >> "$GITHUB_OUTPUT"
             echo "stack=monstruo-dev" >> "$GITHUB_OUTPUT"
