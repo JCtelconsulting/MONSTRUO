@@ -20,7 +20,7 @@ services:
       dockerfile: code/ops/docker/Dockerfile.api
     container_name: ${STACK_NAME:-monstruo}-api
     env_file:
-      - ${ENV_FILE:-.env}
+      - ${ENV_FILE:-ops/env/.env.server.dev}
     volumes:
       - ./code:/app/code
       - ./data/tickets:${TICKET_ATTACHMENTS_DIR:-/srv/monstruo_dev/data/tickets}
