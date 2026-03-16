@@ -1,6 +1,20 @@
 # PROYECTO CONTEXTO: MONSTRUO
-**Fecha de actualizacion:** 12 Marzo 2026
+**Fecha de actualizacion:** 16 Marzo 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
+
+## HITO: 2026-03-16 - Despliegue Exitoso DEV -> PROD (Ticketera + ERP Hardening)
+- **Solicitud**: promover todos los cambios de DEV a PROD de forma segura.
+- **Acción ejecutada**:
+  - Limpieza de Git: Se detectaron archivos de 4.2GB en `data/fundacion`, se procedió a excluirlos vía `.gitignore` para permitir el push.
+  - Sincronización: Merge de `dev` a `main` y push a GitHub, detonando auto-deploy vía runner.
+  - Base de Datos:
+    - Ejecución de `migrate_to_schemas.py` en PROD: esquemas `auth`, `tks`, `erp`, `crm`, `bodega`, `core`, `ia`, `ops`, `cat`, `pmo` creados y tablas migradas desde `public`.
+    - Verificación de motor de migraciones SQL funcional.
+  - Runtime: Ajuste de variables de entorno para evitar cruces (puertos 9000 vs 9001, rutas `/srv/monstruo` vs `/srv/monstruo_dev`).
+- **Verificación**:
+  - `curl http://localhost:9000/health` -> 200 OK ✅
+  - Acceso a base de datos de producción validada con nuevos esquemas. ✅
+- **Estado**: CERRADO.
 
 ## HITO: 2026-03-12 - Blindaje DEV/PROD para deploy sin regresiones (DEV)
 - **Solicitud**: dejar DEV y PROD realmente separados para que al promover cambios desde `dev` a `main` no aparezcan regresiones por mezcla de envs o rutas legacy.
