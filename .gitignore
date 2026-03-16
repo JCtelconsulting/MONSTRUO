@@ -34,9 +34,7 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-data/*.db
-data/*.sqlite
-data/*.sqlite3
+data/
 ops/guardian/*.sqlite*
 
 # Backups
