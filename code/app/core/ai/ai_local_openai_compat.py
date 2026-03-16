@@ -3,14 +3,12 @@ import json
 import logging
 import requests
 from typing import List, Dict, Optional, Any
-from dotenv import load_dotenv
 
 from pathlib import Path
 
-# Load Env
-# code/app/core/ai/ai_local_openai_compat.py -> parents[4] = root
-env_path = Path(__file__).resolve().parents[4] / ".env"
-load_dotenv(env_path)
+from app.core.env_loader import load_runtime_env
+
+load_runtime_env(Path(__file__).resolve())
 
 # Configure simple ascii logger
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)

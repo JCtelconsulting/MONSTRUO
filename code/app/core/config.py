@@ -1,9 +1,11 @@
 from pydantic_settings import BaseSettings
 from typing import List, Dict
 import os
-from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+from app.core.env_loader import load_runtime_env
+
+load_runtime_env(Path(__file__).resolve())
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Monstruo"

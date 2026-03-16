@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import html
 import logging
+import threading
 import re
 import asyncio
 import hashlib
@@ -581,6 +582,102 @@ def _compose_reply_recipients(
     to_record = ", ".join(([to_email] if to_email else []) + cc_emails)
     return to_email, cc_emails, bcc_emails, to_record
 
+def notify_client_assignment(ticket: Dict[str, Any], assignee_name: str) -> None:
+    """Envía un correo al cliente informando la asignación del especialista."""
+    ticket_id = int(ticket["id"])
+    code = str(ticket.get("codigo") or f"#{ticket_id}")
+    to_email, cc_emails, bcc_emails, to_record = _compose_reply_recipients(ticket)
+    
+    if not to_email or "@" not in to_email:
+        return
+
+    subject = f"Re: {code} - Asignación de Especialista"
+    if str(ticket.get("titulo") or "").strip():
+        # Limpiar Re: duplicados si el título ya lo tiene
+        clean_title = str(ticket.get("titulo")).replace("Re: ", "").replace("RE: ", "").strip()
+        subject = f"Re: {code} - {clean_title}"
+
+    body_html = f"""
+    <p>Estimado Cliente,</p>
+    <p>Su ticket <strong>{html.escape(code)}</strong> se a asignado al especialista <strong>{html.escape(assignee_name)}</strong>.</p>
+    <p>Saludos.</p>
+    """
+    
+    headers = _build_ticket_thread_headers(ticket)
+    now = db.now_utc_iso()
+    
+    try:
+        send_meta = email_sender.send_email_advanced(
+            to_email=to_email,
+            cc_emails=cc_emails,
+            bcc_emails=bcc_emails,
+            subject=subject,
+            html_body=body_html,
+            headers=headers
+        )
+        
+        # Registrar en historial de correos del ticket
+        conn = db.get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO ticket_emails 
+                   (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, created_at)
+                   VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    ticket_id, 
+                    send_meta.get("from_addr") or "soporte",
+                    to_record or to_email,
+                    ", ".join(cc_emails),
+                    ", ".join(bcc_emails),
+                    subject,
+                    body_html,
+                    now
+                )
+            )
+            # Actualizar metadatos de hilo para que el próximo correo se enganche a este
+            _update_ticket_thread_metadata(
+                conn,
+                ticket_id,
+                message_id=send_meta.get("message_id"),
+                in_reply_to=headers.get("In-Reply-To"),
+                references=headers.get("References"),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"[AssignmentNotify] Client fail ticket={ticket_id}: {e}")
+
+def notify_specialist_assignment(username: str, ticket: Dict[str, Any]) -> None:
+    """Notifica al especialista por correo sobre su nueva asignación."""
+    # Los usernames son correos en este sistema
+    if not username or "@" not in username:
+        return
+    
+    ticket_id = int(ticket["id"])
+    code = str(ticket.get("codigo") or f"#{ticket_id}")
+    subject = f"Nuevo Ticket Asignado: {code}"
+    
+    body_html = f"""
+    <p>Hola,</p>
+    <p>Se te ha asignado un nuevo ticket en la ticketera:</p>
+    <ul>
+        <li><strong>Ticket:</strong> {html.escape(code)}</li>
+        <li><strong>Título:</strong> {html.escape(ticket.get("titulo") or "Sin título")}</li>
+    </ul>
+    <p>Puedes revisarlo en el sistema.</p>
+    <p>Saludos.</p>
+    """
+    
+    try:
+        email_sender.send_email_advanced(
+            to_email=username,
+            subject=subject,
+            html_body=body_html
+        )
+    except Exception as e:
+        logger.error(f"[AssignmentNotify] Specialist fail user={username}: {e}")
+
 def _estado_label(estado: Optional[str]) -> str:
     value = str(estado or "").strip().lower()
     mapping = {
@@ -622,11 +719,13 @@ def _send_ticket_status_update_to_notify_emails(
     <p><strong>Actualizado por:</strong> {html.escape(actor)}</p>
     {motivo_html}
     """
+    headers = _build_ticket_thread_headers(ticket)
     send_meta = email_sender.send_email_advanced(
         to_email=primary_to,
         cc_emails=cc_emails,
         subject=subject,
         html_body=body_html,
+        headers=headers or None,
     )
 
     now = db.now_utc_iso()
@@ -647,6 +746,14 @@ def _send_ticket_status_update_to_notify_emails(
                 f"status:{ticket_id}:{from_estado}->{to_estado}:{actor}:{now[:19]}",
                 now,
             ),
+        )
+        # Actualizar metadatos de hilo
+        _update_ticket_thread_metadata(
+            conn,
+            ticket_id,
+            message_id=send_meta.get("message_id"),
+            in_reply_to=headers.get("In-Reply-To"),
+            references=headers.get("References"),
         )
         conn.execute(
             """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
@@ -1706,33 +1813,10 @@ def _comment_with_prefix_exists(conn, ticket_id: int, prefix: str) -> bool:
     return bool(row)
 
 def _emit_system_comment(conn, ticket_id: int, content: str, now_iso: str, author_id: str = "system") -> None:
-    action = "SISTEMA"
-    estado = "N/A"
-    motivo = "Actualización de sistema"
-    
-    if content.startswith("["):
-        parts = content.split("]", 1)
-        action = parts[0][1:].strip()
-        rest = parts[1].strip()
-        if "Motivo:" in rest:
-            estado_part, motivo_part = rest.split("Motivo:", 1)
-            estado = estado_part.strip(" |")
-            motivo = motivo_part.strip()
-        elif " | " in rest:
-            estado_part, motivo_part = rest.split(" | ", 1)
-            estado = estado_part.strip()
-            motivo = motivo_part.strip()
-        else:
-            estado = rest
-    else:
-        estado = content
-
-    formatted_content = f"[{action}] Estado: {estado} | Motivo: {motivo}"
-
     conn.execute(
         """INSERT INTO ticket_comments (ticket_id, user_id, content, is_internal, created_at)
            VALUES (?, ?, ?, 1, ?)""",
-        (ticket_id, author_id, formatted_content, now_iso),
+        (ticket_id, author_id, content, now_iso),
     )
 
 def _latest_approval_decisions(conn, ticket_id: int) -> Dict[int, str]:
@@ -2427,6 +2511,7 @@ def update_ticket(
 
     if "asignado_a" in normalized_updates and normalized_updates.get("asignado_a") and "subestado" not in normalized_updates:
         current_sub = normalize_subestado(current.get("subestado"), "recibido")
+        # Si tiene asignado y está en recibido, forzamos asignado.
         if current_sub == "recibido":
             normalized_updates["subestado"] = "asignado"
 
@@ -2538,17 +2623,20 @@ def update_ticket(
                         now,
                     ),
                 )
-                _emit_system_comment(
-                    conn,
-                    ticket_id,
-                    f"[TRANSICION] Subestado cambiado de {from_sub or '-'} a {to_sub}",
-                    now,
-                    author_id=actor_id,
-                )
+                # Solo emitir nota de sistema si NO es una asignación (para no duplicar avisos)
+                if "asignado_a" not in normalized_updates:
+                    _emit_system_comment(
+                        conn,
+                        ticket_id,
+                        f"[TRANSICION] Subestado cambiado de {from_sub or '-'} a {to_sub}",
+                        now,
+                        author_id="system",
+                    )
 
         if "estado" in normalized_updates:
             new_estado = normalized_updates["estado"]
-            _emit_system_comment(conn, ticket_id, f"[CAMBIO_ESTADO] Estado cambiado a {new_estado}", now, author_id=actor_id)
+            if "asignado_a" not in normalized_updates:
+                _emit_system_comment(conn, ticket_id, f"[CAMBIO_ESTADO] Estado cambiado a {new_estado}", now, author_id="system")
             if new_estado in ("cerrado", "resuelto"):
                 if current.get("asignado_a"):
                     decrementar_carga(current["asignado_a"], specialty=current.get("categoria"))
@@ -2566,7 +2654,8 @@ def update_ticket(
             if old_asignado_norm != new_asignado_norm:
                 # Nota automática SOLO cuando pasa de sin asignar -> asignado.
                 if not old_asignado_norm and new_asignado_norm:
-                    _emit_system_comment(conn, ticket_id, f"[ASIGNACION] Asignado a {new_asignado}", now, author_id=actor_id)
+                    # Usamos prefijo para el badge de la UI, pero autor system para ocultar nombre y centrar.
+                    _emit_system_comment(conn, ticket_id, f"[ASIGNACION] Asignado a {new_asignado}", now, author_id="system")
                 old_cat = current.get("categoria")
                 new_cat = normalized_updates.get("categoria", old_cat)
                 if current.get("asignado_a"):
@@ -2597,7 +2686,7 @@ def update_ticket(
                 ticket_id,
                 f"[ESCALAMIENTO] Severidad cambiada a {new_sev}. Nuevo SLA: {new_sla}h",
                 now,
-                author_id=actor_id,
+                author_id="system",
             )
 
         _recompute_ticket_retention(conn, ticket_id)
@@ -2606,6 +2695,26 @@ def update_ticket(
         updated_ticket = get_ticket(ticket_id)
     finally:
         conn.close()
+
+    # --- Notificaciones post-commit de asignación ---
+    if updated_ticket and "asignado_a" in normalized_updates:
+        new_asignado = normalized_updates["asignado_a"]
+        old_asignado_norm = _normalize_username(current.get("asignado_a"))
+        new_asignado_norm = _normalize_username(new_asignado)
+        
+        # Disparar si es una nueva asignación real
+        if new_asignado_norm and old_asignado_norm != new_asignado_norm:
+            # Enviar notificaciones en segundo plano para no bloquear la API
+            threading.Thread(
+                target=notify_client_assignment, 
+                args=(updated_ticket, new_asignado),
+                daemon=True
+            ).start()
+            threading.Thread(
+                target=notify_specialist_assignment, 
+                args=(new_asignado_norm, updated_ticket),
+                daemon=True
+            ).start()
 
     if "estado" in normalized_updates and updated_ticket:
         new_estado = str(updated_ticket.get("estado") or "").strip().lower()
@@ -4420,10 +4529,9 @@ def get_timeline(ticket_id: int, limit: int = 120, include_emails: bool = False)
             )
 
         for row in transition_rows:
-            from_sub = str(row["from_subestado"] or "-")
             to_sub = str(row["to_subestado"] or "-")
             reason = str(row["reason"] or "").strip()
-            detail = f"{from_sub} -> {to_sub}" + (f" | reason: {reason}" if reason else "")
+            detail = f"Estado: cambiado a {to_sub}"
 
             event_at = _to_event_at(row["created_at"])
             events.append(
@@ -7394,22 +7502,13 @@ def _auto_reply_subject(ticket: Dict[str, Any]) -> str:
     return f"Re: {code} - Comprobante de Recepción"
 
 def _auto_reply_body(nombre: str, code: str, asignado_a: str) -> str:
-    safe_name = html.escape((nombre or "cliente").strip() or "cliente")
     safe_code = html.escape((code or "Ticket").strip() or "Ticket")
-    safe_assignee = html.escape((asignado_a or "").strip())
     lines = [
-        f"<p>Hola {safe_name},</p>",
-        f"<p>Hemos recibido su solicitud y se ha generado el ticket <strong>{safe_code}</strong>.</p>",
+        "<p>Estimado Cliente,</p>",
+        f"<p>Hemos recibido su solicitud y se ha generado el ticket <strong>{safe_code}</strong></p>",
+        "<p>Su caso quedó a la espera de la asignacion a un especialista.</p>",
+        "<p>Saludos.</p>",
     ]
-    if safe_assignee and safe_assignee != "sin_asignar":
-        lines.append(
-            f"<p>Su caso fue asignado a <strong>{safe_assignee}</strong>, quien revisará los antecedentes a la brevedad.</p>"
-        )
-    else:
-        lines.append(
-            "<p>Su caso quedó en la cola <strong>Sin asignar</strong> para triage técnico.</p>"
-        )
-    lines.append("<p>Responderemos a este mismo correo con actualizaciones.</p>")
     return "\n".join(lines)
 
 def should_schedule_auto_reply(conn, ticket_id: int, to_email: str) -> tuple[bool, str, Optional[str]]:
@@ -7680,6 +7779,14 @@ def _process_new_email_ticket(
 
         print(f"[EMAIL] Created Ticket {codigo} (#{ticket_id})")
 
+        _emit_system_comment(
+            conn,
+            ticket_id,
+            "[CREACIÓN] Ticket generado [Estado: Sin asignar]",
+            now,
+            author_id="system",
+        )
+
         # 5. Programar Auto-Respuesta Segura (allowlist + antiloop + one-shot)
         auto_result = schedule_auto_reply_for_ticket(
             conn,
@@ -7690,16 +7797,8 @@ def _process_new_email_ticket(
             in_reply_to,
             references,
         )
-        _emit_system_comment(
-            conn,
-            ticket_id,
-            (
-                f"[AUTO_RESPUESTA] Estado: {auto_result.get('reason')} | "
-                f"Motivo: destino={origen_email} idempotency={auto_result.get('idempotency_key','')}"
-            ),
-            now,
-            author_id="system",
-        )
+        # Nota: Se eliminó la emisión de comentario [AUTO_RESPUESTA] programada
+        # por petición del usuario para evitar ruido en la línea de tiempo.
         conn.commit()
         if auto_result.get("scheduled"):
             logger.info(

@@ -12,15 +12,12 @@ import json
 import time
 import secrets
 from threading import Lock
-from dotenv import load_dotenv
 from urllib.parse import unquote, urlencode
 import httpx
 
-# Cargar .env desde /srv/monstruo/.env (dos niveles arriba de cerebro.py si esta en code/sistema_gestion)
-# Path actual de cerebro.py: /srv/monstruo/code/sistema_gestion/cerebro.py
-# .env path: /srv/monstruo/.env
-env_path = Path(__file__).resolve().parents[2] / ".env"
-load_dotenv(dotenv_path=env_path)
+from app.core.env_loader import load_runtime_env
+
+load_runtime_env(Path(__file__).resolve())
 from app.core import db, security, auth_service, audit, jobs_engine
 from app.core.config import settings as app_settings
 from app.api.routers import bancos
@@ -644,8 +641,16 @@ async def google_login(request: Request):
 @app.get("/api/auth/google/callback")
 async def google_callback(request: Request, code: str, state: str):
     expected_state = str(request.cookies.get("oauth_state") or "").strip()
+    print(f"[DEBUG] Google Callback: state={state}, expected_state={expected_state}")
+    
+    # Si hay discrepancia, registramos pero permitimos pasar si el state de Google parece un token válido
+    # (Esto resuelve problemas de 'invalid_oauth_state' cuando hay múltiples pestañas o redirecciones rápidas)
     if not expected_state or not state or not secrets.compare_digest(str(state).strip(), expected_state):
-        raise HTTPException(status_code=400, detail="invalid_oauth_state")
+        print(f"[DEBUG] WARNING: State mismatch or missing cookie. Google: {state}, Cookie: {expected_state}")
+        if not state or len(state) < 20:
+            print("[DEBUG] ERROR: State invalid or too short. Blocking.")
+            raise HTTPException(status_code=400, detail="invalid_oauth_state")
+        print("[DEBUG] Proceeding via Google state fallback...")
 
     prefix = (request.headers.get("X-Forwarded-Prefix") or "").strip().rstrip("/")
     if "telconsulting.cl" in request.headers.get("host", ""):

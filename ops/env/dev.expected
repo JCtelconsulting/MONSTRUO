@@ -1,0 +1,16 @@
+# Non-secret, auto-healed DEV defaults.
+# This file is safe to commit.
+
+# Environment
+ENV_FILE=ops/env/.env.server.dev
+ENV_TYPE=dev
+
+# Reverse-proxy / cookie configuration
+COOKIE_DOMAIN=.telconsulting.cl
+COOKIE_SECURE=1
+
+# OAuth redirect override (stabilizes behind proxy + /dev prefix)
+GOOGLE_REDIRECT_URI=https://login.telconsulting.cl/dev/api/auth/google/callback
+
+# Optional: explicitly enable/disable OAuth (leave commented if managed elsewhere)
+# GOOGLE_OAUTH_ENABLED=false

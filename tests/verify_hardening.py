@@ -46,7 +46,10 @@ def parse_env_like(path: Path) -> dict:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        data[key.strip()] = value.strip()
+        key = key.strip()
+        if key.startswith("export "):
+            key = key.split(None, 1)[1].strip()
+        data[key] = value.strip()
     return data
 
 
@@ -95,6 +98,27 @@ def repo_checks() -> List[str]:
         errors.append("deploy.sh no tiene branch default en dev")
     if 'APP_DIR="${DEPLOY_PATH:-$PROJECT_ROOT}"' not in deploy_text:
         errors.append("deploy.sh no usa APP_DIR dinamico por PROJECT_ROOT")
+    for required in (
+        'ops/env/.env.server.dev',
+        'ops/env/.env.server',
+    ):
+        if required not in deploy_text:
+            errors.append(f"deploy.sh no referencia env canónico requerido: {required}")
+
+    syntax = subprocess.run(
+        ["bash", "-n", str(PROJECT_ROOT / "ops/herramientas/deploy/deploy.sh")],
+        capture_output=True,
+        text=True,
+    )
+    if syntax.returncode != 0:
+        detail = (syntax.stderr or syntax.stdout).strip()
+        errors.append(f"deploy.sh con error de sintaxis: {detail}")
+
+    compose_text = read_text(PROJECT_ROOT / "docker-compose.yaml")
+    if "${ENV_FILE:-ops/env/.env.server.dev}" not in compose_text:
+        errors.append("docker-compose.yaml debe usar ENV_FILE canónico para env_file")
+    if re.search(r"^\s*-\s*\.env\s*$", compose_text, flags=re.M):
+        errors.append("docker-compose.yaml no debe fijar env_file a .env")
 
     gitignore_text = read_text(PROJECT_ROOT / ".gitignore")
     if "data/compliance/" not in gitignore_text:
@@ -232,6 +256,27 @@ def repo_checks() -> List[str]:
             errors.append(f"{path} no usa MONSTRUO_TEST_USER")
         if "MONSTRUO_TEST_PASSWORD" not in text:
             errors.append(f"{path} no usa MONSTRUO_TEST_PASSWORD")
+
+    canonical_env_users = {
+        PROJECT_ROOT / "code/app/main.py": "load_runtime_env(",
+        PROJECT_ROOT / "code/app/core/config.py": "load_runtime_env(",
+        PROJECT_ROOT / "code/app/core/db.py": "load_runtime_env(",
+        PROJECT_ROOT / "code/app/core/ai/ai_local_openai_compat.py": "load_runtime_env(",
+        PROJECT_ROOT / "code/scripts/sync_erp.py": "load_runtime_env(",
+        PROJECT_ROOT / "code/scripts/sync_calendario_ejecutivo.py": "load_runtime_env(",
+    }
+    for path, marker in canonical_env_users.items():
+        text = read_text(path)
+        if marker not in text:
+            errors.append(f"{path} no usa carga canónica de env")
+
+    for path in [
+        PROJECT_ROOT / "code/scripts/sync_erp.py",
+        PROJECT_ROOT / "code/scripts/sync_calendario_ejecutivo.py",
+    ]:
+        text = read_text(path)
+        if "/srv/monstruo_dev/.env.server.dev" in text:
+            errors.append(f"{path} mantiene ruta hardcodeada a .env.server.dev de DEV")
 
     return errors
 
@@ -516,7 +561,7 @@ def api_checks(args: argparse.Namespace) -> List[str]:
 
 
 def check_deploy_workflow() -> List[str]:
-    """Valida que .github/workflows/deploy.yml tenga la configuración correcta para DEV."""
+    """Valida que .github/workflows/deploy.yml tenga la configuración correcta para DEV/PROD."""
     errors = []
     deploy_yml = PROJECT_ROOT / ".github/workflows/deploy.yml"
     if not deploy_yml.exists():
@@ -526,10 +571,14 @@ def check_deploy_workflow() -> List[str]:
     
     # Validaciones específicas para rama DEV
     checks = [
-        (r'echo\s+"env_file=/srv/monstruo_dev/\.env\.server\.dev"', "DEV debe usar .env.server.dev"),
+        (r'echo\s+"env_file=/srv/monstruo/ops/env/\.env\.server"', "PROD debe usar ops/env/.env.server"),
+        (r'echo\s+"env_file=/srv/monstruo_dev/ops/env/\.env\.server\.dev"', "DEV debe usar ops/env/.env.server.dev"),
         (r'echo\s+"project=monstruo_dev"', "DEV debe usar project=monstruo_dev"),
+        (r'echo\s+"project=monstruo"', "PROD debe usar project=monstruo"),
         (r'echo\s+"health=http://127\.0\.0\.1:9001/health"', "DEV debe chequear health en puerto 9001"),
+        (r'echo\s+"health=http://127\.0\.0\.1:9000/health"', "PROD debe chequear health en puerto 9000"),
         (r'echo\s+"deploy_path=/srv/monstruo_dev"', "DEV debe deployar en /srv/monstruo_dev"),
+        (r'echo\s+"deploy_path=/srv/monstruo"', "PROD debe deployar en /srv/monstruo"),
     ]
 
     for pattern, msg in checks:

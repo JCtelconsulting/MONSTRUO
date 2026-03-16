@@ -43,7 +43,7 @@ Frase de control recomendada:
 |---|---|---|
 | Rama base | `dev` | `main` |
 | Ruta servidor | `/srv/monstruo_dev` | `/srv/monstruo` |
-| Env file | `.env.server.dev` | `.env.server` |
+| Env file | `ops/env/.env.server.dev` | `ops/env/.env.server` |
 | Compose project | `monstruo_dev` | `monstruo` |
 | Stack visible | `monstruo-dev` | `monstruo` |
 | Puerto API interno | `9001` | `9000` |

@@ -20,6 +20,8 @@ CODE_ROOT = PROJECT_ROOT / "code"
 if str(CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(CODE_ROOT))
 
+DEV_ENV_FILE = "ops/env/.env.server.dev"
+
 from _helpers import as_json, build_session, env_str, guard_prod_target, require_credentials
 from app.core.security import create_access_token
 
@@ -273,7 +275,7 @@ except PermissionError:
 print("SUCCESS")
 """
         cmd_ownership = [
-            "docker", "compose", "--env-file", ".env.server.dev",
+            "docker", "compose", "--env-file", DEV_ENV_FILE,
             "exec", "-T", "api", "python3", "-c", inner_ownership
         ]
         proc_ownership = subprocess.run(cmd_ownership, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
@@ -607,7 +609,7 @@ except Exception as e:
     sys.exit(1)
 """
         cmd = [
-            "docker", "compose", "--env-file", ".env.server.dev",
+            "docker", "compose", "--env-file", DEV_ENV_FILE,
             "exec", "-T", "api", "python3", "-c", inner_script
         ]
         proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
@@ -835,7 +837,7 @@ finally:
     settings.TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS = backup["blocked_localparts"]
 """
         cmd_auto_reply = [
-            "docker", "compose", "--env-file", ".env.server.dev",
+            "docker", "compose", "--env-file", DEV_ENV_FILE,
             "exec", "-T", "api", "python3", "-c", inner_auto_reply
         ]
         proc_auto_reply = subprocess.run(cmd_auto_reply, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
@@ -962,7 +964,7 @@ if p.exists():
 print("SUCCESS")
 """
         delete_cmd = [
-            "docker", "compose", "--env-file", ".env.server.dev",
+            "docker", "compose", "--env-file", DEV_ENV_FILE,
             "exec", "-T", "api", "python3", "-c", delete_manifest_script
         ]
         delete_proc = subprocess.run(delete_cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
@@ -1146,7 +1148,7 @@ if not second_retry.get("duplicate_skipped"):
 print("SUCCESS")
 """
         cmd_channels = [
-            "docker", "compose", "--env-file", ".env.server.dev",
+            "docker", "compose", "--env-file", DEV_ENV_FILE,
             "exec", "-T", "api", "python3", "-c", inner_channels
         ]
         proc_channels = subprocess.run(cmd_channels, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
@@ -1199,7 +1201,7 @@ if not f.get("enqueued") or not s.get("duplicate"):
 print(f"SUCCESS STALE_ID={{stale_id}}")
 """
         seed_cmd = [
-            "docker", "compose", "--env-file", ".env.server.dev",
+            "docker", "compose", "--env-file", DEV_ENV_FILE,
             "exec", "-T", "api", "python3", "-c", inner_queue_seed
         ]
         seed_proc = subprocess.run(seed_cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
@@ -1246,7 +1248,7 @@ if status not in ("RETRY", "FAILED"):
 print("SUCCESS")
 """
         check_cmd = [
-            "docker", "compose", "--env-file", ".env.server.dev",
+            "docker", "compose", "--env-file", DEV_ENV_FILE,
             "exec", "-T", "api", "python3", "-c", inner_check_stale
         ]
         check_proc = subprocess.run(check_cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))

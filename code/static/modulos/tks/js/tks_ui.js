@@ -376,6 +376,21 @@ const TksUI = (() => {
         }
     }
 
+    function formatTimeOnly(value) {
+        const ts = toTs(value);
+        if (!ts) return '';
+        try {
+            const d = new Date(ts);
+            return d.toLocaleTimeString('es-CL', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+        } catch (e) {
+            return '';
+        }
+    }
+
     function formatMinutesLabel(minutesLike) {
         const minutes = Math.max(0, Number(minutesLike || 0));
         if (minutes < 60) return `${Math.round(minutes)}m`;
@@ -412,30 +427,30 @@ const TksUI = (() => {
         dayStart.setHours(0, 0, 0, 0);
 
         const laborStart = new Date(dayStart.getTime());
-        laborStart.setHours(6, 0, 0, 0);
+        laborStart.setHours(8, 0, 0, 0);
         const laborEnd = new Date(dayStart.getTime());
-        laborEnd.setHours(22, 0, 0, 0);
+        laborEnd.setHours(18, 0, 0, 0);
 
-        const extraBeforeHours = 1; // margen previo para visualizar extensiones
-        const extraAfterHours = 1;  // margen posterior para visualizar extensiones
+        const extraBeforeHours = 0; 
+        const extraAfterHours = 0;  
         const viewStartTs = laborStart.getTime() - (extraBeforeHours * 60 * 60 * 1000);
         const viewEndTs = laborEnd.getTime() + (extraAfterHours * 60 * 60 * 1000);
         const viewSpan = Math.max(1, viewEndTs - viewStartTs);
 
         const hourTicks = [];
-        for (let h = 5; h <= 23; h += 1) {
+        for (let h = 8; h <= 18; h += 1) {
             const ts = dayStart.getTime() + (h * 60 * 60 * 1000);
             const leftPct = ((ts - viewStartTs) / viewSpan) * 100;
-            hourTicks.push({ hour: h, leftPct, isLabor: h >= 6 && h <= 22 });
+            hourTicks.push({ hour: h, leftPct, isLabor: true });
         }
         const tickLinesHtml = hourTicks
             .map((tick) => `<span class="tks-assign-grid-line ${tick.isLabor ? 'labor' : 'extra'}" style="left:${tick.leftPct.toFixed(3)}%"></span>`)
             .join('');
         const rulerHtml = hourTicks
             .map((tick) => {
-                const showLabel = (tick.hour % 2 === 0) || tick.hour === 5 || tick.hour === 23;
+                const showLabel = (tick.hour % 2 === 0) || tick.hour === 8 || tick.hour === 18;
                 if (!showLabel) return '';
-                return `<span class="tks-assign-ruler-tick ${tick.isLabor ? 'labor' : 'extra'}" style="left:${tick.leftPct.toFixed(3)}%">${escapeHtml(formatHourLabel(tick.hour))}</span>`;
+                return `<span class="tks-assign-ruler-tick ${tick.isLabor ? 'labor' : 'extra'}" style="--tick-left:${tick.leftPct.toFixed(3)}%; left:${tick.leftPct.toFixed(3)}%">${escapeHtml(formatHourLabel(tick.hour))}</span>`;
             })
             .join('');
 
@@ -533,11 +548,11 @@ const TksUI = (() => {
             <div class="tks-assign-head">
                 <div>
                     <h3><i class="fas fa-users-cog"></i> Asignación Técnica</h3>
-                    <p>Vista tipo horario por técnico. Jornada visible 06:00-22:00 con margen extra 05:00-23:00.</p>
-                </div>
-                <div class="tks-assign-head-meta">
-                    <span><strong>Actualizado:</strong> ${escapeHtml(formatDateTimeShort(generatedAt))}</span>
-                    <span><strong>Día:</strong> ${escapeHtml(new Date(referenceTs).toLocaleDateString('es-CL'))}</span>
+                    <div class="tks-assign-head-meta-new">
+                        <span><strong>Día:</strong> ${escapeHtml(new Date(referenceTs).toLocaleDateString('es-CL'))}</span>
+                        <span class="tks-sep">·</span>
+                        <span><strong>Actualizado:</strong> ${escapeHtml(formatTimeOnly(generatedAt))}</span>
+                    </div>
                 </div>
             </div>
 
@@ -665,10 +680,12 @@ const TksUI = (() => {
                 </button>`;
             }
 
+            const subjectNormalized = sentenceCase(t.titulo);
+
             return `<tr class="tks-row" data-id="${t.id}">
                 <td class="td-min"><span class="tks-codigo">${escapeHtml(t.codigo || `#${t.id}`)}</span></td>
                 <td>
-                    <div class="tks-ticket-title">${escapeHtml(t.titulo || 'Sin título')}</div>
+                    <div class="tks-ticket-title fade-overflow" title="${escapeHtml(t.titulo || 'Sin título')}">${escapeHtml(subjectNormalized)}</div>
                 </td>
                 <td>
                     ${clientHtml}
@@ -689,11 +706,11 @@ const TksUI = (() => {
             <table class="tks-table tks-list-table">
                 <thead>
                     <tr>
-                        <th class="tks-th-code">ID</th>
+                        <th class="tks-th-code">NRº de Ticket</th>
                         <th>Asunto</th>
                         <th>Cliente</th>
-                        <th class="tks-th-cat">Cat</th>
-                        <th class="tks-th-sev">Sev</th>
+                        <th class="tks-th-cat">Categoria</th>
+                        <th class="tks-th-sev">Severidad</th>
                         <th class="tks-th-status">Estado</th>
                         <th class="tks-th-sla">SLA</th>
                     </tr>
@@ -829,7 +846,7 @@ const TksUI = (() => {
             if (filtered.length) selectableFlowCandidates = filtered;
         }
         const nonWaitingCandidates = selectableFlowCandidates.filter((sub) => !waitingSubestadoSet.has(sub));
-        const flowPool = nonWaitingCandidates.length ? nonWaitingCandidates : selectableFlowCandidates;
+        const flowPool = nonWaitingCandidates.length ? nonWaitingCandidates.filter(s => s !== 'asignado') : selectableFlowCandidates.filter(s => s !== 'asignado');
         const preferredOrder = [
             ...(flowPriorityByCurrent[currentSubestado] || []),
             ...genericFlowPriority,
@@ -841,6 +858,7 @@ const TksUI = (() => {
             : (currentEstado === 'resuelto' && nextFlowSubestado === 'cerrado')
                 ? 'Cerrar de inmediato (cliente aprobó)'
                 : `Avanzar a ${subestadoLabel(nextFlowSubestado)}`;
+        selectableFlowCandidates = selectableFlowCandidates.filter(s => s !== 'asignado');
         const waitingSubestadoActions = showWaitingSubestados
             ? waitingCandidates.filter((sub) => sub !== currentSubestado)
             : [];
@@ -851,7 +869,7 @@ const TksUI = (() => {
         }
 
         const filteredEvents = (eventos || []).filter((ev) => {
-            const rawEvent = String(ev?.evento || ev?.event_type || '').trim().toLowerCase().replace(/\s+/g, '_');
+                const rawEvent = String(ev?.evento || ev?.event_type || '').trim().toLowerCase().replace(/\s+/g, '_');
             const rawDetail = String(ev?.detalle || ev?.detail || '').trim().toLowerCase();
             if (rawEvent.startsWith('correo')) return false;
             if (rawEvent.includes('adjunto_incoming')) return false;
@@ -862,13 +880,16 @@ const TksUI = (() => {
 
         const eventItems = filteredEvents.map((ev) => {
             const eventType = String(ev?.event_type || "").trim().toLowerCase();
-            const isManualSystem = ["Transicion", "Asignacion", "Cambio_estado", "Reasignacion", "Escalamiento"].includes(ev.evento);
+            const rawEv = String(ev?.evento || "").trim().toLowerCase();
+            const isManualSystem = ["transicion", "asignacion", "cambio_estado", "reasignacion", "escalamiento"].includes(rawEv);
 
             const fallbackLabelByType = {
                 transition: "Cambio de estado",
                 status_change: "Cambio de estado",
                 assignment: "Asignación",
+                asignacion: "Asignación",
                 reassignment: "Reasignación",
+                reasignacion: "Reasignación",
                 escalation: "Escalamiento",
                 email: "Correo",
                 attachment: "Adjunto",
@@ -883,7 +904,7 @@ const TksUI = (() => {
                 evento: resolvedLabel || String(ev?.event_type || "").trim(),
                 detalle: ev.detalle || ev.detail || "",
                 usuario: ev.usuario || ev.actor || "-",
-                isSystem: String(ev.usuario || ev.actor || "").trim().toLowerCase() === "system" || isManualSystem || ["transition","approval","email"].includes(eventType),
+                isSystem: String(ev.usuario || ev.actor || "").trim().toLowerCase() === "system" || isManualSystem || ["transition","approval","email","asignacion","cambio_estado"].includes(eventType),
             };
         });
 
@@ -906,20 +927,45 @@ const TksUI = (() => {
 
         const feedHtml = unifiedFeed.map((item) => {
             if (item.kind === 'event') {
-                const kindLabel = item.isSystem ? (item.evento || 'Sistema') : 'Nota interna';
+                const systemBadgeMap = {
+                    'creación': 'Creación',
+                    'creacion': 'Creación',
+                    'cambio_estado': 'Cambio de estado',
+                    'cambio de estado': 'Cambio de estado',
+                    'transicion': 'Transición',
+                    'transition': 'Transición',
+                    'asignacion': 'Asignación',
+                    'assignment': 'Asignación',
+                    'reasignacion': 'Reasignación',
+                    'reassignment': 'Reasignación',
+                    'escalamiento': 'Escalamiento',
+                    'auto_reply': 'Auto-respuesta',
+                    'comment': 'Sistema',
+                    'sistema': 'Sistema',
+                };
+                const rawEvento = String(item.evento || '').trim();
+                const kindLabel = item.isSystem
+                    ? (systemBadgeMap[rawEvento.toLowerCase()] || rawEvento || 'Sistema')
+                    : 'Nota interna';
                 const eventTypeClass = item.isSystem ? 'system' : 'note';
 
-                const actorName = item.usuario === 'system' ? 'Sistema' : formatAssigneeDisplay(item.usuario);
+                const actorName = item.usuario === 'system' ? '' : formatAssigneeDisplay(item.usuario);
+
+                // Para eventos de sistema: limpiar el detalle (sin prefijos, sin lo que va después de "|")
+                let cleanDetail = String(item.detalle || '');
+                if (item.isSystem && cleanDetail.includes('|')) {
+                    cleanDetail = cleanDetail.split('|')[0].trim();
+                }
 
                 return `<article class="tks-feed-item tks-feed-item-event ${eventTypeClass}">
                     <div class="tks-feed-item-head compact">
-                        <div class="tks-feed-head-side tks-feed-actor">${escapeHtml(actorName)}</div>
+                        <div class="tks-feed-head-side tks-feed-actor">${item.isSystem ? '' : escapeHtml(actorName)}</div>
                         <div class="tks-feed-head-center"><span class="tks-feed-badge">${kindLabel}</span></div>
                         <div class="tks-feed-head-side tks-feed-time right">${formatExactDateTime(feedTimestamp(item))}</div>
                     </div>
                     <div class="tks-feed-content ${item.isSystem ? 'system-movement' : ''}">
                         ${item.isSystem
-                        ? `<div class="tks-feed-system-line"><strong>${escapeHtml(item.evento)}:</strong> ${escapeHtml(item.detalle)}</div>`
+                        ? `<div class="tks-feed-system-line" style="text-align:center">${escapeHtml(cleanDetail)}</div>`
                         : `<h4 class="tks-feed-title">${escapeHtml(item.evento)}</h4>
                                <div class="tks-feed-detail">${escapeHtml(item.detalle)}</div>`
                     }
@@ -944,7 +990,7 @@ const TksUI = (() => {
             }).join('');
 
             const rawSender = incoming ? (parseEmailIdentity(item.from_addr).name || item.from_addr) : (parseEmailIdentity(item.from_addr || 'Soporte').name || 'Soporte');
-            const senderName = formatAssigneeDisplay(rawSender);
+            const senderName = formatAssigneeDisplay(decodeMimeEncodedString(rawSender));
 
             return `<article class="tks-feed-item tks-feed-item-email ${incoming ? 'incoming' : 'outgoing'}">
                 <div class="tks-feed-item-head compact">

@@ -4,12 +4,19 @@ import os
 from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from dotenv import load_dotenv
 from pathlib import Path
 
 # Configuración de rutas y carga de entorno
-BASE_DIR = Path("/srv/monstruo_dev")
-load_dotenv(BASE_DIR / ".env.server.dev")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CODE_ROOT = PROJECT_ROOT / "code"
+if str(CODE_ROOT) not in sys.path:
+    sys.path.append(str(CODE_ROOT))
+
+from app.core.env_loader import load_runtime_env
+
+load_runtime_env(Path(__file__).resolve())
+
+BASE_DIR = PROJECT_ROOT
 
 DB_URL = os.getenv("DB_URL", "postgresql://monstruo:monstruo@172.25.0.3:5432/monstruo")
 EXCEL_PATH = BASE_DIR / "data/fundacion/planificaciones/Calendario 2026.xlsx"

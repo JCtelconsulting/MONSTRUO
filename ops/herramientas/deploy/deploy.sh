@@ -43,16 +43,37 @@ if [ ! -d ".git" ] && [ -n "$REPO_URL" ]; then
   git checkout -f "$BRANCH"
 fi
 
-  if [ -f "$APP_DIR/ops/env/.env.server" ]; then
-    DEPLOY_ENV_FILE="$APP_DIR/ops/env/.env.server"
-  elif [ -f "$APP_DIR/ops/env/.env" ]; then
-    DEPLOY_ENV_FILE="$APP_DIR/ops/env/.env"
-  elif [ -f "$APP_DIR/.env" ]; then
-    DEPLOY_ENV_FILE="$APP_DIR/.env"
-  else
-    echo "[deploy] ERROR: no se encontró archivo de entorno (.env.server o .env)."
-    exit 1
+declare -a CANDIDATES=()
+if [ -n "$DEPLOY_ENV_FILE" ]; then
+  CANDIDATES+=("$DEPLOY_ENV_FILE")
+fi
+if [ "$BRANCH" = "main" ]; then
+  CANDIDATES+=(
+    "$APP_DIR/ops/env/.env.server"
+    "$APP_DIR/.env.server"
+    "$APP_DIR/.env"
+  )
+else
+  CANDIDATES+=(
+    "$APP_DIR/ops/env/.env.server.dev"
+    "$APP_DIR/.env.server.dev"
+    "$APP_DIR/ops/env/.env.server"
+    "$APP_DIR/.env.server"
+    "$APP_DIR/.env"
+  )
+fi
+
+DEPLOY_ENV_FILE=""
+for candidate in "${CANDIDATES[@]}"; do
+  if [ -f "$candidate" ]; then
+    DEPLOY_ENV_FILE="$candidate"
+    break
   fi
+done
+
+if [ -z "$DEPLOY_ENV_FILE" ]; then
+  echo "[deploy] ERROR: no se encontró archivo de entorno canónico para branch=$BRANCH."
+  exit 1
 fi
 
 if [ ! -f "$DEPLOY_ENV_FILE" ]; then

@@ -4,12 +4,15 @@ import sys
 import argparse
 import time
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
+from pathlib import Path
 
 # /app/code/scripts/ -> /app/code
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+CODE_ROOT = Path(__file__).resolve().parents[1]
+if str(CODE_ROOT) not in sys.path:
+    sys.path.append(str(CODE_ROOT))
 
 from app.integraciones.laudus import LaudusClient
+from app.core.env_loader import load_runtime_env
 
 
 def _get_direct_conn():
@@ -36,7 +39,7 @@ def sync_erp(days=60, verbose=False):
     Sincroniza datos ERP (Clientes y Facturas) desde Laudus a la DB local.
     Usa conexión directa con autocommit para evitar bloqueos.
     """
-    load_dotenv(dotenv_path="/srv/monstruo_dev/.env.server.dev")
+    load_runtime_env(Path(__file__).resolve())
 
     print("--- Iniciando Sincronización ERP ---")
     client = LaudusClient()

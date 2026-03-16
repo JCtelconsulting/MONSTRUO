@@ -553,10 +553,12 @@ async def send_auto_response_job(payload: dict):
                 marker_id,
             ),
         )
-        lock_conn.execute(
-            """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-               VALUES (?, 'system', ?, ?)""",
-            (ticket_id, f"[AUTO_REPLY] Auto-respuesta enviada a {to_email}.", now),
+        tickets_service._emit_system_comment(
+            lock_conn,
+            ticket_id,
+            "[CAMBIO_ESTADO] Estado: cambiado a auto-respondido",
+            now,
+            author_id="system",
         )
         lock_conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, ticket_id))
         tickets_service._update_ticket_thread_metadata(

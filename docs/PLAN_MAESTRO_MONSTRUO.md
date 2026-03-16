@@ -74,6 +74,7 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-03-12: Blindaje DEV/PROD para deploy y runtime: `docker-compose.yaml` vuelve a resolver `env_file` por `ENV_FILE` canónico, `deploy.sh` corrige fallback por rama (`ops/env/.env.server` vs `ops/env/.env.server.dev`), runtime deja de depender de `.env` raíz por defecto y CI agrega validaciones anti-cruce para bloquear regresiones antes de subir `dev -> main`.
 - 2026-02-23: Gobernanza de agentes DEV alineada a estructura real del repo: la ruta canónica de reglas cambia de `.agent/...` a `.agents/rules/reglas-monstruo-dev.md` y se valida reset operativo de Ticketera en DEV (`tickets=0`, `current_load=0`).
 - 2026-02-19: **UI Shell Canónico Unificado**: se oficializa estructura única para módulos shell (`main-inner module-shell` + `module-shell-header` + `section-block module-shell-content`), con subtítulo estándar y ancho compartido (`--max-content-width`), eliminando overrides locales que causaban divergencias visuales.
 - 2026-02-16: Despliegue a producción exitoso de PMO Fix y Ticketera V1 (EPIC 11). Se robusteció el script de despliegue (`deploy.sh`) con `git checkout -f` y `reset --hard` para garantizar la paridad del servidor con el repositorio remoto y evitar bloqueos por cambios locales. Verificación de salud PROD: 200 OK.
@@ -127,6 +128,13 @@ git checkout -b feature/nueva-funcionalidad
 git push origin feature/nueva-funcionalidad
 # NOTIFICAR AL USUARIO PARA MERGE
 ```
+
+**Contrato canónico de entornos (obligatorio):**
+- `docker-compose.yaml` debe resolver `env_file` mediante `ENV_FILE`; queda prohibido fijarlo a `.env` en configuración desplegable.
+- Deploy por rama:
+  - `main` -> `ops/env/.env.server`
+  - `dev` -> `ops/env/.env.server.dev`
+- Runtime y scripts operativos no deben hardcodear rutas como `/srv/monstruo_dev/.env.server.dev`; deben resolver por `ENV_FILE` o por la convención `ops/env/`.
 
 0.6 Prioridad Operativa Vigente (desde 2026-02-14)
 
@@ -2208,8 +2216,8 @@ Aceptación:
 
 ### CI/CD actualizado
 - Workflow `deploy.yml` ahora despliega por rama:
-  - push a `main` -> deploy entorno productivo (`.env.server`)
-  - push a `dev` -> deploy entorno dev (`.env.server.dev`)
+  - push a `main` -> deploy entorno productivo (`ops/env/.env.server`)
+  - push a `dev` -> deploy entorno dev (`ops/env/.env.server.dev`)
 - Script de deploy soporta:
   - `DEPLOY_COMPOSE_PROJECT`
   - `DEPLOY_STACK_NAME`

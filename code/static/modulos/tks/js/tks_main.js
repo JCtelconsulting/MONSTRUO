@@ -1265,7 +1265,11 @@ const TksMain = (() => {
             const options = [];
             const seen = new Set();
 
-            if (currentAssignee) {
+            // Siempre permitir la opción de desasignar
+            options.push(`<option value="">Sin asignar</option>`);
+            seen.add('');
+
+            if (currentAssignee && !seen.has(currentAssignee)) {
                 options.push(`<option value="${TksUI.escapeHtml(currentAssignee)}">${TksUI.escapeHtml(currentLabel)}</option>`);
                 seen.add(currentAssignee);
             }
@@ -1300,10 +1304,7 @@ const TksMain = (() => {
         const select = el('tks-assignee-select');
         if (!select) return;
         const nextAssignee = normalizeUser(select.value || '');
-        if (!nextAssignee) {
-            if (window.showToast) window.showToast('Selecciona una persona para asignar', 'warning');
-            return;
-        }
+        // Eliminada restricción que impide desasignar (nextAssignee === '')
 
         const currentAssignee = normalizeUser(selectedTicket?.asignado_a);
         if (currentAssignee === nextAssignee) {
@@ -1311,10 +1312,11 @@ const TksMain = (() => {
         }
 
         try {
-            await TksApi.updateTicket(ticketId, { asignado_a: nextAssignee });
+            await TksApi.updateTicket(ticketId, { asignado_a: nextAssignee || null });
             clearDataCache();
             const selectedLabel = String(select.options?.[select.selectedIndex]?.textContent || '').trim() || (humanizeUsername(nextAssignee) || nextAssignee);
-            if (window.showToast) window.showToast(`Ticket asignado a ${selectedLabel}`, 'success');
+            const msg = nextAssignee ? `Ticket asignado a ${selectedLabel}` : 'Ticket desasignado';
+            if (window.showToast) window.showToast(msg, 'success');
             if (currentTab === 'lista') {
                 refreshList();
                 openDetail(ticketId, { preserveTab: true });

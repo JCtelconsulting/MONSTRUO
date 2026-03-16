@@ -10,6 +10,7 @@ echo "=========================================="
 echo ""
 
 PROJECT_ROOT="${PROJECT_ROOT:-/srv/monstruo_dev}"
+ENV_FILE="${ENV_FILE:-$PROJECT_ROOT/ops/env/.env.server.dev}"
 
 run_sudo() {
     if [ -n "${SUDO_PASS:-}" ]; then
@@ -20,7 +21,11 @@ run_sudo() {
 }
 
 # 0. Cargar credenciales para modo desatendido
-if [ -f "$PROJECT_ROOT/.env" ]; then
+if [ -f "$ENV_FILE" ]; then
+    set -o allexport
+    source "$ENV_FILE"
+    set +o allexport
+elif [ -f "$PROJECT_ROOT/.env" ]; then
     set -o allexport
     source "$PROJECT_ROOT/.env"
     set +o allexport

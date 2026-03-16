@@ -1,6 +1,39 @@
 # PROYECTO CONTEXTO: MONSTRUO
-**Fecha de actualizacion:** 23 Febrero 2026
+**Fecha de actualizacion:** 12 Marzo 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
+
+## HITO: 2026-03-12 - Blindaje DEV/PROD para deploy sin regresiones (DEV)
+- **Solicitud**: dejar DEV y PROD realmente separados para que al promover cambios desde `dev` a `main` no aparezcan regresiones por mezcla de envs o rutas legacy.
+- **Acción ejecutada**:
+  - `docker-compose.yaml` vuelve a usar `env_file` canónico por `ENV_FILE` con default DEV (`ops/env/.env.server.dev`) en vez de `.env` fijo.
+  - `ops/herramientas/deploy/deploy.sh` corregido:
+    - se repara error de sintaxis (`fi` sobrante),
+    - se agrega fallback explícito por rama para `ops/env/.env.server` y `ops/env/.env.server.dev`,
+    - se mantiene compatibilidad controlada con legacy `.env.server` / `.env`.
+  - runtime backend ahora resuelve entorno por convención canónica (`code/app/core/env_loader.py`) y deja de depender de `.env` raíz por defecto en:
+    - `code/app/main.py`
+    - `code/app/core/config.py`
+    - `code/app/core/db.py`
+    - `code/app/core/ai/ai_local_openai_compat.py`
+  - scripts operativos alineados a la misma resolución de entorno:
+    - `code/scripts/sync_erp.py`
+    - `code/scripts/sync_calendario_ejecutivo.py`
+    - `ops/herramientas/deploy/start.sh`
+    - `ops/herramientas/deploy/iniciar_todo.sh`
+  - tests y checks endurecidos para bloquear regresiones de contrato:
+    - `tests/e2e_ticketera.py` usa `ops/env/.env.server.dev`
+    - `tests/verify_hardening.py` ahora valida workflow DEV/PROD, compose canónico, uso de `load_runtime_env()` y sintaxis de `deploy.sh`.
+- **Verificación**:
+  - `bash -n ops/herramientas/deploy/deploy.sh` ✅
+  - `python3 -m compileall -q code/app code/scripts` ✅
+  - `python3 tests/verify_hardening.py` ✅
+  - `ENV_FILE=ops/env/.env.server.dev docker compose --env-file ops/env/.env.server.dev config -q` ✅
+  - `ENV_FILE=/srv/monstruo/.env.server docker compose --env-file /srv/monstruo/.env.server config -q` ✅
+- **Estado**: CERRADO.
+
+## HITO: 2026-03-11 - Consolidación de archivos `.env`, limpieza de redundancias y actualización de Google OAuth (PROD)
+- **Descripción**: Consolidación de archivos `.env`, limpieza de redundancias y actualización de Google OAuth. Configuración centralizada en `ops/env/` con despliegue exitoso a `main`. (Juan / Antigravity)
+- **Estado**: CERRADO.
 
 ## HITO: 2026-02-23 - EPIC 11 Ticketera: reset operativo + eliminación de usuarios de prueba (DEV)
 - **Solicitud**: resetear ticketera y eliminar usuarios de pruebas creados durante validaciones.

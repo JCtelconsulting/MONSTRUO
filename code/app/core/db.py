@@ -4,7 +4,6 @@ import hashlib
 import secrets
 import re
 import json
-from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
@@ -29,7 +28,9 @@ except Exception:
     RealDictCursor = None
     _HAVE_PSYCOPG2 = False
 
-load_dotenv()
+from app.core.env_loader import load_runtime_env
+
+load_runtime_env(Path(__file__).resolve())
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DB_URL = os.getenv("DB_URL", "").strip()
