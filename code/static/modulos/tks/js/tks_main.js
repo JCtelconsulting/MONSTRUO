@@ -1059,6 +1059,61 @@ const TksMain = (() => {
         }
     }
 
+    /**
+     * Refresca solo la línea de tiempo (eventos y correos) de un ticket abierto.
+     * Útil para capturar cambios asíncronos en el backend (ej: correos de notificación).
+     */
+    async function refreshDetailFeed(ticketId) {
+        if (!ticketId || currentTab !== 'lista' || Number(selectedTicketId) !== Number(ticketId)) return;
+        
+        try {
+            const [eventosData, emailsData, attachmentsData] = await Promise.all([
+                TksApi.getEventos(ticketId, { timeoutMs: 5000 }),
+                TksApi.getTicketEmails(ticketId, { timeoutMs: 5000 }),
+                TksApi.getTicketAttachments(ticketId, { timeoutMs: 5000 }),
+            ]);
+
+            // Re-renderizamos el detalle completo para mantener la consistencia del estado
+            // pero preservando el modo del composer si el usuario estaba escribiendo (aunque openDetail ya lo hace).
+            // Si el ticket cambió (ej: ya no es el mismo ID), abortamos.
+            if (Number(selectedTicketId) !== Number(ticketId)) return;
+
+            // Actualizamos la variable global 'selectedTicket' por si cambió algo en el refresh
+            // Aunque aquí solo pedimos eventos/emails, es mejor re-pedir el ticket completo si queremos
+            // que los badges de estado/asignado también se actualicen.
+            const ticket = await TksApi.getTicket(ticketId, { timeoutMs: 5000 });
+            selectedTicket = ticket;
+
+            const permissions = ticketPermissions(ticket);
+            const html = TksUI.renderDetail(
+                ticket,
+                eventosData.items || [],
+                emailsData.items || [],
+                attachmentsData.items || [],
+                {
+                    ...permissions,
+                    currentUser: sessionCtx.user,
+                    currentRole: sessionCtx.role,
+                    composerMode: detailActiveTab,
+                    draft: currentDraftSnapshot,
+                    draftMeta: currentDraftMeta,
+                    hasDraftLockToken: !!draftLockToken,
+                    workflow: currentWorkflow,
+                }
+            );
+
+            const panel = el('tks-detail-panel');
+            if (panel) {
+                panel.innerHTML = html;
+                hydrateAssigneePicker(ticket, permissions);
+                // No scrolleamos obligatoriamente al final para no molestar si el usuario está leyendo arriba,
+                // a menos que sea un refresh provocado por una acción propia.
+            }
+        } catch (e) {
+            console.warn('[refreshDetailFeed] Failed:', e);
+        }
+    }
+
     // ---- ACTIONS ----
     async function changeStatus(ticketId, newStatus) {
         const perms = selectedTicket && Number(selectedTicket.id) === Number(ticketId)
@@ -1112,6 +1167,8 @@ const TksMain = (() => {
             if (currentTab === 'lista') {
                 refreshList();
                 openDetail(ticketId, { preserveTab: true });
+                // Gatillar un segundo refresco tras 3 segundos para capturar correos asíncronos
+                setTimeout(() => refreshDetailFeed(ticketId), 3000);
             } else {
                 loadTab(currentTab, { force: true });
             }
@@ -1141,7 +1198,10 @@ const TksMain = (() => {
             await TksApi.addEvento(ticketId, { evento: 'nota', detalle: text });
             clearDataCache();
             input.value = '';
-            openDetail(ticketId, { preserveTab: true });
+            // Refrescar inmediatamente el detalle
+            await openDetail(ticketId, { preserveTab: true });
+            // Asegurar que bajamos el scroll para ver la nota recién puesta
+            scrollTimelineToBottom();
         } catch (e) {
             if (window.showToast) window.showToast(`Error: ${e.message}`, 'error');
         }
@@ -1320,6 +1380,8 @@ const TksMain = (() => {
             if (currentTab === 'lista') {
                 refreshList();
                 openDetail(ticketId, { preserveTab: true });
+                // Gatillar un segundo refresco para capturar el correo de asignación asíncrono
+                setTimeout(() => refreshDetailFeed(ticketId), 3000);
             }
         } catch (e) {
             if (window.showToast) window.showToast(`Error reasignando ticket: ${e.message}`, 'error');

@@ -507,7 +507,7 @@ def api_checks(args: argparse.Namespace) -> List[str]:
         transition_idem = f"hardening-transition-{ticket_id}-{int(time.time() * 1000)}"
         t1 = session.post(
             f"{base_url}/api/tks/tickets/{ticket_id}/transitions",
-            json={"to_subestado": "en_analisis", "motivo": "idempotencia"},
+            json={"to_subestado": "asignado", "motivo": "idempotencia"},
             headers={"Idempotency-Key": transition_idem},
             timeout=args.timeout,
         )
@@ -517,12 +517,22 @@ def api_checks(args: argparse.Namespace) -> List[str]:
 
         t2 = session.post(
             f"{base_url}/api/tks/tickets/{ticket_id}/transitions",
-            json={"to_subestado": "en_analisis", "motivo": "idempotencia"},
+            json={"to_subestado": "asignado", "motivo": "idempotencia"},
             headers={"Idempotency-Key": transition_idem},
             timeout=args.timeout,
         )
         if t2.status_code != 200 or not as_json(t2).get("duplicate_skipped"):
             errors.append(f"Transition idempotente (duplicada) no deduplicó: {t2.status_code} {t2.text}")
+            return errors
+
+        analysis_transition = session.post(
+            f"{base_url}/api/tks/tickets/{ticket_id}/transitions",
+            json={"to_subestado": "en_analisis", "motivo": "pasa a analisis"},
+            headers={"Idempotency-Key": f"{transition_idem}-analysis"},
+            timeout=args.timeout,
+        )
+        if analysis_transition.status_code != 200:
+            errors.append(f"Transition a en_analisis falló: {analysis_transition.status_code} {analysis_transition.text}")
             return errors
 
         p1 = session.post(

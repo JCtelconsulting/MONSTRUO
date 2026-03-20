@@ -585,17 +585,17 @@ def _compose_reply_recipients(
 def notify_client_assignment(ticket: Dict[str, Any], assignee_name: str) -> None:
     """Envía un correo al cliente informando la asignación del especialista."""
     ticket_id = int(ticket["id"])
+    # Recargar ticket para capturar metadatos de hilo actualizados (evitar carrera con auto-respuesta)
+    ticket = get_ticket(ticket_id) or ticket
     code = str(ticket.get("codigo") or f"#{ticket_id}")
     to_email, cc_emails, bcc_emails, to_record = _compose_reply_recipients(ticket)
     
     if not to_email or "@" not in to_email:
         return
 
-    subject = f"Re: {code} - Asignación de Especialista"
-    if str(ticket.get("titulo") or "").strip():
-        # Limpiar Re: duplicados si el título ya lo tiene
-        clean_title = str(ticket.get("titulo")).replace("Re: ", "").replace("RE: ", "").strip()
-        subject = f"Re: {code} - {clean_title}"
+    subject = f"Re: [{code}] {str(ticket.get('titulo') or '').strip()}"
+    if not str(ticket.get("titulo") or "").strip():
+        subject = f"Re: [{code}] Asignación de Especialista"
 
     body_html = f"""
     <p>Estimado Cliente,</p>
@@ -710,7 +710,7 @@ def _send_ticket_status_update_to_notify_emails(
     from_label = _estado_label(from_estado)
     to_label = _estado_label(to_estado)
 
-    subject = f"[{code}] Estado actualizado: {to_label}"
+    subject = f"Re: [{code}] {str(title).strip()}"
     motivo_html = f"<p><strong>Motivo:</strong> {html.escape(motivo)}</p>" if str(motivo or "").strip() else ""
     body_html = f"""
     <p>Se actualizó el estado del ticket <strong>{html.escape(code)}</strong>.</p>
@@ -783,7 +783,8 @@ def _build_ticket_reply_subject(ticket: Dict[str, Any], asunto: Optional[str] = 
     else:
         base = ticket.get("codigo") or f"Ticket #{int(ticket.get('id') or 0)}"
         title = (ticket.get("titulo") or "").strip()
-        subject = f"{base} - {title}" if title else str(base)
+        subject = f"[{base}] {title}" if title else str(base)
+    
     if not subject.lower().startswith("re:"):
         subject = f"Re: {subject}"
     return subject
@@ -1402,6 +1403,94 @@ def log_notification_attempt(
         logger.warning(f"[ticket_notifications] intento no pudo registrarse para {notification_id}: {e}")
     finally:
         conn.close()
+
+def _get_auto_close_hours() -> int:
+    """Recupera el tiempo de auto-cierre configurado en system_settings."""
+    conn = db.get_conn()
+    try:
+        row = conn.execute("SELECT value FROM system_settings WHERE key = 'ticket_auto_close_time'").fetchone()
+        if row and row["value"]:
+            try:
+                return max(1, int(row["value"]))
+            except ValueError:
+                pass
+    except Exception as e:
+        logger.warning(f"Error al recuperar ticket_auto_close_time: {e}")
+    finally:
+        conn.close()
+    return 24
+
+def notify_client_resolution(ticket: Dict[str, Any]) -> None:
+    """Envía un correo al cliente informando que el ticket ha sido resuelto."""
+    ticket_id = int(ticket["id"])
+    # Recargar ticket para capturar metadatos de hilo actualizados (evitar carrera con asignación)
+    ticket = get_ticket(ticket_id) or ticket
+    code = str(ticket.get("codigo") or f"#{ticket_id}")
+    to_email, cc_emails, bcc_emails, to_record = _compose_reply_recipients(ticket)
+    
+    if not to_email or "@" not in to_email:
+        return
+
+    subject = f"Re: [{code}] {str(ticket.get('titulo') or '').strip()}"
+    if not str(ticket.get("titulo") or "").strip():
+        subject = f"Re: [{code}] Ticket Resuelto"
+
+    hours = _get_auto_close_hours()
+    body_html = f"""
+    <p>Estimado Cliente,</p>
+    <p>Le informamos que su ticket <strong>{html.escape(code)}</strong> ya está listo y ha sido marcado como <strong>RESUELTO</strong>.</p>
+    <p>Si no recibimos comentarios adicionales de su parte en las próximas <strong>{hours} horas</strong>, el ticket se cerrará automáticamente.</p>
+    <p>Gracias por su preferencia.</p>
+    <p>Saludos.</p>
+    """
+    
+    headers = _build_ticket_thread_headers(ticket)
+    now = db.now_utc_iso()
+    
+    try:
+        send_meta = email_sender.send_email_advanced(
+            to_email=to_email,
+            cc_emails=cc_emails,
+            bcc_emails=bcc_emails,
+            subject=subject,
+            html_body=body_html,
+            headers=headers
+        )
+        
+        # Registrar en historial de correos del ticket
+        conn = db.get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO ticket_emails 
+                   (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, created_at)
+                   VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    ticket_id, 
+                    send_meta.get("from_addr") or "soporte",
+                    to_record or to_email,
+                    ", ".join(cc_emails),
+                    ", ".join(bcc_emails),
+                    subject,
+                    body_html,
+                    now
+                )
+            )
+            # Actualizar metadatos de hilo para que el próximo correo se enganche a este
+            _update_ticket_thread_metadata(
+                conn,
+                ticket_id,
+                message_id=send_meta.get("message_id"),
+                in_reply_to=headers.get("In-Reply-To"),
+                references=headers.get("References")
+            )
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Error al registrar correo de resolución para ticket {ticket_id}: {e}")
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"Error al enviar correo de resolución para ticket {ticket_id}: {e}")
 
 async def _schedule_next_process_notifications(delay_seconds: int = 60) -> None:
     next_run = (datetime.now(timezone.utc) + timedelta(seconds=max(5, int(delay_seconds or 60)))).isoformat()
@@ -2624,19 +2713,21 @@ def update_ticket(
                     ),
                 )
                 # Solo emitir nota de sistema si NO es una asignación (para no duplicar avisos)
-                if "asignado_a" not in normalized_updates:
-                    _emit_system_comment(
-                        conn,
-                        ticket_id,
-                        f"[TRANSICION] Subestado cambiado de {from_sub or '-'} a {to_sub}",
-                        now,
-                        author_id="system",
-                    )
+                # Eliminada emisión de [TRANSICION] por ser redundante con la visual de estados
+                # if "asignado_a" not in normalized_updates:
+                #     _emit_system_comment(
+                #         conn,
+                #         ticket_id,
+                #         f"[TRANSICION] Subestado cambiado de {from_sub or '-'} a {to_sub}",
+                #         now,
+                #         author_id="system",
+                #     )
 
         if "estado" in normalized_updates:
             new_estado = normalized_updates["estado"]
             if "asignado_a" not in normalized_updates:
-                _emit_system_comment(conn, ticket_id, f"[CAMBIO_ESTADO] Estado cambiado a {new_estado}", now, author_id="system")
+                clean_estado = str(new_estado).replace("_", " ")
+                _emit_system_comment(conn, ticket_id, f"[CAMBIO_ESTADO] Estado cambiado a {clean_estado}", now, author_id="system")
             if new_estado in ("cerrado", "resuelto"):
                 if current.get("asignado_a"):
                     decrementar_carga(current["asignado_a"], specialty=current.get("categoria"))
@@ -2719,6 +2810,9 @@ def update_ticket(
     if "estado" in normalized_updates and updated_ticket:
         new_estado = str(updated_ticket.get("estado") or "").strip().lower()
         if old_estado and new_estado and old_estado != new_estado:
+            if new_estado == "resuelto":
+                threading.Thread(target=notify_client_resolution, args=(updated_ticket,), daemon=True).start()
+
             try:
                 _send_ticket_status_update_to_notify_emails(
                     updated_ticket,
@@ -3645,13 +3739,16 @@ def transition_ticket(
     if result_ticket:
         new_estado = str(result_ticket.get("estado") or "").strip().lower()
         if old_estado and new_estado and old_estado != new_estado:
+            if new_estado == "resuelto":
+                threading.Thread(target=notify_client_resolution, args=(result_ticket,), daemon=True).start()
+
             try:
                 _send_ticket_status_update_to_notify_emails(
                     result_ticket,
                     from_estado=old_estado,
                     to_estado=new_estado,
                     actor_id=actor_id,
-                    motivo=motivo or "transicion_workflow",
+                    motivo=motivo,
                 )
             except Exception as status_mail_error:
                 logger.warning(f"[transition_ticket] aviso de estado por correo no crítico falló para ticket {ticket_id}: {status_mail_error}")
@@ -7499,7 +7596,10 @@ def _find_ticket_by_subject(subject: str) -> Optional[int]:
 
 def _auto_reply_subject(ticket: Dict[str, Any]) -> str:
     code = str(ticket.get("codigo") or f"TK-{ticket.get('id', '')}").strip() or "Ticket"
-    return f"Re: {code} - Comprobante de Recepción"
+    title = str(ticket.get("titulo") or "").strip()
+    if title:
+        return f"Re: [{code}] {title}"
+    return f"Re: [{code}] Comprobante de Recepción"
 
 def _auto_reply_body(nombre: str, code: str, asignado_a: str) -> str:
     safe_code = html.escape((code or "Ticket").strip() or "Ticket")

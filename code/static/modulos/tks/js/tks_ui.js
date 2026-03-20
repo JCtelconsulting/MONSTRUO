@@ -872,6 +872,7 @@ const TksUI = (() => {
                 const rawEvent = String(ev?.evento || ev?.event_type || '').trim().toLowerCase().replace(/\s+/g, '_');
             const rawDetail = String(ev?.detalle || ev?.detail || '').trim().toLowerCase();
             if (rawEvent.startsWith('correo')) return false;
+            if (rawEvent === 'transicion') return false;
             if (rawEvent.includes('adjunto_incoming')) return false;
             if (rawDetail.startsWith('respuesta enviada a ')) return false;
             if (rawDetail.startsWith('se guardaron') && rawDetail.includes('adjunto')) return false;
@@ -955,6 +956,9 @@ const TksUI = (() => {
                 let cleanDetail = String(item.detalle || '');
                 if (item.isSystem && cleanDetail.includes('|')) {
                     cleanDetail = cleanDetail.split('|')[0].trim();
+                }
+                if (item.isSystem) {
+                    cleanDetail = cleanDetail.replace(/_/g, ' ');
                 }
 
                 return `<article class="tks-feed-item tks-feed-item-event ${eventTypeClass}">

@@ -1,8 +1,58 @@
 # PROYECTO CONTEXTO: MONSTRUO
-**Fecha de actualizacion:** 16 Marzo 2026
+**Fecha de actualizacion:** 20 Marzo 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
-## HITO: 2026-03-16 - Despliegue Exitoso DEV -> PROD (Ticketera + ERP Hardening)
+## HITO: 2026-03-20 - Preflight DEV -> PROD Ticketera (DEV)
+- **Solicitud**: preparar una promoción segura de `dev` a `prod` para ticketera sin romper threading, adjuntos ni gates de validación.
+- **Acción ejecutada**:
+  - `code/app/core/email_integration.py`:
+    - corregido parseo multipart IMAP para no perder adjuntos cuando aparecen después del primer `text/plain`/`text/html`.
+  - `tests/unit_ticketera_core.py`:
+    - agregadas regresiones para:
+      - asunto/threading de correo de asignación,
+      - correo de resolución con ventana dinámica de auto-cierre,
+      - lectura de `ticket_auto_close_time`,
+      - parseo IMAP de asunto/cuerpo/adjuntos.
+  - `tests/verify_hardening.py`:
+    - alineado `--check-api` al workflow vigente de tickets tipo `cambio` (`recibido -> asignado -> en_analisis -> pendiente_aprobacion_1`) para eliminar falso negativo del gate.
+  - Runtime DEV:
+    - reinicio controlado de `monstruo-dev-api` para validar el código actual montado en contenedor.
+- **Verificación**:
+  - `python3 tests/unit_ticketera_core.py` ✅
+  - `python3 tests/unit_ticketera_frontend_security.py` ✅
+  - `python3 tests/verify_hardening.py` ✅
+  - `python3 tests/verify_hardening.py --check-api --base-url http://127.0.0.1:9001 --user <temp> --password '***' --timeout 60` ✅
+  - `python3 -m compileall -q code/app tests/unit_ticketera_core.py tests/verify_hardening.py` ✅
+- **Estado**: CERRADO (DEV). Queda pendiente promoción humana `dev -> main` para disparar deploy PROD por Actions.
+
+## HITO: 2026-03-17 - UX Ticketera: Notificación de Resolución Dinámica y Auto-cierre (DEV)
+- **Solicitud**: automatizar correo al cliente sincronizado con la configuración de Ajustes (auto-cierre).
+- **Acción ejecutada**:
+  - `tickets_service.py`: 
+    - Implementada función `_get_auto_close_hours()` para leer el tiempo configurado en la DB (`ticket_auto_close_time`).
+    - Actualizada `notify_client_resolution` para que el texto del correo informe dinámicamente el plazo de horas.
+  - `jobs_engine.py`: Ajustado intervalo de auto-cierre por defecto a 24h.
+- **Estado**: CERRADO (DEV).
+
+## HITO: 2026-03-17 - UX Ticketera: Actualización automática y limpieza visual (DEV)
+- **Solicitud**: actualización reactiva del detalle y eliminación de "tarjetas amarillas" redundantes.
+- **Acción ejecutada**:
+  - `tks_main.js`: Implementación de `refreshDetailFeed` con polling diferido de 3s.
+  - `tks_ui.js`: Filtrado de eventos "transicion" y humanización de textos (sin guiones bajos).
+  - `tickets_service.py`: Desactivada emisión de comentarios de sistema para transiciones y humanización de mensajes de estado.
+- **Estado**: CERRADO (DEV).
+
+## HITO: 2026-03-17 - Reinicio Técnico de Ticketera a 0 (DEV & PROD)
+- **Solicitud**: reiniciar la ticketera a 0 tickets en ambos ambientes para iniciar ciclo de pruebas limpio.
+- **Acción ejecutada**:
+  - Base de Datos: Truncado transaccional (`RESTART IDENTITY CASCADE`) de 19 tablas operativas en los esquemas `tks`, `ops` y `core`.
+  - Archivos: Limpieza total de directorios de adjuntos en `/srv/monstruo_dev/data/tickets/` y `/srv/monstruo/data/tickets/`.
+  - Carga Técnica: Reinicio de contadores de carga de especialistas a 0.
+- **Verificación**:
+  - DEV: Tickets = 0, Carga = 0, Archivos = 0 ✅
+  - PROD: Tickets = 0, Carga = 0, Archivos = 0 ✅
+- **Estado**: CERRADO.
+
 - **Solicitud**: promover todos los cambios de DEV a PROD de forma segura.
 - **Acción ejecutada**:
   - Limpieza de Git: Se detectaron archivos de 4.2GB en `data/fundacion`, se procedió a excluirlos vía `.gitignore` para permitir el push.

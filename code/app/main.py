@@ -297,6 +297,11 @@ async def start_background_workers():
         "JIRA_DELTA_SYNC_DAILY", payload={"recurring": True}, max_retries=1
     )
     await jobs_engine.enqueue_unique_job(
+        "RECOVER_STALE_JOBS",
+        payload={"recurring": True, "stale_minutes": stale_minutes},
+        max_retries=1,
+    )
+    await jobs_engine.enqueue_unique_job(
         "CLEANUP_SYS_JOBS",
         payload={"recurring": True, "retention_days": retention_days},
         max_retries=1,

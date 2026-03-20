@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
 import sys
 import unittest
 from datetime import datetime
+from email.header import Header
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +20,7 @@ if str(CODE_ROOT) not in sys.path:
 
 from app.core.tickets import roles as ticket_roles
 from app.core.tickets import workflow as ticket_workflow
+from app.core import email_integration
 from app.core import tickets_service
 
 
@@ -123,6 +129,132 @@ class TicketTimelineTests(unittest.TestCase):
         mock_conn.close.assert_called_once()
 
 
+class TicketEmailNotificationTests(unittest.TestCase):
+    def test_notify_client_assignment_uses_reply_subject_and_thread_headers(self) -> None:
+        ticket = {
+            "id": 101,
+            "codigo": "TK-20-03-2026-0001",
+            "titulo": "Falla correo",
+            "origen_email": "cliente@example.com",
+            "email_thread_id": "<parent@example.com>",
+            "email_references": "<older@example.com>",
+        }
+        conn = MagicMock()
+
+        with (
+            patch("app.core.tickets_service.get_ticket", return_value=ticket),
+            patch("app.core.tickets_service.db.get_conn", return_value=conn),
+            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-20T12:00:00+00:00"),
+            patch(
+                "app.core.tickets_service.email_sender.send_email_advanced",
+                return_value={"from_addr": "soporte@example.com", "message_id": "<msg-assignment@example.com>"},
+            ) as send_email,
+            patch("app.core.tickets_service._update_ticket_thread_metadata") as update_thread,
+        ):
+            tickets_service.notify_client_assignment(ticket, "Especialista Uno")
+
+        kwargs = send_email.call_args.kwargs
+        self.assertEqual(kwargs["subject"], "Re: [TK-20-03-2026-0001] Falla correo")
+        self.assertEqual(kwargs["to_email"], "cliente@example.com")
+        self.assertEqual(
+            kwargs["headers"],
+            {"In-Reply-To": "<parent@example.com>", "References": "<older@example.com> <parent@example.com>"},
+        )
+
+        update_thread.assert_called_once_with(
+            conn,
+            101,
+            message_id="<msg-assignment@example.com>",
+            in_reply_to="<parent@example.com>",
+            references="<older@example.com> <parent@example.com>",
+        )
+        conn.commit.assert_called_once()
+        conn.close.assert_called_once()
+
+    def test_notify_client_resolution_uses_configured_auto_close_window(self) -> None:
+        ticket = {
+            "id": 102,
+            "codigo": "TK-20-03-2026-0002",
+            "titulo": "Incidente mayor",
+            "origen_email": "cliente@example.com",
+            "email_thread_id": "<thread@example.com>",
+            "email_references": "<history@example.com>",
+        }
+        conn = MagicMock()
+
+        with (
+            patch("app.core.tickets_service.get_ticket", return_value=ticket),
+            patch("app.core.tickets_service._get_auto_close_hours", return_value=36),
+            patch("app.core.tickets_service.db.get_conn", return_value=conn),
+            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-20T12:00:00+00:00"),
+            patch(
+                "app.core.tickets_service.email_sender.send_email_advanced",
+                return_value={"from_addr": "soporte@example.com", "message_id": "<msg-resolution@example.com>"},
+            ) as send_email,
+            patch("app.core.tickets_service._update_ticket_thread_metadata") as update_thread,
+        ):
+            tickets_service.notify_client_resolution(ticket)
+
+        kwargs = send_email.call_args.kwargs
+        self.assertEqual(kwargs["subject"], "Re: [TK-20-03-2026-0002] Incidente mayor")
+        self.assertIn("36 horas", kwargs["html_body"])
+        self.assertEqual(kwargs["to_email"], "cliente@example.com")
+        self.assertEqual(
+            kwargs["headers"],
+            {"In-Reply-To": "<thread@example.com>", "References": "<history@example.com> <thread@example.com>"},
+        )
+
+        update_thread.assert_called_once_with(
+            conn,
+            102,
+            message_id="<msg-resolution@example.com>",
+            in_reply_to="<thread@example.com>",
+            references="<history@example.com> <thread@example.com>",
+        )
+        conn.commit.assert_called_once()
+        conn.close.assert_called_once()
+
+    def test_get_auto_close_hours_reads_db_setting(self) -> None:
+        conn = MagicMock()
+        conn.execute.return_value.fetchone.return_value = {"value": "48"}
+
+        with patch("app.core.tickets_service.db.get_conn", return_value=conn):
+            hours = tickets_service._get_auto_close_hours()
+
+        self.assertEqual(hours, 48)
+        conn.close.assert_called_once()
+
+
+class EmailIntegrationParsingTests(unittest.TestCase):
+    def test_parse_email_decodes_subject_body_and_attachment(self) -> None:
+        msg = MIMEMultipart()
+        msg["Subject"] = Header("Prueba ñ", "utf-8").encode()
+        msg["From"] = "Cliente E2E <cliente@example.com>"
+        msg["Message-ID"] = "<imap@example.com>"
+        msg.attach(MIMEText("Linea 1\nLinea 2", "plain", "utf-8"))
+        msg.attach(MIMEText("<p>Linea <strong>HTML</strong></p>", "html", "utf-8"))
+
+        attachment = MIMEBase("application", "octet-stream")
+        attachment.set_payload(b"hola mundo")
+        attachment.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=Header("adjunto-á.txt", "utf-8").encode(),
+        )
+        msg.attach(attachment)
+
+        processor = email_integration.EmailProcessor.__new__(email_integration.EmailProcessor)
+        with patch("builtins.print"):
+            parsed = processor.parse_email(msg)
+
+        self.assertEqual(parsed["subject"], "Prueba ñ")
+        self.assertEqual(parsed["sender"], "Cliente E2E <cliente@example.com>")
+        self.assertEqual(parsed["message_id"], "<imap@example.com>")
+        self.assertIn("Linea 1", parsed["body"])
+        self.assertEqual(len(parsed["attachments"]), 1)
+        self.assertEqual(parsed["attachments"][0]["filename"], "adjunto-á.txt")
+        self.assertEqual(base64.b64decode(parsed["attachments"][0]["data_base64"]), b"hola mundo")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

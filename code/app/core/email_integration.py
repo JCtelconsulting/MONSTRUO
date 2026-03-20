@@ -63,7 +63,7 @@ class EmailProcessor:
         user = self.config['imap_user']
         password = self.config['imap_password']
         
-        self.mail = imaplib.IMAP4_SSL(host, port)
+        self.mail = imaplib.IMAP4_SSL(host, port, timeout=30)
         self.mail.login(user, password)
         
     def fetch_unread(self):
@@ -90,50 +90,75 @@ class EmailProcessor:
         
     def parse_email(self, msg):
         raw_subject = msg.get("Subject", "") or ""
-        subject, encoding = decode_header(raw_subject)[0]
-        if isinstance(subject, bytes):
-            subject = subject.decode(encoding or "utf-8", errors="ignore")
-            
-        sender = msg.get("From")
-        message_id = msg.get("Message-ID")
+        subject = ""
+        try:
+            decoded_parts = decode_header(raw_subject)
+            for part, encoding in decoded_parts:
+                if isinstance(part, bytes):
+                    subject += part.decode(encoding or "utf-8", errors="replace")
+                else:
+                    subject += str(part)
+        except Exception:
+            subject = str(raw_subject)
+
+        sender = msg.get("From", "unknown")
+        message_id = msg.get("Message-ID", "unknown")
         in_reply_to = msg.get("In-Reply-To")
         references = msg.get("References")
+        
+        print(f"[IMAP] Parsing email ID={message_id} from={sender}")
         
         body = ""
         attachments = []
         if msg.is_multipart():
             for part in msg.walk():
                 content_type = part.get_content_type()
-                content_disposition = str(part.get("Content-Disposition"))
+                content_disposition = str(part.get("Content-Disposition", ""))
 
                 if "attachment" in content_disposition.lower():
                     filename = part.get_filename()
                     if filename:
-                        filename_decoded, enc = decode_header(filename)[0]
-                        if isinstance(filename_decoded, bytes):
-                            filename_decoded = filename_decoded.decode(enc or "utf-8", errors="ignore")
+                        try:
+                            decoded_header = decode_header(filename)[0]
+                            filename_decoded, enc = decoded_header
+                            if isinstance(filename_decoded, bytes):
+                                filename_decoded = filename_decoded.decode(enc or "utf-8", errors="replace")
+                        except Exception:
+                            filename_decoded = str(filename)
+                            
                         payload = part.get_payload(decode=True) or b""
                         attachments.append(
                             {
                                 "filename": filename_decoded or "attachment.bin",
                                 "content_type": content_type or "application/octet-stream",
-                                # Keep as base64 string to avoid binary issues in logs/middlewares.
                                 "data_base64": base64.b64encode(payload).decode("ascii"),
                             }
                         )
                     continue
 
-                if content_type == "text/plain" and "attachment" not in content_disposition:
-                    body = part.get_payload(decode=True).decode()
-                    break # Prefer plain text
-                elif content_type == "text/html" and "attachment" not in content_disposition:
-                    html_body = part.get_payload(decode=True).decode()
-                    body = clean_html_content(html_body)
+                if content_type in ["text/plain", "text/html"] and "attachment" not in content_disposition.lower():
+                    try:
+                        charset = part.get_content_charset() or "utf-8"
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            decoded_body = payload.decode(charset, errors="replace")
+                            if content_type == "text/plain":
+                                body = decoded_body
+                            elif not body.strip():
+                                body = clean_html_content(decoded_body)
+                    except Exception as e:
+                        print(f"[IMAP] Error decoding part {content_type}: {e}")
         else:
             content_type = msg.get_content_type()
-            body = msg.get_payload(decode=True).decode()
-            if content_type == "text/html":
-                body = clean_html_content(body)
+            try:
+                charset = msg.get_content_charset() or "utf-8"
+                payload = msg.get_payload(decode=True)
+                if payload:
+                    body = payload.decode(charset, errors="replace")
+                    if content_type == "text/html":
+                        body = clean_html_content(body)
+            except Exception as e:
+                print(f"[IMAP] Error decoding single-part email: {e}")
                 
         return {
             "subject": subject,

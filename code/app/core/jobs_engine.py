@@ -362,7 +362,11 @@ async def poll_email_job(payload: dict):
         try:
             processor.connect()
             emails = processor.fetch_unread()
-            print(f"[JobEngine] Found {len(emails)} unread emails.")
+            if emails:
+                print(f"[JobEngine] Found {len(emails)} unread emails.")
+            else:
+                # Solo log en debug/verbose o si realmente hay IDs pero falló el parseo
+                pass
 
             for email_data in emails:
                 try:
@@ -590,7 +594,7 @@ async def auto_close_tickets_job(payload: dict):
     logger.info("[JobEngine] Revisando tickets para Auto-Cierre...")
     conn = db.get_conn()
     now = db.now_utc_iso()
-    interval_horas = 72
+    interval_horas = 24
 
     try:
         # 1. Leer de DB el tiempo de configuración
@@ -651,8 +655,24 @@ async def auto_close_tickets_job(payload: dict):
             update_existing_next_run=False,
         )
 
+async def recover_stale_jobs_job(payload: dict):
+    stale_minutes = int(payload.get("stale_minutes", 20) or 20)
+    result = recover_stale_running_jobs(stale_minutes=stale_minutes)
+    if result.get("recovered", 0) > 0:
+        print(f"[JobEngine] Recovered {result['recovered']} stale jobs.")
+    
+    if bool(payload.get("recurring", True)):
+        await enqueue_unique_job(
+            "RECOVER_STALE_JOBS",
+            {"recurring": True, "stale_minutes": stale_minutes},
+            max_retries=1,
+            next_run_at=_next_run_iso(10 * 60), # Cada 10 min
+            update_existing_next_run=False,
+        )
+
 # Register default jobs
 register_job("EMAIL_POLLING", poll_email_job)
 register_job("SEND_AUTO_RESPONSE", send_auto_response_job)
 register_job("CLEANUP_SYS_JOBS", cleanup_sys_jobs_job)
 register_job("AUTO_CLOSE_TICKETS", auto_close_tickets_job)
+register_job("RECOVER_STALE_JOBS", recover_stale_jobs_job)
