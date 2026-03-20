@@ -17,6 +17,7 @@
     - alineado `--check-api` al workflow vigente de tickets tipo `cambio` (`recibido -> asignado -> en_analisis -> pendiente_aprobacion_1`) para eliminar falso negativo del gate.
   - Runtime DEV:
     - reinicio controlado de `monstruo-dev-api` para validar el código actual montado en contenedor.
+    - limpieza de artefactos de validación (`Hardening Workflow*`, decisiones `go-no-go` de prueba y usuario temporal de smoke).
 - **Verificación**:
   - `python3 tests/unit_ticketera_core.py` ✅
   - `python3 tests/unit_ticketera_frontend_security.py` ✅
