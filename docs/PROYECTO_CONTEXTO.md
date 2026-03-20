@@ -2,6 +2,35 @@
 **Fecha de actualizacion:** 20 Marzo 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-03-20 - Promoción DEV -> PROD validada (Ticketera)
+- **Solicitud**: ejecutar la promoción real de `dev` a `main/prod` y verificar que producción quedara estable con la versión validada.
+- **Acción ejecutada**:
+  - Git:
+    - `main` fue avanzado por fast-forward desde `69e83e3` a `8fb5cc6`.
+    - push ejecutado a `origin/main`, disparando deploy automático por GitHub Actions.
+  - Deploy PROD:
+    - repositorio `/srv/monstruo` actualizado a `8fb5cc6`.
+    - contenedor `monstruo-api` reiniciado con `APP_GIT_SHA=8fb5cc6`, `APP_GIT_BRANCH=main`, `APP_BUILD_TIME=2026-03-20T17:05:38Z`.
+  - Validación post-deploy:
+    - healthcheck HTTP 200.
+    - smoke API productivo con `verify_hardening.py --check-api --allow-prod` usando usuario temporal controlado.
+    - limpieza posterior de artefactos de smoke (`tickets`, `parallel_decisions`, usuario y sesión temporales).
+- **Verificación**:
+  - `git -C /srv/monstruo rev-parse --short HEAD` -> `8fb5cc6` ✅
+  - `curl http://127.0.0.1:9000/health` -> `200` ✅
+  - `python3 tests/verify_hardening.py --check-api --allow-prod --base-url http://127.0.0.1:9000 --user <temp> --password '***' --timeout 60` ✅
+  - runtime limpio tras smoke:
+    - `tickets=0` ✅
+    - `hardening_decisions=0` ✅
+    - `temp_users=0` ✅
+  - assets Ticketera servidos desde PROD:
+    - `tks_main.js?v=53` -> 200 ✅
+    - `tks_ui.js?v=76` -> 200 ✅
+- **Observación operativa**:
+  - PROD quedó estable a nivel deploy/runtime.
+  - Correo de Ticketera sigue pendiente de configuración funcional en PROD (`imap_host` y `smtp_host` vacíos al momento de la validación), por lo que el polling IMAP seguirá registrando `No IMAP config found` hasta completar esa configuración.
+- **Estado**: CERRADO (PROD validado).
+
 ## HITO: 2026-03-20 - Preflight DEV -> PROD Ticketera (DEV)
 - **Solicitud**: preparar una promoción segura de `dev` a `prod` para ticketera sin romper threading, adjuntos ni gates de validación.
 - **Acción ejecutada**:
