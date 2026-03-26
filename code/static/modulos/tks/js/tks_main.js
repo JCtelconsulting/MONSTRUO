@@ -565,13 +565,24 @@ const TksMain = (() => {
         };
     }
 
+    function ticketAllowsReplyStatus(ticket) {
+        const status = String(ticket?.estado || '').trim().toLowerCase();
+        return status === 'abierto' || status === 'en_progreso';
+    }
+
     function replyBlockedReason(ticket, permissions) {
         if (permissions?.canParticipate !== true) {
             return String(permissions?.blockedReason || '').trim();
         }
         const status = String(ticket?.estado || '').trim().toLowerCase();
-        if (status !== 'en_progreso') {
-            return 'Para responder el ticket al cliente, debes pasarlo primero a estado En Progreso';
+        if (!ticketAllowsReplyStatus(ticket)) {
+            if (status === 'resuelto') {
+                return 'El ticket está resuelto. Si necesitas escribir al cliente, vuelve el ticket a una etapa activa.';
+            }
+            if (status === 'cerrado') {
+                return 'El ticket está cerrado. Reábrelo para responder al cliente.';
+            }
+            return 'El estado actual del ticket no permite responder al cliente.';
         }
         return '';
     }
@@ -694,6 +705,7 @@ const TksMain = (() => {
         const canChangeStatus = isAdmin || (isTech && isMine);
         const canAddInternalNote = isAdmin || (isTech && isMine);
         const canParticipate = isTech && isMine;
+        const canReplyToClient = canParticipate && ticketAllowsReplyStatus(ticket);
         console.log('[DEBUG] permissions result', { isTech, isMine, canParticipate, roles, ROLE_TECH: Array.from(ROLE_TECH) });
         let blockedReason = '';
         if (!canParticipate) {
@@ -714,6 +726,7 @@ const TksMain = (() => {
             canChangeStatus,
             canAddInternalNote,
             canParticipate,
+            canReplyToClient,
             blockedReason,
             isAdmin,
             isTech,
@@ -1229,7 +1242,7 @@ const TksMain = (() => {
             const permissions = ticketPermissions(ticket);
             currentDraftSnapshot = buildReplySnapshot(ticket);
             currentDraftMeta = {
-                canEdit: permissions.canParticipate === true && String(ticket?.estado || '').trim().toLowerCase() === 'en_progreso',
+                canEdit: permissions.canReplyToClient === true,
                 blockedReason: replyBlockedReason(ticket, permissions),
                 heartbeatSeconds: 60,
             };
@@ -1297,7 +1310,7 @@ const TksMain = (() => {
             const permissions = ticketPermissions(ticket);
             currentDraftSnapshot = buildReplySnapshot(ticket);
             currentDraftMeta = {
-                canEdit: permissions.canParticipate === true && String(ticket?.estado || '').trim().toLowerCase() === 'en_progreso',
+                canEdit: permissions.canReplyToClient === true,
                 blockedReason: replyBlockedReason(ticket, permissions),
                 heartbeatSeconds: 60,
             };
@@ -1753,8 +1766,8 @@ const TksMain = (() => {
             if (window.showToast) window.showToast(permissions.blockedReason || 'No puedes responder este ticket', 'warning');
             return;
         }
-        if (ticket && String(ticket.estado || '').trim().toLowerCase() !== 'en_progreso') {
-            if (window.showToast) window.showToast('Para responder el ticket al cliente, debes pasarlo primero a estado En Progreso', 'warning');
+        if (ticket && permissions && !permissions.canReplyToClient) {
+            if (window.showToast) window.showToast(replyBlockedReason(ticket, permissions), 'warning');
             return;
         }
 

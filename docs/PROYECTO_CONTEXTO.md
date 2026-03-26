@@ -50,6 +50,29 @@
   - `GET /api/tks/tickets/1/attachments/1/download?inline=1` sin sesión -> `401` ✅
 - **Estado**: IMPLEMENTADO EN DEV. Pendiente validación visual/manual del usuario.
 
+## HITO: 2026-03-26 - Ticketera: respuesta al cliente habilitada en tickets activos (DEV)
+- **Incidente**: en producción el especialista asignado no podía abrir `Responder cliente` si el ticket seguía en estado principal `abierto`, porque frontend y backend exigían `en_progreso` para habilitar el correo.
+- **Acción ejecutada**:
+  - `code/app/core/tickets_service.py`:
+    - el envío de correo al cliente queda permitido mientras el ticket esté activo (`abierto` o `en_progreso`), manteniendo bloqueo en `resuelto` y `cerrado`.
+  - `code/static/modulos/tks/js/tks_main.js`:
+    - nueva evaluación `canReplyToClient` para especialistas asignados en tickets activos.
+    - el compositor deja de marcarse readonly en `abierto`.
+    - el review/envío deja de bloquear por no estar en `en_progreso`.
+  - `code/static/modulos/tks/js/tks_ui.js`:
+    - `Responder cliente` queda habilitado en tickets activos.
+    - textos de ayuda actualizados para reflejar que el bloqueo real aplica a `resuelto/cerrado`.
+  - `code/static/modulos/tks/tks.html`:
+    - cache-bust a `tks_ui.js?v=82` y `tks_main.js?v=58`.
+  - `tests/unit_ticketera_core.py`:
+    - regresión ajustada para exigir bloqueo sólo en `resuelto/cerrado`.
+- **Verificación**:
+  - `python3 -m unittest tests.unit_ticketera_core` ✅
+  - `node --check code/static/modulos/tks/js/tks_ui.js` ✅
+  - `node --check code/static/modulos/tks/js/tks_main.js` ✅
+  - `python3 -m py_compile code/app/core/tickets_service.py` ✅
+- **Estado**: IMPLEMENTADO EN DEV. Pendiente promoción a PROD.
+
 ## HITO: 2026-03-26 - Ticketera: dominio/plantillas movidos a pestaña propia (DEV)
 - **Solicitud**: sacar la edición de mensajes y el enrutamiento por correo/dominio desde Configuración y dejarlo dentro del módulo Ticketera con acceso para `encargado_mesa` y `admin`.
 - **Acción ejecutada**:

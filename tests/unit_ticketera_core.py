@@ -471,12 +471,13 @@ class TicketeraEpic11Tests(unittest.TestCase):
         conn.commit.assert_called_once()
         conn.close.assert_called_once()
 
-    def test_reply_is_only_allowed_in_en_progreso(self) -> None:
-        for estado in ("abierto", "resuelto", "cerrado"):
+    def test_reply_is_allowed_while_ticket_is_active(self) -> None:
+        for estado in ("resuelto", "cerrado"):
             with self.subTest(estado=estado):
                 with self.assertRaises(ValueError):
                     tickets_service._ensure_reply_allowed_estado({"estado": estado}, "responder correos")
 
+        tickets_service._ensure_reply_allowed_estado({"estado": "abierto"}, "responder correos")
         tickets_service._ensure_reply_allowed_estado({"estado": "en_progreso"}, "responder correos")
 
     def test_main_status_transition_rejects_non_adjacent_change(self) -> None:

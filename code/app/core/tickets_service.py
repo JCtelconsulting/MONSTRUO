@@ -78,9 +78,10 @@ CHAIN_VERSION = 1
 EMAIL_DRAFT_LOCK_MINUTES = 5
 EMAIL_DRAFT_LOCK_HEARTBEAT_SECONDS = 60
 # "cerrado" -> Bloqueo total (ReadOnly)
-# Solo "en_progreso" permite responder al cliente.
+# El correo al cliente se permite mientras el ticket siga activo.
 TICKET_READONLY_ESTADOS = {"cerrado"}
-TICKET_EMAIL_BLOCKED_ESTADOS = set(ESTADOS_VALIDOS) - {"en_progreso"}
+TICKET_EMAIL_ALLOWED_ESTADOS = {"abierto", "en_progreso"}
+TICKET_EMAIL_BLOCKED_ESTADOS = set(ESTADOS_VALIDOS) - TICKET_EMAIL_ALLOWED_ESTADOS
 REPLY_BLOCKED_ESTADOS = TICKET_EMAIL_BLOCKED_ESTADOS  # Alias legacy
 
 class ConflictError(Exception):
@@ -648,7 +649,7 @@ def _ensure_reply_allowed_estado(ticket: Dict[str, Any], action_label: str) -> N
         estado = str(ticket.get("estado") or "").strip().lower() or "-"
         raise ValueError(
             f"No se puede {action_label} cuando el ticket está en estado '{estado}'. "
-            "Primero debe estar en 'en_progreso'."
+            "Solo está permitido en 'abierto' o 'en_progreso'."
         )
 
 def _extract_ticket_target_email(ticket: Dict[str, Any]) -> str:

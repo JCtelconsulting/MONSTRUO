@@ -887,7 +887,7 @@ const TksUI = (() => {
         const canAddInternalNote = permissions.canAddInternalNote === true && !isClosed;
 
         const canOpenReplyAction = canParticipate && !isGerenciaViewer;
-        const canReplyComposer = canOpenReplyAction && status === 'en_progreso';
+        const canReplyComposer = permissions.canReplyToClient === true;
         const requestedComposerMode = String(permissions.composerMode || permissions.activeTab || 'note') === 'reply' ? 'reply' : 'note';
         const composerMode = canReplyComposer && requestedComposerMode === 'reply' ? 'reply' : 'note';
         const draft = permissions.draft || null;
@@ -1195,8 +1195,8 @@ const TksUI = (() => {
                                 <i class="fas fa-forward"></i> ${flowActionLabel}
                            </button>`
                 : '<div class="tks-feed-empty">No hay un siguiente paso directo disponible.</div>'}
-                        ${currentEstado !== 'en_progreso'
-                ? '<div class="tks-status-editor-hint">Para responder el ticket al cliente, debes pasarlo primero a estado En Progreso</div>'
+                        ${currentEstado === 'resuelto' || currentEstado === 'cerrado'
+                ? '<div class="tks-status-editor-hint">En estado resuelto o cerrado, el correo al cliente queda bloqueado hasta reactivar el ticket.</div>'
                 : ''}
                         <div class="tks-status-editor-hint">${currentEstado === 'resuelto'
                 ? (resueltoAutoCloseHours > 0
@@ -1319,7 +1319,7 @@ const TksUI = (() => {
                 ? `<button class="tks-composer-mode-btn ${composerMode === 'reply' ? 'active' : ''}" data-composer-mode="reply" onclick="TksMain.switchComposerMode('reply')">
                                 <i class="fas fa-reply"></i> Responder cliente
                             </button>`
-                : `<button class="tks-composer-mode-btn" type="button" disabled title="${escapeHtml(draftBlockedReason || 'Disponible solo en En Progreso')}">
+                : `<button class="tks-composer-mode-btn" type="button" disabled title="${escapeHtml(draftBlockedReason || 'Disponible mientras el ticket esté activo')}">
                                 <i class="fas fa-reply"></i> Responder cliente
                             </button>`)
                 : ''}
