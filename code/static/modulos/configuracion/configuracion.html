@@ -134,6 +134,33 @@
             flex-wrap: wrap;
         }
 
+        .cfg-grid--routing-form {
+            grid-template-columns: 1fr 2fr 1fr;
+            align-items: end;
+        }
+
+        .cfg-textarea {
+            min-height: 170px;
+            resize: vertical;
+        }
+
+        .cfg-form-note {
+            margin-top: 10px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-soft);
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }
+
+        .cfg-form-note code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.8rem;
+            color: #f5fbff;
+        }
+
         .cfg-users-header {
             display: flex;
             justify-content: space-between;
@@ -781,6 +808,10 @@
                 grid-template-columns: 1fr 1fr;
             }
 
+            .cfg-grid--routing-form {
+                grid-template-columns: 1fr 1fr;
+            }
+
             .cfg-scroll-grid {
                 grid-template-columns: 1fr 1fr;
             }
@@ -788,6 +819,10 @@
 
         @media (max-width: 720px) {
             .cfg-grid--specialty-form {
+                grid-template-columns: 1fr;
+            }
+
+            .cfg-grid--routing-form {
                 grid-template-columns: 1fr;
             }
 
@@ -936,6 +971,9 @@
                         <input type="checkbox" id="chkAutoReply" checked>
                         <label for="chkAutoReply">Habilitar envío automático de acuse de recibo de cara al
                             cliente</label>
+                    </div>
+                    <div class="cfg-form-note">
+                        Las plantillas y el enrutamiento por correo/dominio ahora se administran desde <strong>Ticketera &gt; Dominio/Plantillas</strong>.
                     </div>
 
                     <div class="cfg-actions-end" style="margin-top:20px;">
@@ -1124,7 +1162,7 @@
         </div>
     </div>
 
-    <script src="/modulos/_compartido/js/utilidades.js?v=203"></script>
+    <script src="/modulos/_compartido/js/utilidades.js?v=205"></script>
     <script src="/modulos/_compartido/js/admin.js?v=4"></script>
     <script src="js/users_ui.js?v=18"></script>
     <script>
@@ -1133,27 +1171,27 @@
         // ===================================================================
         async function loadTicketeraConfig() {
             try {
-                const data = await window.fetchApi('/api/config/smtp'); // Trae el JSON engrosado
-                if (data) {
+                const smtpData = await window.fetchApi('/api/config/smtp');
+                if (smtpData) {
                     // SMTP
-                    document.getElementById('smtpHost').value = data.smtp_host || '';
-                    document.getElementById('smtpPort').value = data.smtp_port || '';
-                    document.getElementById('smtpUser').value = data.smtp_user || '';
-                    document.getElementById('smtpPass').value = data.smtp_password || '';
-                    document.getElementById('smtpFromName').value = data.smtp_from_name || '';
+                    document.getElementById('smtpHost').value = smtpData.smtp_host || '';
+                    document.getElementById('smtpPort').value = smtpData.smtp_port || '';
+                    document.getElementById('smtpUser').value = smtpData.smtp_user || '';
+                    document.getElementById('smtpPass').value = smtpData.smtp_password || '';
+                    document.getElementById('smtpFromName').value = smtpData.smtp_from_name || '';
 
                     // IMAP
-                    document.getElementById('imapHost').value = data.imap_host || '';
-                    document.getElementById('imapPort').value = data.imap_port || '';
-                    document.getElementById('imapUser').value = data.imap_user || '';
-                    document.getElementById('imapPass').value = data.imap_password || '';
+                    document.getElementById('imapHost').value = smtpData.imap_host || '';
+                    document.getElementById('imapPort').value = smtpData.imap_port || '';
+                    document.getElementById('imapUser').value = smtpData.imap_user || '';
+                    document.getElementById('imapPass').value = smtpData.imap_password || '';
 
                     // AUTO
-                    document.getElementById('emailPollingInterval').value = data.email_polling_interval || '';
-                    document.getElementById('ticketAutoReplyTime').value = data.ticket_auto_reply_time || '';
-                    document.getElementById('ticketAutoCloseTime').value = data.ticket_auto_close_time || '';
+                    document.getElementById('emailPollingInterval').value = smtpData.email_polling_interval || '';
+                    document.getElementById('ticketAutoReplyTime').value = smtpData.ticket_auto_reply_time || '';
+                    document.getElementById('ticketAutoCloseTime').value = smtpData.ticket_auto_close_time || '';
 
-                    document.getElementById('chkAutoReply').checked = data.ticket_auto_reply_enabled === 'true' || data.ticket_auto_reply_enabled === '1' || data.ticket_auto_reply_enabled === true;
+                    document.getElementById('chkAutoReply').checked = smtpData.ticket_auto_reply_enabled === 'true' || smtpData.ticket_auto_reply_enabled === '1' || smtpData.ticket_auto_reply_enabled === true;
                 }
             } catch (e) {
                 console.error("Error loading Ticketera config", e);
@@ -1269,7 +1307,7 @@
             }
         });
     </script>
-    <script src="/modulos/_compartido/js/sidebar.js?v=11"></script>
+    <script src="/modulos/_compartido/js/sidebar.js?v=13"></script>
 </body>
 
 </html>

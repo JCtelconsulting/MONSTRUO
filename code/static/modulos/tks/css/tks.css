@@ -246,6 +246,179 @@
     border-radius: 4px;
 }
 
+.tks-settings-shell {
+    display: grid;
+    gap: 1rem;
+}
+
+.tks-settings-panel {
+    border: 1px solid var(--tks-border);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.82));
+    box-shadow: 0 18px 48px rgba(2, 6, 23, 0.28);
+    padding: 1.4rem;
+}
+
+.tks-settings-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.tks-settings-head h3 {
+    margin: 0 0 0.35rem;
+    font-size: 1.15rem;
+}
+
+.tks-settings-head p {
+    margin: 0;
+    color: var(--tks-text-muted);
+    line-height: 1.5;
+}
+
+.tks-settings-scope {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    background: rgba(59, 130, 246, 0.12);
+    color: #bfdbfe;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.tks-settings-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.tks-settings-routing-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: 1rem;
+}
+
+.tks-template-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.tks-template-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+    padding: 1rem;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.52);
+    color: var(--tks-text);
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.tks-template-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(96, 165, 250, 0.4);
+    background: rgba(30, 41, 59, 0.66);
+}
+
+.tks-template-card-label {
+    font-weight: 700;
+    font-size: 0.98rem;
+}
+
+.tks-template-card-desc {
+    color: var(--tks-text-muted);
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.tks-template-card-subject {
+    width: 100%;
+    font-size: 0.82rem;
+    color: #dbeafe;
+    border-top: 1px solid rgba(148, 163, 184, 0.16);
+    padding-top: 0.6rem;
+    word-break: break-word;
+}
+
+.tks-template-card-meta {
+    font-size: 0.78rem;
+    color: var(--tks-text-muted);
+}
+
+.tks-settings-textarea {
+    min-height: 220px;
+    resize: vertical;
+}
+
+.tks-settings-note {
+    margin-top: 0.25rem;
+    padding: 0.9rem 1rem;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.58);
+    color: var(--tks-text-muted);
+    line-height: 1.55;
+}
+
+.tks-settings-note strong {
+    color: var(--tks-text);
+}
+
+.tks-settings-note code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    color: #e2e8f0;
+}
+
+.tks-settings-actions {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.tks-settings-hint {
+    margin: 0;
+    color: var(--tks-text-muted);
+    font-size: 0.9rem;
+}
+
+.tks-settings-actions-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.tks-settings-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    color: var(--tks-text);
+}
+
+.tks-pivot-table .td-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.tks-template-editor-modal {
+    width: min(820px, 96vw);
+}
+
 /* Efecto de difuminado para textos largos */
 .fade-overflow {
     white-space: nowrap;
@@ -654,6 +827,18 @@
     .tks-assign-schedule-row {
         grid-template-columns: 1fr;
         gap: 0.5rem;
+    }
+
+    .tks-settings-head {
+        flex-direction: column;
+    }
+
+    .tks-settings-scope {
+        white-space: normal;
+    }
+
+    .tks-settings-routing-grid {
+        grid-template-columns: 1fr;
     }
 }
 

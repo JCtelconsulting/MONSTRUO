@@ -77,6 +77,18 @@ def _ensure_ticket_read_scope(
     return current
 
 
+def _require_ticketera_message_editor(
+    sess: dict = Depends(deps.require_session_hybrid),
+) -> dict:
+    roles = _normalize_session_roles(sess)
+    if any(role in ROLES_GESTION_GLOBAL for role in roles):
+        return sess
+    raise HTTPException(
+        status_code=403,
+        detail="Solo admin o encargado_mesa pueden gestionar mensajes de Ticketera.",
+    )
+
+
 # ==========================================================================
 # MODELOS PYDANTIC
 # ==========================================================================
@@ -114,6 +126,19 @@ class ComentarioCreate(BaseModel):
 class TicketEmailReply(BaseModel):
     mensaje: str
     asunto: Optional[str] = None
+
+
+class TicketeraTemplatesIn(BaseModel):
+    subject_template: str = ""
+    body_template: str = ""
+
+
+class TicketeraRoutingRuleIn(BaseModel):
+    id: int | None = None
+    match_type: str
+    match_value: str
+    categoria: str
+    is_active: bool = True
 
 
 class SpecialtyUpsert(BaseModel):
@@ -255,6 +280,105 @@ class EmailDraftSendIn(BaseModel):
 
 class EmailDraftDiscardIn(BaseModel):
     lock_token: str
+
+
+# ==========================================================================
+# AJUSTES DE TICKETS
+# ==========================================================================
+@router.get("/settings/domain-templates", response_model=dict)
+async def get_ticketera_domain_templates_settings(
+    sess: dict = Depends(_require_ticketera_message_editor),
+):
+    return tickets_service.get_ticketera_admin_config()
+
+
+@router.get("/settings/message-templates", response_model=dict)
+async def get_ticketera_message_templates(
+    sess: dict = Depends(_require_ticketera_message_editor),
+):
+    return {"templates": tickets_service.get_ticketera_templates()}
+
+
+@router.put("/settings/message-templates", response_model=dict)
+async def update_ticketera_message_templates(
+    payload: TicketeraTemplatesIn,
+    sess: dict = Depends(_require_ticketera_message_editor),
+):
+    try:
+        return {
+            "ok": True,
+            "templates": tickets_service.update_ticketera_templates(
+                payload.subject_template,
+                payload.body_template,
+                sess.get("username", ""),
+            ),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/settings/mail-templates/{template_key}", response_model=dict)
+async def get_ticketera_mail_template(
+    template_key: str,
+    sess: dict = Depends(_require_ticketera_message_editor),
+):
+    try:
+        return {
+            "ok": True,
+            "template": tickets_service.get_ticketera_mail_template(template_key),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/settings/mail-templates/{template_key}", response_model=dict)
+async def update_ticketera_mail_template(
+    template_key: str,
+    payload: TicketeraTemplatesIn,
+    sess: dict = Depends(_require_ticketera_message_editor),
+):
+    try:
+        return {
+            "ok": True,
+            "template": tickets_service.update_ticketera_mail_template(
+                template_key,
+                payload.subject_template,
+                payload.body_template,
+                sess.get("username", ""),
+            ),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/settings/routing-rules", response_model=dict)
+async def upsert_ticketera_routing_rule(
+    payload: TicketeraRoutingRuleIn,
+    sess: dict = Depends(_require_ticketera_message_editor),
+):
+    try:
+        rule = tickets_service.upsert_ticketera_routing_rule(
+            rule_id=payload.id,
+            match_type=payload.match_type,
+            match_value=payload.match_value,
+            categoria=payload.categoria,
+            is_active=payload.is_active,
+            actor_id=sess.get("username", ""),
+        )
+        return {"ok": True, "rule": rule}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/settings/routing-rules/{rule_id}", response_model=dict)
+async def delete_ticketera_routing_rule(
+    rule_id: int,
+    sess: dict = Depends(_require_ticketera_message_editor),
+):
+    deleted = tickets_service.delete_ticketera_routing_rule(rule_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Regla de routing no encontrada")
+    return {"ok": True, "deleted": True, "rule_id": int(rule_id)}
 
 
 # ==========================================================================
@@ -599,6 +723,9 @@ async def reply_ticket_email(
     ticket_id: int,
     mensaje: str = Form(...),
     asunto: Optional[str] = Form(None),
+    to_addr: Optional[str] = Form(None),
+    cc_addrs: Optional[str] = Form(None),
+    bcc_addrs: Optional[str] = Form(None),
     files: List[UploadFile] = File(default=[]),
     idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     sess: dict = Depends(deps.require_permission("tickets:write"))
@@ -610,6 +737,9 @@ async def reply_ticket_email(
             mensaje=mensaje,
             author_role=_session_actor_roles(sess),
             asunto=asunto,
+            to_addr=to_addr,
+            cc_addrs=cc_addrs,
+            bcc_addrs=bcc_addrs,
             files=files,
             idempotency_key=idempotency_key,
         )

@@ -1,6 +1,104 @@
 # PROYECTO CONTEXTO: MONSTRUO
-**Fecha de actualizacion:** 20 Marzo 2026
+**Fecha de actualizacion:** 26 Marzo 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
+
+## HITO: 2026-03-26 - Ticketera: dominio/plantillas movidos a pestaña propia (DEV)
+- **Solicitud**: sacar la edición de mensajes y el enrutamiento por correo/dominio desde Configuración y dejarlo dentro del módulo Ticketera con acceso para `encargado_mesa` y `admin`.
+- **Acción ejecutada**:
+  - `code/app/api/routers/tks.py`:
+    - agregados endpoints propios:
+      - `GET /api/tks/settings/domain-templates`
+      - `GET/PUT /api/tks/settings/message-templates`
+      - `GET/PUT /api/tks/settings/mail-templates/{template_key}`
+      - `POST/DELETE /api/tks/settings/routing-rules*`
+    - guardia dedicada para permitir edición sólo a roles de gestión Ticketera (`admin`, `encargado_mesa`).
+  - `code/static/modulos/tks/tks.html`:
+    - nueva pestaña `Dominio/Plantillas` dentro del shell de Ticketera.
+  - `code/static/modulos/tks/js/tks_api.js`:
+    - agregadas llamadas API para leer/guardar plantillas y reglas de enrutamiento desde Ticketera.
+  - `code/static/modulos/tks/js/tks_main.js`:
+    - visibilidad del tab controlada por rol.
+    - carga y guardado del panel combinado `Dominio/Plantillas` con caché propia del módulo.
+    - apertura del editor de plantilla contra endpoint puntual para precargar el contenido efectivo actual antes de editar.
+  - `code/static/modulos/tks/js/tks_ui.js` + `code/static/modulos/tks/css/tks.css`:
+    - nueva vista con 4 plantillas operativas visibles como botones/tarjetas:
+      - auto-respuesta
+      - asignación de especialista
+      - notificación de especialista
+      - cierre de TK
+    - edición en modal mostrando el contenido actual efectivo del sistema, aunque la DB no tenga una personalización previa guardada.
+    - formulario y grilla para reglas de routing por correo exacto o dominio.
+  - `code/app/core/tickets_service.py`:
+    - catálogo canónico de 4 plantillas de correo de Ticketera con subject/body configurables por DB.
+    - render de notificaciones de asignación/cierre unificado sobre plantillas configurables.
+    - avisos internos de cambio de estado mantenidos fuera del editor de plantillas.
+  - `code/static/modulos/configuracion/configuracion.html`:
+    - removidos de Configuración la edición de plantilla y el enrutamiento.
+    - se deja aviso indicando que ahora se administra desde `Ticketera > Dominio/Plantillas`.
+  - `tests/unit_ticketera_core.py`:
+    - regresiones para validar que Ticketera expone 4 plantillas efectivas y que las notificaciones al especialista y de cambio de estado interno siguen operativas.
+  - Runtime DEV:
+    - reinicio controlado de `monstruo-dev-api` para activar los endpoints nuevos en memoria.
+- **Verificación**:
+  - `python3 -m py_compile code/app/core/tickets_service.py code/app/api/routers/tks.py` ✅
+  - `python3 -m py_compile code/app/api/routers/tks.py` ✅
+  - `node --check code/static/modulos/tks/js/tks_api.js` ✅
+  - `node --check code/static/modulos/tks/js/tks_main.js` ✅
+  - `node --check code/static/modulos/tks/js/tks_ui.js` ✅
+  - `python3 -m unittest tests.unit_ticketera_core` ✅
+  - `curl http://127.0.0.1:9001/health` -> `200` ✅
+  - `GET http://127.0.0.1:9001/api/tks/settings/domain-templates` sin auth -> `401 missing_auth` ✅
+  - `GET http://127.0.0.1:9001/api/tks/settings/mail-templates/auto_reply` sin auth -> `401 missing_auth` ✅
+- **Estado**: IMPLEMENTADO EN CÓDIGO Y RUNTIME DEV REINICIADO. Pendiente validación visual/manual del usuario.
+
+## HITO: 2026-03-23 - Fundación: fix de migración canónica + promoción de data hacia PROD (DEV)
+- **Solicitud**: usar `DEV` como fuente de verdad para llevar a `PROD` la planificación completa de Fundación.
+- **Acción ejecutada**:
+  - `code/app/core/db.py`: la migración canónica de `fundacion.fundacion_tareas` ahora asegura también `curso`, `categoria`, `categoria_madre` y `subcategoria`.
+  - se validó que `DEV` contenía `1050` registros de Fundación y fue usado como origen para la promoción de data hacia `PROD`.
+  - se aplicó el mismo `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` en `DEV` para mantener paridad estructural explícita, aunque la base ya tenía esas columnas.
+  - reinicio controlado de `monstruo-dev-api`.
+- **Verificación**:
+  - `fundacion.fundacion_tareas` en `DEV` se mantiene en `1050` registros ✅
+  - `http://127.0.0.1:9001/health` -> `200` ✅
+- **Estado**: DEV queda como fuente alineada y con migración canónica corregida.
+
+## HITO: 2026-03-23 - Sincronización DEV de fixes Sidebar/Fundación/Cuenta (DEV)
+- **Solicitud**: pasar a `DEV` los fixes ya aplicados en `PROD` para dejar consistentes la barra lateral, los controles `Cuenta/Salir`, el switch DEV/PROD y Fundación.
+- **Acción ejecutada**:
+  - sincronizados desde `/srv/monstruo` hacia `/srv/monstruo_dev` los archivos backend y frontend involucrados en:
+    - resolución backend de `allowed_modules` y `permissions`,
+    - compatibilidad legacy de módulos (`ticketera`, `ultron`, `configuracion`),
+    - endpoint de cambio de contraseña,
+    - inicialización compartida de `Cuenta` y `Salir`,
+    - generación idempotente del footer del sidebar,
+    - permisos reales de Fundación y corrección del dueño de tarea,
+    - fix visual de Fundación para no contaminar `#sidebar-toggle` con el override local de `.btn-icon`.
+  - shells DEV actualizados para cache-bust:
+    - `utilidades.js?v=205`
+    - `sidebar.js?v=13`
+    - `fundacion.js?v=5`
+  - runtime DEV: reinicio controlado de `monstruo-dev-api`.
+- **Verificación**:
+  - `node --check` sobre:
+    - `code/static/modulos/_compartido/js/sidebar.js` ✅
+    - `code/static/modulos/_compartido/js/utilidades.js` ✅
+    - `code/static/modulos/fundacion/js/fundacion.js` ✅
+  - `compile(...)` Python sobre:
+    - `code/app/core/config.py` ✅
+    - `code/app/main.py` ✅
+    - `code/app/core/auth_service.py` ✅
+    - `code/app/api/routers/fundacion/fundacion_router.py` ✅
+  - smoke de helpers:
+    - `gerencia` ahora conserva `fundacion:read` ✅
+    - aliases legacy `configuracion -> config`, `ultron -> ia`, `ticketera -> tks` ✅
+  - `docker restart monstruo-dev-api` ejecutado ✅
+  - `curl http://127.0.0.1:9001/health` -> `200` ✅
+  - `POST http://127.0.0.1:9001/api/auth/change-password` sin sesión -> `401` (endpoint activo) ✅
+  - assets públicos DEV:
+    - `https://login.telconsulting.cl/dev/modulos/fundacion/fundacion.html` sirve `utilidades.js?v=205`, `sidebar.js?v=13`, `fundacion.js?v=5` ✅
+    - `https://config.telconsulting.cl/dev/modulos/configuracion/configuracion.html` sirve `utilidades.js?v=205`, `sidebar.js?v=13` ✅
+- **Estado**: IMPLEMENTADO EN CÓDIGO Y RUNTIME DEV REINICIADO. Pendiente validación visual/manual del usuario.
 
 ## HITO: 2026-03-20 - Promoción DEV -> PROD validada (Ticketera)
 - **Solicitud**: ejecutar la promoción real de `dev` a `main/prod` y verificar que producción quedara estable con la versión validada.
@@ -2942,4 +3040,48 @@ HITO: 2026-02-05 14:50 - Integración CRM + Facturación Automática
   - `node --check code/static/modulos/tks/js/tks_main.js` -> PASS.
   - `node --check code/static/modulos/tks/js/tks_ui.js` -> PASS.
   - alcance funcional: no cambia contratos API ni lógica de filtros/navegación; ajuste visual/estructural de render.
+- Estado: CERRADO.
+
+### 2026-03-23 17:08 - EPIC 11 Ticketera: configuración autónoma, reply directo y Kanban secuencial
+- Solicitud: implementar el plan de Antigravity para EPIC 11 en Ticketera.
+- Entregable:
+  - Backend Ticketera:
+    - `code/app/core/db.py`
+      - creación canónica de `ticket_config_client_emails`.
+      - nueva tabla `ticket_config_email_routes` para routing por correo/dominio.
+    - `code/app/core/tickets_service.py`
+      - templates de auto-respuesta configurables desde `system_settings`.
+      - CRUD y resolución de routing por correo/dominio con prioridad `email > domain > clasificación`.
+      - reply al cliente bloqueado salvo en `en_progreso`.
+      - helper unificado de correo saliente sin firma legacy y con adjuntos persistidos.
+      - asunto de reply canónico y movimientos principales de estado restringidos a un paso por vez.
+    - `code/app/api/routers/config_router.py`
+      - nuevos endpoints `/api/config/ticketera`, `/api/config/ticketera/templates`, `/api/config/ticketera/routing-rules`.
+    - `code/app/api/routers/tks.py`
+      - `reply-email` acepta `to_addr`, `cc_addrs`, `bcc_addrs` desde el composer directo.
+  - Frontend Ticketera:
+    - `code/static/modulos/configuracion/configuracion.html`
+      - UI para editar plantilla de auto-respuesta y reglas de enrutamiento por correo/dominio.
+    - `code/static/modulos/tks/js/tks_ui.js`
+      - composer directo sin `guardar/descartar borrador`.
+      - asunto readonly, adjuntos locales y acción de respuesta habilitada solo en `en_progreso`.
+      - mensaje guía bajo avance de flujo: `Para responder el ticket al cliente, debes pasarlo primero a estado En Progreso`.
+      - Kanban con drag validado por estado adyacente.
+    - `code/static/modulos/tks/js/tks_main.js`
+      - `openDetail()` deja de consumir `email-draft*`.
+      - confirmación previa al envío usando `reply-email` con `FormData`.
+      - detección de cambios pendientes basada en valores actuales del form y archivos locales.
+  - Pruebas:
+    - `tests/unit_ticketera_core.py`
+      - cobertura de routing, templates, bloqueo de reply, transición secuencial y helper de correo saliente.
+    - `tests/e2e_ticketera.py`
+      - ampliado para bloqueo reply fuera de `en_progreso`, asunto canónico, ausencia de firma legacy, `409` por salto de estado, routing configurable y templates de auto-respuesta.
+- Verificación:
+  - `python3 -m compileall -q code/app tests/unit_ticketera_core.py tests/e2e_ticketera.py` -> PASS.
+  - `python3 -m py_compile code/app/api/routers/config_router.py code/app/api/routers/tks.py code/app/core/tickets_service.py` -> PASS.
+  - `python3 -m unittest tests.unit_ticketera_core` -> PASS (`20` tests).
+  - `node --check code/static/modulos/tks/js/tks_ui.js` -> PASS.
+  - `node --check code/static/modulos/tks/js/tks_main.js` -> PASS.
+  - `node --check code/static/modulos/tks/js/tks_api.js` -> PASS.
+  - `python3 tests/e2e_ticketera.py` -> BLOQUEADO por entorno: faltan `MONSTRUO_TEST_USER` y `MONSTRUO_TEST_PASSWORD`.
 - Estado: CERRADO.

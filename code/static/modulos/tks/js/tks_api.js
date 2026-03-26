@@ -128,6 +128,34 @@ const TksApi = (() => {
         // --- Mis Tickets ---
         getMisTickets: () => _fetch(`${BASE}/mis-tickets`),
 
+        // --- Ajustes Ticketera ---
+        getDomainTemplateSettings: (requestOpts = null) =>
+            _fetch(`${BASE}/settings/domain-templates`, requestOpts || {}),
+        getMessageTemplates: (requestOpts = null) =>
+            _fetch(`${BASE}/settings/message-templates`, requestOpts || {}),
+        getMailTemplate: (templateKey, requestOpts = null) =>
+            _fetch(`${BASE}/settings/mail-templates/${encodeURIComponent(templateKey)}`, requestOpts || {}),
+        updateMessageTemplates: (body, requestOpts = null) =>
+            _fetch(
+                `${BASE}/settings/message-templates`,
+                requestOpts ? { method: 'PUT', body, ...requestOpts } : { method: 'PUT', body }
+            ),
+        updateMailTemplate: (templateKey, body, requestOpts = null) =>
+            _fetch(
+                `${BASE}/settings/mail-templates/${encodeURIComponent(templateKey)}`,
+                requestOpts ? { method: 'PUT', body, ...requestOpts } : { method: 'PUT', body }
+            ),
+        upsertRoutingRule: (body, requestOpts = null) =>
+            _fetch(
+                `${BASE}/settings/routing-rules`,
+                requestOpts ? { method: 'POST', body, ...requestOpts } : { method: 'POST', body }
+            ),
+        deleteRoutingRule: (ruleId, requestOpts = null) =>
+            _fetch(
+                `${BASE}/settings/routing-rules/${ruleId}`,
+                requestOpts ? { method: 'DELETE', ...requestOpts } : { method: 'DELETE' }
+            ),
+
         // --- Operación / Cola / Canales ---
         getQueueHealth: (requestOpts = null) => _fetch(`${BASE}/ops/queue-health`, requestOpts || {}),
         getChannelsStatus: (requestOpts = null) => _fetch(`${BASE}/channels/status`, requestOpts || {}),

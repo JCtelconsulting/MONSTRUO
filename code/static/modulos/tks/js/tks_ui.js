@@ -743,16 +743,14 @@ const TksUI = (() => {
         // Regla: Si está RESUELTO, no se puede responder correos (solo notas).
         const canAddInternalNote = permissions.canAddInternalNote === true && !isClosed;
 
-        // Responder solo si no es Gerencia, tiene permisos y NO está resuelto/cerrado
-        const canReplyComposer = (permissions.isAdmin !== true || canParticipate) && !isGerenciaViewer && !isClosed && !isResolved;
+        const canOpenReplyAction = canParticipate && !isGerenciaViewer;
+        const canReplyComposer = canOpenReplyAction && status === 'en_progreso';
         const requestedComposerMode = String(permissions.composerMode || permissions.activeTab || 'note') === 'reply' ? 'reply' : 'note';
         const composerMode = canReplyComposer && requestedComposerMode === 'reply' ? 'reply' : 'note';
         const draft = permissions.draft || null;
         const draftMeta = permissions.draftMeta || {};
-        const draftCanEdit = draftMeta.canEdit === true;
         const draftBlockedReason = String(draftMeta.blockedReason || blockedReason || '').trim();
-        const canEditDraftNow = draftCanEdit;
-        const draftVersion = Number(draft?.version || 1);
+        const canEditDraftNow = canReplyComposer && draftMeta.canEdit === true;
         const resolveAttachment = buildEmailAttachmentResolver(t.id, ticketAttachments);
 
         const clientNameRaw = decodeMimeEncodedString(t.cliente_nombre || '').trim();
@@ -1051,22 +1049,8 @@ const TksUI = (() => {
             </div>`
             : `<div class="tks-readonly-box">${escapeHtml(blockedReason || 'Solo lectura para notas internas.')}</div>`;
 
-        const draftAttachmentsHtml = (draft?.attachments || []).map((att) => {
-            const removeBtn = canEditDraftNow
-                ? `<button class="tks-btn-icon-sm" title="Eliminar adjunto" onclick="TksMain.deleteDraftAttachment(${t.id}, ${Number(att.id)})"><i class="fas fa-trash"></i></button>`
-                : '';
-            return `<div class="tks-draft-attachment-row">
-                <span><i class="fas fa-paperclip"></i> ${escapeHtml(att.filename || 'adjunto')} (${sizeLabel(att.size_bytes)})</span>
-                ${removeBtn}
-            </div>`;
-        }).join('');
         const draftCcValue = draft ? String(draft?.cc_addrs || '') : notifyEmailsList.join(', ');
         const draftBccValue = String(draft?.bcc_addrs || '');
-
-        let lockBoxHtml = '';
-        if (draftBlockedReason) {
-            lockBoxHtml = `<span class="tks-lock-label">${escapeHtml(draftBlockedReason)}</span>`;
-        }
 
         const statusManagementHtml = canChangeStatus
             ? `
@@ -1079,6 +1063,9 @@ const TksUI = (() => {
                                 <i class="fas fa-forward"></i> ${flowActionLabel}
                            </button>`
                 : '<div class="tks-feed-empty">No hay un siguiente paso directo disponible.</div>'}
+                        ${currentEstado !== 'en_progreso'
+                ? '<div class="tks-status-editor-hint">Para responder el ticket al cliente, debes pasarlo primero a estado En Progreso</div>'
+                : ''}
                         <div class="tks-status-editor-hint">${currentEstado === 'resuelto'
                 ? (resueltoAutoCloseHours > 0
                     ? `Seguimiento activo en resuelto. Cierre automático en ${resueltoAutoCloseHours}h; también puedes cerrar de inmediato al aprobar cliente.`
@@ -1195,10 +1182,14 @@ const TksUI = (() => {
                             <i class="fas fa-sticky-note"></i> Nota interna
                         </button>`
                 : ''}
-                        ${canReplyComposer
+                        ${canOpenReplyAction
+                ? (canReplyComposer
                 ? `<button class="tks-composer-mode-btn ${composerMode === 'reply' ? 'active' : ''}" data-composer-mode="reply" onclick="TksMain.switchComposerMode('reply')">
                                 <i class="fas fa-reply"></i> Responder cliente
                             </button>`
+                : `<button class="tks-composer-mode-btn" type="button" disabled title="${escapeHtml(draftBlockedReason || 'Disponible solo en En Progreso')}">
+                                <i class="fas fa-reply"></i> Responder cliente
+                            </button>`)
                 : ''}
                     </div>
 
@@ -1210,11 +1201,8 @@ const TksUI = (() => {
                 ? `<div data-composer-pane="reply" style="${composerMode === 'reply' ? '' : 'display:none'}">
                             <div class="tks-email-reply-card">
                                 <div class="tks-email-reply-head">
-                                    <strong>Correo al cliente (borrador persistente)</strong>
-                                    ${lockBoxHtml}
+                                    <strong>Correo al cliente (envío directo)</strong>
                                 </div>
-                                ${draftBlockedReason && !draftCanEdit ? `<div class="tks-readonly-box">${escapeHtml(draftBlockedReason)}</div>` : ''}
-                                <input type="hidden" id="tks-draft-version" value="${draftVersion}">
                                 <div class="tks-form-group">
                                     <label>Para</label>
                                     <input class="tks-input" id="tks-draft-to" value="${escapeHtml(draft?.to_addr || t.origen_email || '')}" ${canEditDraftNow ? '' : 'readonly'}>
@@ -1231,31 +1219,22 @@ const TksUI = (() => {
                                 </div>
                                 <div class="tks-form-group">
                                     <label>Asunto</label>
-                                    <input class="tks-input" id="tks-draft-subject" value="${escapeHtml(draft?.subject || '')}" ${canEditDraftNow ? '' : 'readonly'}>
+                                    <input class="tks-input" id="tks-draft-subject" value="${escapeHtml(draft?.subject || '')}" readonly>
                                 </div>
                                 <div class="tks-form-group">
                                     <label>Descripción</label>
                                     <textarea class="tks-textarea tks-email-reply-input" id="tks-draft-body" rows="7" ${canEditDraftNow ? '' : 'readonly'}>${escapeHtml(draft?.body_text || '')}</textarea>
                                 </div>
                                 <div class="tks-form-group">
-                                    <label>Adjuntos borrador</label>
-                                    <div class="tks-draft-attachments">${draftAttachmentsHtml || '<div style="color:var(--tks-text-muted);font-size:0.8rem;">Sin adjuntos</div>'}</div>
-                                </div>
-                                <div class="tks-email-reply-actions">
+                                    <label>Adjuntos</label>
                                     <input type="file" id="tks-draft-files" multiple class="tks-file-input" ${canEditDraftNow ? '' : 'disabled'}>
-                                    <button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="TksMain.uploadDraftAttachments(${t.id})" ${canEditDraftNow ? '' : 'disabled'}>
-                                        <i class="fas fa-paperclip"></i> Subir adjuntos
-                                    </button>
+                                    <div class="tks-draft-attachments" id="tks-draft-file-list">
+                                        <div style="color:var(--tks-text-muted);font-size:0.8rem;">Sin adjuntos seleccionados</div>
+                                    </div>
                                 </div>
                                 <div class="tks-email-reply-actions">
-                                    <button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="TksMain.saveEmailDraft(${t.id})" ${canEditDraftNow ? '' : 'disabled'}>
-                                        <i class="fas fa-save"></i> Guardar borrador
-                                    </button>
-                                    <button class="tks-btn tks-btn-primary tks-btn-sm" onclick="TksMain.reviewSendDraft(${t.id})" ${canEditDraftNow ? '' : 'disabled'}>
+                                    <button class="tks-btn tks-btn-primary tks-btn-sm" onclick="TksMain.replyByEmail(${t.id})" ${canEditDraftNow ? '' : 'disabled'}>
                                         <i class="fas fa-paper-plane"></i> Revisar y enviar
-                                    </button>
-                                    <button class="tks-btn tks-btn-danger tks-btn-sm" onclick="TksMain.discardEmailDraft(${t.id})" ${canEditDraftNow ? '' : 'disabled'}>
-                                        <i class="fas fa-trash"></i> Descartar
                                     </button>
                                 </div>
                             </div>
@@ -1323,7 +1302,7 @@ const TksUI = (() => {
                     ${items.map(t => `
                         <div class="tks-kanban-card" data-id="${t.id}" data-prio="${t.prioridad || 3}"
                              draggable="${canDrag ? 'true' : 'false'}"
-                             ${canDrag ? `ondragstart="TksMain.onDragStart(event, ${t.id})"` : ''}
+                             ${canDrag ? `ondragstart="TksMain.onDragStart(event, ${t.id}, '${escapeJsSingleQuoted(col.key)}')"` : ''}
                              onclick="TksMain.openDetail(${t.id})">
                             <div class="tks-kanban-card-title">${escapeHtml(t.titulo)}</div>
                             <div class="tks-kanban-card-meta">
@@ -1458,6 +1437,185 @@ const TksUI = (() => {
         `;
     }
 
+    function renderMessageTemplates(data, options = {}) {
+        const categories = Array.isArray(data?.categories) && data.categories.length
+            ? data.categories
+            : ['admin', 'ejecucion', 'general', 'redes', 'sistemas'];
+        const mailTemplates = Array.isArray(data?.mailTemplates) ? data.mailTemplates : [];
+        const routingRules = Array.isArray(data?.routingRules) ? data.routingRules : [];
+        const editingRule = options?.editingRule || null;
+        const editing = Boolean(editingRule && editingRule.id);
+        const categoryOptions = categories.map((cat) => {
+            const selected = String(editingRule?.categoria || categories[0] || 'general') === String(cat)
+                ? ' selected'
+                : '';
+            return `<option value="${escapeHtml(cat)}"${selected}>${escapeHtml(cat)}</option>`;
+        }).join('');
+        const templateCards = mailTemplates.length
+            ? mailTemplates.map((template) => `
+                <button class="tks-template-card" type="button" onclick="TksMain.openMailTemplateModal('${escapeJsSingleQuoted(template.key || '')}')">
+                    <span class="tks-template-card-label">${escapeHtml(template.label || template.key || 'Plantilla')}</span>
+                    <span class="tks-template-card-desc">${escapeHtml(template.description || '')}</span>
+                    <span class="tks-template-card-subject">${escapeHtml(template.subject_template || '') || 'Sin asunto'}</span>
+                    <span class="tks-template-card-meta">${template.uses_default_subject || template.uses_default_body ? 'Usando base actual del sistema' : 'Plantilla personalizada'}</span>
+                </button>
+            `).join('')
+            : '<div class="tks-feed-empty">No hay plantillas disponibles.</div>';
+        const routingRows = routingRules.length
+            ? routingRules.map((rule) => `
+                <tr>
+                    <td>${escapeHtml(rule.match_type === 'domain' ? 'Dominio' : 'Correo')}</td>
+                    <td>${escapeHtml(rule.match_value || '-')}</td>
+                    <td>${escapeHtml(catLabel(rule.categoria || 'general'))}</td>
+                    <td>${rule.is_active ? 'Activa' : 'Inactiva'}</td>
+                    <td class="td-actions">
+                        <button class="tks-btn tks-btn-ghost tks-btn-sm" type="button" onclick="TksMain.editRoutingRule(${Number(rule.id)})">
+                            Editar
+                        </button>
+                        <button class="tks-btn tks-btn-danger tks-btn-sm" type="button" onclick="TksMain.deleteRoutingRule(${Number(rule.id)})">
+                            Eliminar
+                        </button>
+                    </td>
+                </tr>
+            `).join('')
+            : `<tr><td colspan="5" style="text-align:center;color:var(--tks-text-muted)">Sin reglas configuradas</td></tr>`;
+
+        return `
+        <div class="tks-settings-shell">
+            <section class="tks-settings-panel">
+                <div class="tks-settings-head">
+                    <div>
+                        <h3>Dominios / Plantillas</h3>
+                        <p>Administra desde Ticketera el correo automático de acuse al cliente y las reglas de enrutamiento por correo exacto o dominio.</p>
+                    </div>
+                    <span class="tks-settings-scope">Admin / Encargado Mesa</span>
+                </div>
+
+                <div class="tks-settings-note">
+                    <strong>Plantillas disponibles:</strong>
+                    auto-respuesta, asignacion de especialista, notificacion de especialista y cierre de TK.
+                    Al abrir una plantilla, el editor carga el contenido actual efectivo del sistema, aunque no exista una version guardada en DB.
+                </div>
+
+                <div class="tks-template-card-grid">${templateCards}</div>
+            </section>
+
+            <section class="tks-settings-panel">
+                <div class="tks-settings-head">
+                    <div>
+                        <h3>Enrutamiento por Correo / Dominio</h3>
+                        <p>Define a qué área cae un ticket cuando entra por un remitente específico o por el dominio del cliente.</p>
+                    </div>
+                </div>
+
+                <div class="tks-settings-routing-grid">
+                    <div class="tks-form-group">
+                        <label>Tipo</label>
+                        <select id="tks-routing-match-type" class="tks-select">
+                            <option value="email"${String(editingRule?.match_type || 'email') === 'email' ? ' selected' : ''}>Correo exacto</option>
+                            <option value="domain"${String(editingRule?.match_type || '') === 'domain' ? ' selected' : ''}>Dominio</option>
+                        </select>
+                    </div>
+
+                    <div class="tks-form-group">
+                        <label>Valor</label>
+                        <input
+                            id="tks-routing-match-value"
+                            class="tks-input"
+                            type="text"
+                            value="${escapeHtml(editingRule?.match_value || '')}"
+                            placeholder="cliente@empresa.cl o empresa.cl"
+                        >
+                    </div>
+
+                    <div class="tks-form-group">
+                        <label>Área / Categoría</label>
+                        <select id="tks-routing-categoria" class="tks-select">
+                            ${categoryOptions}
+                        </select>
+                    </div>
+                </div>
+
+                <label class="tks-settings-checkbox">
+                    <input id="tks-routing-is-active" type="checkbox"${editingRule?.is_active === false ? '' : ' checked'}>
+                    <span>Regla activa</span>
+                </label>
+
+                <div class="tks-settings-actions">
+                    <p class="tks-settings-hint">${editing ? 'Editando una regla existente.' : 'Crea una nueva regla de enrutamiento.'}</p>
+                    <div class="tks-settings-actions-inline">
+                        ${editing
+                ? `<button class="tks-btn tks-btn-ghost" type="button" onclick="TksMain.resetRoutingRuleForm()">
+                                Cancelar edición
+                           </button>`
+                : ''}
+                        <button class="tks-btn tks-btn-primary" type="button" onclick="TksMain.saveRoutingRule()">
+                            <i class="fas fa-save"></i> ${editing ? 'Actualizar regla' : 'Guardar regla'}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tks-pivot-container" style="margin-top:1rem">
+                    <table class="tks-pivot-table">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Valor</th>
+                                <th>Área</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>${routingRows}</tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+        `;
+    }
+
+    function renderMailTemplateEditorModal(template) {
+        const subjectValue = String(template?.subject_template || '');
+        const bodyValue = String(template?.body_template || '');
+        const usesDefault = template?.uses_default_subject || template?.uses_default_body;
+        return `
+        <div class="tks-modal-overlay open" id="tks-template-editor-modal">
+            <div class="tks-modal tks-template-editor-modal">
+                <div class="tks-modal-header">
+                    <h3>${escapeHtml(template?.label || 'Editar plantilla')}</h3>
+                    <button class="tks-modal-close" type="button" onclick="TksMain.closeMailTemplateModal()">&times;</button>
+                </div>
+                <div class="tks-modal-body">
+                    <p class="tks-settings-hint">${escapeHtml(template?.description || '')}</p>
+                    ${usesDefault ? '<div class="tks-settings-note">Se esta mostrando la base actual del sistema. Si guardas cambios, esta plantilla quedara personalizada.</div>' : ''}
+                    <div class="tks-settings-note">
+                        <strong>Placeholders disponibles:</strong>
+                        <code>{{customer_name}}</code>,
+                        <code>{{ticket_code}}</code>,
+                        <code>{{ticket_title}}</code>,
+                        <code>{{assignee_name}}</code>,
+                        <code>{{auto_close_hours}}</code>.
+                    </div>
+                    <div class="tks-form-group">
+                        <label>Asunto</label>
+                        <input id="tks-template-editor-subject" class="tks-input" type="text" value="${escapeHtml(subjectValue)}">
+                    </div>
+                    <div class="tks-form-group">
+                        <label>Cuerpo</label>
+                        <textarea id="tks-template-editor-body" class="tks-textarea tks-settings-textarea" rows="12">${escapeHtml(bodyValue)}</textarea>
+                    </div>
+                </div>
+                <div class="tks-modal-footer">
+                    <button class="tks-btn tks-btn-ghost" type="button" onclick="TksMain.closeMailTemplateModal()">Cancelar</button>
+                    <button class="tks-btn tks-btn-primary" type="button" onclick="TksMain.saveMessageTemplates()">
+                        <i class="fas fa-save"></i> Guardar plantilla
+                    </button>
+                </div>
+            </div>
+        </div>
+        `;
+    }
+
     // --- MODAL NUEVO TICKET ---
     function renderCreateModal() {
         return `<div class="tks-modal-overlay" id="tks-create-modal">
@@ -1554,6 +1712,8 @@ const TksUI = (() => {
         renderTicketTable,
         renderDetail,
         renderKanban,
+        renderMessageTemplates,
+        renderMailTemplateEditorModal,
         renderOps,
         renderCreateModal,
         slaStatus,

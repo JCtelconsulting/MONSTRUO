@@ -225,6 +225,296 @@ class TicketEmailNotificationTests(unittest.TestCase):
         conn.close.assert_called_once()
 
 
+class TicketeraEpic11Tests(unittest.TestCase):
+    def test_list_ticketera_mail_templates_returns_four_effective_templates(self) -> None:
+        conn = MagicMock()
+        cursor = MagicMock()
+        cursor.fetchone.return_value = None
+        conn.execute.return_value = cursor
+
+        with patch("app.core.tickets_service.db.get_conn", return_value=conn):
+            templates = tickets_service.list_ticketera_mail_templates()
+
+        self.assertEqual(len(templates), 4)
+        self.assertEqual(
+            [item["key"] for item in templates],
+            [
+                tickets_service.MAIL_TEMPLATE_KEY_AUTO_REPLY,
+                tickets_service.MAIL_TEMPLATE_KEY_CLIENT_ASSIGNMENT,
+                tickets_service.MAIL_TEMPLATE_KEY_SPECIALIST_ASSIGNMENT,
+                tickets_service.MAIL_TEMPLATE_KEY_RESOLUTION,
+            ],
+        )
+        self.assertTrue(all(item["subject_template"] for item in templates))
+        self.assertTrue(all(item["body_template"] for item in templates))
+
+    def test_resolve_routing_category_prioritizes_exact_email(self) -> None:
+        conn = MagicMock()
+        email_cursor = MagicMock()
+        email_cursor.fetchone.return_value = {"categoria": "redes"}
+        conn.execute.return_value = email_cursor
+
+        categoria = tickets_service._resolve_routing_category_for_email(conn, "Cliente <cliente@empresa.cl>")
+
+        self.assertEqual(categoria, "redes")
+        self.assertEqual(conn.execute.call_count, 1)
+
+    def test_resolve_routing_category_uses_domain_when_exact_email_is_missing(self) -> None:
+        conn = MagicMock()
+        email_cursor = MagicMock()
+        email_cursor.fetchone.return_value = None
+        domain_cursor = MagicMock()
+        domain_cursor.fetchone.return_value = {"categoria": "sistemas"}
+        conn.execute.side_effect = [email_cursor, domain_cursor]
+
+        categoria = tickets_service._resolve_routing_category_for_email(conn, "cliente@empresa.cl")
+
+        self.assertEqual(categoria, "sistemas")
+        self.assertEqual(conn.execute.call_count, 2)
+
+    def test_create_ticket_falls_back_to_classifier_when_routing_has_no_match(self) -> None:
+        conn = MagicMock()
+
+        def _execute(sql: str, params=None):
+            cursor = MagicMock()
+            lowered = " ".join(str(sql).lower().split())
+            if "insert into tickets" in lowered:
+                cursor.fetchone.return_value = {"id": 55}
+                return cursor
+            if "update tickets set codigo" in lowered:
+                return cursor
+            if "insert into ticket_transitions" in lowered:
+                return cursor
+            return cursor
+
+        conn.execute.side_effect = _execute
+
+        with (
+            patch("app.core.tickets_service.db.get_conn", return_value=conn),
+            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-23T12:00:00+00:00"),
+            patch("app.core.tickets_service.get_client_for_email", return_value=None),
+            patch("app.core.tickets_service._resolve_routing_category_for_email", return_value=None) as resolve_route,
+            patch("app.core.tickets_service.clasificar_ticket", return_value="general") as classify_ticket,
+            patch("app.core.tickets_service._find_customer_by_email", return_value=None),
+            patch("app.core.tickets_service._evaluate_ticket_sla"),
+            patch("app.core.tickets_service.get_ticket", return_value={"id": 55, "categoria": "general"}),
+        ):
+            ticket = tickets_service.create_ticket(
+                titulo="Incidente sin regla",
+                descripcion="Debe usar clasificación automática",
+                creador_id="tester",
+                categoria=None,
+                origen_email="cliente@empresa.cl",
+            )
+
+        self.assertEqual(ticket["categoria"], "general")
+        resolve_route.assert_called_once()
+        classify_ticket.assert_called_once_with("Incidente sin regla", "Debe usar clasificación automática")
+
+    def test_auto_reply_templates_render_from_db_and_fallback_to_default(self) -> None:
+        ticket = {
+            "id": 42,
+            "codigo": "TK-23-03-2026-0042",
+            "titulo": "Router caído",
+            "cliente_nombre": "Cliente Demo",
+            "asignado_a": "tecnico1",
+        }
+
+        configured_conn = MagicMock()
+        configured_subject = MagicMock()
+        configured_subject.fetchone.return_value = {"value": "Acuse {{ticket_code}} para {{customer_name}}"}
+        configured_body = MagicMock()
+        configured_body.fetchone.return_value = {"value": "Hola {{customer_name}}, revisaremos {{ticket_title}} con {{assignee_name}}."}
+        configured_conn.execute.side_effect = [configured_subject, configured_body]
+
+        subject = tickets_service._auto_reply_subject(configured_conn, ticket, nombre="Cliente Demo", asignado_a="Técnico Uno")
+        body = tickets_service._auto_reply_body(configured_conn, ticket, "Cliente Demo", "Técnico Uno")
+
+        self.assertEqual(subject, "Acuse TK-23-03-2026-0042 para Cliente Demo")
+        self.assertIn("Hola Cliente Demo", body)
+        self.assertIn("Router caído", body)
+        self.assertIn("Técnico Uno", body)
+
+        fallback_conn = MagicMock()
+        empty_subject = MagicMock()
+        empty_subject.fetchone.return_value = None
+        empty_body = MagicMock()
+        empty_body.fetchone.return_value = None
+        fallback_conn.execute.side_effect = [empty_subject, empty_body]
+
+        fallback_subject = tickets_service._auto_reply_subject(fallback_conn, ticket, nombre="Cliente Demo", asignado_a="Mesa")
+        fallback_body = tickets_service._auto_reply_body(fallback_conn, ticket, "Cliente Demo", "Mesa")
+
+        self.assertEqual(fallback_subject, "Re: [TK-23-03-2026-0042] Router caído")
+        self.assertIn("Hemos recibido su solicitud", fallback_body)
+        self.assertIn("TK-23-03-2026-0042", fallback_body)
+
+    def test_notify_specialist_assignment_uses_configured_template(self) -> None:
+        ticket = {
+            "id": 88,
+            "codigo": "TK-23-03-2026-0088",
+            "titulo": "VPN intermitente",
+        }
+        conn = MagicMock()
+        subject_cursor = MagicMock()
+        subject_cursor.fetchone.return_value = {"value": "Nueva tarea {{ticket_code}}"}
+        body_cursor = MagicMock()
+        body_cursor.fetchone.return_value = {"value": "Hola, revisa {{ticket_title}}."}
+        conn.execute.side_effect = [subject_cursor, body_cursor]
+
+        with (
+            patch("app.core.tickets_service.db.get_conn", return_value=conn),
+            patch("app.core.tickets_service.email_sender.send_email_advanced") as send_email,
+        ):
+            tickets_service.notify_specialist_assignment("tecnico@example.com", ticket)
+
+        kwargs = send_email.call_args.kwargs
+        self.assertEqual(kwargs["subject"], "Nueva tarea TK-23-03-2026-0088")
+        self.assertIn("revisa VPN intermitente", kwargs["html_body"])
+        self.assertEqual(kwargs["to_email"], "tecnico@example.com")
+
+    def test_status_update_notify_sends_internal_email(self) -> None:
+        ticket = {
+            "id": 89,
+            "codigo": "TK-23-03-2026-0089",
+            "titulo": "Firewall caido",
+            "notify_emails": "dueno@example.com, supervisor@example.com",
+            "email_thread_id": "<status-parent@example.com>",
+            "email_references": "<status-history@example.com>",
+        }
+        conn = MagicMock()
+
+        with (
+            patch("app.core.tickets_service.db.get_conn", return_value=conn),
+            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-26T16:00:00+00:00"),
+            patch(
+                "app.core.tickets_service.email_sender.send_email_advanced",
+                return_value={"from_addr": "soporte@example.com", "message_id": "<msg-status@example.com>"},
+            ) as send_email,
+            patch("app.core.tickets_service._update_ticket_thread_metadata") as update_thread,
+        ):
+            result = tickets_service._send_ticket_status_update_to_notify_emails(
+                ticket,
+                from_estado="abierto",
+                to_estado="en_progreso",
+                actor_id="encargado.mesa",
+                motivo="Escalado a mesa interna",
+            )
+
+        self.assertTrue(result["sent"])
+        kwargs = send_email.call_args.kwargs
+        self.assertEqual(kwargs["to_email"], "dueno@example.com")
+        self.assertEqual(kwargs["cc_emails"], ["supervisor@example.com"])
+        self.assertEqual(kwargs["subject"], "Re: [TK-23-03-2026-0089] Firewall caido")
+        self.assertIn("Abierto -> En progreso", kwargs["html_body"])
+        self.assertIn("Escalado a mesa interna", kwargs["html_body"])
+        self.assertIn("encargado.mesa", kwargs["html_body"])
+        update_thread.assert_called_once_with(
+            conn,
+            89,
+            message_id="<msg-status@example.com>",
+            in_reply_to="<status-parent@example.com>",
+            references="<status-history@example.com> <status-parent@example.com>",
+        )
+        conn.commit.assert_called_once()
+        conn.close.assert_called_once()
+
+    def test_reply_is_only_allowed_in_en_progreso(self) -> None:
+        for estado in ("abierto", "resuelto", "cerrado"):
+            with self.subTest(estado=estado):
+                with self.assertRaises(ValueError):
+                    tickets_service._ensure_reply_allowed_estado({"estado": estado}, "responder correos")
+
+        tickets_service._ensure_reply_allowed_estado({"estado": "en_progreso"}, "responder correos")
+
+    def test_main_status_transition_rejects_non_adjacent_change(self) -> None:
+        with self.assertRaises(tickets_service.ConflictError):
+            tickets_service._validate_main_status_transition("abierto", "cerrado")
+
+    def test_send_ticket_reply_email_uses_canonical_subject_without_legacy_signature_and_persists_attachments(self) -> None:
+        ticket = {
+            "id": 77,
+            "codigo": "TK-23-03-2026-0077",
+            "titulo": "Incidente saliente",
+            "email_thread_id": "<padre@example.com>",
+            "email_references": "<historial@example.com>",
+        }
+        stored_attachment = {
+            "filename": "salida.txt",
+            "path": "/tmp/salida.txt",
+            "size": 14,
+            "content_type": "text/plain",
+            "sha256": "abc123",
+        }
+        email_attachment = {
+            "filename": "salida.txt",
+            "data": b"hola adjunto",
+            "content_type": "text/plain",
+        }
+
+        lock_conn = MagicMock()
+        conn = MagicMock()
+
+        def lock_execute(sql: str, params=None):
+            cursor = MagicMock()
+            lowered = " ".join(str(sql).lower().split())
+            if "idempotency_key" in lowered and "from ticket_emails" in lowered:
+                cursor.fetchone.return_value = None
+                return cursor
+            if "body_html" in lowered and "from ticket_emails" in lowered:
+                cursor.fetchone.return_value = None
+                return cursor
+            if "insert into ticket_emails" in lowered and "outgoing_pending" in lowered:
+                cursor.fetchone.return_value = {"id": 990}
+                return cursor
+            cursor.fetchone.return_value = None
+            return cursor
+
+        lock_conn.execute.side_effect = lock_execute
+
+        def main_execute(sql: str, params=None):
+            cursor = MagicMock()
+            cursor.fetchone.return_value = None
+            return cursor
+
+        conn.execute.side_effect = main_execute
+
+        with (
+            patch("app.core.tickets_service.db.get_conn", side_effect=[lock_conn, conn]),
+            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-23T15:00:00+00:00"),
+            patch(
+                "app.core.tickets_service.email_sender.send_email_advanced",
+                return_value={"from_addr": "soporte@example.com", "message_id": "<reply@example.com>"},
+            ) as send_email,
+            patch("app.core.tickets_service._maybe_mark_first_response"),
+            patch("app.core.tickets_service._update_ticket_thread_metadata"),
+            patch("app.core.tickets_service._evaluate_ticket_sla"),
+            patch("app.core.tickets_service.create_evidence_event"),
+        ):
+            result = tickets_service._send_ticket_reply_email(
+                ticket=ticket,
+                author_id="tecnico1",
+                clean_msg="Respuesta limpia al cliente",
+                to_email="cliente@example.com",
+                cc_emails=["cc@example.com"],
+                bcc_emails=["cco@example.com"],
+                to_addr_record="cliente@example.com",
+                email_attachments=[email_attachment],
+                stored_attachments=[stored_attachment],
+                idempotency_key="reply-test-1",
+            )
+
+        send_kwargs = send_email.call_args.kwargs
+        self.assertEqual(send_kwargs["subject"], "Re: [TK-23-03-2026-0077] Incidente saliente")
+        self.assertEqual(send_kwargs["attachments"][0]["filename"], "salida.txt")
+        self.assertNotIn("Mesa de Ayuda", send_kwargs["html_body"])
+        self.assertEqual(result["sent_email_id"], 990)
+
+        executed_sql = "\n".join(str(call.args[0]) for call in conn.execute.call_args_list)
+        self.assertIn("INSERT INTO ticket_attachments", executed_sql)
+        self.assertIn("INSERT INTO ticket_comments", executed_sql)
+
+
 class EmailIntegrationParsingTests(unittest.TestCase):
     def test_parse_email_decodes_subject_body_and_attachment(self) -> None:
         msg = MIMEMultipart()

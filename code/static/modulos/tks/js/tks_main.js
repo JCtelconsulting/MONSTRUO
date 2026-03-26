@@ -22,10 +22,12 @@ const TksMain = (() => {
     let notifAbortController = null;
     const DEFAULT_LIST_LIMIT = 50;
     const CACHE_TTL_MS = 15000;
+    const DEFAULT_TICKETERA_CATEGORIES = Object.freeze(['admin', 'ejecucion', 'general', 'redes', 'sistemas']);
     const cache = {
         dashboard: null,
         assignment: null,
         kanban: null,
+        messages: null,
         ops: null,
         list: new Map(),
     };
@@ -36,6 +38,7 @@ const TksMain = (() => {
     const ROLE_MANAGEMENT = new Set([ROLE_ADMIN, ROLE_MESA_MANAGER]);
     const ROLE_DISPATCH = new Set(['ops', ROLE_MESA_MANAGER]);
     const ROLE_OPS_READ = new Set([ROLE_ADMIN]);
+    const MAIN_STATUS_SEQUENCE = ['abierto', 'en_progreso', 'resuelto', 'cerrado'];
     let sessionCtx = {
         user: '',
         role: '',
@@ -43,6 +46,7 @@ const TksMain = (() => {
         canWrite: false,
         canCreate: false,
         canViewOps: false,
+        canManageMessages: false,
         isTech: false,
         isScopedTech: false,
         isAdmin: false,
@@ -62,6 +66,14 @@ const TksMain = (() => {
     let resueltoCountdownIntervalId = null;
     const ASSIGNEE_CACHE_TTL_MS = 120000;
     let assigneeDirectoryCache = { items: [], ts: 0 };
+    let kanbanDragSourceStatus = '';
+    let messageSettingsState = {
+        categories: [...DEFAULT_TICKETERA_CATEGORIES],
+        mailTemplates: [],
+        routingRules: [],
+        activeTemplateKey: '',
+        editingRuleId: null,
+    };
 
     // ---- Elementos clave ----
     function el(id) { return document.getElementById(id); }
@@ -72,6 +84,7 @@ const TksMain = (() => {
         cache.dashboard = null;
         cache.assignment = null;
         cache.kanban = null;
+        cache.messages = null;
         cache.ops = null;
         cache.list.clear();
     }
@@ -82,6 +95,109 @@ const TksMain = (() => {
 
     function errorHtml(err) {
         return TksUI.escapeHtml(errorMessage(err));
+    }
+
+    function normalizeMessageSettingsData(rawData) {
+        const data = rawData || {};
+        return {
+            categories: Array.isArray(data?.categories) && data.categories.length
+                ? data.categories
+                : [...DEFAULT_TICKETERA_CATEGORIES],
+            mail_templates: Array.isArray(data?.mail_templates) ? data.mail_templates : [],
+            routing_rules: Array.isArray(data?.routing_rules) ? data.routing_rules : [],
+        };
+    }
+
+    function hydrateMessageSettingsState(rawData) {
+        const normalized = normalizeMessageSettingsData(rawData);
+        messageSettingsState = {
+            categories: [...normalized.categories],
+            mailTemplates: normalized.mail_templates.map((item) => ({ ...item })),
+            routingRules: normalized.routing_rules.map((item) => ({ ...item })),
+            activeTemplateKey: '',
+            editingRuleId: null,
+        };
+        return messageSettingsState;
+    }
+
+    function getMailTemplateByKey(templateKey) {
+        const normalizedKey = String(templateKey || '').trim().toLowerCase();
+        return messageSettingsState.mailTemplates.find((item) => String(item?.key || '').trim().toLowerCase() === normalizedKey) || null;
+    }
+
+    function mergeMailTemplateState(template) {
+        if (!template || !template.key) return null;
+        const normalizedKey = String(template.key || '').trim().toLowerCase();
+        let mergedTemplate = null;
+        messageSettingsState.mailTemplates = messageSettingsState.mailTemplates.map((item) => {
+            if (String(item?.key || '').trim().toLowerCase() !== normalizedKey) return item;
+            mergedTemplate = { ...item, ...template };
+            return mergedTemplate;
+        });
+        if (!mergedTemplate) {
+            mergedTemplate = { ...template };
+            messageSettingsState.mailTemplates.push(mergedTemplate);
+        }
+        const nextData = normalizeMessageSettingsData(cache.messages?.data || {});
+        let foundTemplate = false;
+        nextData.mail_templates = (nextData.mail_templates || []).map((item) => {
+            if (String(item?.key || '').trim().toLowerCase() !== normalizedKey) return item;
+            foundTemplate = true;
+            return { ...item, ...mergedTemplate };
+        });
+        if (!foundTemplate) {
+            nextData.mail_templates.push({ ...mergedTemplate });
+        }
+        cache.messages = { data: nextData, ts: Date.now() };
+        return mergedTemplate;
+    }
+
+    function getEditingRoutingRule() {
+        const targetId = Number(messageSettingsState.editingRuleId || 0);
+        if (!targetId) return null;
+        return messageSettingsState.routingRules.find((item) => Number(item?.id || 0) === targetId) || null;
+    }
+
+    function renderMessageSettings(container) {
+        if (!container) return;
+        container.innerHTML = `
+            <div style="position: relative; padding-top: 0.5rem; overflow: visible;">
+                ${TksUI.renderMessageTemplates(messageSettingsState, { editingRule: getEditingRoutingRule() })}
+            </div>
+        `;
+    }
+
+    function closeMailTemplateModal() {
+        const modal = el('tks-template-editor-modal');
+        if (modal) modal.remove();
+        messageSettingsState.activeTemplateKey = '';
+    }
+
+    async function openMailTemplateModal(templateKey) {
+        const normalizedKey = String(templateKey || '').trim().toLowerCase();
+        const fallbackTemplate = getMailTemplateByKey(normalizedKey);
+        if (!fallbackTemplate) {
+            if (window.showToast) window.showToast('No se encontro la plantilla seleccionada.', 'warning');
+            return;
+        }
+        let template = fallbackTemplate;
+        try {
+            const out = await TksApi.getMailTemplate(normalizedKey, { timeoutMs: 12000 });
+            template = mergeMailTemplateState(out?.template || null) || fallbackTemplate;
+        } catch (e) {
+            if (window.showToast) {
+                window.showToast(`No fue posible refrescar la plantilla. Se mostrara la version cargada: ${errorMessage(e)}`, 'warning');
+            }
+        }
+        closeMailTemplateModal();
+        messageSettingsState.activeTemplateKey = normalizedKey;
+        document.body.insertAdjacentHTML('beforeend', TksUI.renderMailTemplateEditorModal(template));
+        const modal = el('tks-template-editor-modal');
+        if (modal) {
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeMailTemplateModal();
+            });
+        }
     }
 
     function escapeJsSingleQuoted(text) {
@@ -391,6 +507,54 @@ const TksMain = (() => {
         return String(user || '').trim().toLowerCase();
     }
 
+    function parseNotifyEmails(ticket) {
+        const list = Array.isArray(ticket?.notify_emails_list)
+            ? ticket.notify_emails_list
+            : String(ticket?.notify_emails || '')
+                .split(/[,\n;]+/)
+                .map((value) => String(value || '').trim())
+                .filter(Boolean);
+        return Array.from(new Set(list));
+    }
+
+    function buildReplySubject(ticket) {
+        const code = String(ticket?.codigo || `Ticket #${Number(ticket?.id || 0)}`).trim();
+        const title = String(ticket?.titulo || '').trim();
+        const base = title ? `[${code}] ${title}` : code;
+        return /^re:/i.test(base) ? base : `Re: ${base}`;
+    }
+
+    function buildReplySnapshot(ticket) {
+        return {
+            to_addr: String(ticket?.origen_email || '').trim(),
+            cc_addrs: parseNotifyEmails(ticket).join(', '),
+            bcc_addrs: '',
+            subject: buildReplySubject(ticket),
+            body_text: '',
+        };
+    }
+
+    function replyBlockedReason(ticket, permissions) {
+        if (permissions?.canParticipate !== true) {
+            return String(permissions?.blockedReason || '').trim();
+        }
+        const status = String(ticket?.estado || '').trim().toLowerCase();
+        if (status !== 'en_progreso') {
+            return 'Para responder el ticket al cliente, debes pasarlo primero a estado En Progreso';
+        }
+        return '';
+    }
+
+    function isAdjacentStatusMove(sourceStatus, targetStatus) {
+        const source = String(sourceStatus || '').trim().toLowerCase();
+        const target = String(targetStatus || '').trim().toLowerCase();
+        if (!source || !target || source === target) return true;
+        const sourceIndex = MAIN_STATUS_SEQUENCE.indexOf(source);
+        const targetIndex = MAIN_STATUS_SEQUENCE.indexOf(target);
+        if (sourceIndex < 0 || targetIndex < 0) return false;
+        return Math.abs(targetIndex - sourceIndex) === 1;
+    }
+
     function buildSessionContext(sessionPayload = {}) {
         const roles = normalizeRoles(sessionPayload.roles, sessionPayload.role);
         const role = roles[0] || '';
@@ -399,6 +563,7 @@ const TksMain = (() => {
         const isTech = roles.some((item) => ROLE_TECH.has(item));
         const isScopedTech = isTech && !isAdmin;
         const canViewOps = roles.some((item) => ROLE_OPS_READ.has(item));
+        const canManageMessages = roles.some((item) => ROLE_MANAGEMENT.has(item));
         const canWrite = isAdmin || isTech;
         return {
             user,
@@ -407,6 +572,7 @@ const TksMain = (() => {
             canWrite,
             canCreate: canWrite,
             canViewOps,
+            canManageMessages,
             isTech,
             isScopedTech,
             isAdmin,
@@ -428,14 +594,24 @@ const TksMain = (() => {
 
     function applyRoleView() {
         document.querySelectorAll('.tks-tab-btn').forEach(btn => {
-            if (btn.dataset.tab !== 'ops') return;
-            if (sessionCtx.canViewOps) {
-                btn.style.removeProperty('display');
-                btn.hidden = false;
+            const tabKey = String(btn.dataset.tab || '').trim();
+            if (tabKey === 'ops') {
+                if (sessionCtx.canViewOps) {
+                    btn.style.removeProperty('display');
+                    btn.hidden = false;
+                    return;
+                }
+                btn.remove();
                 return;
             }
-            // Hide hard: remove tab from DOM to avoid global CSS !important overrides.
-            btn.remove();
+            if (tabKey === 'messages') {
+                if (sessionCtx.canManageMessages) {
+                    btn.style.removeProperty('display');
+                    btn.hidden = false;
+                    return;
+                }
+                btn.remove();
+            }
         });
         const createBtn = el('tks-create-btn');
         if (createBtn) {
@@ -575,6 +751,9 @@ const TksMain = (() => {
         if (tab === 'ops' && !sessionCtx.canViewOps) {
             tab = 'lista';
         }
+        if (tab === 'messages' && !sessionCtx.canManageMessages) {
+            tab = 'lista';
+        }
         const force = options.force === true;
         const content = el('tks-content');
         if (!force && tab === currentTab && content && content.dataset.loadedTab === tab) {
@@ -597,8 +776,10 @@ const TksMain = (() => {
             selectedTicket = null;
             resetDraftState();
             stopAutoProgressTimer();
-            const reviewModal = el('tks-draft-review-modal');
-            if (reviewModal) reviewModal.remove();
+            ['tks-draft-review-modal', 'tks-reply-review-modal', 'tks-template-editor-modal'].forEach((modalId) => {
+                const modal = el(modalId);
+                if (modal) modal.remove();
+            });
         }
 
         currentTab = tab;
@@ -616,6 +797,7 @@ const TksMain = (() => {
         else if (tab === 'asignacion') loadAssignmentTimeline(content, token);
         else if (tab === 'lista') loadList(content, token);
         else if (tab === 'kanban') loadKanban(content, token);
+        else if (tab === 'messages') loadMessageTemplates(content, token);
         else if (tab === 'ops') loadOps(content, token);
     }
 
@@ -890,7 +1072,6 @@ const TksMain = (() => {
             return true;
         }
 
-        const canEditDraftSession = currentDraftMeta.canEdit;
         const toInput = el('tks-draft-to');
         const ccInput = el('tks-draft-cc');
         const bccInput = el('tks-draft-bcc');
@@ -898,11 +1079,11 @@ const TksMain = (() => {
         const bodyInput = el('tks-draft-body');
         const fileInput = el('tks-draft-files');
 
-        if (canEditDraftSession && fileInput && fileInput.files && fileInput.files.length > 0) {
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
             return true;
         }
 
-        if (canEditDraftSession && (toInput || ccInput || bccInput || subjectInput || bodyInput)) {
+        if (toInput || ccInput || bccInput || subjectInput || bodyInput) {
             const snapshot = currentDraftSnapshot || {};
             const currentTo = String(toInput?.value || '').trim();
             const currentCc = String(ccInput?.value || '').trim();
@@ -923,10 +1104,6 @@ const TksMain = (() => {
             ) {
                 return true;
             }
-        }
-
-        if (canEditDraftSession && detailActiveTab === 'reply') {
-            return true;
         }
 
         return false;
@@ -950,8 +1127,10 @@ const TksMain = (() => {
             panel.style.display = 'none';
             panel.innerHTML = '<div class="tks-detail-empty"><span>Selecciona un ticket</span></div>';
         }
-        const reviewModal = el('tks-draft-review-modal');
-        if (reviewModal) reviewModal.remove();
+        ['tks-draft-review-modal', 'tks-reply-review-modal', 'tks-template-editor-modal'].forEach((modalId) => {
+            const modal = el(modalId);
+            if (modal) modal.remove();
+        });
         const listPanel = el('tks-list-panel');
         if (listPanel) listPanel.style.display = '';
 
@@ -1006,23 +1185,22 @@ const TksMain = (() => {
                     if (err?.name === 'AbortError') throw err;
                     return { allowed_next: [] };
                 });
-            const [ticket, eventosData, emailsData, attachmentsData, draftData, workflowData] = await Promise.all([
+            const [ticket, eventosData, emailsData, attachmentsData, workflowData] = await Promise.all([
                 TksApi.getTicket(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 TksApi.getEventos(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 TksApi.getTicketEmails(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 TksApi.getTicketAttachments(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
-                TksApi.getEmailDraft(ticketId, { signal: controller.signal, timeoutMs: 10000 }),
                 workflowPromise,
             ]);
             if (reqToken !== detailRequestToken || selectedTicketId !== ticketId) return;
             selectedTicket = ticket;
             currentWorkflow = workflowData || {};
             const permissions = ticketPermissions(ticket);
-            currentDraftSnapshot = draftData?.draft || null;
+            currentDraftSnapshot = buildReplySnapshot(ticket);
             currentDraftMeta = {
-                canEdit: draftData?.can_edit === true,
-                blockedReason: String(draftData?.blocked_reason || ''),
-                heartbeatSeconds: Number(draftData?.heartbeat_seconds || 60),
+                canEdit: permissions.canParticipate === true && String(ticket?.estado || '').trim().toLowerCase() === 'en_progreso',
+                blockedReason: replyBlockedReason(ticket, permissions),
+                heartbeatSeconds: 60,
             };
             stopDraftHeartbeat();
 
@@ -1044,6 +1222,7 @@ const TksMain = (() => {
             );
             panel.innerHTML = html;
             hydrateAssigneePicker(ticket, permissions);
+            bindReplyComposer();
             scrollTimelineToBottom();
             switchComposerMode(detailActiveTab);
             scheduleAutoProgress(ticket, permissions, currentWorkflow);
@@ -1085,6 +1264,12 @@ const TksMain = (() => {
             selectedTicket = ticket;
 
             const permissions = ticketPermissions(ticket);
+            currentDraftSnapshot = buildReplySnapshot(ticket);
+            currentDraftMeta = {
+                canEdit: permissions.canParticipate === true && String(ticket?.estado || '').trim().toLowerCase() === 'en_progreso',
+                blockedReason: replyBlockedReason(ticket, permissions),
+                heartbeatSeconds: 60,
+            };
             const html = TksUI.renderDetail(
                 ticket,
                 eventosData.items || [],
@@ -1106,6 +1291,7 @@ const TksMain = (() => {
             if (panel) {
                 panel.innerHTML = html;
                 hydrateAssigneePicker(ticket, permissions);
+                bindReplyComposer();
                 // No scrolleamos obligatoriamente al final para no molestar si el usuario está leyendo arriba,
                 // a menos que sea un refresh provocado por una acción propia.
             }
@@ -1406,10 +1592,31 @@ const TksMain = (() => {
         switchComposerMode(tabKey);
     }
 
+    function renderReplyFileList() {
+        const input = el('tks-draft-files');
+        const list = el('tks-draft-file-list');
+        if (!list) return;
+        const files = Array.from(input?.files || []);
+        if (!files.length) {
+            list.innerHTML = '<div style="color:var(--tks-text-muted);font-size:0.8rem;">Sin adjuntos seleccionados</div>';
+            return;
+        }
+        list.innerHTML = files.map((file) => `
+            <div class="tks-draft-attachment-row">
+                <span><i class="fas fa-paperclip"></i> ${TksUI.escapeHtml(file.name || 'adjunto')}</span>
+            </div>
+        `).join('');
+    }
+
+    function bindReplyComposer() {
+        const input = el('tks-draft-files');
+        if (!input) return;
+        input.addEventListener('change', renderReplyFileList);
+        renderReplyFileList();
+    }
+
     function readDraftEditor(ticketId) {
         return {
-            lock_token: draftLockToken,
-            version: Number(el('tks-draft-version')?.value || currentDraftSnapshot?.version || 0),
             to_addr: el('tks-draft-to')?.value?.trim() || '',
             cc_addrs: el('tks-draft-cc')?.value?.trim() || '',
             bcc_addrs: el('tks-draft-bcc')?.value?.trim() || '',
@@ -1424,59 +1631,16 @@ const TksMain = (() => {
     }
 
     async function saveEmailDraft(ticketId, options = {}) {
-        const silent = options.silent === true;
-        const refresh = options.refresh !== false;
-        const payload = readDraftEditor(ticketId);
-        if (!payload.version) {
-            if (!silent && window.showToast) window.showToast('Versión de borrador inválida; recarga el detalle', 'warning');
-            return null;
-        }
-        try {
-            const out = await TksApi.saveEmailDraft(ticketId, payload);
-            currentDraftSnapshot = out?.draft || currentDraftSnapshot;
-            if (!silent && window.showToast) window.showToast('Borrador guardado', 'success');
-            if (refresh) {
-                detailActiveTab = 'reply';
-                openDetail(ticketId, { preserveTab: true });
-            }
-            return out;
-        } catch (e) {
-            if (!silent && window.showToast) window.showToast(`Error guardando borrador: ${e.message}`, 'error');
-            return null;
-        }
+        if (window.showToast) window.showToast('El flujo de borradores fue deshabilitado. Usa Enviar respuesta.', 'warning');
+        return null;
     }
 
     async function uploadDraftAttachments(ticketId) {
-        const input = el('tks-draft-files');
-        if (!input || !input.files || input.files.length === 0) {
-            if (window.showToast) window.showToast('Selecciona uno o más archivos', 'warning');
-            return;
-        }
-        const fd = new FormData();
-        fd.append('lock_token', draftLockToken);
-        Array.from(input.files).forEach((file) => fd.append('files', file));
-        try {
-            const out = await TksApi.uploadEmailDraftAttachments(ticketId, fd, { timeoutMs: 60000 });
-            currentDraftSnapshot = out?.draft || currentDraftSnapshot;
-            input.value = '';
-            if (window.showToast) window.showToast(`Adjuntos cargados: ${Number(out?.uploaded || 0)}`, 'success');
-            detailActiveTab = 'reply';
-            openDetail(ticketId, { preserveTab: true });
-        } catch (e) {
-            if (window.showToast) window.showToast(`Error subiendo adjuntos: ${e.message}`, 'error');
-        }
+        renderReplyFileList();
     }
 
     async function deleteDraftAttachment(ticketId, attachmentId) {
-        try {
-            const out = await TksApi.deleteEmailDraftAttachment(ticketId, attachmentId, draftLockToken);
-            currentDraftSnapshot = out?.draft || currentDraftSnapshot;
-            if (window.showToast) window.showToast('Adjunto eliminado', 'success');
-            detailActiveTab = 'reply';
-            openDetail(ticketId, { preserveTab: true });
-        } catch (e) {
-            if (window.showToast) window.showToast(`Error eliminando adjunto: ${e.message}`, 'error');
-        }
+        if (window.showToast) window.showToast('Los adjuntos ahora se envían directamente desde el selector local.', 'warning');
     }
 
     function closeDraftReviewModal() {
@@ -1496,11 +1660,11 @@ const TksMain = (() => {
         }
 
         closeDraftReviewModal();
-        const attachments = Array.isArray(currentDraftSnapshot?.attachments) ? currentDraftSnapshot.attachments : [];
+        const attachments = Array.from(el('tks-draft-files')?.files || []);
         const ccPreview = String(payload.cc_addrs || '').trim();
         const bccPreview = String(payload.bcc_addrs || '').trim();
         const listItems = attachments.length
-            ? attachments.map((att) => `<li>${TksUI.escapeHtml(att.filename || 'adjunto')}</li>`).join('')
+            ? attachments.map((att) => `<li>${TksUI.escapeHtml(att.name || 'adjunto')}</li>`).join('')
             : '<li>Sin adjuntos</li>';
         const html = `
             <div class="tks-modal-overlay open" id="tks-draft-review-modal">
@@ -1548,19 +1712,34 @@ const TksMain = (() => {
     }
 
     async function reviewSendDraft(ticketId) {
-        const out = await saveEmailDraft(ticketId, { silent: false, refresh: false });
-        if (!out) return;
         openDraftReviewModal(ticketId);
     }
 
     async function confirmSendDraft(ticketId) {
-        const version = Number(currentDraftSnapshot?.version || el('tks-draft-version')?.value || 0);
-        if (!version) {
-            if (window.showToast) window.showToast('Versión de borrador inválida', 'warning');
+        const ticket = selectedTicket && Number(selectedTicket?.id) === Number(ticketId) ? selectedTicket : null;
+        const permissions = ticket ? ticketPermissions(ticket) : null;
+        if (permissions && !permissions.canParticipate) {
+            if (window.showToast) window.showToast(permissions.blockedReason || 'No puedes responder este ticket', 'warning');
             return;
         }
+        if (ticket && String(ticket.estado || '').trim().toLowerCase() !== 'en_progreso') {
+            if (window.showToast) window.showToast('Para responder el ticket al cliente, debes pasarlo primero a estado En Progreso', 'warning');
+            return;
+        }
+
+        const payload = readDraftEditor(ticketId);
+        const filesInput = el('tks-draft-files');
+        const files = Array.from(filesInput?.files || []);
+        const formData = new FormData();
+        formData.append('mensaje', payload.body_text);
+        formData.append('asunto', payload.subject);
+        formData.append('to_addr', payload.to_addr);
+        formData.append('cc_addrs', payload.cc_addrs);
+        formData.append('bcc_addrs', payload.bcc_addrs);
+        files.forEach((file) => formData.append('files', file));
+
         try {
-            await TksApi.sendEmailDraft(ticketId, { lock_token: draftLockToken, version }, { timeoutMs: 60000 });
+            await TksApi.replyByEmail(ticketId, formData, { timeoutMs: 60000 });
             closeDraftReviewModal();
             clearDataCache();
             stopDraftHeartbeat();
@@ -1574,18 +1753,7 @@ const TksMain = (() => {
     }
 
     async function discardEmailDraft(ticketId) {
-        if (!confirm('¿Descartar borrador activo?')) return;
-        try {
-            await TksApi.discardEmailDraft(ticketId, draftLockToken);
-            stopDraftHeartbeat();
-            draftLockToken = '';
-            currentDraftSnapshot = null;
-            if (window.showToast) window.showToast('Borrador descartado', 'success');
-            detailActiveTab = 'reply';
-            openDetail(ticketId, { preserveTab: true });
-        } catch (e) {
-            if (window.showToast) window.showToast(`Error descartando borrador: ${e.message}`, 'error');
-        }
+        if (window.showToast) window.showToast('El flujo de borradores fue deshabilitado.', 'warning');
     }
 
     async function replyByEmail(ticketId) {
@@ -1656,6 +1824,34 @@ const TksMain = (() => {
         }
     }
 
+    // ---- MENSAJES ----
+    async function loadMessageTemplates(container, token) {
+        if (!container) return;
+        if (isFresh(cache.messages)) {
+            hydrateMessageSettingsState(cache.messages.data);
+            renderMessageSettings(container);
+            return;
+        }
+        const controller = new AbortController();
+        panelAbortController = controller;
+        container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:220px;"></div></div>';
+        try {
+            const data = await TksApi.getDomainTemplateSettings({ signal: controller.signal, timeoutMs: 12000 });
+            if (token !== tabRequestToken || currentTab !== 'messages') return;
+            cache.messages = { data, ts: Date.now() };
+            hydrateMessageSettingsState(data);
+            renderMessageSettings(container);
+        } catch (e) {
+            if (e?.name === 'AbortError') return;
+            if (token !== tabRequestToken || currentTab !== 'messages') return;
+            container.innerHTML = `<div class="tks-dashboard"><p style="color:red">Error cargando mensajes: ${errorHtml(e)}</p></div>`;
+        } finally {
+            if (panelAbortController === controller) {
+                panelAbortController = null;
+            }
+        }
+    }
+
     // ---- OPS ----
     async function loadOps(container, token) {
         const renderOpsContainer = (data) => `
@@ -1710,6 +1906,96 @@ const TksMain = (() => {
         loadTab('ops', { force: true });
     }
 
+    function readMessageTemplateEditor() {
+        return {
+            subject_template: String(el('tks-template-editor-subject')?.value || '').trim(),
+            body_template: String(el('tks-template-editor-body')?.value || ''),
+        };
+    }
+
+    async function saveMessageTemplates() {
+        const templateKey = String(messageSettingsState.activeTemplateKey || '').trim().toLowerCase();
+        if (!templateKey) {
+            if (window.showToast) window.showToast('Primero selecciona una plantilla.', 'warning');
+            return;
+        }
+        const payload = readMessageTemplateEditor();
+        try {
+            const out = await TksApi.updateMailTemplate(templateKey, payload, { timeoutMs: 12000 });
+            const updatedTemplate = mergeMailTemplateState(out?.template || null);
+            if (updatedTemplate) {
+                hydrateMessageSettingsState(cache.messages?.data || {});
+            }
+            closeMailTemplateModal();
+            if (window.showToast) window.showToast('Plantilla guardada.', 'success');
+            renderMessageSettings(el('tks-content'));
+        } catch (e) {
+            if (window.showToast) {
+                window.showToast(`No fue posible guardar la plantilla: ${errorMessage(e)}`, 'error');
+            }
+        }
+    }
+
+    function readRoutingRuleEditor() {
+        return {
+            id: Number(messageSettingsState.editingRuleId || 0) || null,
+            match_type: String(el('tks-routing-match-type')?.value || 'email').trim(),
+            match_value: String(el('tks-routing-match-value')?.value || '').trim(),
+            categoria: String(el('tks-routing-categoria')?.value || '').trim(),
+            is_active: el('tks-routing-is-active')?.checked !== false,
+        };
+    }
+
+    function resetRoutingRuleForm() {
+        messageSettingsState.editingRuleId = null;
+        renderMessageSettings(el('tks-content'));
+    }
+
+    function editRoutingRule(ruleId) {
+        messageSettingsState.editingRuleId = Number(ruleId || 0) || null;
+        renderMessageSettings(el('tks-content'));
+    }
+
+    async function saveRoutingRule() {
+        const payload = readRoutingRuleEditor();
+        if (!payload.match_value) {
+            if (window.showToast) window.showToast('Debes ingresar un correo o dominio para la regla.', 'warning');
+            return;
+        }
+        if (!payload.categoria) {
+            if (window.showToast) window.showToast('Debes seleccionar un área para la regla.', 'warning');
+            return;
+        }
+        try {
+            await TksApi.upsertRoutingRule(payload, { timeoutMs: 12000 });
+            messageSettingsState.editingRuleId = null;
+            cache.messages = null;
+            if (window.showToast) window.showToast('Regla de enrutamiento guardada.', 'success');
+            loadTab('messages', { force: true });
+        } catch (e) {
+            if (window.showToast) {
+                window.showToast(`No fue posible guardar la regla: ${errorMessage(e)}`, 'error');
+            }
+        }
+    }
+
+    async function deleteRoutingRule(ruleId) {
+        const normalizedId = Number(ruleId || 0);
+        if (!normalizedId) return;
+        if (!window.confirm('¿Eliminar esta regla de enrutamiento?')) return;
+        try {
+            await TksApi.deleteRoutingRule(normalizedId, { timeoutMs: 12000 });
+            messageSettingsState.editingRuleId = null;
+            cache.messages = null;
+            if (window.showToast) window.showToast('Regla eliminada.', 'success');
+            loadTab('messages', { force: true });
+        } catch (e) {
+            if (window.showToast) {
+                window.showToast(`No fue posible eliminar la regla: ${errorMessage(e)}`, 'error');
+            }
+        }
+    }
+
     async function retryChannel(notificationId) {
         const id = Number(notificationId || 0);
         if (!id) return;
@@ -1737,8 +2023,10 @@ const TksMain = (() => {
         }
     }
 
-    function onDragStart(event, ticketId) {
+    function onDragStart(event, ticketId, sourceStatus = '') {
+        kanbanDragSourceStatus = String(sourceStatus || '').trim().toLowerCase();
         event.dataTransfer.setData('text/plain', ticketId);
+        event.dataTransfer.setData('application/x-tks-status', kanbanDragSourceStatus);
         event.dataTransfer.effectAllowed = 'move';
     }
 
@@ -1752,7 +2040,16 @@ const TksMain = (() => {
                 col.style.background = '';
                 const ticketId = parseInt(e.dataTransfer.getData('text/plain'));
                 const newStatus = col.dataset.status;
+                const sourceStatus = String(
+                    e.dataTransfer.getData('application/x-tks-status') || kanbanDragSourceStatus || ''
+                ).trim().toLowerCase();
                 if (!ticketId || !newStatus) return;
+                if (!isAdjacentStatusMove(sourceStatus, newStatus)) {
+                    if (window.showToast) {
+                        window.showToast('Solo puedes avanzar o retroceder un estado a la vez en el Kanban.', 'warning');
+                    }
+                    return;
+                }
                 await changeStatus(ticketId, newStatus);
             });
         });
@@ -1980,6 +2277,13 @@ const TksMain = (() => {
         openDetail,
         closeDetail,
         refreshList,
+        openMailTemplateModal,
+        closeMailTemplateModal,
+        saveMessageTemplates,
+        saveRoutingRule,
+        editRoutingRule,
+        deleteRoutingRule,
+        resetRoutingRuleForm,
         switchComposerMode,
         switchDetailTab,
         applyStatusChange,

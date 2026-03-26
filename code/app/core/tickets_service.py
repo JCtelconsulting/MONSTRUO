@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # ==========================================================================
 CATEGORIAS_VALIDAS = {"redes", "sistemas", "ejecucion", "admin", "general"}
 ESTADOS_VALIDOS = {"abierto", "en_progreso", "resuelto", "cerrado"}
+MAIN_STATUS_SEQUENCE = ("abierto", "en_progreso", "resuelto", "cerrado")
 SEVERIDADES_VALIDAS = {"baja", "media", "alta", "critica"}
 ROLES_TECNICOS = ticket_roles.ROLES_TECNICOS
 ROLES_TECNICOS_SET = ticket_roles.ROLES_TECNICOS_SET
@@ -76,9 +77,9 @@ CHAIN_VERSION = 1
 EMAIL_DRAFT_LOCK_MINUTES = 5
 EMAIL_DRAFT_LOCK_HEARTBEAT_SECONDS = 60
 # "cerrado" -> Bloqueo total (ReadOnly)
-# "resuelto" -> Bloqueo de envío de correos (EmailBlocked)
+# Solo "en_progreso" permite responder al cliente.
 TICKET_READONLY_ESTADOS = {"cerrado"}
-TICKET_EMAIL_BLOCKED_ESTADOS = {"resuelto", "cerrado"}
+TICKET_EMAIL_BLOCKED_ESTADOS = set(ESTADOS_VALIDOS) - {"en_progreso"}
 REPLY_BLOCKED_ESTADOS = TICKET_EMAIL_BLOCKED_ESTADOS  # Alias legacy
 
 class ConflictError(Exception):
@@ -327,6 +328,89 @@ JIRA_SYNC_DAILY_HOUR = _clamp_int(
 )
 JIRA_SYNC_TZ = _parse_timezone_name(getattr(app_settings, "JIRA_SYNC_TZ", "America/Santiago"))
 AUTO_REPLY_MAX_REFERENCES = 20
+EMAIL_ROUTE_MATCH_TYPES = {"email", "domain"}
+AUTO_REPLY_SUBJECT_SETTING_KEY = "ticket_auto_reply_subject_template"
+AUTO_REPLY_BODY_SETTING_KEY = "ticket_auto_reply_body_template"
+CLIENT_ASSIGNMENT_SUBJECT_SETTING_KEY = "ticket_client_assignment_subject_template"
+CLIENT_ASSIGNMENT_BODY_SETTING_KEY = "ticket_client_assignment_body_template"
+SPECIALIST_ASSIGNMENT_SUBJECT_SETTING_KEY = "ticket_specialist_assignment_subject_template"
+SPECIALIST_ASSIGNMENT_BODY_SETTING_KEY = "ticket_specialist_assignment_body_template"
+RESOLUTION_SUBJECT_SETTING_KEY = "ticket_resolution_subject_template"
+RESOLUTION_BODY_SETTING_KEY = "ticket_resolution_body_template"
+MAIL_TEMPLATE_KEY_AUTO_REPLY = "auto_reply"
+MAIL_TEMPLATE_KEY_CLIENT_ASSIGNMENT = "client_assignment"
+MAIL_TEMPLATE_KEY_SPECIALIST_ASSIGNMENT = "specialist_assignment"
+MAIL_TEMPLATE_KEY_RESOLUTION = "ticket_resolution"
+DEFAULT_REPLY_SUBJECT_TEMPLATE = "Re: [{{ticket_code}}] {{ticket_title}}"
+DEFAULT_AUTO_REPLY_BODY_TEMPLATE = (
+    "Estimado Cliente,\n\n"
+    "Hemos recibido su solicitud y se ha generado el ticket {{ticket_code}}.\n"
+    "Su caso quedó a la espera de la asignación a un especialista.\n\n"
+    "Saludos."
+)
+DEFAULT_CLIENT_ASSIGNMENT_BODY_TEMPLATE = (
+    "Estimado Cliente,\n\n"
+    "Su ticket {{ticket_code}} se ha asignado al especialista {{assignee_name}}.\n\n"
+    "Saludos."
+)
+DEFAULT_SPECIALIST_ASSIGNMENT_SUBJECT_TEMPLATE = "Nuevo Ticket Asignado: {{ticket_code}}"
+DEFAULT_SPECIALIST_ASSIGNMENT_BODY_TEMPLATE = (
+    "Hola,\n\n"
+    "Se te ha asignado un nuevo ticket en la ticketera:\n"
+    "Ticket: {{ticket_code}}\n"
+    "Titulo: {{ticket_title}}\n\n"
+    "Puedes revisarlo en el sistema.\n\n"
+    "Saludos."
+)
+DEFAULT_RESOLUTION_BODY_TEMPLATE = (
+    "Estimado Cliente,\n\n"
+    "Le informamos que su ticket {{ticket_code}} ya esta listo y ha sido marcado como RESUELTO.\n"
+    "Si no recibimos comentarios adicionales de su parte en las proximas {{auto_close_hours}} horas, el ticket se cerrara automaticamente.\n\n"
+    "Gracias por su preferencia.\n"
+    "Saludos."
+)
+TICKETERA_MAIL_TEMPLATE_DEFS: Dict[str, Dict[str, str]] = {
+    MAIL_TEMPLATE_KEY_AUTO_REPLY: {
+        "key": MAIL_TEMPLATE_KEY_AUTO_REPLY,
+        "label": "Auto-respuesta",
+        "description": "Acuse automatico al cliente cuando entra un ticket por correo.",
+        "subject_setting_key": AUTO_REPLY_SUBJECT_SETTING_KEY,
+        "body_setting_key": AUTO_REPLY_BODY_SETTING_KEY,
+        "default_subject_template": DEFAULT_REPLY_SUBJECT_TEMPLATE,
+        "default_body_template": DEFAULT_AUTO_REPLY_BODY_TEMPLATE,
+        "default_subject_fallback_label": "Comprobante de Recepcion",
+    },
+    MAIL_TEMPLATE_KEY_CLIENT_ASSIGNMENT: {
+        "key": MAIL_TEMPLATE_KEY_CLIENT_ASSIGNMENT,
+        "label": "Asignacion de especialista",
+        "description": "Correo al cliente cuando su ticket queda asignado.",
+        "subject_setting_key": CLIENT_ASSIGNMENT_SUBJECT_SETTING_KEY,
+        "body_setting_key": CLIENT_ASSIGNMENT_BODY_SETTING_KEY,
+        "default_subject_template": DEFAULT_REPLY_SUBJECT_TEMPLATE,
+        "default_body_template": DEFAULT_CLIENT_ASSIGNMENT_BODY_TEMPLATE,
+        "default_subject_fallback_label": "Asignacion de Especialista",
+    },
+    MAIL_TEMPLATE_KEY_SPECIALIST_ASSIGNMENT: {
+        "key": MAIL_TEMPLATE_KEY_SPECIALIST_ASSIGNMENT,
+        "label": "Notificacion de especialista",
+        "description": "Correo al tecnico/especialista cuando se le asigna un ticket.",
+        "subject_setting_key": SPECIALIST_ASSIGNMENT_SUBJECT_SETTING_KEY,
+        "body_setting_key": SPECIALIST_ASSIGNMENT_BODY_SETTING_KEY,
+        "default_subject_template": DEFAULT_SPECIALIST_ASSIGNMENT_SUBJECT_TEMPLATE,
+        "default_body_template": DEFAULT_SPECIALIST_ASSIGNMENT_BODY_TEMPLATE,
+        "default_subject_fallback_label": "",
+    },
+    MAIL_TEMPLATE_KEY_RESOLUTION: {
+        "key": MAIL_TEMPLATE_KEY_RESOLUTION,
+        "label": "Cierre de TK",
+        "description": "Correo al cliente cuando el ticket queda resuelto y empieza el conteo de auto-cierre.",
+        "subject_setting_key": RESOLUTION_SUBJECT_SETTING_KEY,
+        "body_setting_key": RESOLUTION_BODY_SETTING_KEY,
+        "default_subject_template": DEFAULT_REPLY_SUBJECT_TEMPLATE,
+        "default_body_template": DEFAULT_RESOLUTION_BODY_TEMPLATE,
+        "default_subject_fallback_label": "Ticket Resuelto",
+    },
+}
 
 def _parse_csv_lower_set(raw_value: Any, strip_prefix: str = "") -> set[str]:
     values: set[str] = set()
@@ -347,6 +431,80 @@ def _normalize_email_address(raw_email: Optional[str]) -> str:
     if not local_part or not domain:
         return ""
     return f"{local_part}@{domain}"
+
+def _extract_email_domain(raw_email: Optional[str]) -> str:
+    normalized = _normalize_email_address(raw_email)
+    if "@" not in normalized:
+        return ""
+    return normalized.split("@", 1)[1].strip().lower()
+
+def _normalize_email_route_match_value(match_type: str, match_value: Any) -> str:
+    normalized_type = str(match_type or "").strip().lower()
+    raw_value = str(match_value or "").strip().lower()
+    if normalized_type == "email":
+        return _normalize_email_address(raw_value)
+    if normalized_type == "domain":
+        if "@" in raw_value:
+            raw_value = raw_value.split("@", 1)[1]
+        raw_value = raw_value.lstrip("@").strip().lower()
+        if not raw_value:
+            return ""
+        allowed = set("abcdefghijklmnopqrstuvwxyz0123456789.-")
+        if any(ch not in allowed for ch in raw_value):
+            return ""
+        if "." not in raw_value:
+            return ""
+        return raw_value
+    return ""
+
+def _get_system_setting(conn, key: str, default_value: str = "") -> str:
+    row = conn.execute("SELECT value FROM system_settings WHERE key = ?", ((key or "").strip(),)).fetchone()
+    value = None
+    if row:
+        if isinstance(row, dict):
+            value = row.get("value")
+        else:
+            try:
+                value = row["value"]
+            except Exception:
+                getter = getattr(row, "get", None)
+                if callable(getter):
+                    try:
+                        value = getter("value")
+                    except Exception:
+                        value = None
+    if value in (None, ""):
+        return default_value
+    if not isinstance(value, (str, int, float, bool)):
+        return default_value
+    return str(value)
+
+def _upsert_system_setting(
+    conn,
+    key: str,
+    value: Any,
+    *,
+    group_name: str = "ticketera",
+    is_sensitive: bool = False,
+    now_iso: Optional[str] = None,
+) -> None:
+    now_iso = now_iso or db.now_utc_iso()
+    conn.execute(
+        """INSERT INTO system_settings (key, value, group_name, is_sensitive, updated_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(key) DO UPDATE SET
+               value = EXCLUDED.value,
+               group_name = EXCLUDED.group_name,
+               is_sensitive = EXCLUDED.is_sensitive,
+               updated_at = EXCLUDED.updated_at""",
+        (
+            str(key or "").strip(),
+            str(value or ""),
+            str(group_name or "ticketera").strip() or "ticketera",
+            bool(is_sensitive),
+            now_iso,
+        ),
+    )
 
 def _sender_identity(sender: str) -> tuple[str, str]:
     name, addr = parseaddr(str(sender or ""))
@@ -487,7 +645,10 @@ def _is_readonly_blocked_by_estado(ticket: Dict[str, Any]) -> bool:
 def _ensure_reply_allowed_estado(ticket: Dict[str, Any], action_label: str) -> None:
     if _is_reply_blocked_by_estado(ticket):
         estado = str(ticket.get("estado") or "").strip().lower() or "-"
-        raise ValueError(f"No se puede {action_label} cuando el ticket está en estado '{estado}'.")
+        raise ValueError(
+            f"No se puede {action_label} cuando el ticket está en estado '{estado}'. "
+            "Primero debe estar en 'en_progreso'."
+        )
 
 def _extract_ticket_target_email(ticket: Dict[str, Any]) -> str:
     _, parsed_addr = parseaddr(ticket.get("origen_email") or "")
@@ -548,6 +709,360 @@ def _normalize_recipient_emails(raw_value: Any, *, label: str) -> List[str]:
         raise ValueError(f"Correos inválidos en {label}: {invalid_text}")
     return valid
 
+def _render_text_template(template: Any, context: Dict[str, Any]) -> str:
+    rendered = str(template or "")
+    safe_context = {str(key): str(value or "") for key, value in (context or {}).items()}
+    for key, value in safe_context.items():
+        rendered = rendered.replace(f"{{{{{key}}}}}", value)
+    return rendered
+
+def _ticketera_template_context(
+    *,
+    ticket: Dict[str, Any],
+    customer_name: str = "",
+    assignee_name: str = "",
+    auto_close_hours: Any = "",
+) -> Dict[str, str]:
+    ticket_id = int(ticket.get("id") or 0)
+    return {
+        "customer_name": str(customer_name or ticket.get("cliente_nombre") or "Cliente").strip() or "Cliente",
+        "ticket_code": str(ticket.get("codigo") or f"TK-{ticket_id}" or "Ticket").strip() or "Ticket",
+        "ticket_title": str(ticket.get("titulo") or "").strip(),
+        "assignee_name": str(assignee_name or ticket.get("asignado_a") or "").strip(),
+        "auto_close_hours": str(auto_close_hours or "").strip(),
+    }
+
+def _get_ticketera_mail_template_def(template_key: str) -> Dict[str, str]:
+    normalized = str(template_key or "").strip().lower()
+    template_def = TICKETERA_MAIL_TEMPLATE_DEFS.get(normalized)
+    if not template_def:
+        raise ValueError("Plantilla de Ticketera no reconocida.")
+    return template_def
+
+def _serialize_ticketera_mail_template(
+    conn,
+    template_key: str,
+) -> Dict[str, Any]:
+    template_def = _get_ticketera_mail_template_def(template_key)
+    stored_subject = _get_system_setting(conn, template_def["subject_setting_key"], "")
+    stored_body = _get_system_setting(conn, template_def["body_setting_key"], "")
+    default_subject = template_def.get("default_subject_template", "")
+    default_body = template_def.get("default_body_template", "")
+    use_default_subject = not str(stored_subject or "").strip()
+    use_default_body = not str(stored_body or "").strip()
+    return {
+        "key": template_def["key"],
+        "label": template_def.get("label", template_key),
+        "description": template_def.get("description", ""),
+        "subject_template": str(stored_subject or "").strip() or default_subject,
+        "body_template": str(stored_body or "") or default_body,
+        "uses_default_subject": use_default_subject,
+        "uses_default_body": use_default_body,
+    }
+
+def list_ticketera_mail_templates() -> List[Dict[str, Any]]:
+    conn = db.get_conn()
+    try:
+        return [
+            _serialize_ticketera_mail_template(conn, template_key)
+            for template_key in (
+                MAIL_TEMPLATE_KEY_AUTO_REPLY,
+                MAIL_TEMPLATE_KEY_CLIENT_ASSIGNMENT,
+                MAIL_TEMPLATE_KEY_SPECIALIST_ASSIGNMENT,
+                MAIL_TEMPLATE_KEY_RESOLUTION,
+            )
+        ]
+    finally:
+        conn.close()
+
+def get_ticketera_mail_template(template_key: str) -> Dict[str, Any]:
+    conn = db.get_conn()
+    try:
+        return _serialize_ticketera_mail_template(conn, template_key)
+    finally:
+        conn.close()
+
+def update_ticketera_mail_template(
+    template_key: str,
+    subject_template: str,
+    body_template: str,
+    actor_id: str,
+) -> Dict[str, Any]:
+    template_def = _get_ticketera_mail_template_def(template_key)
+    conn = db.get_conn()
+    try:
+        now = db.now_utc_iso()
+        _upsert_system_setting(
+            conn,
+            template_def["subject_setting_key"],
+            str(subject_template or "").strip(),
+            group_name="ticketera",
+            now_iso=now,
+        )
+        _upsert_system_setting(
+            conn,
+            template_def["body_setting_key"],
+            str(body_template or ""),
+            group_name="ticketera",
+            now_iso=now,
+        )
+        conn.commit()
+        updated = _serialize_ticketera_mail_template(conn, template_key)
+        updated["updated_by"] = str(actor_id or "").strip()
+        updated["updated_at"] = now
+        return updated
+    finally:
+        conn.close()
+
+def get_ticketera_templates() -> Dict[str, str]:
+    template = get_ticketera_mail_template(MAIL_TEMPLATE_KEY_AUTO_REPLY)
+    return {
+        "subject_template": str(template.get("subject_template") or ""),
+        "body_template": str(template.get("body_template") or ""),
+    }
+
+def update_ticketera_templates(subject_template: str, body_template: str, actor_id: str) -> Dict[str, str]:
+    updated = update_ticketera_mail_template(
+        MAIL_TEMPLATE_KEY_AUTO_REPLY,
+        subject_template,
+        body_template,
+        actor_id,
+    )
+    return {
+        "subject_template": str(updated.get("subject_template") or ""),
+        "body_template": str(updated.get("body_template") or ""),
+        "updated_by": str(updated.get("updated_by") or "").strip(),
+        "updated_at": updated.get("updated_at"),
+    }
+
+def _ticketera_template_text_to_html(text: Any) -> str:
+    normalized = str(text or "").replace("\r\n", "\n").strip()
+    if not normalized:
+        return ""
+    paragraphs = [chunk.strip() for chunk in normalized.split("\n\n") if chunk.strip()]
+    if not paragraphs:
+        return ""
+    return "".join(
+        f"<p>{html.escape(paragraph).replace(chr(10), '<br>')}</p>"
+        for paragraph in paragraphs
+    )
+
+def _render_ticketera_mail_subject(
+    conn,
+    template_key: str,
+    context: Dict[str, Any],
+) -> str:
+    template_def = _get_ticketera_mail_template_def(template_key)
+    stored_template = _get_system_setting(conn, template_def["subject_setting_key"], "").strip()
+    using_default = not stored_template
+    base_template = stored_template or template_def.get("default_subject_template", "")
+    rendered = _render_text_template(base_template, context).strip()
+    title = str(context.get("ticket_title") or "").strip()
+    fallback_label = str(template_def.get("default_subject_fallback_label") or "").strip()
+    if using_default and not title and fallback_label:
+        return f"Re: [{context.get('ticket_code')}] {fallback_label}"
+    return rendered or (f"Re: [{context.get('ticket_code')}] {fallback_label}" if fallback_label else str(base_template).strip())
+
+def _render_ticketera_mail_body_html(
+    conn,
+    template_key: str,
+    context: Dict[str, Any],
+) -> str:
+    template_def = _get_ticketera_mail_template_def(template_key)
+    stored_template = _get_system_setting(conn, template_def["body_setting_key"], "")
+    base_template = stored_template or template_def.get("default_body_template", "")
+    rendered = _render_text_template(base_template, context).strip() or template_def.get("default_body_template", "")
+    return _ticketera_template_text_to_html(rendered)
+
+def _render_ticketera_mail_template(
+    conn,
+    template_key: str,
+    context: Dict[str, Any],
+) -> Tuple[str, str]:
+    return (
+        _render_ticketera_mail_subject(conn, template_key, context),
+        _render_ticketera_mail_body_html(conn, template_key, context),
+    )
+
+def _serialize_email_route_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "id": int(row.get("id") or 0),
+        "match_type": str(row.get("match_type") or "").strip().lower(),
+        "match_value": str(row.get("match_value") or "").strip().lower(),
+        "categoria": str(row.get("categoria") or "").strip().lower(),
+        "is_active": bool(int(row.get("is_active") or 0)),
+        "created_by": str(row.get("created_by") or "").strip(),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+def list_ticketera_routing_rules(*, only_active: bool = False) -> List[Dict[str, Any]]:
+    conn = db.get_conn()
+    try:
+        where = "WHERE is_active = 1" if only_active else ""
+        rows = conn.execute(
+            f"""SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at
+                FROM ticket_config_email_routes
+                {where}
+                ORDER BY match_type ASC, match_value ASC, id ASC"""
+        ).fetchall()
+        return [_serialize_email_route_row(dict(row)) for row in rows]
+    finally:
+        conn.close()
+
+def upsert_ticketera_routing_rule(
+    *,
+    rule_id: Optional[int] = None,
+    match_type: str,
+    match_value: str,
+    categoria: str,
+    actor_id: str,
+    is_active: bool = True,
+) -> Dict[str, Any]:
+    normalized_type = str(match_type or "").strip().lower()
+    if normalized_type not in EMAIL_ROUTE_MATCH_TYPES:
+        raise ValueError("Tipo de regla inválido. Usa 'email' o 'domain'.")
+
+    normalized_value = _normalize_email_route_match_value(normalized_type, match_value)
+    if not normalized_value:
+        raise ValueError("Valor de regla inválido para el tipo seleccionado.")
+
+    normalized_categoria = str(categoria or "").strip().lower()
+    if normalized_categoria not in CATEGORIAS_VALIDAS:
+        raise ValueError("Categoría inválida para routing Ticketera.")
+
+    conn = db.get_conn()
+    try:
+        now = db.now_utc_iso()
+        normalized_actor = str(actor_id or "").strip()
+        target_rule_id = int(rule_id or 0)
+        if target_rule_id > 0:
+            existing = conn.execute(
+                """SELECT id
+                   FROM ticket_config_email_routes
+                   WHERE id = ?
+                   LIMIT 1""",
+                (target_rule_id,),
+            ).fetchone()
+            if not existing:
+                raise ValueError("La regla de routing indicada no existe.")
+            duplicated = conn.execute(
+                """SELECT id
+                   FROM ticket_config_email_routes
+                   WHERE match_type = ? AND match_value = ? AND id <> ?
+                   LIMIT 1""",
+                (normalized_type, normalized_value, target_rule_id),
+            ).fetchone()
+            if duplicated:
+                raise ValueError("Ya existe otra regla con ese correo o dominio.")
+            conn.execute(
+                """UPDATE ticket_config_email_routes
+                   SET match_type = ?,
+                       match_value = ?,
+                       categoria = ?,
+                       is_active = ?,
+                       updated_at = ?
+                   WHERE id = ?""",
+                (
+                    normalized_type,
+                    normalized_value,
+                    normalized_categoria,
+                    1 if is_active else 0,
+                    now,
+                    target_rule_id,
+                ),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO ticket_config_email_routes
+                   (match_type, match_value, categoria, is_active, created_by, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(match_type, match_value) DO UPDATE SET
+                       categoria = EXCLUDED.categoria,
+                       is_active = EXCLUDED.is_active,
+                       updated_at = EXCLUDED.updated_at""",
+                (
+                    normalized_type,
+                    normalized_value,
+                    normalized_categoria,
+                    1 if is_active else 0,
+                    normalized_actor,
+                    now,
+                    now,
+                ),
+            )
+        conn.commit()
+        if target_rule_id > 0:
+            row = conn.execute(
+                """SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at
+                   FROM ticket_config_email_routes
+                   WHERE id = ?
+                   LIMIT 1""",
+                (target_rule_id,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at
+                   FROM ticket_config_email_routes
+                   WHERE match_type = ? AND match_value = ?
+                   LIMIT 1""",
+                (normalized_type, normalized_value),
+            ).fetchone()
+        return _serialize_email_route_row(dict(row)) if row else {}
+    finally:
+        conn.close()
+
+def delete_ticketera_routing_rule(rule_id: int) -> bool:
+    conn = db.get_conn()
+    try:
+        cursor = conn.execute("DELETE FROM ticket_config_email_routes WHERE id = ?", (int(rule_id),))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def get_ticketera_admin_config() -> Dict[str, Any]:
+    return {
+        "templates": get_ticketera_templates(),
+        "mail_templates": list_ticketera_mail_templates(),
+        "routing_rules": list_ticketera_routing_rules(),
+        "categories": sorted(CATEGORIAS_VALIDAS),
+    }
+
+def _resolve_routing_category_for_email(conn, origen_email: Optional[str]) -> Optional[str]:
+    normalized_email = _normalize_email_address(origen_email)
+    if not normalized_email:
+        return None
+
+    email_row = conn.execute(
+        """SELECT categoria
+           FROM ticket_config_email_routes
+           WHERE match_type = 'email'
+             AND match_value = ?
+             AND is_active = 1
+           LIMIT 1""",
+        (normalized_email,),
+    ).fetchone()
+    if email_row and str(email_row.get("categoria") or "").strip().lower() in CATEGORIAS_VALIDAS:
+        return str(email_row.get("categoria") or "").strip().lower()
+
+    domain = _extract_email_domain(normalized_email)
+    if not domain:
+        return None
+    domain_row = conn.execute(
+        """SELECT categoria
+           FROM ticket_config_email_routes
+           WHERE match_type = 'domain'
+             AND match_value = ?
+             AND is_active = 1
+           LIMIT 1""",
+        (domain,),
+    ).fetchone()
+    if domain_row and str(domain_row.get("categoria") or "").strip().lower() in CATEGORIAS_VALIDAS:
+        return str(domain_row.get("categoria") or "").strip().lower()
+
+    return None
+
 def _compose_reply_recipients(
     ticket: Dict[str, Any],
     explicit_to: Optional[str] = None,
@@ -587,26 +1102,20 @@ def notify_client_assignment(ticket: Dict[str, Any], assignee_name: str) -> None
     ticket_id = int(ticket["id"])
     # Recargar ticket para capturar metadatos de hilo actualizados (evitar carrera con auto-respuesta)
     ticket = get_ticket(ticket_id) or ticket
-    code = str(ticket.get("codigo") or f"#{ticket_id}")
     to_email, cc_emails, bcc_emails, to_record = _compose_reply_recipients(ticket)
-    
+
     if not to_email or "@" not in to_email:
         return
 
-    subject = f"Re: [{code}] {str(ticket.get('titulo') or '').strip()}"
-    if not str(ticket.get("titulo") or "").strip():
-        subject = f"Re: [{code}] Asignación de Especialista"
-
-    body_html = f"""
-    <p>Estimado Cliente,</p>
-    <p>Su ticket <strong>{html.escape(code)}</strong> se a asignado al especialista <strong>{html.escape(assignee_name)}</strong>.</p>
-    <p>Saludos.</p>
-    """
-    
-    headers = _build_ticket_thread_headers(ticket)
-    now = db.now_utc_iso()
-    
+    conn = db.get_conn()
     try:
+        subject, body_html = _render_ticketera_mail_template(
+            conn,
+            MAIL_TEMPLATE_KEY_CLIENT_ASSIGNMENT,
+            _ticketera_template_context(ticket=ticket, assignee_name=assignee_name),
+        )
+        headers = _build_ticket_thread_headers(ticket)
+        now = db.now_utc_iso()
         send_meta = email_sender.send_email_advanced(
             to_email=to_email,
             cc_emails=cc_emails,
@@ -615,38 +1124,34 @@ def notify_client_assignment(ticket: Dict[str, Any], assignee_name: str) -> None
             html_body=body_html,
             headers=headers
         )
-        
-        # Registrar en historial de correos del ticket
-        conn = db.get_conn()
-        try:
-            conn.execute(
-                """INSERT INTO ticket_emails 
-                   (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, created_at)
-                   VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    ticket_id, 
-                    send_meta.get("from_addr") or "soporte",
-                    to_record or to_email,
-                    ", ".join(cc_emails),
-                    ", ".join(bcc_emails),
-                    subject,
-                    body_html,
-                    now
-                )
-            )
-            # Actualizar metadatos de hilo para que el próximo correo se enganche a este
-            _update_ticket_thread_metadata(
-                conn,
+        conn.execute(
+            """INSERT INTO ticket_emails
+               (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, created_at)
+               VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, ?)""",
+            (
                 ticket_id,
-                message_id=send_meta.get("message_id"),
-                in_reply_to=headers.get("In-Reply-To"),
-                references=headers.get("References"),
+                send_meta.get("from_addr") or "soporte",
+                to_record or to_email,
+                ", ".join(cc_emails),
+                ", ".join(bcc_emails),
+                subject,
+                body_html,
+                now
             )
-            conn.commit()
-        finally:
-            conn.close()
+        )
+        # Actualizar metadatos de hilo para que el próximo correo se enganche a este
+        _update_ticket_thread_metadata(
+            conn,
+            ticket_id,
+            message_id=send_meta.get("message_id"),
+            in_reply_to=headers.get("In-Reply-To"),
+            references=headers.get("References"),
+        )
+        conn.commit()
     except Exception as e:
         logger.error(f"[AssignmentNotify] Client fail ticket={ticket_id}: {e}")
+    finally:
+        conn.close()
 
 def notify_specialist_assignment(username: str, ticket: Dict[str, Any]) -> None:
     """Notifica al especialista por correo sobre su nueva asignación."""
@@ -655,19 +1160,15 @@ def notify_specialist_assignment(username: str, ticket: Dict[str, Any]) -> None:
         return
     
     ticket_id = int(ticket["id"])
-    code = str(ticket.get("codigo") or f"#{ticket_id}")
-    subject = f"Nuevo Ticket Asignado: {code}"
-    
-    body_html = f"""
-    <p>Hola,</p>
-    <p>Se te ha asignado un nuevo ticket en la ticketera:</p>
-    <ul>
-        <li><strong>Ticket:</strong> {html.escape(code)}</li>
-        <li><strong>Título:</strong> {html.escape(ticket.get("titulo") or "Sin título")}</li>
-    </ul>
-    <p>Puedes revisarlo en el sistema.</p>
-    <p>Saludos.</p>
-    """
+    template_conn = db.get_conn()
+    try:
+        subject, body_html = _render_ticketera_mail_template(
+            template_conn,
+            MAIL_TEMPLATE_KEY_SPECIALIST_ASSIGNMENT,
+            _ticketera_template_context(ticket=ticket, assignee_name=username),
+        )
+    finally:
+        template_conn.close()
     
     try:
         email_sender.send_email_advanced(
@@ -709,28 +1210,26 @@ def _send_ticket_status_update_to_notify_emails(
     actor = str(actor_id or "sistema").strip() or "sistema"
     from_label = _estado_label(from_estado)
     to_label = _estado_label(to_estado)
-
-    subject = f"Re: [{code}] {str(title).strip()}"
-    motivo_html = f"<p><strong>Motivo:</strong> {html.escape(motivo)}</p>" if str(motivo or "").strip() else ""
-    body_html = f"""
-    <p>Se actualizó el estado del ticket <strong>{html.escape(code)}</strong>.</p>
-    <p><strong>Título:</strong> {html.escape(title)}</p>
-    <p><strong>Cambio:</strong> {html.escape(from_label)} -> {html.escape(to_label)}</p>
-    <p><strong>Actualizado por:</strong> {html.escape(actor)}</p>
-    {motivo_html}
-    """
     headers = _build_ticket_thread_headers(ticket)
-    send_meta = email_sender.send_email_advanced(
-        to_email=primary_to,
-        cc_emails=cc_emails,
-        subject=subject,
-        html_body=body_html,
-        headers=headers or None,
-    )
-
     now = db.now_utc_iso()
     conn = db.get_conn()
     try:
+        subject = f"Re: [{code}] {str(title).strip()}"
+        motivo_html = f"<p><strong>Motivo:</strong> {html.escape(motivo)}</p>" if str(motivo or "").strip() else ""
+        body_html = f"""
+        <p>Se actualizó el estado del ticket <strong>{html.escape(code)}</strong>.</p>
+        <p><strong>Título:</strong> {html.escape(title)}</p>
+        <p><strong>Cambio:</strong> {html.escape(from_label)} -> {html.escape(to_label)}</p>
+        <p><strong>Actualizado por:</strong> {html.escape(actor)}</p>
+        {motivo_html}
+        """
+        send_meta = email_sender.send_email_advanced(
+            to_email=primary_to,
+            cc_emails=cc_emails,
+            subject=subject,
+            html_body=body_html,
+            headers=headers or None,
+        )
         conn.execute(
             """INSERT INTO ticket_emails
                (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
@@ -778,13 +1277,9 @@ def _send_ticket_status_update_to_notify_emails(
     }
 
 def _build_ticket_reply_subject(ticket: Dict[str, Any], asunto: Optional[str] = None) -> str:
-    if asunto and str(asunto).strip():
-        subject = str(asunto).strip()
-    else:
-        base = ticket.get("codigo") or f"Ticket #{int(ticket.get('id') or 0)}"
-        title = (ticket.get("titulo") or "").strip()
-        subject = f"[{base}] {title}" if title else str(base)
-    
+    base = ticket.get("codigo") or f"Ticket #{int(ticket.get('id') or 0)}"
+    title = (ticket.get("titulo") or "").strip()
+    subject = f"[{base}] {title}" if title else str(base)
     if not subject.lower().startswith("re:"):
         subject = f"Re: {subject}"
     return subject
@@ -1425,29 +1920,20 @@ def notify_client_resolution(ticket: Dict[str, Any]) -> None:
     ticket_id = int(ticket["id"])
     # Recargar ticket para capturar metadatos de hilo actualizados (evitar carrera con asignación)
     ticket = get_ticket(ticket_id) or ticket
-    code = str(ticket.get("codigo") or f"#{ticket_id}")
     to_email, cc_emails, bcc_emails, to_record = _compose_reply_recipients(ticket)
-    
+
     if not to_email or "@" not in to_email:
         return
 
-    subject = f"Re: [{code}] {str(ticket.get('titulo') or '').strip()}"
-    if not str(ticket.get("titulo") or "").strip():
-        subject = f"Re: [{code}] Ticket Resuelto"
-
-    hours = _get_auto_close_hours()
-    body_html = f"""
-    <p>Estimado Cliente,</p>
-    <p>Le informamos que su ticket <strong>{html.escape(code)}</strong> ya está listo y ha sido marcado como <strong>RESUELTO</strong>.</p>
-    <p>Si no recibimos comentarios adicionales de su parte en las próximas <strong>{hours} horas</strong>, el ticket se cerrará automáticamente.</p>
-    <p>Gracias por su preferencia.</p>
-    <p>Saludos.</p>
-    """
-    
-    headers = _build_ticket_thread_headers(ticket)
-    now = db.now_utc_iso()
-    
+    conn = db.get_conn()
     try:
+        subject, body_html = _render_ticketera_mail_template(
+            conn,
+            MAIL_TEMPLATE_KEY_RESOLUTION,
+            _ticketera_template_context(ticket=ticket, auto_close_hours=_get_auto_close_hours()),
+        )
+        headers = _build_ticket_thread_headers(ticket)
+        now = db.now_utc_iso()
         send_meta = email_sender.send_email_advanced(
             to_email=to_email,
             cc_emails=cc_emails,
@@ -1456,41 +1942,34 @@ def notify_client_resolution(ticket: Dict[str, Any]) -> None:
             html_body=body_html,
             headers=headers
         )
-        
-        # Registrar en historial de correos del ticket
-        conn = db.get_conn()
-        try:
-            conn.execute(
-                """INSERT INTO ticket_emails 
-                   (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, created_at)
-                   VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    ticket_id, 
-                    send_meta.get("from_addr") or "soporte",
-                    to_record or to_email,
-                    ", ".join(cc_emails),
-                    ", ".join(bcc_emails),
-                    subject,
-                    body_html,
-                    now
-                )
-            )
-            # Actualizar metadatos de hilo para que el próximo correo se enganche a este
-            _update_ticket_thread_metadata(
-                conn,
+        conn.execute(
+            """INSERT INTO ticket_emails
+               (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, created_at)
+               VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, ?)""",
+            (
                 ticket_id,
-                message_id=send_meta.get("message_id"),
-                in_reply_to=headers.get("In-Reply-To"),
-                references=headers.get("References")
+                send_meta.get("from_addr") or "soporte",
+                to_record or to_email,
+                ", ".join(cc_emails),
+                ", ".join(bcc_emails),
+                subject,
+                body_html,
+                now
             )
-            conn.commit()
-        except Exception as e:
-            logger.error(f"Error al registrar correo de resolución para ticket {ticket_id}: {e}")
-        finally:
-            conn.close()
-            
+        )
+        # Actualizar metadatos de hilo para que el próximo correo se enganche a este
+        _update_ticket_thread_metadata(
+            conn,
+            ticket_id,
+            message_id=send_meta.get("message_id"),
+            in_reply_to=headers.get("In-Reply-To"),
+            references=headers.get("References")
+        )
+        conn.commit()
     except Exception as e:
         logger.error(f"Error al enviar correo de resolución para ticket {ticket_id}: {e}")
+    finally:
+        conn.close()
 
 async def _schedule_next_process_notifications(delay_seconds: int = 60) -> None:
     next_run = (datetime.now(timezone.utc) + timedelta(seconds=max(5, int(delay_seconds or 60)))).isoformat()
@@ -1889,6 +2368,21 @@ def _filter_waiting_subestados(allowed_next: List[str], estado_actual: Optional[
         return list(allowed_next or [])
     return [s for s in (allowed_next or []) if normalize_subestado(s, "") not in SUBESTADOS_ESPERA]
 
+def _validate_main_status_transition(current_estado: str, target_estado: str) -> None:
+    current = str(current_estado or "").strip().lower()
+    target = str(target_estado or "").strip().lower()
+    if current not in MAIN_STATUS_SEQUENCE or target not in MAIN_STATUS_SEQUENCE:
+        return
+    if current == target:
+        return
+    current_idx = MAIN_STATUS_SEQUENCE.index(current)
+    target_idx = MAIN_STATUS_SEQUENCE.index(target)
+    if abs(target_idx - current_idx) > 1:
+        raise ConflictError(
+            "Transición de estado inválida: solo se permite avanzar o retroceder un estado a la vez "
+            f"({current} -> {target})."
+        )
+
 def _comment_with_prefix_exists(conn, ticket_id: int, prefix: str) -> bool:
     row = conn.execute(
         """SELECT 1
@@ -2238,9 +2732,12 @@ def create_ticket(
         if severidad not in SEVERIDADES_VALIDAS:
             severidad = "media"
 
-        # Auto-clasificar si no se especifica categoría
-        if not categoria or categoria not in CATEGORIAS_VALIDAS:
-            categoria = clasificar_ticket(titulo, descripcion)
+        explicit_categoria = str(categoria or "").strip().lower()
+        if explicit_categoria in CATEGORIAS_VALIDAS:
+            categoria = explicit_categoria
+        else:
+            routed_categoria = _resolve_routing_category_for_email(conn, origen_email) if origen_email else None
+            categoria = routed_categoria or clasificar_ticket(titulo, descripcion)
 
         # Normalizar tipo
         tipo = normalize_ticket_type(tipo)
@@ -2560,21 +3057,7 @@ def update_ticket(
             estado = str(value or "").strip().lower()
             if estado in ESTADOS_VALIDOS:
                 current_estado = str(current.get("estado") or "abierto").lower()
-                
-                # Matriz de transiciones
-                # ABIERTO -> EN_PROGRESO, RESUELTO, CERRADO
-                # EN_PROGRESO -> ABIERTO, RESUELTO, CERRADO 
-                # RESUELTO -> EN_PROGRESO, CERRADO
-                # CERRADO -> RESUELTO
-                
-                if current_estado == "cerrado":
-                    if estado not in ["resuelto", "cerrado"]:
-                        raise ConflictError("Transición de estado inválida: un ticket CERRADO solo puede reabrirse parcialmente a RESUELTO.")
-                
-                if current_estado == "resuelto":
-                    if estado == "abierto":
-                        raise ConflictError("Transición de estado inválida: un ticket RESUELTO no puede volver directo a ABIERTO. Debe retroceder a EN PROGRESO.")
-
+                _validate_main_status_transition(current_estado, estado)
                 normalized_updates[key] = estado
             continue
         if key == "subestado":
@@ -3372,6 +3855,343 @@ def discard_ticket_email_draft(
     finally:
         conn.close()
 
+def _build_ticket_reply_body_html(message_text: str) -> str:
+    escaped_msg = html.escape(str(message_text or "").strip()).replace("\n", "<br>")
+    return f"<p>{escaped_msg}</p>"
+
+def _prepare_uploaded_reply_attachments(ticket_id: int, files: Optional[List[Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    email_attachments: List[Dict[str, Any]] = []
+    stored_attachments: List[Dict[str, Any]] = []
+    if not files:
+        return email_attachments, stored_attachments
+
+    base_root = str(getattr(app_settings, "TICKET_ATTACHMENTS_DIR", "") or _default_ticket_attachments_dir())
+    base_path = Path(base_root) / str(ticket_id) / "attachments"
+    base_path.mkdir(parents=True, exist_ok=True)
+
+    for file in files:
+        try:
+            file.file.seek(0, 2)
+            size = file.file.tell()
+            file.file.seek(0)
+            if size > app_settings.TICKET_MAX_FILE_SIZE:
+                logger.warning(f"File {file.filename} exceeds max size")
+                continue
+
+            filename = getattr(file, "filename", "untitled")
+            ext = Path(filename).suffix.lower()
+            if ext not in app_settings.TICKET_ALLOWED_EXTENSIONS:
+                logger.warning(f"File extension {ext} not allowed")
+                continue
+
+            file_content = file.file.read()
+            file_path = base_path / _attachment_storage_name(filename)
+            if not _is_safe_attachment_path(file_path):
+                logger.warning(f"[reply_email] ruta de adjunto fuera de raíz permitida: {file_path}")
+                continue
+
+            with open(file_path, "wb") as fh:
+                fh.write(file_content)
+
+            sha256 = hashlib.sha256(file_content).hexdigest()
+            content_type = getattr(file, "content_type", "application/octet-stream")
+            email_attachments.append(
+                {
+                    "filename": filename,
+                    "data": file_content,
+                    "content_type": content_type,
+                }
+            )
+            stored_attachments.append(
+                {
+                    "filename": filename,
+                    "path": str(file_path),
+                    "size": len(file_content),
+                    "content_type": content_type,
+                    "sha256": sha256,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error procesando adjunto {getattr(file, 'filename', '?')}: {e}")
+
+    return email_attachments, stored_attachments
+
+def _send_ticket_reply_email(
+    *,
+    ticket: Dict[str, Any],
+    author_id: str,
+    clean_msg: str,
+    to_email: str,
+    cc_emails: List[str],
+    bcc_emails: List[str],
+    to_addr_record: str,
+    email_attachments: Optional[List[Dict[str, Any]]] = None,
+    stored_attachments: Optional[List[Dict[str, Any]]] = None,
+    idempotency_key: Optional[str] = None,
+    artifact_ref: Optional[str] = None,
+    evidence_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    ticket_id = int(ticket.get("id") or 0)
+    clean_msg = str(clean_msg or "").strip()
+    if not clean_msg:
+        raise ValueError("El mensaje de respuesta está vacío")
+    if not to_email or "@" not in str(to_email):
+        raise ValueError("Este ticket no tiene un correo de cliente válido")
+
+    subject = _build_ticket_reply_subject(ticket)
+    headers = _build_ticket_thread_headers(ticket)
+    threaded = bool(headers.get("In-Reply-To") or headers.get("References"))
+    body_html = _build_ticket_reply_body_html(clean_msg)
+    now = db.now_utc_iso()
+    preview = clean_msg if len(clean_msg) <= 300 else clean_msg[:300] + "..."
+    normalized_idempotency_key = (idempotency_key or "").strip()[:128] or None
+    email_attachments = list(email_attachments or [])
+    stored_attachments = list(stored_attachments or [])
+
+    dedupe_since = (
+        datetime.fromisoformat(now.replace("Z", "+00:00")) - timedelta(minutes=3)
+    ).isoformat()
+    marker_id = None
+
+    lock_conn = db.get_conn()
+    try:
+        try:
+            lock_conn.execute("SELECT pg_advisory_lock(?)", (ticket_id,))
+        except Exception:
+            pass
+
+        if normalized_idempotency_key:
+            idem_row = lock_conn.execute(
+                """SELECT id, direction FROM ticket_emails
+                   WHERE ticket_id = ?
+                     AND direction IN ('outgoing', 'outgoing_pending')
+                     AND idempotency_key = ?
+                   ORDER BY id DESC
+                   LIMIT 1""",
+                (ticket_id, normalized_idempotency_key),
+            ).fetchone()
+            if idem_row:
+                for att in stored_attachments:
+                    try:
+                        Path(att["path"]).unlink(missing_ok=True)
+                    except Exception as e:
+                        logger.warning(f"Failed to cleanup duplicate file {att['path']}: {e}")
+                return {
+                    "ok": True,
+                    "ticket_id": ticket_id,
+                    "to_email": to_email,
+                    "cc_emails": cc_emails,
+                    "bcc_emails": bcc_emails,
+                    "subject": subject,
+                    "threaded": threaded,
+                    "duplicate_skipped": True,
+                    "message": "Se evitó un envío duplicado (Idempotency-Key ya procesado).",
+                    "sent_email_id": int(idem_row.get("id") or 0),
+                    "email_direction": str(idem_row.get("direction") or ""),
+                }
+
+        dup_row = lock_conn.execute(
+            """SELECT id, direction FROM ticket_emails
+               WHERE ticket_id = ?
+                 AND direction IN ('outgoing', 'outgoing_pending')
+                 AND to_addr = ?
+                 AND subject = ?
+                 AND body_html = ?
+                 AND created_at >= ?
+               ORDER BY id DESC
+               LIMIT 1""",
+            (ticket_id, to_addr_record or to_email, subject, body_html, dedupe_since),
+        ).fetchone()
+        if dup_row:
+            for att in stored_attachments:
+                try:
+                    Path(att["path"]).unlink(missing_ok=True)
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup duplicate file {att['path']}: {e}")
+            return {
+                "ok": True,
+                "ticket_id": ticket_id,
+                "to_email": to_email,
+                "cc_emails": cc_emails,
+                "bcc_emails": bcc_emails,
+                "subject": subject,
+                "threaded": threaded,
+                "duplicate_skipped": True,
+                "message": "Se evitó un envío duplicado (correo ya enviado recientemente).",
+                "sent_email_id": int(dup_row.get("id") or 0),
+                "email_direction": str(dup_row.get("direction") or ""),
+            }
+
+        marker_row = lock_conn.execute(
+            """INSERT INTO ticket_emails
+               (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
+               VALUES (?, 'outgoing_pending', '', ?, ?, ?, ?, ?, ?, ?, ?)
+               RETURNING id""",
+            (
+                ticket_id,
+                to_addr_record or to_email,
+                ", ".join(cc_emails),
+                ", ".join(bcc_emails),
+                subject,
+                body_html,
+                json.dumps(stored_attachments),
+                normalized_idempotency_key,
+                now,
+            ),
+        ).fetchone()
+        marker_id = int((marker_row or {}).get("id") or 0)
+        lock_conn.commit()
+    finally:
+        try:
+            lock_conn.execute("SELECT pg_advisory_unlock(?)", (ticket_id,))
+        except Exception:
+            pass
+        lock_conn.close()
+
+    try:
+        send_meta = email_sender.send_email_advanced(
+            to_email=to_email,
+            cc_emails=cc_emails,
+            bcc_emails=bcc_emails,
+            subject=subject,
+            html_body=body_html,
+            headers=headers or None,
+            attachments=email_attachments,
+        )
+    except Exception as e:
+        if marker_id:
+            cleanup_conn = db.get_conn()
+            try:
+                cleanup_conn.execute(
+                    "DELETE FROM ticket_emails WHERE id = ? AND direction = 'outgoing_pending'",
+                    (marker_id,),
+                )
+                cleanup_conn.commit()
+            finally:
+                cleanup_conn.close()
+        for att in stored_attachments:
+            try:
+                Path(att["path"]).unlink(missing_ok=True)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup attachment file on send error {att['path']}: {cleanup_error}")
+        raise ValueError(str(e))
+
+    conn = db.get_conn()
+    try:
+        email_id = marker_id
+        if marker_id:
+            conn.execute(
+                """UPDATE ticket_emails
+                   SET direction = 'outgoing', from_addr = ?, to_addr = ?, cc_addrs = ?, bcc_addrs = ?
+                   WHERE id = ?""",
+                (
+                    send_meta.get("from_addr"),
+                    to_addr_record or to_email,
+                    ", ".join(cc_emails),
+                    ", ".join(bcc_emails),
+                    marker_id,
+                ),
+            )
+        else:
+            email_row = conn.execute(
+                """INSERT INTO ticket_emails
+                   (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   RETURNING id""",
+                (
+                    ticket_id,
+                    "outgoing",
+                    send_meta.get("from_addr"),
+                    to_addr_record or to_email,
+                    ", ".join(cc_emails),
+                    ", ".join(bcc_emails),
+                    subject,
+                    body_html,
+                    json.dumps(stored_attachments),
+                    normalized_idempotency_key,
+                    now,
+                ),
+            ).fetchone()
+            email_id = int((email_row or {}).get("id") or 0)
+
+        for att in stored_attachments:
+            conn.execute(
+                """INSERT INTO ticket_attachments
+                   (ticket_id, filename, file_path, uploaded_by, created_at, size_bytes, content_type, sha256)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    ticket_id,
+                    str(att.get("filename") or "attachment.bin"),
+                    str(att.get("path") or ""),
+                    author_id,
+                    now,
+                    int(att.get("size") or 0),
+                    str(att.get("content_type") or "application/octet-stream"),
+                    str(att.get("sha256") or ""),
+                ),
+            )
+
+        has_attachments = " (con adjuntos)" if stored_attachments else ""
+        cc_hint = f" + CC: {', '.join(cc_emails)}" if cc_emails else ""
+        bcc_hint = f" + CCO: {', '.join(bcc_emails)}" if bcc_emails else ""
+        conn.execute(
+            """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (
+                ticket_id,
+                author_id,
+                f"[CORREO] Respuesta enviada a {to_email}{cc_hint}{bcc_hint}{has_attachments}: {preview}",
+                now,
+            ),
+        )
+        conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, ticket_id))
+        _maybe_mark_first_response(conn, ticket_id, author_id, now)
+        _update_ticket_thread_metadata(
+            conn,
+            ticket_id,
+            message_id=send_meta.get("message_id"),
+            in_reply_to=headers.get("In-Reply-To"),
+            references=headers.get("References"),
+        )
+        _evaluate_ticket_sla(conn, ticket_id, now)
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        create_evidence_event(
+            control_id="A.8.16",
+            artifact_ref=artifact_ref or f"ticket:{ticket_id}:email_reply",
+            owner=author_id,
+            integrity_hash=send_meta.get("message_id") or "",
+            metadata={
+                "to": to_email,
+                "cc": cc_emails,
+                "bcc": bcc_emails,
+                "threaded": threaded,
+                "has_attachments": bool(stored_attachments),
+                "idempotency_key": normalized_idempotency_key or "",
+                **(evidence_metadata or {}),
+            },
+        )
+    except Exception as e:
+        logger.warning(f"[_send_ticket_reply_email] evidence_event no crítico falló para ticket {ticket_id}: {e}")
+
+    return {
+        "ok": True,
+        "ticket_id": ticket_id,
+        "to_email": to_email,
+        "cc_emails": cc_emails,
+        "bcc_emails": bcc_emails,
+        "subject": subject,
+        "threaded": threaded,
+        "message_id": send_meta.get("message_id"),
+        "idempotency_key": normalized_idempotency_key,
+        "sent_email_id": int(email_id or 0),
+        "body_html": body_html,
+        "duplicate_skipped": False,
+    }
+
 def send_ticket_email_draft(
     ticket_id: int,
     actor_id: str,
@@ -3389,12 +4209,22 @@ def send_ticket_email_draft(
     if expected_version <= 0:
         raise ValueError("La versión del borrador es obligatoria para enviar.")
 
+    draft_id = 0
+    current_version = 0
+    to_email = ""
+    cc_emails: List[str] = []
+    bcc_emails: List[str] = []
+    to_addr_record = ""
+    clean_msg = ""
+    email_attachments: List[Dict[str, Any]] = []
+    stored_attachments: List[Dict[str, Any]] = []
     conn = db.get_conn()
     try:
         draft = _get_active_email_draft_row(conn, ticket_id)
         if not draft:
             raise ValueError("No existe borrador activo para este ticket.")
         _validate_draft_lock(draft, actor_id, lock_token)
+        draft_id = int(draft.get("id") or 0)
         current_version = int(draft.get("version") or 1)
         if current_version != expected_version:
             raise ConflictError(
@@ -3410,15 +4240,12 @@ def send_ticket_email_draft(
         if not to_email or "@" not in to_email:
             raise ValueError("Este ticket no tiene un correo de cliente válido")
 
-        subject = _build_ticket_reply_subject(ticket, draft.get("subject"))
         body_text = str(draft.get("body_text") or "")
         clean_msg = body_text.strip()
         if not clean_msg:
             raise ValueError("El borrador está vacío. Agrega un mensaje antes de enviar.")
 
-        draft_attachments = _list_email_draft_attachments(conn, int(draft["id"]))
-        email_attachments: List[Dict[str, Any]] = []
-        stored_attachments: List[Dict[str, Any]] = []
+        draft_attachments = _list_email_draft_attachments(conn, draft_id)
         for item in draft_attachments:
             raw_path = str(item.get("file_path") or "").strip()
             path = Path(raw_path).resolve() if raw_path else None
@@ -3444,122 +4271,59 @@ def send_ticket_email_draft(
                     "sha256": str(item.get("sha256") or hashlib.sha256(content).hexdigest()),
                 }
             )
-
-        headers = _build_ticket_thread_headers(ticket)
-        threaded = bool(headers.get("In-Reply-To") or headers.get("References"))
-        escaped_msg = html.escape(clean_msg).replace("\n", "<br>")
-        body_html = f"""
-
-    <p>{escaped_msg}</p>
-    <hr>
-    <p style="color:#666;font-size:12px">
-      Respuesta enviada desde Mesa de Ayuda {html.escape(ticket.get("codigo") or f"#{ticket_id}")}.
-    </p>
-    """
-        send_meta = email_sender.send_email_advanced(
-            to_email=to_email,
-            cc_emails=cc_emails,
-            bcc_emails=bcc_emails,
-            subject=subject,
-            html_body=body_html,
-            headers=headers or None,
-            attachments=email_attachments,
-        )
-
-        now = db.now_utc_iso()
-        email_row = conn.execute(
-            """INSERT INTO ticket_emails
-               (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
-               VALUES (?, 'outgoing', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-               RETURNING id""",
-            (
-                int(ticket_id),
-                send_meta.get("from_addr"),
-                to_addr_record or to_email,
-                ", ".join(cc_emails),
-                ", ".join(bcc_emails),
-                subject,
-                body_html,
-                json.dumps(stored_attachments),
-                f"draft:{int(draft['id'])}:v{current_version}",
-                now,
-            ),
-        ).fetchone()
-        email_id = int((email_row or {}).get("id") or 0)
-        if email_id <= 0:
-            raise ValueError("No se pudo registrar el correo enviado desde borrador.")
-
-        for att in stored_attachments:
-            conn.execute(
-                """INSERT INTO ticket_attachments
-                   (ticket_id, filename, file_path, uploaded_by, created_at, size_bytes, content_type, sha256)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    int(ticket_id),
-                    att["filename"],
-                    att["path"],
-                    actor_id,
-                    now,
-                    int(att["size"]),
-                    att["content_type"],
-                    att["sha256"],
-                ),
-            )
-
-        conn.execute(
-            """UPDATE ticket_email_draft_attachments
-               SET sent_email_id = ?
-               WHERE draft_id = ? AND sent_email_id IS NULL""",
-            (email_id, int(draft["id"])),
-        )
-
-        conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, int(ticket_id)))
-        _maybe_mark_first_response(conn, int(ticket_id), actor_id, now)
-        _update_ticket_thread_metadata(
-            conn,
-            int(ticket_id),
-            message_id=send_meta.get("message_id"),
-            in_reply_to=headers.get("In-Reply-To"),
-            references=headers.get("References"),
-        )
-        _evaluate_ticket_sla(conn, int(ticket_id), now)
-
-        conn.execute(
-            """UPDATE ticket_email_drafts
-               SET status = 'sent',
-                   sent_by = ?,
-                   sent_email_id = ?,
-                   sent_at = ?,
-                   lock_owner = NULL,
-                   lock_token_hash = NULL,
-                   lock_expires_at = NULL,
-                   updated_by = ?,
-                   updated_at = ?
-               WHERE id = ?""",
-            (actor_id, email_id, now, actor_id, now, int(draft["id"])),
-        )
-        conn.commit()
     finally:
         conn.close()
 
-    try:
-        create_evidence_event(
-            control_id="A.8.16",
-            artifact_ref=f"ticket:{ticket_id}:email_reply_draft",
-            owner=actor_id,
-            integrity_hash=send_meta.get("message_id") or "",
-            metadata={
-                "to": to_email,
-                "cc": cc_emails,
-                "bcc": bcc_emails,
-                "threaded": threaded,
-                "has_attachments": bool(stored_attachments),
-                "draft_id": int(draft["id"]),
-                "version": current_version,
-            },
-        )
-    except Exception as e:
-        logger.warning(f"[send_ticket_email_draft] evidence_event no crítico falló para ticket {ticket_id}: {e}")
+    send_result = _send_ticket_reply_email(
+        ticket=ticket,
+        author_id=actor_id,
+        clean_msg=clean_msg,
+        to_email=to_email,
+        cc_emails=cc_emails,
+        bcc_emails=bcc_emails,
+        to_addr_record=to_addr_record,
+        email_attachments=email_attachments,
+        stored_attachments=stored_attachments,
+        idempotency_key=f"draft:{draft_id}:v{current_version}",
+        artifact_ref=f"ticket:{ticket_id}:email_reply_draft",
+        evidence_metadata={
+            "draft_id": draft_id,
+            "version": current_version,
+        },
+    )
+    email_id = int(send_result.get("sent_email_id") or 0)
+    email_direction = str(send_result.get("email_direction") or "outgoing").strip().lower()
+    should_mark_sent = (not send_result.get("duplicate_skipped")) or email_direction == "outgoing"
+    draft_status = "active"
+
+    if should_mark_sent and email_id > 0:
+        now = db.now_utc_iso()
+        conn = db.get_conn()
+        try:
+            conn.execute(
+                """UPDATE ticket_email_draft_attachments
+                   SET sent_email_id = ?
+                   WHERE draft_id = ? AND sent_email_id IS NULL""",
+                (email_id, draft_id),
+            )
+            conn.execute(
+                """UPDATE ticket_email_drafts
+                   SET status = 'sent',
+                       sent_by = ?,
+                       sent_email_id = ?,
+                       sent_at = ?,
+                       lock_owner = NULL,
+                       lock_token_hash = NULL,
+                       lock_expires_at = NULL,
+                       updated_by = ?,
+                       updated_at = ?
+                   WHERE id = ?""",
+                (actor_id, email_id, now, actor_id, now, draft_id),
+            )
+            conn.commit()
+            draft_status = "sent"
+        finally:
+            conn.close()
 
     return {
         "ok": True,
@@ -3567,11 +4331,11 @@ def send_ticket_email_draft(
         "to_email": to_email,
         "cc_emails": cc_emails,
         "bcc_emails": bcc_emails,
-        "subject": subject,
-        "threaded": threaded,
-        "message_id": send_meta.get("message_id"),
+        "subject": send_result.get("subject"),
+        "threaded": bool(send_result.get("threaded")),
+        "message_id": send_result.get("message_id"),
         "sent_email_id": email_id,
-        "draft_status": "sent",
+        "draft_status": draft_status,
         "ticket": get_ticket(ticket_id),
     }
 
@@ -3945,6 +4709,9 @@ def reply_ticket_email(
     mensaje: str,
     author_role: str = "",
     asunto: Optional[str] = None,
+    to_addr: Optional[str] = None,
+    cc_addrs: Optional[Any] = None,
+    bcc_addrs: Optional[Any] = None,
     files: Optional[List[Any]] = None,  # List[UploadFile]
     idempotency_key: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -3965,306 +4732,28 @@ def reply_ticket_email(
         logger.error(f"Reply failed: Message empty for ticket {ticket_id}")
         raise ValueError("El mensaje de respuesta está vacío")
 
-    to_email, cc_emails, bcc_emails, to_addr_record = _compose_reply_recipients(ticket)
+    to_email, cc_emails, bcc_emails, to_addr_record = _compose_reply_recipients(
+        ticket,
+        explicit_to=to_addr,
+        explicit_cc=cc_addrs,
+        explicit_bcc=bcc_addrs,
+    )
     if not to_email or "@" not in to_email:
         logger.error(f"Reply failed: Invalid to_email '{to_email}' for ticket {ticket_id}")
         raise ValueError("Este ticket no tiene un correo de cliente válido")
-
-    subject = _build_ticket_reply_subject(ticket, asunto)
-
-    headers = _build_ticket_thread_headers(ticket)
-    threaded = bool(headers.get("In-Reply-To") or headers.get("References"))
-
-    escaped_msg = html.escape(clean_msg).replace("\n", "<br>")
-    body_html = f"""
-
-    <p>{escaped_msg}</p>
-    <hr>
-    <p style="color:#666;font-size:12px">
-      Respuesta enviada desde Mesa de Ayuda {html.escape(ticket.get("codigo") or f"#{ticket_id}")}.
-    </p>
-    """
-    now = db.now_utc_iso()
-    preview = clean_msg if len(clean_msg) <= 300 else clean_msg[:300] + "..."
-    normalized_idempotency_key = (idempotency_key or "").strip()[:128] or None
-    
-    # Procesar adjuntos
-    email_attachments = []
-    stored_attachments = []
-    
-    if files:
-        base_root = str(getattr(app_settings, "TICKET_ATTACHMENTS_DIR", "") or _default_ticket_attachments_dir())
-        base_path = Path(base_root) / str(ticket_id) / "attachments"
-        base_path.mkdir(parents=True, exist_ok=True)
-
-        for file in files:
-            try:
-                # Validar tamaño y extensión
-                file.file.seek(0, 2)
-                size = file.file.tell()
-                file.file.seek(0)
-                
-                if size > app_settings.TICKET_MAX_FILE_SIZE:
-                    logger.warning(f"File {file.filename} exceeds max size")
-                    continue
-                    
-                ext = Path(file.filename).suffix.lower()
-                if ext not in app_settings.TICKET_ALLOWED_EXTENSIONS:
-                    logger.warning(f"File extension {ext} not allowed")
-                    continue
-
-                # Leer contenido
-                file_content = file.file.read()
-
-                # Guardar en disco (temporalmente, confirmaremos si no es duplicado)
-                filename = getattr(file, "filename", "untitled")
-                file_path = base_path / _attachment_storage_name(filename)
-                if not _is_safe_attachment_path(file_path):
-                    logger.warning(f"[reply_email] ruta de adjunto fuera de raíz permitida: {file_path}")
-                    continue
-                
-                with open(file_path, "wb") as f:
-                    f.write(file_content)
-                sha256 = hashlib.sha256(file_content).hexdigest()
-                    
-                email_attachments.append({
-                    "filename": filename,
-                    "data": file_content,
-                    "content_type": getattr(file, "content_type", "application/octet-stream")
-                })
-                
-                stored_attachments.append({
-                    "filename": filename,
-                    "path": str(file_path),
-                    "size": len(file_content),
-                    "content_type": getattr(file, "content_type", "application/octet-stream"),
-                    "sha256": sha256,
-                })
-            except Exception as e:
-                logger.error(f"Error procesando adjunto {getattr(file, 'filename', '?')}: {e}")
-
-    dedupe_since = (
-        datetime.fromisoformat(now.replace("Z", "+00:00")) - timedelta(minutes=3)
-    ).isoformat()
-    marker_id = None
-
-    # Lock + dedupe para evitar doble envío por reintento en UI.
-    lock_conn = db.get_conn()
-    try:
-        try:
-            lock_conn.execute("SELECT pg_advisory_lock(?)", (int(ticket_id),))
-        except Exception:
-            # Si no soporta advisory lock, seguimos con dedupe best-effort.
-            pass
-
-        if normalized_idempotency_key:
-            idem_row = lock_conn.execute(
-                """SELECT id FROM ticket_emails
-                   WHERE ticket_id = ?
-                     AND direction IN ('outgoing', 'outgoing_pending')
-                     AND idempotency_key = ?
-                   ORDER BY id DESC
-                   LIMIT 1""",
-                (ticket_id, normalized_idempotency_key),
-            ).fetchone()
-            if idem_row:
-                for att in stored_attachments:
-                    try:
-                        Path(att["path"]).unlink(missing_ok=True)
-                    except Exception as e:
-                        logger.warning(f"Failed to cleanup duplicate file {att['path']}: {e}")
-                return {
-                    "ok": True,
-                    "ticket_id": ticket_id,
-                    "to_email": to_email,
-                    "cc_emails": cc_emails,
-                    "bcc_emails": bcc_emails,
-                    "subject": subject,
-                    "threaded": threaded,
-                    "duplicate_skipped": True,
-                    "message": "Se evitó un envío duplicado (Idempotency-Key ya procesado).",
-                }
-
-        # Check for duplicate including body and attachments hash (stored in metadata or body?)
-        # For now, we trust subject + body + to_addr + strict time window.
-        # Ideally we should store a hash of the operation.
-        dup_row = lock_conn.execute(
-            """SELECT id FROM ticket_emails
-               WHERE ticket_id = ?
-                 AND direction IN ('outgoing', 'outgoing_pending')
-                 AND to_addr = ?
-                 AND subject = ?
-                 AND body_html = ?
-                 AND created_at >= ?
-               ORDER BY id DESC
-               LIMIT 1""",
-            (ticket_id, to_addr_record or to_email, subject, body_html, dedupe_since),
-        ).fetchone()
-        
-        if dup_row:
-             # Clean up stored files as they are duplicates
-            for att in stored_attachments:
-                try:
-                    Path(att["path"]).unlink(missing_ok=True)
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup duplicate file {att['path']}: {e}")
-
-            return {
-                "ok": True,
-                "ticket_id": ticket_id,
-                "to_email": to_email,
-                "cc_emails": cc_emails,
-                "bcc_emails": bcc_emails,
-                "subject": subject,
-                "threaded": threaded,
-                "duplicate_skipped": True,
-                "message": "Se evitó un envío duplicado (correo ya enviado recientemente).",
-            }
-
-        marker_row = lock_conn.execute(
-            """INSERT INTO ticket_emails
-               (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
-               VALUES (?, 'outgoing_pending', '', ?, ?, ?, ?, ?, ?, ?, ?)
-               RETURNING id""",
-            (ticket_id, to_addr_record or to_email, ", ".join(cc_emails), ", ".join(bcc_emails), subject, body_html, json.dumps(stored_attachments), normalized_idempotency_key, now),
-        ).fetchone()
-        marker_id = marker_row["id"] if marker_row else None
-        lock_conn.commit()
-    finally:
-        try:
-            lock_conn.execute("SELECT pg_advisory_unlock(?)", (int(ticket_id),))
-        except Exception:
-            pass
-        lock_conn.close()
-
-    try:
-        send_meta = email_sender.send_email_advanced(
-            to_email=to_email,
-            cc_emails=cc_emails,
-            bcc_emails=bcc_emails,
-            subject=subject,
-            html_body=body_html,
-            headers=headers or None,
-            attachments=email_attachments
-        )
-    except Exception as e:
-        # Limpieza de marcador para permitir retry real si falló envío.
-        if marker_id:
-            cleanup_conn = db.get_conn()
-            try:
-                cleanup_conn.execute(
-                    "DELETE FROM ticket_emails WHERE id = ? AND direction = 'outgoing_pending'",
-                    (marker_id,),
-                )
-                cleanup_conn.commit()
-            finally:
-                cleanup_conn.close()
-        for att in stored_attachments:
-            try:
-                Path(att["path"]).unlink(missing_ok=True)
-            except Exception as cleanup_error:
-                logger.warning(f"Failed to cleanup attachment file on send error {att['path']}: {cleanup_error}")
-        raise ValueError(str(e))
-
-    conn = db.get_conn()
-    try:
-        if marker_id:
-            conn.execute(
-                """UPDATE ticket_emails
-                   SET direction = 'outgoing', from_addr = ?, to_addr = ?, cc_addrs = ?, bcc_addrs = ?
-                   WHERE id = ?""",
-                (send_meta.get("from_addr"), to_addr_record or to_email, ", ".join(cc_emails), ", ".join(bcc_emails), marker_id),
-            )
-        else:
-            conn.execute(
-                """INSERT INTO ticket_emails
-                   (ticket_id, direction, from_addr, to_addr, cc_addrs, bcc_addrs, subject, body_html, attachments_json, idempotency_key, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    ticket_id,
-                    "outgoing",
-                    send_meta.get("from_addr"),
-                    to_addr_record or to_email,
-                    ", ".join(cc_emails),
-                    ", ".join(bcc_emails),
-                    subject,
-                    body_html,
-                    json.dumps(stored_attachments),
-                    normalized_idempotency_key,
-                    now,
-                ),
-            )
-
-        for att in stored_attachments:
-            conn.execute(
-                """INSERT INTO ticket_attachments
-                   (ticket_id, filename, file_path, uploaded_by, created_at, size_bytes, content_type, sha256)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    ticket_id,
-                    str(att.get("filename") or "attachment.bin"),
-                    str(att.get("path") or ""),
-                    author_id,
-                    now,
-                    int(att.get("size") or 0),
-                    str(att.get("content_type") or "application/octet-stream"),
-                    str(att.get("sha256") or ""),
-                ),
-            )
-        
-        has_attachments = " (con adjuntos)" if stored_attachments else ""
-        cc_hint = f" + CC: {', '.join(cc_emails)}" if cc_emails else ""
-        bcc_hint = f" + CCO: {', '.join(bcc_emails)}" if bcc_emails else ""
-        conn.execute(
-            """INSERT INTO ticket_comments (ticket_id, user_id, content, created_at)
-               VALUES (?, ?, ?, ?)""",
-            (ticket_id, author_id, f"[CORREO] Respuesta enviada a {to_email}{cc_hint}{bcc_hint}{has_attachments}: {preview}", now),
-        )
-        conn.execute("UPDATE tickets SET updated_at = ? WHERE id = ?", (now, ticket_id))
-        _maybe_mark_first_response(conn, ticket_id, author_id, now)
-
-        _update_ticket_thread_metadata(
-            conn,
-            ticket_id,
-            message_id=send_meta.get("message_id"),
-            in_reply_to=headers.get("In-Reply-To"),
-            references=headers.get("References"),
-        )
-
-        _evaluate_ticket_sla(conn, ticket_id, now)
-        conn.commit()
-    finally:
-        conn.close()
-
-    try:
-        create_evidence_event(
-            control_id="A.8.16",
-            artifact_ref=f"ticket:{ticket_id}:email_reply",
-            owner=author_id,
-            integrity_hash=send_meta.get("message_id") or "",
-            metadata={
-                "to": to_email,
-                "cc": cc_emails,
-                "bcc": bcc_emails,
-                "threaded": threaded,
-                "has_attachments": bool(stored_attachments),
-                "idempotency_key": normalized_idempotency_key or "",
-            },
-        )
-    except Exception as e:
-        logger.warning(f"[reply_ticket_email] evidence_event no crítico falló para ticket {ticket_id}: {e}")
-
-    return {
-        "ok": True,
-        "ticket_id": ticket_id,
-        "to_email": to_email,
-        "cc_emails": cc_emails,
-        "bcc_emails": bcc_emails,
-        "subject": subject,
-        "threaded": threaded,
-        "message_id": send_meta.get("message_id"),
-        "idempotency_key": normalized_idempotency_key,
-    }
+    email_attachments, stored_attachments = _prepare_uploaded_reply_attachments(ticket_id, files)
+    return _send_ticket_reply_email(
+        ticket=ticket,
+        author_id=author_id,
+        clean_msg=clean_msg,
+        to_email=to_email,
+        cc_emails=cc_emails,
+        bcc_emails=bcc_emails,
+        to_addr_record=to_addr_record,
+        email_attachments=email_attachments,
+        stored_attachments=stored_attachments,
+        idempotency_key=idempotency_key,
+    )
 
 def _html_to_text(raw_html: str) -> str:
     text = raw_html or ""
@@ -7594,22 +8083,30 @@ def _find_ticket_by_subject(subject: str) -> Optional[int]:
     finally:
         conn.close()
 
-def _auto_reply_subject(ticket: Dict[str, Any]) -> str:
+def _auto_reply_subject_default(ticket: Dict[str, Any]) -> str:
     code = str(ticket.get("codigo") or f"TK-{ticket.get('id', '')}").strip() or "Ticket"
     title = str(ticket.get("titulo") or "").strip()
     if title:
         return f"Re: [{code}] {title}"
     return f"Re: [{code}] Comprobante de Recepción"
 
-def _auto_reply_body(nombre: str, code: str, asignado_a: str) -> str:
-    safe_code = html.escape((code or "Ticket").strip() or "Ticket")
-    lines = [
-        "<p>Estimado Cliente,</p>",
-        f"<p>Hemos recibido su solicitud y se ha generado el ticket <strong>{safe_code}</strong></p>",
-        "<p>Su caso quedó a la espera de la asignacion a un especialista.</p>",
-        "<p>Saludos.</p>",
-    ]
-    return "\n".join(lines)
+def _auto_reply_subject(conn, ticket: Dict[str, Any], nombre: str = "", asignado_a: str = "") -> str:
+    template = _get_system_setting(conn, AUTO_REPLY_SUBJECT_SETTING_KEY, "").strip()
+    if not template:
+        return _auto_reply_subject_default(ticket)
+    rendered = _render_text_template(
+        template,
+        _ticketera_template_context(ticket=ticket, customer_name=nombre, assignee_name=asignado_a),
+    ).strip()
+    return rendered or _auto_reply_subject_default(ticket)
+
+def _auto_reply_body(conn, ticket: Dict[str, Any], nombre: str, asignado_a: str) -> str:
+    template = _get_system_setting(conn, AUTO_REPLY_BODY_SETTING_KEY, DEFAULT_AUTO_REPLY_BODY_TEMPLATE)
+    rendered = _render_text_template(
+        template,
+        _ticketera_template_context(ticket=ticket, customer_name=nombre, assignee_name=asignado_a),
+    ).strip() or DEFAULT_AUTO_REPLY_BODY_TEMPLATE
+    return "<p>" + html.escape(rendered).replace("\n", "<br>") + "</p>"
 
 def should_schedule_auto_reply(conn, ticket_id: int, to_email: str) -> tuple[bool, str, Optional[str]]:
     # 1. Traer de settings de DB
@@ -7664,7 +8161,6 @@ def schedule_auto_reply_for_ticket(
     normalized_to = _normalize_email_address(to_email)
     delay_minutes = _auto_reply_delay_minutes(conn)
     run_at = (datetime.utcnow() + timedelta(minutes=delay_minutes)).isoformat()
-    ticket_code = str(ticket.get("codigo") or f"TK-{ticket_id}")
     thread_headers = _build_ticket_thread_headers(ticket)
     in_reply_to_norm = _normalize_message_id(in_reply_to) or thread_headers.get("In-Reply-To")
     merged_refs = _merge_reference_chain(
@@ -7677,13 +8173,13 @@ def schedule_auto_reply_for_ticket(
         "email": normalized_to,
         "nombre": nombre,
         "asignado_a": asignado_a or "",
-        "ticket_code": ticket_code,
+        "ticket_code": str(ticket.get("codigo") or f"TK-{ticket_id}"),
         "idempotency_key": idem_key,
         "in_reply_to": in_reply_to_norm or "",
         "references": merged_refs or "",
     }
-    body_html = _auto_reply_body(nombre, ticket_code, asignado_a or "")
-    subject = _auto_reply_subject(ticket)
+    body_html = _auto_reply_body(conn, ticket, nombre, asignado_a or "")
+    subject = _auto_reply_subject(conn, ticket, nombre, asignado_a or "")
 
     # Nunca enviar en línea durante el procesamiento de correo entrante.
     # Incluso con delay=0, encolamos el job para evitar bloquear el ciclo de ingestión
