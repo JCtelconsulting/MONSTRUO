@@ -333,6 +333,149 @@ const TksUI = (() => {
         };
     }
 
+    function attachmentContentType(att) {
+        const explicit = String(att?.content_type || att?.mime_type || '').trim().toLowerCase();
+        if (explicit) return explicit;
+        const filename = String(att?.filename || '').trim().toLowerCase();
+        if (!filename.includes('.')) return 'application/octet-stream';
+        const ext = filename.split('.').pop();
+        return {
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            png: 'image/png',
+            gif: 'image/gif',
+            webp: 'image/webp',
+            bmp: 'image/bmp',
+            svg: 'image/svg+xml',
+            pdf: 'application/pdf',
+            txt: 'text/plain',
+            log: 'text/plain',
+            csv: 'text/csv',
+            json: 'application/json',
+            mp4: 'video/mp4',
+            webm: 'video/webm',
+            mp3: 'audio/mpeg',
+            wav: 'audio/wav',
+        }[ext] || 'application/octet-stream';
+    }
+
+    function attachmentPreviewKind(att) {
+        const contentType = attachmentContentType(att);
+        if (contentType.startsWith('image/')) return 'image';
+        if (contentType === 'application/pdf') return 'pdf';
+        if (contentType.startsWith('text/') || contentType === 'application/json') return 'text';
+        if (contentType.startsWith('video/')) return 'video';
+        if (contentType.startsWith('audio/')) return 'audio';
+        return 'file';
+    }
+
+    function attachmentKindLabel(att) {
+        const kind = attachmentPreviewKind(att);
+        if (kind === 'image') return 'IMG';
+        if (kind === 'pdf') return 'PDF';
+        if (kind === 'text') return 'TXT';
+        if (kind === 'video') return 'VIDEO';
+        if (kind === 'audio') return 'AUDIO';
+        const filename = String(att?.filename || '').trim();
+        if (filename.includes('.')) {
+            return filename.split('.').pop().slice(0, 5).toUpperCase();
+        }
+        return 'FILE';
+    }
+
+    function attachmentIconClass(att) {
+        const kind = attachmentPreviewKind(att);
+        if (kind === 'image') return 'fa-file-image';
+        if (kind === 'pdf') return 'fa-file-pdf';
+        if (kind === 'text') return 'fa-file-lines';
+        if (kind === 'video') return 'fa-file-video';
+        if (kind === 'audio') return 'fa-file-audio';
+        return 'fa-file';
+    }
+
+    function attachmentCanInlinePreview(att) {
+        const kind = attachmentPreviewKind(att);
+        return kind === 'image' || kind === 'pdf' || kind === 'text';
+    }
+
+    function renderAttachmentCard(ticketId, attachmentId, attachment, options = {}) {
+        const compact = options.compact === true;
+        const filename = String(attachment?.filename || 'adjunto').trim() || 'adjunto';
+        const contentType = attachmentContentType(attachment);
+        const inlineUrl = attachmentId ? TksApi.getTicketAttachmentInlineUrl(ticketId, attachmentId) : '';
+        const classes = [
+            'tks-attachment-card',
+            compact ? 'compact' : '',
+            attachmentId ? '' : 'is-disabled',
+            attachmentPreviewKind(attachment) === 'image' ? 'is-image' : '',
+        ].filter(Boolean).join(' ');
+        const thumbHtml = attachmentId && attachmentPreviewKind(attachment) === 'image'
+            ? `<div class="tks-attachment-thumb">
+                    <img src="${escapeHtml(inlineUrl)}" alt="${escapeHtml(filename)}" loading="lazy">
+               </div>`
+            : `<div class="tks-attachment-thumb is-generic">
+                    <i class="fas ${attachmentIconClass(attachment)}"></i>
+                    <span>${escapeHtml(attachmentKindLabel(attachment))}</span>
+               </div>`;
+        const metaHtml = `
+            <div class="tks-attachment-meta">
+                <span class="tks-attachment-name">${escapeHtml(filename)}</span>
+                <span class="tks-attachment-sub">${sizeLabel(attachment?.size_bytes ?? attachment?.size ?? 0)} · ${escapeHtml(attachmentCanInlinePreview(attachment) ? 'Vista previa' : 'Abrir archivo')}</span>
+            </div>
+        `;
+        if (!attachmentId) {
+            return `<div class="${classes}" title="Adjunto histórico sin archivo asociado">${thumbHtml}${metaHtml}</div>`;
+        }
+        return `<button
+            class="${classes}"
+            type="button"
+            onclick="TksMain.openAttachmentPreview(${Number(ticketId)}, ${Number(attachmentId)}, '${escapeJsSingleQuoted(filename)}', '${escapeJsSingleQuoted(contentType)}', ${Number(attachment?.size_bytes ?? attachment?.size ?? 0)})"
+        >${thumbHtml}${metaHtml}</button>`;
+    }
+
+    function renderAttachmentPreviewModal(attachment) {
+        const ticketId = Number(attachment?.ticketId || 0);
+        const attachmentId = Number(attachment?.attachmentId || 0);
+        const filename = String(attachment?.filename || 'adjunto').trim() || 'adjunto';
+        const contentType = attachmentContentType(attachment);
+        const kind = attachmentPreviewKind({ content_type: contentType, filename });
+        const inlineUrl = attachmentId ? TksApi.getTicketAttachmentInlineUrl(ticketId, attachmentId) : '';
+        const downloadUrl = attachmentId ? TksApi.getTicketAttachmentDownloadUrl(ticketId, attachmentId) : '';
+        let previewHtml = `
+            <div class="tks-attachment-preview-empty">
+                <i class="fas ${attachmentIconClass({ content_type: contentType, filename })}"></i>
+                <p>Este tipo de archivo no tiene vista previa inline.</p>
+            </div>
+        `;
+        if (kind === 'image') {
+            previewHtml = `<img class="tks-attachment-preview-image" src="${escapeHtml(inlineUrl)}" alt="${escapeHtml(filename)}">`;
+        } else if (kind === 'pdf' || kind === 'text') {
+            previewHtml = `<iframe class="tks-attachment-preview-frame" src="${escapeHtml(inlineUrl)}" title="${escapeHtml(filename)}"></iframe>`;
+        }
+        return `
+        <div class="tks-modal-overlay open" id="tks-attachment-preview-modal">
+            <div class="tks-modal tks-attachment-preview-modal">
+                <div class="tks-modal-header">
+                    <h3>${escapeHtml(filename)}</h3>
+                    <button class="tks-modal-close" type="button" onclick="TksMain.closeAttachmentPreview()">&times;</button>
+                </div>
+                <div class="tks-modal-body">
+                    <div class="tks-attachment-preview-meta">
+                        <span>${escapeHtml(contentType)}</span>
+                        <span>${sizeLabel(attachment?.size_bytes ?? attachment?.size ?? 0)}</span>
+                    </div>
+                    <div class="tks-attachment-preview-stage">
+                        ${previewHtml}
+                    </div>
+                </div>
+                <div class="tks-modal-footer">
+                    <button class="tks-btn tks-btn-ghost" type="button" onclick="TksMain.closeAttachmentPreview()">Cerrar</button>
+                    ${downloadUrl ? `<a class="tks-btn tks-btn-primary" href="${escapeHtml(downloadUrl)}" download rel="noopener">Descargar</a>` : ''}
+                </div>
+            </div>
+        </div>`;
+    }
+
     function toTs(value) {
         const ts = Date.parse(String(value || ''));
         return Number.isFinite(ts) ? ts : 0;
@@ -752,6 +895,7 @@ const TksUI = (() => {
         const draftBlockedReason = String(draftMeta.blockedReason || blockedReason || '').trim();
         const canEditDraftNow = canReplyComposer && draftMeta.canEdit === true;
         const resolveAttachment = buildEmailAttachmentResolver(t.id, ticketAttachments);
+        const ticketAttachmentById = new Map((ticketAttachments || []).map((att) => [Number(att?.id || 0), att]));
 
         const clientNameRaw = decodeMimeEncodedString(t.cliente_nombre || '').trim();
         const clientName = clientNameRaw || 'Desconocido';
@@ -979,16 +1123,8 @@ const TksUI = (() => {
             const tag = incoming ? 'Correo entrante' : 'Correo saliente';
             const attachmentsHtml = (item.attachments || []).map((att) => {
                 const attachmentId = resolveAttachment(att);
-                const label = `${escapeHtml(att.filename || 'adjunto')} (${sizeLabel(att.size_bytes ?? att.size ?? 0)})`;
-                if (attachmentId) {
-                    const url = TksApi.getTicketAttachmentDownloadUrl(t.id, attachmentId);
-                    return `<a class="tks-att-chip" href="${escapeHtml(url)}" target="_blank" rel="noopener">
-                        <i class="fas fa-paperclip"></i> ${label}
-                    </a>`;
-                }
-                return `<span class="tks-att-chip tks-att-chip-muted" title="Adjunto no disponible para descarga">
-                    <i class="fas fa-paperclip"></i> ${label}
-                </span>`;
+                const attachmentMeta = attachmentId ? (ticketAttachmentById.get(Number(attachmentId)) || att) : att;
+                return renderAttachmentCard(t.id, attachmentId, attachmentMeta, { compact: true });
             }).join('');
 
             const rawSender = incoming ? (parseEmailIdentity(item.from_addr).name || item.from_addr) : (parseEmailIdentity(item.from_addr || 'Soporte').name || 'Soporte');
@@ -1034,13 +1170,9 @@ const TksUI = (() => {
             </div>`;
         }
 
-        const sidebarAttachments = (ticketAttachments || []).map((att) => {
-            const downloadUrl = TksApi.getTicketAttachmentDownloadUrl(t.id, att.id);
-            return `<a class="tks-side-attachment" href="${escapeHtml(downloadUrl)}" target="_blank" rel="noopener">
-                <span class="name">${escapeHtml(att.filename || 'adjunto')}</span>
-                <span class="size">${sizeLabel(att.size_bytes)}</span>
-            </a>`;
-        }).join('');
+        const sidebarAttachments = (ticketAttachments || []).map((att) =>
+            renderAttachmentCard(t.id, Number(att?.id || 0), att)
+        ).join('');
 
         const notePaneHtml = canAddInternalNote
             ? `<div class="tks-note-composer">
@@ -1714,6 +1846,7 @@ const TksUI = (() => {
         renderKanban,
         renderMessageTemplates,
         renderMailTemplateEditorModal,
+        renderAttachmentPreviewModal,
         renderOps,
         renderCreateModal,
         slaStatus,

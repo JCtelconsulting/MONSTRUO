@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import html
 import logging
+import mimetypes
 import threading
 import re
 import asyncio
@@ -5027,6 +5028,11 @@ def get_ticket_attachment_for_download(ticket_id: int, attachment_id: int) -> Di
         raise ValueError("Archivo adjunto no disponible")
 
     item["resolved_path"] = str(path.resolve())
+    item["content_type"] = (
+        str(item.get("content_type") or "").strip()
+        or mimetypes.guess_type(path.name)[0]
+        or "application/octet-stream"
+    )
     return item
 
 def get_timeline(ticket_id: int, limit: int = 120, include_emails: bool = False) -> List[Dict[str, Any]]:

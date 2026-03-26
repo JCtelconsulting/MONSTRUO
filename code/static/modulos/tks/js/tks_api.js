@@ -50,6 +50,7 @@ const TksApi = (() => {
         getTicketApprovals: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/approvals`, requestOpts || {}),
         getTicketAttachments: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/attachments`, requestOpts || {}),
         getTicketAttachmentDownloadUrl: (ticketId, attachmentId) => `${BASE}/tickets/${ticketId}/attachments/${attachmentId}/download`,
+        getTicketAttachmentInlineUrl: (ticketId, attachmentId) => `${BASE}/tickets/${ticketId}/attachments/${attachmentId}/download?inline=1`,
 
         replyByEmail: (ticketId, body, requestOpts = null) => {
             // Si body es FormData, no stringify y dejar que fetch ponga headers (multipart).

@@ -781,6 +781,7 @@ async def get_ticket_attachments(
 async def download_ticket_attachment(
     ticket_id: int,
     attachment_id: int,
+    inline: bool = Query(False),
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     _ensure_ticket_read_scope(ticket_id, sess)
@@ -792,6 +793,7 @@ async def download_ticket_attachment(
         path=item["resolved_path"],
         filename=item.get("filename") or f"ticket-{ticket_id}-attachment-{attachment_id}",
         media_type=item.get("content_type") or "application/octet-stream",
+        content_disposition_type="inline" if inline else "attachment",
     )
 
 

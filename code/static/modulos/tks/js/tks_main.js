@@ -173,6 +173,37 @@ const TksMain = (() => {
         messageSettingsState.activeTemplateKey = '';
     }
 
+    function closeAttachmentPreview() {
+        const modal = el('tks-attachment-preview-modal');
+        if (modal) modal.remove();
+    }
+
+    function openAttachmentPreview(ticketId, attachmentId, filename = '', contentType = '', sizeBytes = 0) {
+        const targetTicketId = Number(ticketId || selectedTicketId || 0);
+        const targetAttachmentId = Number(attachmentId || 0);
+        if (!targetTicketId || !targetAttachmentId) {
+            if (window.showToast) window.showToast('No se pudo abrir el adjunto seleccionado.', 'warning');
+            return;
+        }
+        closeAttachmentPreview();
+        document.body.insertAdjacentHTML(
+            'beforeend',
+            TksUI.renderAttachmentPreviewModal({
+                ticketId: targetTicketId,
+                attachmentId: targetAttachmentId,
+                filename,
+                content_type: contentType,
+                size_bytes: Number(sizeBytes || 0),
+            })
+        );
+        const modal = el('tks-attachment-preview-modal');
+        if (modal) {
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeAttachmentPreview();
+            });
+        }
+    }
+
     async function openMailTemplateModal(templateKey) {
         const normalizedKey = String(templateKey || '').trim().toLowerCase();
         const fallbackTemplate = getMailTemplateByKey(normalizedKey);
@@ -1127,7 +1158,7 @@ const TksMain = (() => {
             panel.style.display = 'none';
             panel.innerHTML = '<div class="tks-detail-empty"><span>Selecciona un ticket</span></div>';
         }
-        ['tks-draft-review-modal', 'tks-reply-review-modal', 'tks-template-editor-modal'].forEach((modalId) => {
+        ['tks-draft-review-modal', 'tks-reply-review-modal', 'tks-template-editor-modal', 'tks-attachment-preview-modal'].forEach((modalId) => {
             const modal = el(modalId);
             if (modal) modal.remove();
         });
@@ -2277,6 +2308,8 @@ const TksMain = (() => {
         openDetail,
         closeDetail,
         refreshList,
+        openAttachmentPreview,
+        closeAttachmentPreview,
         openMailTemplateModal,
         closeMailTemplateModal,
         saveMessageTemplates,

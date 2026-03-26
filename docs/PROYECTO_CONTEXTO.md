@@ -21,6 +21,35 @@
   - `curl http://127.0.0.1:9000/health` -> `200` ✅
 - **Estado**: HOTFIX APLICADO EN PROD Y PENDIENTE DE PROMOCIÓN CANÓNICA POR GIT.
 
+## HITO: 2026-03-26 - Ticketera: vista previa inline de adjuntos (DEV)
+- **Solicitud**: evitar que las imágenes y adjuntos del detalle se descarguen de inmediato; mostrar vista previa, abrirlos dentro de la misma página y dejar la descarga como acción secundaria dentro del visor.
+- **Acción ejecutada**:
+  - `code/app/api/routers/tks.py`:
+    - el endpoint `GET /api/tks/tickets/{ticket_id}/attachments/{attachment_id}/download` ahora acepta `?inline=1` y responde con `Content-Disposition: inline` cuando corresponde.
+  - `code/app/core/tickets_service.py`:
+    - `get_ticket_attachment_for_download()` normaliza `content_type` usando el valor guardado o una inferencia por extensión para habilitar preview real de imágenes/PDF/texto.
+  - `code/static/modulos/tks/js/tks_api.js`:
+    - agregado helper `getTicketAttachmentInlineUrl(...)`.
+  - `code/static/modulos/tks/js/tks_ui.js`:
+    - los adjuntos del feed y del sidebar pasan a renderizarse como tarjetas con miniatura/ícono, eliminando el enlace morado de descarga directa.
+    - nuevo modal de preview inline para imágenes, PDF y texto.
+    - la acción principal del usuario pasa a ser abrir el adjunto dentro de la misma vista; descargar queda dentro del modal.
+  - `code/static/modulos/tks/js/tks_main.js`:
+    - manejo de apertura/cierre del visor de adjuntos.
+  - `code/static/modulos/tks/css/tks.css` + `code/static/modulos/tks/tks.html`:
+    - estilos nuevos para tarjetas y modal de preview.
+    - cache-bust de assets (`tks.css?v=52`, `tks_api.js?v=15`, `tks_ui.js?v=81`, `tks_main.js?v=57`).
+- **Verificación**:
+  - `python3 -m py_compile code/app/api/routers/tks.py code/app/core/tickets_service.py` ✅
+  - `node --check code/static/modulos/tks/js/tks_api.js` ✅
+  - `node --check code/static/modulos/tks/js/tks_ui.js` ✅
+  - `node --check code/static/modulos/tks/js/tks_main.js` ✅
+  - `python3 -m unittest tests.unit_ticketera_core` ✅
+  - `docker restart monstruo-dev-api` ✅
+  - `curl http://127.0.0.1:9001/health` -> `200` ✅
+  - `GET /api/tks/tickets/1/attachments/1/download?inline=1` sin sesión -> `401` ✅
+- **Estado**: IMPLEMENTADO EN DEV. Pendiente validación visual/manual del usuario.
+
 ## HITO: 2026-03-26 - Ticketera: dominio/plantillas movidos a pestaña propia (DEV)
 - **Solicitud**: sacar la edición de mensajes y el enrutamiento por correo/dominio desde Configuración y dejarlo dentro del módulo Ticketera con acceso para `encargado_mesa` y `admin`.
 - **Acción ejecutada**:
