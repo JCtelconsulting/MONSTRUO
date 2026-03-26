@@ -506,11 +506,16 @@ async def send_auto_response_job(payload: dict):
             marker_id = int(marker["id"]) if marker else None
             lock_conn.commit()
 
-        code = str(ticket.get("codigo") or payload.get("ticket_code") or f"TK-{ticket_id}")
-        subject = tickets_service._auto_reply_subject(ticket)
-        body = tickets_service._auto_reply_body(
+        subject = tickets_service._auto_reply_subject(
+            lock_conn,
+            ticket,
             str(payload.get("nombre") or ticket.get("cliente_nombre") or "cliente"),
-            code,
+            str(payload.get("asignado_a") or ticket.get("asignado_a") or ""),
+        )
+        body = tickets_service._auto_reply_body(
+            lock_conn,
+            ticket,
+            str(payload.get("nombre") or ticket.get("cliente_nombre") or "cliente"),
             str(payload.get("asignado_a") or ticket.get("asignado_a") or ""),
         )
 

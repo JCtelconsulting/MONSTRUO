@@ -2,6 +2,25 @@
 **Fecha de actualizacion:** 26 Marzo 2026
 **Fuente de verdad:** `docs/PLAN_MAESTRO_MONSTRUO`
 
+## HITO: 2026-03-26 - Hotfix PROD Ticketera: dominio/plantillas + auto-respuesta
+- **Incidente**: en producción, la pestaña `Ticketera > Dominio/Plantillas` respondía `500` por falta de la tabla `tks.ticket_config_email_routes`; además el worker de auto-respuesta quedó llamando helpers con la firma antigua y fallaba al procesar correos entrantes.
+- **Acción ejecutada**:
+  - `code/app/core/db.py`:
+    - se agrega creación canónica de `tks.ticket_config_email_routes` e índices asociados dentro de `init_db()`.
+  - `code/app/core/jobs_engine.py`:
+    - `send_auto_response_job()` queda alineado con las firmas nuevas de `_auto_reply_subject()` y `_auto_reply_body()`, usando la conexión y el ticket completos.
+  - `tests/unit_ticketera_core.py`:
+    - nueva regresión para validar que el job de auto-respuesta usa correctamente los helpers de plantilla.
+  - Runtime PROD:
+    - hotfix directo en DB para crear `tks.ticket_config_email_routes` y sacar de inmediato el `500` del panel.
+- **Verificación**:
+  - `python3 -m py_compile code/app/core/db.py code/app/core/jobs_engine.py code/app/core/tickets_service.py` ✅
+  - `python3 -m unittest tests.unit_ticketera_core` ✅
+  - `SELECT to_regclass('tks.ticket_config_email_routes')` en PROD -> `tks.ticket_config_email_routes` ✅
+  - `SELECT count(*) FROM tks.ticket_config_email_routes` en PROD -> `0` ✅
+  - `curl http://127.0.0.1:9000/health` -> `200` ✅
+- **Estado**: HOTFIX APLICADO EN PROD Y PENDIENTE DE PROMOCIÓN CANÓNICA POR GIT.
+
 ## HITO: 2026-03-26 - Ticketera: dominio/plantillas movidos a pestaña propia (DEV)
 - **Solicitud**: sacar la edición de mensajes y el enrutamiento por correo/dominio desde Configuración y dejarlo dentro del módulo Ticketera con acceso para `encargado_mesa` y `admin`.
 - **Acción ejecutada**:

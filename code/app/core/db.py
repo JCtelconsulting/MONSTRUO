@@ -1056,6 +1056,30 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_tk_transitions_idem ON tks.ticket_transitions(idempotency_key);"
         )
 
+        # --- Routing por correo/dominio para Ticketera ---
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS tks.ticket_config_email_routes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_type TEXT NOT NULL,
+            match_value TEXT NOT NULL,
+            categoria TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """)
+        conn.execute(
+            """CREATE UNIQUE INDEX IF NOT EXISTS idx_tk_email_routes_match
+               ON tks.ticket_config_email_routes(match_type, match_value);"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_routes_active ON tks.ticket_config_email_routes(is_active);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tk_email_routes_categoria ON tks.ticket_config_email_routes(categoria);"
+        )
+
         # --- Aprobaciones de cambios ---
         conn.execute("""
         CREATE TABLE IF NOT EXISTS tks.ticket_approvals (

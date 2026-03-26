@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import asyncio
 import sys
 import unittest
 from datetime import datetime
@@ -21,6 +22,7 @@ if str(CODE_ROOT) not in sys.path:
 from app.core.tickets import roles as ticket_roles
 from app.core.tickets import workflow as ticket_workflow
 from app.core import email_integration
+from app.core import jobs_engine
 from app.core import tickets_service
 
 
@@ -416,6 +418,56 @@ class TicketeraEpic11Tests(unittest.TestCase):
             in_reply_to="<status-parent@example.com>",
             references="<status-history@example.com> <status-parent@example.com>",
         )
+        conn.commit.assert_called_once()
+        conn.close.assert_called_once()
+
+    def test_send_auto_response_job_uses_template_helpers_with_connection(self) -> None:
+        ticket = {
+            "id": 91,
+            "codigo": "TK-23-03-2026-0091",
+            "titulo": "Correo entrante",
+            "cliente_nombre": "Cliente Demo",
+            "email_thread_id": "<parent@example.com>",
+            "email_references": "<history@example.com>",
+        }
+        conn = MagicMock()
+        lock_cursor = MagicMock()
+        lock_cursor.fetchone.return_value = {"locked": True}
+        sent_cursor = MagicMock()
+        sent_cursor.fetchone.return_value = None
+        pending_cursor = MagicMock()
+        pending_cursor.fetchone.return_value = {"id": 991}
+        conn.execute.side_effect = [lock_cursor, sent_cursor, pending_cursor, MagicMock(), MagicMock()]
+
+        payload = {
+            "ticket_id": 91,
+            "email": "cliente@example.com",
+            "nombre": "Cliente Demo",
+            "asignado_a": "mesa",
+            "idempotency_key": "auto_reply:91:test",
+            "in_reply_to": "<parent@example.com>",
+            "references": "<history@example.com>",
+        }
+
+        with (
+            patch("app.core.jobs_engine.db.get_conn", return_value=conn),
+            patch("app.core.jobs_engine.db.now_utc_iso", return_value="2026-03-26T18:30:00+00:00"),
+            patch("app.core.tickets_service.get_ticket", return_value=ticket),
+            patch("app.core.tickets_service._auto_reply_sender_allowed", return_value=(True, "allowed")),
+            patch("app.core.tickets_service._auto_reply_subject", return_value="Asunto auto") as reply_subject,
+            patch("app.core.tickets_service._auto_reply_body", return_value="<p>Cuerpo auto</p>") as reply_body,
+            patch(
+                "app.core.email.send_email_advanced",
+                return_value={"from_addr": "soporte@example.com", "message_id": "<auto-msg@example.com>"},
+            ) as send_email,
+            patch("app.core.tickets_service._emit_system_comment"),
+            patch("app.core.tickets_service._update_ticket_thread_metadata"),
+        ):
+            asyncio.run(jobs_engine.send_auto_response_job(payload))
+
+        reply_subject.assert_called_once_with(conn, ticket, "Cliente Demo", "mesa")
+        reply_body.assert_called_once_with(conn, ticket, "Cliente Demo", "mesa")
+        self.assertEqual(send_email.call_args.kwargs["subject"], "Asunto auto")
         conn.commit.assert_called_once()
         conn.close.assert_called_once()
 
