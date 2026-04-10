@@ -1,46 +1,49 @@
-volumes:
-  monstruo_pgdata:
-
+version: '3.8'
 
 services:
   db:
     image: postgres:16
-    container_name: ${STACK_NAME:-monstruo}-postgres
+    container_name: ${STACK_NAME:-monstruo-dev}-db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-monstruo}
+      POSTGRES_DB: ${POSTGRES_DB:-monstruo_dev}
       POSTGRES_USER: ${POSTGRES_USER:-monstruo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}
     volumes:
-      - monstruo_pgdata:/var/lib/postgresql/data
+      - ./plataforma/data/postgres:/var/lib/postgresql/data
     restart: unless-stopped
 
-  api:
+  gateway:
     build:
       context: .
-      dockerfile: code/ops/docker/Dockerfile.api
-    container_name: ${STACK_NAME:-monstruo}-api
+      dockerfile: ./gateway/Dockerfile
+    container_name: ${STACK_NAME:-monstruo-dev}-gateway
     env_file:
-      - ${ENV_FILE:-ops/env/.env.server.dev}
-    volumes:
-      - ./code:/app/code
-      - ./data/tickets:${TICKET_ATTACHMENTS_DIR:-/srv/monstruo_dev/data/tickets}
-      - ./data/compliance:${COMPLIANCE_EXPORT_DIR:-/srv/monstruo_dev/data/compliance}
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
     ports:
-      - "${PORT:-9000}:9000"
+      - "${GATEWAY_PORT:-9001}:9001"
     environment:
-      - PYTHONPATH=/app/code
-      - PORT=${PORT:-9000}
-      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo}
-      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY_required}
-      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
-      - COOKIE_SECURE=${COOKIE_SECURE:-0}
-      - LAUDUS_BASE_URL=${LAUDUS_BASE_URL:-https://api.laudus.cl}
-      - LAUDUS_USERNAME=${LAUDUS_USERNAME:-}
-      - LAUDUS_PASSWORD=${LAUDUS_PASSWORD:-}
-      - LAUDUS_COMPANY_VAT_ID=${LAUDUS_COMPANY_VAT_ID:-}
-      - APP_GIT_SHA=${APP_GIT_SHA:-unknown}
-      - APP_GIT_BRANCH=${APP_GIT_BRANCH:-unknown}
-      - APP_BUILD_TIME=${APP_BUILD_TIME:-unknown}
+      - PYTHONPATH=/app:/app/plataforma
+      - PORT=9001
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
     restart: unless-stopped
+    command: ["uvicorn", "gateway.backend.main:app", "--host", "0.0.0.0", "--port", "9001"]
+
+  ticketera:
+    build:
+      context: .
+      dockerfile: ./ticketera/Dockerfile
+    container_name: ${STACK_NAME:-monstruo-dev}-ticketera
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "9005:9005"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - PORT=9005
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    restart: unless-stopped
+    command: ["uvicorn", "ticketera.backend.main:app", "--host", "0.0.0.0", "--port", "9005"]

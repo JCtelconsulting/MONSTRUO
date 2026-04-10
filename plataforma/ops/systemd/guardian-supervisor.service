@@ -1,0 +1,14 @@
+[Unit]
+Description=MONSTRUO Guardian - Supervisor de eventos
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/monstruo_dev
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /srv/monstruo_dev/plataforma/ops/guardian/scripts/supervisor_eventos.py --config /srv/monstruo_dev/plataforma/ops/guardian/config/configuracion_guardian.json
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

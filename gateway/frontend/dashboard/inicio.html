@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monstruo Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="../shared/css/monstruo.css?v=77" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link rel="manifest" href="../manifest.json">
+  <meta name="theme-color" content="#070b11">
+</head>
+
+<body class="sidebar-collapsed" data-current-module="dashboard">
+  <header id="app-header">
+    <div class="header-top">
+      <h1>MONSTRUO</h1>
+      <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
+        <i class="fas fa-bars"></i>
+      </button>
+    </div>
+    <nav id="dynamic-sidebar" class="side-nav">
+    </nav>
+    <div class="header-actions">
+      <span id="who" class="pill shell-who-pill">Usuario</span>
+      <div class="footer-buttons-container">
+        <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+          <i class="fas fa-key"></i> <span>Cuenta</span>
+        </button>
+        <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+          <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="main-inner">
+      <section class="section-block" id="section-general">
+        <div class="section-header">
+          <h3>Dashboard</h3>
+          <p>Resumen Operativo Monstruo</p>
+        </div>
+        <style>
+          .monstruo-dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+          }
+
+        </style>
+        <div class="monstruo-dashboard-grid">
+          <div class="card card-terreno" style="cursor: default;">
+            <i class="fas fa-chart-pie"></i>
+            <h2>Operaciones</h2>
+            <p>Vista General</p>
+          </div>
+          <div class="card card-supervisor" style="cursor: default;">
+            <i class="fas fa-file-invoice-dollar"></i>
+            <h2>Facturación</h2>
+            <p>Cobranza</p>
+          </div>
+          <div class="card card-gerencia" style="cursor: default;">
+            <i class="fas fa-users"></i>
+            <h2>Clientes</h2>
+            <p>Cartera</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../shared/js/utilidades.js?v=210"></script>
+  <script src="../shared/js/admin.js?v=5"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.initLogout) window.initLogout();
+      loadDashboard();
+      setInterval(loadDashboard, 30000); // 30s auto-refresh
+    });
+
+    async function loadDashboard() {
+      try {
+        const data = await window.fetchApi('/api/ops/dashboard');
+
+        // Render KPIs
+        const kpis = data.kpis;
+        const salesCard = document.querySelector('.card-supervisor');
+        salesCard.querySelector('p').innerHTML = `Hoy: ${kpis.sales_today_count} doc<br>$${new Intl.NumberFormat('es-CL').format(kpis.sales_today_amount)}`;
+
+        const ticketsCard = document.querySelector('.card-terreno'); // Usar Terreno para Tickets? O ajustar iconos
+        // Terreno Icon is chart-pie. Let's hijack it for Jobs or Tickets.
+        // Let's assume Card 1 is Tickets, Card 2 Sales, Card 3 Customers
+
+        // Update Card 1: Tickets
+        const card1 = document.querySelectorAll('.card')[0];
+        card1.innerHTML = `
+            <i class="fas fa-ticket-alt"></i>
+            <h2>${kpis.tickets_open} Tickets</h2>
+            <p>${kpis.tickets_critical} Críticos</p>
+        `;
+        if (kpis.tickets_critical > 0) card1.style.borderLeft = "5px solid #ff4444";
+        else card1.style.borderLeft = "none";
+
+        // Update Card 2: Sales
+        const card2 = document.querySelectorAll('.card')[1];
+        card2.innerHTML = `
+            <i class="fas fa-file-invoice-dollar"></i>
+            <h2>$${new Intl.NumberFormat('es-CL', { notation: "compact" }).format(kpis.sales_today_amount)}</h2>
+            <p>${kpis.sales_today_count} Ventas Hoy</p>
+        `;
+
+        // Update Card 3: Customers
+        const card3 = document.querySelectorAll('.card')[2];
+        card3.innerHTML = `
+            <i class="fas fa-users"></i>
+            <h2>${kpis.total_customers}</h2>
+            <p>Clientes Activos</p>
+        `;
+
+        // System Status
+        const header = document.querySelector('.section-header p');
+        header.innerHTML = `Estado: <span class="pill ${data.system_status == 'healthy' ? 'pill-success' : 'pill-error'}">${data.system_status.toUpperCase()}</span>`;
+        if (data.jobs_health.failures_24h > 0) {
+          header.innerHTML += ` &bull; ${data.jobs_health.failures_24h} Fallas en Jobs (24h)`;
+        }
+
+        // Render Recent Failures Table (Bottom)
+        let failContainer = document.getElementById('failures-container');
+        if (!failContainer) {
+          failContainer = document.createElement('div');
+          failContainer.id = 'failures-container';
+          failContainer.style.marginTop = '2rem';
+          document.querySelector('.monstruo-dashboard-grid').after(failContainer);
+        }
+
+        if (data.recent_failures.length > 0) {
+          let html = `<h4>⚠️ Alertas Recientes</h4><table class="monstruo-table" style="width:100%; margin-top:0.5rem"><thead><tr><th>Job</th><th>Error</th><th>Hora</th></tr></thead><tbody>`;
+          data.recent_failures.forEach(f => {
+            html += `<tr><td>${f.job_type}</td><td style="color:#d32f2f">${String(f.error_msg || f.last_error || '-').substring(0, 50)}...</td><td>${String(f.started_at || f.updated_at || '').substring(11, 16) || '-'}</td></tr>`;
+          });
+          html += `</tbody></table>`;
+          failContainer.innerHTML = html;
+        } else {
+          failContainer.innerHTML = `<div style="margin-top:2rem; opacity:0.6; text-align:center"><i class="fas fa-check-circle" style="color:#00c851"></i> Todos los sistemas operativos</div>`;
+        }
+
+      } catch (err) {
+        console.error("Dashboard Error", err);
+      }
+    }
+  </script>
+  <script src="../shared/js/sidebar.js?v=88"></script>
+</body>
+
+</html>

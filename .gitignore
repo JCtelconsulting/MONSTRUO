@@ -14,9 +14,9 @@ venv.bak/
 .env
 .env.*
 !.env.example
-!ops/env/.env.example
+!plataforma/ops/env/.env.example
 code/.env
-ops/guardian/config/entorno_guardian.env
+plataforma/ops/guardian/config/entorno_guardian.env
 
 # IDEs
 .idea/
@@ -34,8 +34,9 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-data/
-ops/guardian/*.sqlite*
+plataforma/data/
+plataforma/data_runtime/
+plataforma/ops/guardian/*.sqlite*
 
 # Backups
 backups/
@@ -68,8 +69,10 @@ runner/
 .secrets/
 
 # Runtime ticket attachments
-data/tickets/
-data/compliance/
+ticketera/data/tickets/
+ticketera/data/compliance/
+fundacion/data/
+erp/data/
 
 # Guardian runtime reports
-ops/guardian/reportes/*.json
+plataforma/ops/guardian/reportes/*.json

@@ -1,0 +1,58 @@
+# =================================================================
+# Archivo .dockerignore para el proyecto MONSTRUO
+#
+# Propósito: Evitar que archivos innecesarios, pesados o sensibles
+# se incluyan en el contexto de build de Docker. Esto acelera los
+# builds y previene errores críticos como el llenado de disco.
+# =================================================================
+
+# 1. Ignorar el repositorio de Git
+.git/
+
+# 2. Ignorar datos de la aplicación y archivos pesados (¡MUY IMPORTANTE!)
+# Esta sección previene que los datos de usuario, videos, PDFs, etc.,
+# llenen el disco durante el build de Docker.
+/plataforma/data/
+/plataforma/data_runtime/
+/ticketera/data/
+/fundacion/data/
+
+# 3. Ignorar secretos y archivos de entorno local
+# Se ignoran todos los archivos .env para no filtrarlos en las imágenes.
+# Docker Compose los inyectará de forma segura usando 'env_file'.
+.env
+.env.*
+*.env
+
+# 4. Ignorar archivos de Python (caché y entornos virtuales)
+**/__pycache__/
+*.pyc
+venv/
+*.venv
+.python-version
+
+# 5. Ignorar archivos de test y cobertura de código
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 6. Ignorar dependencias de Node.js
+node_modules/
+
+# 7. Ignorar archivos de configuración de IDEs y sistemas operativos
+.vscode/
+.idea/
+.project
+.classpath
+.DS_Store
+Thumbs.db
+
+# 8. Ignorar archivos de build, logs y backups
+dist/
+build/
+*.egg-info/
+*.log
+*.tmp
+*.swp
+*.bak
+*.old
