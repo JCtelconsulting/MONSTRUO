@@ -68,13 +68,20 @@ def _serve_module_html(request: Request, module_path: str, fallback_path: str = 
 
         html = file_path.read_text(encoding="utf-8")
         module_dir = module_path.rsplit("/", 1)[0] + "/"
-        base_href = f"{_public_prefix(request)}{module_dir}" or module_dir
+        prefix = _public_prefix(request)
+        base_href = f"{prefix}/{module_dir}".replace("//", "/") if prefix else module_dir
+        if not base_href.endswith("/"):
+            base_href += "/"
         base_tag = f'<base href="{base_href}">'
-        if "<base " not in html:
-            if "<head>" in html:
-                html = html.replace("<head>", f"<head>\\n    {base_tag}", 1)
-            else:
-                html = base_tag + html
+        
+        # Siempre reescribimos el <base href> existente o lo inyectamos
+        import re
+        if re.search(r'<base\s+href="[^"]*">', html):
+            html = re.sub(r'<base\s+href="[^"]*">', base_tag, html)
+        elif "<head>" in html:
+            html = html.replace("<head>", f"<head>\n    {base_tag}", 1)
+        else:
+            html = base_tag + html
         return HTMLResponse(content=html)
 
     fallback_relative_path = fallback_path.lstrip("/")
@@ -85,13 +92,20 @@ def _serve_module_html(request: Request, module_path: str, fallback_path: str = 
 
         html = fallback_file.read_text(encoding="utf-8")
         fallback_dir = fallback_path.rsplit("/", 1)[0] + "/"
-        base_href = f"{_public_prefix(request)}{fallback_dir}" or fallback_dir
+        prefix = _public_prefix(request)
+        base_href = f"{prefix}/{fallback_dir}".replace("//", "/") if prefix else fallback_dir
+        if not base_href.endswith("/"):
+            base_href += "/"
         base_tag = f'<base href="{base_href}">'
-        if "<base " not in html:
-            if "<head>" in html:
-                html = html.replace("<head>", f"<head>\\n    {base_tag}", 1)
-            else:
-                html = base_tag + html
+        
+        # Siempre reescribimos el <base href> existente o lo inyectamos
+        import re
+        if re.search(r'<base\s+href="[^"]*">', html):
+            html = re.sub(r'<base\s+href="[^"]*">', base_tag, html)
+        elif "<head>" in html:
+            html = html.replace("<head>", f"<head>\n    {base_tag}", 1)
+        else:
+            html = base_tag + html
         return HTMLResponse(content=html)
 
     raise HTTPException(status_code=404, detail="module_not_found")
