@@ -243,8 +243,8 @@ app.include_router(config_router.router)
 app.include_router(ops.router)
 
 SERVICES_MAP = {
-    "ticketera": "http://ticketera:8000",
-    "tks": "http://ticketera:8000",
+    "ticketera": "http://ticketera:9005",
+    "tks": "http://ticketera:9005",
     "erp": "http://erp:8000",
     "bodega": "http://bodega:8000",
     "crm": "http://crm:8000",

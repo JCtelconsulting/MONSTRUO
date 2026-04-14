@@ -1,6 +1,7 @@
 # AGENTS - MONSTRUO DEV
 
 Estas instrucciones aplican a cualquier agente ejecutado en este repositorio. Este es el único archivo de reglas operativas.
+responderas corto, preciso, en español y en lenguaje natural.
 
 ## 0) Objetivo
 Evitar desorden, cruces DEV/PROD y pérdida de foco en la meta de negocio (EPIC 11).

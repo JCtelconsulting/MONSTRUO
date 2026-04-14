@@ -2,39 +2,57 @@
 
 Este documento describe la arquitectura actual del sistema, incluyendo el flujo de red, los componentes de software y un diagnóstico de los problemas de acoplamiento existentes.
 
-## 1. Flujo de Red (Entorno de Desarrollo)
+Referencia operativa del proxy actual:
+- [plataforma/docs/PROXY_INVERSO.md](/srv/monstruo_dev/plataforma/docs/PROXY_INVERSO.md)
+
+## 1. Flujo de Red (Estado actual)
 
 El flujo de una petición HTTP desde un usuario hasta un servicio de la aplicación sigue estos pasos:
 
 ```mermaid
 graph TD
     A[Usuario] --> B{Internet};
-    B --> C[VM Externa: 192.168.60.6];
-    C --> D[VM Aplicaciones: 192.168.60.5];
-    D --> E[Contenedor: gateway];
-    E --> F[Contenedor: servicio final];
+    B --> C[VM Proxy: 192.168.60.6];
+    C --> D[Backend Monstruo PROD: 192.168.60.5:9000];
+    C --> E[Backend Terreneitor PROD: 192.168.60.5:8080];
+    C --> F[Backend Terreneitor DEV: 192.168.60.5:8081];
+    C --> G[Backend Monstruo DEV base: 192.168.60.8:9001];
+    C --> H[Backend Ticketera API DEV: 192.168.60.8:9005];
+    C --> I[Backend IA DEV: 192.168.20.228:18789];
+    C --> J[Backend IA Oficina DEV: 192.168.20.228:8000];
 
-    subgraph "VM Externa (.60.6)"
+    subgraph "VM Proxy (.60.6)"
         C(Nginx Proxy Inverso)
-    end
-
-    subgraph "VM Aplicaciones (.60.5)"
-        D(Proxy Interno: Puerto 80)
-    end
-
-    subgraph "Docker en VM App"
-        E
-        F
     end
 ```
 
-**Descripción del Flujo:**
+**Descripción del Flujo actual:**
 
-1.  **Usuario:** Inicia una petición a un dominio como `ticketera.telconsulting.cl`.
-2.  **VM Externa (`.60.6`):** Un Nginx principal recibe la petición. Su configuración (`monstruo.conf`) redirige todo el tráfico con el prefijo `/dev/` hacia la VM de aplicaciones.
-3.  **VM Aplicaciones (`.60.5`):** Un proceso (probablemente otro Nginx o un proxy similar) escucha en el puerto 80. Este proceso redirige a su vez la petición al puerto del `gateway` de Docker (ej: `9001`).
-4.  **Contenedor Gateway:** El servicio `gateway` (FastAPI) recibe la petición. Valida la autenticación y, basándose en la ruta (ej: `/api/ticketera/...`), actúa como proxy hacia el microservicio correspondiente.
-5.  **Contenedor Servicio Final:** El microservicio (ej: `ticketera`) recibe la petición del `gateway`, la procesa y devuelve la respuesta.
+1. **Usuario:** Inicia una petición a un dominio como `ticketera.telconsulting.cl`.
+2. **VM Proxy (`.60.6`):** Nginx recibe la petición pública y la enruta según familia de aplicación:
+   - `monstruo.conf`
+   - `terreneitor.conf`
+   - `sapa.conf`
+3. **PROD:** Usa `/` sin prefijo visible.
+4. **DEV:** Usa `/dev/` como prefijo público obligatorio.
+5. **Backends reales:** La VM proxy ya no debe asumirse como un simple passthrough a `:80`. Hoy enruta directamente a puertos concretos según servicio.
+
+### Backends actuales publicados por el proxy
+
+**Monstruo PROD**
+- `ticketera.telconsulting.cl` -> `192.168.60.5:9000`
+- `login.telconsulting.cl` -> `192.168.60.5:9000`
+- `config.telconsulting.cl` -> `192.168.60.5:9000`
+
+**Monstruo DEV**
+- `base-dev` -> `192.168.60.8:9001`
+- `ticketera-api-dev` -> `192.168.60.8:9005`
+- `ia-dev` -> `192.168.20.228:18789`
+- `ia-oficina-dev` -> `192.168.20.228:8000`
+
+**Terreneitor**
+- PROD -> `192.168.60.5:8080`
+- DEV -> `192.168.60.5:8081`
 
 ## 2. Componentes Internos (Contenedores Docker)
 
@@ -74,7 +92,7 @@ Esta sección describe la arquitectura ideal propuesta y el plan para alcanzarla
 
 El objetivo es tener dos entornos idénticos y aislados en Proxmox, cada uno con una configuración simple y robusta.
 
-*   **Proxy Inverso Único por VM:** Cada VM (DEV y PROD) tendrá su propio contenedor Nginx. Este será el único punto de entrada a la VM, gestionando los certificados SSL y redirigiendo el tráfico a los servicios internos. Se elimina la necesidad del proxy en la VM `.60.6` y el doble salto.
+*   **Proxy Inverso Único por VM:** Objetivo futuro: que cada entorno tenga su propio proxy local y eliminar dependencia operativa del proxy compartido en `.60.6`.
 *   **Contenedores de Aplicación Aislados:** Las aplicaciones (`gateway`, `ticketera`, `db`, etc.) correrán en contenedores Docker, con su código fuente refactorizado para eliminar dependencias a nivel de ficheros.
 *   **Comunicación Exclusiva por API:** La comunicación entre servicios se realizará únicamente a través de llamadas HTTP, orquestadas por el `gateway`.
 
