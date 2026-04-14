@@ -21,28 +21,24 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install dependencies
+      - name: Setup pip
         run: |
           python -m pip install --upgrade pip
-          pip install -r code/requirements.txt
       - name: Compile (syntax check)
         run: |
-          python -m compileall -q code/app
-      - name: Hardening (repo checks)
+          python -m compileall -q plataforma/core plataforma/tests plataforma/ops/herramientas bodega crm erp fundacion gateway ticketera
+      - name: Deploy script syntax
         run: |
-          python tests/verify_hardening.py
-      - name: Ticketera core policy tests
+          bash -n plataforma/ops/herramientas/deploy/deploy.sh
+      - name: Repo guard
         run: |
-          python tests/unit_ticketera_core.py
-      - name: Ticketera frontend security tests
-        run: |
-          python tests/unit_ticketera_frontend_security.py
+          python plataforma/tests/ci_repo_guard.py
 
   deploy:
     needs: tests
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
-    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+    environment: production
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -60,13 +56,8 @@ jobs:
             echo "health=http://127.0.0.1:9000/health" >> "$GITHUB_OUTPUT"
             echo "deploy_path=/srv/monstruo" >> "$GITHUB_OUTPUT"
           else
-            echo "branch=dev" >> "$GITHUB_OUTPUT"
-            echo "env_file=/srv/monstruo_dev/ops/env/.env.server.dev" >> "$GITHUB_OUTPUT"
-            # Mantener project estable evita conflictos de labels/ownership en contenedores existentes.
-            echo "project=monstruo_dev" >> "$GITHUB_OUTPUT"
-            echo "stack=monstruo-dev" >> "$GITHUB_OUTPUT"
-            echo "health=http://127.0.0.1:9001/health" >> "$GITHUB_OUTPUT"
-            echo "deploy_path=/srv/monstruo_dev" >> "$GITHUB_OUTPUT"
+            echo "Solo se permite el despliegue automático en la rama main hacia la VM de producción."
+            exit 1
           fi
       - name: Deploy to server
         env:
@@ -79,6 +70,6 @@ jobs:
         run: |
           set -euo pipefail
           # Asegurar permisos de ejecución en el script del workspace
-          chmod +x ops/herramientas/deploy/deploy.sh
+          chmod +x plataforma/ops/herramientas/deploy/deploy.sh
           # Ejecutar el script DESDE EL WORKSPACE, apuntando al directorio destino
-          bash ops/herramientas/deploy/deploy.sh
+          bash plataforma/ops/herramientas/deploy/deploy.sh
