@@ -4,7 +4,7 @@ Runs periodically to escalate overdue tickets.
 """
 from datetime import datetime, timedelta, timezone
 
-from core import db, notifications, jobs_engine
+from plataforma.core import db, notifications, jobs_engine
 from ticketera.backend import service as tickets_service
 
 

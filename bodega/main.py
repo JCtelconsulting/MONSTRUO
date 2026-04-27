@@ -5,10 +5,13 @@ from pathlib import Path
 
 import sys
 
+repo_root = Path(__file__).resolve().parents[1]
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 sys.path.append(str(Path(__file__).parent))
 import router as bodega_router
-from core import deps
-from core.web import build_login_redirect_url
+from plataforma.core import deps
+from plataforma.core.web import build_login_redirect_url
 
 app = FastAPI(title="Monstruo - Bodega (WMS) API", version="1.0")
 
@@ -17,7 +20,6 @@ ui_dir = Path(__file__).parent / "ui"
 app.mount("/static", StaticFiles(directory=str(ui_dir)), name="bodega_static")
 
 # Servir estáticos compartidos desde el canon del gateway
-repo_root = Path(__file__).resolve().parents[1]
 shared_ui_dir = repo_root / "gateway" / "shared" / "ui"
 if shared_ui_dir.exists():
     app.mount("/shared", StaticFiles(directory=str(shared_ui_dir)), name="shared_static")

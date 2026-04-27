@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 import unicodedata
-from typing import List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core import db, deps, security
-from core.config import settings
+from plataforma.core import auth_service, db, deps, security
+from plataforma.core.config import settings
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
 ALLOWED_ROLES: Set[str] = set(settings.ROLE_PERMISSIONS.keys())
@@ -54,6 +54,7 @@ class UserCreate(BaseModel):
     role: str
     secondary_roles: List[str] = Field(default_factory=list)
     allowed_modules: List[str] = Field(default_factory=list)
+    fundacion_scope: Dict[str, Any] = Field(default_factory=dict)
 
 
 class UserUpdate(BaseModel):
@@ -62,6 +63,7 @@ class UserUpdate(BaseModel):
     secondary_roles: Optional[List[str]] = None
     is_active: Optional[bool] = None
     allowed_modules: Optional[List[str]] = None
+    fundacion_scope: Optional[Dict[str, Any]] = None
 
 
 @router.get("", response_model=dict)
@@ -71,7 +73,7 @@ async def list_users(
     conn = db.get_conn()
     try:
         cursor = conn.execute(
-            "SELECT username, role, secondary_roles, is_active, allowed_modules, created_at FROM users ORDER BY username ASC"
+            "SELECT username, role, secondary_roles, is_active, allowed_modules, fundacion_scope, created_at FROM users ORDER BY username ASC"
         )
         users = []
         for row in cursor.fetchall():
@@ -87,6 +89,8 @@ async def list_users(
                     item["secondary_roles"] = []
             except Exception:
                 item["secondary_roles"] = []
+
+            item["fundacion_scope"] = auth_service.normalize_fundacion_scope(item.get("fundacion_scope"))
             users.append(item)
         return {"items": users}
     finally:
@@ -102,6 +106,7 @@ async def create_user_endpoint(
     if normalized_role not in ALLOWED_ROLES:
         raise HTTPException(status_code=400, detail=f"Rol invalido: '{body.role}'")
     normalized_secondary_roles = _normalize_secondary_roles_input(body.secondary_roles, normalized_role)
+    normalized_fundacion_scope = auth_service.normalize_fundacion_scope(body.fundacion_scope)
 
     conn = db.get_conn()
     try:
@@ -110,14 +115,15 @@ async def create_user_endpoint(
             raise HTTPException(status_code=409, detail="Usuario ya existe")
 
         conn.execute(
-            """INSERT INTO users (username, password_hash, role, secondary_roles, is_active, allowed_modules, created_at)
-               VALUES (?, ?, ?, ?, 1, ?, ?)""",
+            """INSERT INTO users (username, password_hash, role, secondary_roles, is_active, allowed_modules, fundacion_scope, created_at)
+               VALUES (?, ?, ?, ?, 1, ?, ?, ?)""",
             (
                 body.username,
                 security.get_password_hash(body.password),
                 normalized_role,
                 json.dumps(normalized_secondary_roles),
                 json.dumps(body.allowed_modules or []),
+                json.dumps(normalized_fundacion_scope),
                 db.now_utc_iso(),
             ),
         )
@@ -177,6 +183,10 @@ async def update_user(
         if body.allowed_modules is not None:
             updates.append("allowed_modules = ?")
             params.append(json.dumps(body.allowed_modules))
+
+        if body.fundacion_scope is not None:
+            updates.append("fundacion_scope = ?")
+            params.append(json.dumps(auth_service.normalize_fundacion_scope(body.fundacion_scope)))
 
         if body.password:
             updates.append("password_hash = ?")

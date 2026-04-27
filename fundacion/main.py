@@ -10,15 +10,17 @@ from fastapi.staticfiles import StaticFiles
 
 app_dir = Path(__file__).parent
 repo_root = app_dir.parent
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 sys.path.append(str(app_dir))
 
-from core.env_loader import load_runtime_env
+from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 
 import router as fundacion_router
-from core import deps
-from core.web import build_login_redirect_url
+from plataforma.core import deps
+from plataforma.core.web import build_login_redirect_url
 
 app = FastAPI(title="Monstruo - Fundación API", version="1.0")
 

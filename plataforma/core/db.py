@@ -352,6 +352,7 @@ def init_db() -> None:
             is_active INTEGER NOT NULL DEFAULT 1,
             allowed_modules TEXT DEFAULT '[]',
             secondary_roles TEXT DEFAULT '[]',
+            fundacion_scope TEXT DEFAULT '{}',
             phone_number TEXT,
             created_at TEXT DEFAULT ''
         );
@@ -361,6 +362,7 @@ def init_db() -> None:
             if is_postgres():
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS allowed_modules TEXT DEFAULT '[]'")
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS secondary_roles TEXT DEFAULT '[]'")
+                conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS fundacion_scope TEXT DEFAULT '{}'")
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS phone_number TEXT")
             else:
                 # SQLite fallback
@@ -370,6 +372,10 @@ def init_db() -> None:
                     pass
                 try:
                     conn.execute("ALTER TABLE auth.users ADD COLUMN secondary_roles TEXT DEFAULT '[]'")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE auth.users ADD COLUMN fundacion_scope TEXT DEFAULT '{}'")
                 except Exception:
                     pass
                 try:
@@ -2272,22 +2278,34 @@ def init_db() -> None:
                 fecha_fin TIMESTAMP,
                 asignado_a TEXT, -- username del ejecutivo
                 creado_by TEXT,
+                sede TEXT,
                 estado TEXT DEFAULT 'pendiente', -- pendiente, en_progreso, completado, cancelado
                 color TEXT DEFAULT '#4facfe', -- Para visualización en calendario
                 reporte TEXT, -- Feedback de la monitora
                 imprevistos TEXT, -- Problemas surgidos
                 reportado_at TIMESTAMP, -- Momento del reporte
+                curso TEXT,
+                categoria TEXT,
+                categoria_madre TEXT,
+                subcategoria TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
             # Migraciones incrementales para tablas existentes
+            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS sede TEXT;")
             conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS reporte TEXT;")
             conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS imprevistos TEXT;")
             conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS reportado_at TIMESTAMP;")
+            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS curso TEXT;")
+            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS categoria TEXT;")
+            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS categoria_madre TEXT;")
+            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS subcategoria TEXT;")
             
             conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_asignado ON fundacion.fundacion_tareas(asignado_a);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_fecha ON fundacion.fundacion_tareas(fecha_inicio);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_sede ON fundacion.fundacion_tareas(sede);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_curso ON fundacion.fundacion_tareas(curso);")
 
         _run_guarded_pg_section(conn, "migrate_fundacion", _migrate_fundacion_section)
 

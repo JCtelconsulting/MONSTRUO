@@ -7,7 +7,7 @@ from typing import Any, Dict
 import httpx
 from fastapi import APIRouter, Depends
 
-from core import db, deps, security
+from plataforma.core import db, deps, security
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
 LEGACY_OPS_FALLBACK_URL = os.getenv(

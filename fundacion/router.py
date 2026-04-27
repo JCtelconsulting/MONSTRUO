@@ -2,10 +2,46 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from datetime import datetime
-from core import db, deps
-from core.audit_decorator import audit_action
+from plataforma.core import auth_service, db, deps
+from plataforma.core.audit_decorator import audit_action
 
 router = APIRouter(prefix="/api/fundacion", tags=["fundacion"])
+
+
+def _normalize_sede_value(raw_value: Any) -> str:
+    resolved = auth_service.resolve_fundacion_sede(raw_value)
+    if resolved:
+        return resolved
+
+    normalized_scope = auth_service.normalize_fundacion_scope(
+        {"is_global": False, "sedes": [raw_value], "cursos": []}
+    )
+    sedes = normalized_scope.get("sedes") or []
+    return sedes[0] if sedes else ""
+
+
+def _normalize_curso_value(raw_value: Any) -> str:
+    return auth_service.resolve_fundacion_curso(raw_value)
+
+
+def _is_target_in_scope(scope: Dict[str, Any], sede_value: str, curso_value: str) -> bool:
+    if scope.get("is_global"):
+        return True
+
+    allowed_sedes = set(scope.get("sedes") or [])
+    allowed_cursos = set(scope.get("cursos") or [])
+
+    if allowed_sedes and sede_value not in allowed_sedes:
+        return False
+    if allowed_cursos and curso_value not in allowed_cursos:
+        return False
+    return True
+
+
+def _is_task_in_scope(scope: Dict[str, Any], task_row: Dict[str, Any]) -> bool:
+    sede_value = _normalize_sede_value(task_row.get("sede"))
+    curso_value = _normalize_curso_value(task_row.get("curso"))
+    return _is_target_in_scope(scope, sede_value, curso_value)
 
 class TareaFundacion(BaseModel):
     titulo: str
@@ -13,6 +49,7 @@ class TareaFundacion(BaseModel):
     fecha_inicio: datetime
     fecha_fin: Optional[datetime] = None
     asignado_a: Optional[str] = None
+    sede: Optional[str] = None
     curso: Optional[str] = None
     categoria: Optional[str] = None
     categoria_madre: Optional[str] = None
@@ -33,6 +70,8 @@ async def list_tareas(
     Lista tareas del calendario. Soporta filtrado opcional por rango de fechas.
     Sin parámetros devuelve todas las tareas (carga inicial rápida para cache del cliente).
     """
+    scope = auth_service.get_user_fundacion_scope(user.get("username", ""))
+
     conn = db.get_conn()
     try:
         if start or end:
@@ -49,7 +88,12 @@ async def list_tareas(
             rows = conn.execute(query, tuple(params)).fetchall()
         else:
             rows = conn.execute("SELECT * FROM fundacion_tareas ORDER BY fecha_inicio ASC").fetchall()
-        return [dict(r) for r in rows]
+
+        items = [dict(r) for r in rows]
+        if scope.get("is_global"):
+            return items
+
+        return [item for item in items if _is_task_in_scope(scope, item)]
     finally:
         conn.close()
 
@@ -59,13 +103,34 @@ async def create_tarea(tarea: TareaFundacion, user: dict = Depends(deps.require_
     """
     Crea una nueva tarea.
     """
+    scope = auth_service.get_user_fundacion_scope(user.get("username", ""))
+    normalized_sede = _normalize_sede_value(tarea.sede)
+    normalized_curso = _normalize_curso_value(tarea.curso)
+
+    if not _is_target_in_scope(scope, normalized_sede, normalized_curso):
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear tareas fuera de su alcance Fundación")
+
     conn = db.get_conn()
     try:
         cur = conn.execute("""
-            INSERT INTO fundacion_tareas (titulo, descripcion, fecha_inicio, fecha_fin, asignado_a, creado_by, color, estado, categoria, categoria_madre, subcategoria, curso)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO fundacion_tareas (titulo, descripcion, fecha_inicio, fecha_fin, asignado_a, creado_by, sede, color, estado, categoria, categoria_madre, subcategoria, curso)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (tarea.titulo, tarea.descripcion, tarea.fecha_inicio, tarea.fecha_fin, tarea.asignado_a, user["username"], tarea.color, tarea.estado, tarea.categoria, tarea.categoria_madre, tarea.subcategoria, tarea.curso))
+        """, (
+            tarea.titulo,
+            tarea.descripcion,
+            tarea.fecha_inicio,
+            tarea.fecha_fin,
+            tarea.asignado_a,
+            user["username"],
+            normalized_sede or None,
+            tarea.color,
+            tarea.estado,
+            tarea.categoria,
+            tarea.categoria_madre,
+            tarea.subcategoria,
+            normalized_curso or None,
+        ))
         new_id = cur.fetchone()['id']
         conn.commit()
         return {"ok": True, "id": new_id}
@@ -85,6 +150,15 @@ async def update_tarea(tid: int, update: Dict[str, Any], user: dict = Depends(de
         row = conn.execute("SELECT * FROM fundacion_tareas WHERE id = %s", (tid,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
+
+        scope = auth_service.get_user_fundacion_scope(user.get("username", ""))
+        if not _is_task_in_scope(scope, dict(row)):
+            raise HTTPException(status_code=403, detail="No tiene permisos sobre esta tarea")
+
+        target_sede = _normalize_sede_value(update.get("sede", row.get("sede")))
+        target_curso = _normalize_curso_value(update.get("curso", row.get("curso")))
+        if not _is_target_in_scope(scope, target_sede, target_curso):
+            raise HTTPException(status_code=403, detail="No puede mover esta tarea fuera de su alcance Fundación")
         
         roles = user.get("roles", [])
         is_monitora = any(r in ["admin", "monitora", "gerencia", "ejecutiva"] for r in roles)
@@ -103,7 +177,7 @@ async def update_tarea(tid: int, update: Dict[str, Any], user: dict = Depends(de
         # Filtrar campos permitidos
         allowed_fields = [
             "titulo", "descripcion", "fecha_inicio", "fecha_fin", 
-            "asignado_a", "color", "estado", "reporte", "imprevistos", 
+            "asignado_a", "sede", "color", "estado", "reporte", "imprevistos", 
             "categoria", "categoria_madre", "subcategoria", "curso"
         ]
         
@@ -112,8 +186,14 @@ async def update_tarea(tid: int, update: Dict[str, Any], user: dict = Depends(de
             
         for k, v in update.items():
             if k in allowed_fields:
+                value = v
+                if k == "sede":
+                    value = _normalize_sede_value(v) or None
+                elif k == "curso":
+                    value = _normalize_curso_value(v) or None
+
                 fields.append(f"{k} = %s")
-                values.append(v)
+                values.append(value)
                 if k in reporting_fields:
                     should_set_report_time = True
         
@@ -143,11 +223,21 @@ async def delete_tarea(tid: int, user: dict = Depends(deps.require_permission("f
     """
     Elimina una tarea. Solo monitoras/admin.
     """
+    scope = auth_service.get_user_fundacion_scope(user.get("username", ""))
+
     conn = db.get_conn()
     try:
+        row = conn.execute("SELECT id, sede, curso FROM fundacion_tareas WHERE id = %s", (tid,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+        if not _is_task_in_scope(scope, dict(row)):
+            raise HTTPException(status_code=403, detail="No tiene permisos para eliminar esta tarea")
+
         conn.execute("DELETE FROM fundacion_tareas WHERE id = %s", (tid,))
         conn.commit()
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))

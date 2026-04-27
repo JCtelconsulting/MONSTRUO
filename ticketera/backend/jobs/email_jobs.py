@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from core import db, email, email_integration, jobs_engine
+from plataforma.core import db, email, email_integration, jobs_engine
 from ticketera.backend import service as tickets_service
 
 logger = logging.getLogger(__name__)

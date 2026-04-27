@@ -17,14 +17,14 @@ from pydantic import BaseModel
 # Inyectar el directorio actual en sys.path para que router/service sean locales.
 sys.path.append(str(Path(__file__).parent))
 
-from core.env_loader import load_runtime_env
+from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 
-from core import auth_service, db, deps, jobs_engine, security
-from core.config import settings as app_settings
-from core.middleware import AuthIdentityMiddleware
-from core.web import build_login_redirect_url
+from plataforma.core import auth_service, db, deps, jobs_engine, security
+from plataforma.core.config import settings as app_settings
+from plataforma.core.middleware import AuthIdentityMiddleware
+from plataforma.core.web import build_login_redirect_url
 from .jobs import ticket_sla, email_jobs
 from . import router as tks_router
 from . import service as ticketera_service

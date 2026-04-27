@@ -2,8 +2,9 @@ import json
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from core import db, sales_service
-from core import email as email_service
+from plataforma.core import db
+import sales_service
+from plataforma.core import email as email_service
 from laudus import LaudusClient
 import indicators_service
 

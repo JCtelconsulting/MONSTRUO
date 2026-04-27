@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from core import db, deps
-from core.config import settings
+from plataforma.core import db, deps
+from plataforma.core.config import settings
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -21,6 +21,13 @@ ROLE_LABELS = {
     "monitora": "Monitora Fundacion",
     "ejecutiva": "Ejecutiva Fundacion",
     "fundacion": "Fundacion",
+    "encargado_la_pintana": "Encargado La Pintana",
+    "encargado_maipu": "Encargado Maipu",
+    "encargado_llay_llay": "Encargado Llay-Llay",
+    "encargado_huechuraba": "Encargado Huechuraba",
+    "encargado_renca": "Encargado Renca",
+    "encargado_lo_espejo": "Encargado Lo Espejo",
+    "encargado_cerro_navia": "Encargado Cerro Navia",
 }
 
 ROLE_DESCRIPTIONS = {
@@ -36,6 +43,13 @@ ROLE_DESCRIPTIONS = {
     "monitora": "Planificacion global y gestion de todas las tareas de la Fundacion.",
     "ejecutiva": "Acceso a planificacion propia y reporte de actividades.",
     "fundacion": "Gestion integral del modulo Fundacion.",
+    "encargado_la_pintana": "Responsable operativo de la sede La Pintana.",
+    "encargado_maipu": "Responsable operativo de la sede Maipu.",
+    "encargado_llay_llay": "Responsable operativo de la sede Llay-Llay.",
+    "encargado_huechuraba": "Responsable operativo de la sede Huechuraba.",
+    "encargado_renca": "Responsable operativo de la sede Renca.",
+    "encargado_lo_espejo": "Responsable operativo de la sede Lo Espejo.",
+    "encargado_cerro_navia": "Responsable operativo de la sede Cerro Navia.",
 }
 
 PERMISSION_LABELS = {

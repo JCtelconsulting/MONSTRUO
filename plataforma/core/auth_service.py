@@ -3,9 +3,142 @@ from core import db, security
 from core.config import settings
 import unicodedata
 import json
+import re
 
 
 ALLOWED_ROLES = set(settings.ROLE_PERMISSIONS.keys())
+
+FUNDACION_SEDE_ALIASES = {
+    "arica": ["sede-arica"],
+    "antofagasta": ["sede-antofagasta"],
+    "valparaiso": ["valpo", "sede-valparaiso"],
+    "metropolitana": ["santiago", "rm", "sede-metropolitana"],
+    "concepcion": ["biobio", "sede-concepcion"],
+    "temuco": ["araucania", "sede-temuco"],
+    "puerto-montt": ["los-lagos", "sede-puerto-montt"],
+}
+
+FUNDACION_CURSO_ALIASES = {
+    "prekinder-kinder": ["prekinder-y-kinder", "prekinder", "kinder", "pre-kinder"],
+    "1ro-2do-basico": ["1ro-y-2do-basico", "1ro-y-2do", "1ro-2do", "1-y-2", "1ro", "2do"],
+    "3ro-4to-basico": ["3ro-y-4to-basico", "3ro-y-4to", "3ro-4to", "3-y-4", "3ro", "4to"],
+    "viernes-comunidad": ["viernes-de-comunidad", "comunidad"],
+    "hitos-celebraciones": ["hitos-y-celebraciones", "celebraciones", "hitos"],
+    "rutina": ["rutina"],
+}
+
+
+def _normalize_scope_value(raw_value: Any) -> str:
+    value = unicodedata.normalize("NFKD", str(raw_value or ""))
+    value = value.encode("ascii", "ignore").decode("ascii")
+    value = value.strip().lower()
+    value = re.sub(r"[\/_]+", "-", value)
+    value = re.sub(r"\s+", "-", value)
+    value = re.sub(r"[^a-z0-9-]", "", value)
+    value = re.sub(r"-+", "-", value)
+    return value.strip("-")
+
+
+def _coerce_bool(raw_value: Any) -> bool:
+    if isinstance(raw_value, bool):
+        return raw_value
+    text = str(raw_value or "").strip().lower()
+    return text in {"1", "true", "t", "yes", "y", "si"}
+
+
+def resolve_fundacion_sede(raw_value: Any) -> str:
+    normalized = _normalize_scope_value(raw_value)
+    if not normalized:
+        return ""
+
+    for sede_id, aliases in FUNDACION_SEDE_ALIASES.items():
+        sede_norm = _normalize_scope_value(sede_id)
+        if normalized == sede_norm:
+            return sede_id
+        for alias in aliases:
+            alias_norm = _normalize_scope_value(alias)
+            if normalized == alias_norm or normalized in alias_norm or alias_norm in normalized:
+                return sede_id
+
+    return ""
+
+
+def resolve_fundacion_curso(raw_value: Any) -> str:
+    normalized = _normalize_scope_value(raw_value)
+    if not normalized:
+        return ""
+
+    for curso_id, aliases in FUNDACION_CURSO_ALIASES.items():
+        curso_norm = _normalize_scope_value(curso_id)
+        if normalized == curso_norm:
+            return curso_id
+        for alias in aliases:
+            alias_norm = _normalize_scope_value(alias)
+            if normalized == alias_norm or normalized in alias_norm or alias_norm in normalized:
+                return curso_id
+
+    return normalized
+
+
+def normalize_fundacion_scope(raw_scope: Any) -> Dict[str, Any]:
+    default_scope = {
+        "is_global": True,
+        "sedes": [],
+        "cursos": [],
+    }
+
+    if raw_scope is None:
+        return default_scope
+
+    source: Any = raw_scope
+    if isinstance(source, str):
+        text = source.strip()
+        if not text:
+            return default_scope
+        try:
+            source = json.loads(text)
+        except Exception:
+            return default_scope
+
+    if not isinstance(source, dict):
+        return default_scope
+
+    raw_sedes = source.get("sedes") if isinstance(source.get("sedes"), list) else []
+    raw_cursos = source.get("cursos") if isinstance(source.get("cursos"), list) else []
+
+    sedes: List[str] = []
+    cursos: List[str] = []
+
+    for item in raw_sedes:
+        resolved = resolve_fundacion_sede(item) or _normalize_scope_value(item)
+        if resolved and resolved not in sedes:
+            sedes.append(resolved)
+
+    for item in raw_cursos:
+        resolved = resolve_fundacion_curso(item)
+        if resolved and resolved not in cursos:
+            cursos.append(resolved)
+
+    is_global = _coerce_bool(source.get("is_global")) or (not sedes and not cursos)
+    return {
+        "is_global": is_global,
+        "sedes": sedes,
+        "cursos": cursos,
+    }
+
+
+def get_user_fundacion_scope(username: str) -> Dict[str, Any]:
+    conn = db.get_conn()
+    try:
+        row = conn.execute(
+            "SELECT fundacion_scope FROM users WHERE username = ?",
+            (str(username or "").strip(),),
+        ).fetchone()
+        if not row:
+            return normalize_fundacion_scope({})
+        return normalize_fundacion_scope(row.get("fundacion_scope"))
+    finally:
+        conn.close()
 
 def _normalize_role(raw_role: str) -> str:
     role = unicodedata.normalize("NFKD", str(raw_role or ""))

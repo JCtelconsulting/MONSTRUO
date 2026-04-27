@@ -59,7 +59,8 @@ def build_login_redirect_url(
     local_login_path: str = "/",
 ) -> str:
     prefix = get_public_prefix(request, root_path=root_path)
-    host = (request.headers.get("host") or request.url.hostname or "").split(":")[0].strip().lower()
+    forwarded_host = (request.headers.get("x-forwarded-host") or "").split(",", 1)[0].strip()
+    host = (forwarded_host or request.headers.get("host") or request.url.hostname or "").split(":")[0].strip().lower()
     login_path = local_login_path if local_login_path.startswith("/") else f"/{local_login_path}"
     if host.endswith(".telconsulting.cl"):
         return f"https://login.telconsulting.cl{prefix}{login_path}"

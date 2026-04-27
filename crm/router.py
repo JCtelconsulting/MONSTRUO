@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
-from core import db, deps
+from plataforma.core import db, deps
 
 router = APIRouter(prefix="/api/crm", tags=["crm"])
 

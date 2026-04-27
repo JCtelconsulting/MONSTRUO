@@ -3,7 +3,7 @@ Ticketera V3 — Servicio profesional de Mesa de Ayuda.
 Auto-clasificación, auto-asignación, notificaciones escalonadas, SLA.
 """
 from typing import List, Optional, Dict, Any, Tuple
-from core import db
+from plataforma.core import db
 from datetime import datetime, timedelta, timezone
 import json
 import html
@@ -23,8 +23,8 @@ from zoneinfo import ZoneInfo
 from urllib import parse as urlparse
 from urllib import request as urlrequest
 from urllib import error as urlerror
-from core import email_integration, email as email_sender, jobs_engine
-from core.config import settings as app_settings
+from plataforma.core import email_integration, email as email_sender, jobs_engine
+from plataforma.core.config import settings as app_settings
 from tickets import roles as ticket_roles
 from tickets import workflow as ticket_workflow
 

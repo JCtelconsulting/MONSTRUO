@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from core.env_loader import load_runtime_env
+from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
@@ -17,10 +17,10 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from pydantic import BaseModel
 
 from .api.routers import admin_users, config_router, ops
-from core import auth_service, db, deps, security
-from core.config import settings as app_settings
-from core.middleware import AuthIdentityMiddleware
-from core.web import build_login_redirect_url
+from plataforma.core import auth_service, db, deps, security
+from plataforma.core.config import settings as app_settings
+from plataforma.core.middleware import AuthIdentityMiddleware
+from plataforma.core.web import build_login_redirect_url
 
 ROOT_PATH = os.getenv("ROOT_PATH", "").strip()
 _WEAK_SECRET_MARKERS = {
@@ -38,6 +38,8 @@ app = FastAPI(
 app.add_middleware(AuthIdentityMiddleware)
 
 ui_dir = Path(__file__).parent.parent / "frontend"
+repo_root = Path(__file__).resolve().parents[2]
+fundacion_ui_dir = repo_root / "fundacion" / "ui"
 
 
 def _public_prefix(request: Request) -> str:
@@ -271,7 +273,10 @@ async def _proxy_to_target(target_url: str, request: Request) -> FastAPIResponse
     async with httpx.AsyncClient() as client:
         content = await request.body()
         headers = dict(request.headers)
-        headers.pop("host", None)
+        original_host = (request.headers.get("host") or request.url.hostname or "").strip()
+        if original_host:
+            headers["host"] = original_host
+            headers["x-forwarded-host"] = original_host
 
         response = await client.request(
             request.method,
@@ -406,6 +411,7 @@ def check_session_status(
             "role": sess["role"],
             "roles": sess.get("roles") or [sess["role"]],
             "allowed_modules": _get_effective_allowed_modules(sess),
+            "fundacion_scope": auth_service.get_user_fundacion_scope(sess["username"]),
         }
     except Exception as exc:
         return {"ok": False, "detail": str(exc)}
@@ -517,18 +523,26 @@ async def shared_static(asset_path: str):
 
 
 @app.get("/fundacion")
-@app.get("/fundacion/")
-async def fundacion_root(
-    request: Request,
-    authorization: Optional[str] = Header(default=None),
-    access_token: Optional[str] = Cookie(default=None),
-):
-    try:
-        deps.require_permission("fundacion:read")(authorization, access_token)
-    except Exception:
-        return RedirectResponse(build_login_redirect_url(request, root_path=ROOT_PATH), status_code=302)
+async def fundacion_root(request: Request):
+    return RedirectResponse(_prefixed_path(request, "/fundacion/"), status_code=302)
 
-    return RedirectResponse(_service_root_url(request, "fundacion", 9012), status_code=302)
+
+@app.get("/fundacion/")
+async def fundacion_root_slash():
+    index_path = fundacion_ui_dir / "fundacion.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="fundacion_ui_not_found")
+    return HTMLResponse(index_path.read_text(encoding="utf-8"))
+
+
+@app.get("/fundacion/fundacion.html")
+async def fundacion_canonical_redirect(request: Request):
+    return RedirectResponse(_prefixed_path(request, "/fundacion/"), status_code=302)
+
+
+@app.get("/fundacion/{asset_path:path}")
+async def fundacion_static(asset_path: str):
+    return _serve_static_file(fundacion_ui_dir, asset_path)
 
 
 @app.get("/health")

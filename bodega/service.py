@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from core import db
+from plataforma.core import db
 
 def create_or_update_product(
     sku: str, 

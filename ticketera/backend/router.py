@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from fastapi.responses import FileResponse
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from core import deps
+from plataforma.core import deps
 from ticketera.backend import service as tickets_service
-from core.audit_decorator import audit_action
+from plataforma.core.audit_decorator import audit_action
 from ticketera.backend.tickets import roles as ticket_roles
 
 router = APIRouter(prefix="/api/tks", tags=["tickets"])

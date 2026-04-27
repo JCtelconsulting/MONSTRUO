@@ -2,7 +2,7 @@ import requests
 import time
 from typing import Optional
 from datetime import date, datetime
-from core import db as core_db
+from plataforma.core import db as core_db
 
 # Cache simple en memoria para evitar llamadas excesivas
 _uf_cache = {"value": None, "timestamp": 0}

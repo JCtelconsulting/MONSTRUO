@@ -80,6 +80,7 @@ Se deben mover a la carpeta externa `/srv/monstruo_old/` (El Museo) para mantene
 
 0.4 Bitácora de avances recientes (resumen corto)
 
+- 2026-04-27: DEV elimina accesos directos estructurales (`.env` raíz y `bodega/core`, `crm/core`, `erp/core`, `fundacion/core`), migra imports de apps/scripts activos a `plataforma.core` y refuerza `plataforma/tests/ci_repo_guard.py` para bloquear regresiones de estructura.
 - 2026-04-02: DEV Ticketera ajusta compromiso SLA operativo para mesa interna con objetivo visible de `auto-respuesta <= 30 min`, `asignación <= 1 hora` y `resolución <= 2.5 horas`; además el resumen incorpora ventanas históricas y la UX de correo limita bloques de imágenes con scroll y soporta pegado de capturas como adjuntos.
 - 2026-04-02: DEV Ticketera agrega aviso de nuevo ticket al rol `encargado_mesa` por correo apenas entra el TK; la audiencia queda resuelta desde usuarios activos y conserva `phone_number` para escalar luego el mismo flujo a WhatsApp o 3CX sin rediseñar la selección de destinatarios.
 - 2026-04-01: DEV formaliza `plataforma/` para limpiar la raíz visible: soporte compartido y legado activo pasan a `plataforma/` (`core`, `docs`, `ops`, `tests`, `legacy/code`, `data`), `core` deja de vivir conceptualmente en `gateway`, Ticketera queda dueña canónica de `ticketera/data`, Fundación recibe `fundacion/data`, ERP recibe `erp/data`, y la raíz visible queda reservada casi solo para apps; `migrations/` persiste temporalmente en raíz por bloqueo de permisos `root`.

@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'ia', label: 'IA (ULTRON)', icon: 'fas fa-robot', link: `https://ia.telconsulting.cl${envPrefix}/`, title: 'Asistente IA' },
         { id: 'zabbix', label: 'Zabbix', icon: 'fas fa-signal', link: `https://zabbix.telconsulting.cl${envPrefix}/`, title: 'Monitoreo' },
         { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: `https://config.telconsulting.cl${envPrefix}/`, title: 'Configuración' },
-        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: `https://fundacion.telconsulting.cl${envPrefix}/`, title: 'Fundación' }
+        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: `https://login.telconsulting.cl${envPrefix}/fundacion`, title: 'Fundación' }
     ] : [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', link: localServiceUrl(9001, '/dashboard'), title: 'Dashboard' },
         { id: 'pmo', label: 'Proyectos (PMO)', icon: 'fas fa-helmet-safety', link: localServiceUrl(9009, '/'), title: 'Oficina Técnica' },
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'ia', label: 'IA (ULTRON)', icon: 'fas fa-robot', link: localServiceUrl(9010, '/'), title: 'Asistente IA' },
         { id: 'zabbix', label: 'Zabbix', icon: 'fas fa-signal', link: localServiceUrl(9011, '/'), title: 'Monitoreo' },
         { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: localServiceUrl(9001, '/configuracion'), title: 'Configuración' },
-        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: localServiceUrl(9012, '/'), title: 'Fundación' }
+        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: localServiceUrl(9001, '/fundacion'), title: 'Fundación' }
     ];
 
     const currentPath = window.location.pathname;

@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from typing import List, Optional
 from pydantic import BaseModel
 import service as bodega_service
-from core import deps, db, jobs_engine
-from core.audit_decorator import audit_action
+from plataforma.core import deps, db, jobs_engine
+from plataforma.core.audit_decorator import audit_action
 
 router = APIRouter(prefix="/api/bodega", tags=["bodega"])
 

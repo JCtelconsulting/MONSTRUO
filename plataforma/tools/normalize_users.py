@@ -8,12 +8,13 @@ from pathlib import Path
 # Asumimos que este script se ejecuta desde /srv/monstruo_dev/gateway/
 # o que el CWD está configurado para que 'core' sea importable.
 # La forma más robusta es añadir el directorio del proyecto al path.
-project_root = Path(__file__).resolve().parent
-sys.path.append(str(project_root))
+project_root = Path(__file__).resolve().parents[2]
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 try:
-    from core import db
-    from core.config import settings as app_settings
+    from plataforma.core import db
+    from plataforma.core.config import settings as app_settings
 except ImportError as e:
     print(f"Error: No se pudieron importar los módulos de la aplicación. Asegúrate de que el script se ejecute desde el directorio correcto y que el entorno virtual esté activo si es necesario. {e}")
     sys.exit(1)

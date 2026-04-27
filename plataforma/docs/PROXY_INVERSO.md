@@ -9,6 +9,10 @@ Configuración activa de Nginx:
 - `terreneitor.conf`
 - `sapa.conf`
 
+Copia versionada en el repo:
+- `plataforma/ops/nginx/`
+- fuente de verdad versionada para `monstruo.conf`, `terreneitor.conf` y `sapa.conf`
+
 ## Monstruo
 
 ### PROD
@@ -141,3 +145,4 @@ Para no volver al desorden:
 - documentar `DEV` por servicio real, no por arrastre histórico
 - mover lo viejo a `_disabled` o eliminarlo
 - evitar dejar archivos paralelos activos para la misma familia
+- mantener sincronizado `plataforma/ops/nginx/` con la VM proxy real

@@ -7,11 +7,10 @@ from getpass import getpass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-PLATAFORMA_DIR = PROJECT_ROOT / "plataforma"
-if str(PLATAFORMA_DIR) not in sys.path:
-    sys.path.insert(0, str(PLATAFORMA_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from core import auth_service, db, security
+from plataforma.core import auth_service, db, security
 
 
 def main() -> int:

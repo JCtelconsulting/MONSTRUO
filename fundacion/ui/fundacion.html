@@ -1,0 +1,1015 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fundación | Monstruo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="../shared/css/monstruo.css?v=75" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    .hidden {
+      display: none !important;
+    }
+
+    .fund-intro p {
+      margin: 0;
+      color: var(--text-soft);
+      font-size: .92rem;
+    }
+
+    .fund-sedes-grid {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .fund-sede-item {
+      display: flex;
+      flex-direction: column;
+      gap: .55rem;
+    }
+
+    .fund-sede-card {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(8, 12, 18, 0.75);
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
+      text-align: left;
+      color: var(--text);
+      cursor: pointer;
+      transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .fund-sede-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(79, 172, 254, .6);
+      box-shadow: 0 14px 28px rgba(0, 0, 0, .28);
+    }
+
+    .fund-sede-card.is-open {
+      border-color: rgba(79, 172, 254, .68);
+      box-shadow: 0 0 0 1px rgba(79, 172, 254, .22), 0 14px 28px rgba(0, 0, 0, .28);
+    }
+
+    .fund-sede-card h3 {
+      margin: 0;
+      font-size: 1.28rem;
+      font-weight: 700;
+      letter-spacing: .01em;
+      line-height: 1.2;
+    }
+
+    .fund-sede-card p {
+      margin: .42rem 0 0;
+      color: var(--text-soft);
+      font-size: .76rem;
+      line-height: 1.35;
+    }
+
+    .fund-sede-meta {
+      margin-top: .2rem;
+      font-size: .74rem;
+      color: var(--text-soft);
+    }
+
+    .fund-sede-footer {
+      margin-top: .5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+
+    .fund-sede-footer .fund-sede-meta {
+      margin-top: 0;
+    }
+
+    .fund-sede-chevron {
+      color: var(--text-soft);
+      font-size: .76rem;
+      transition: transform .2s ease, color .2s ease;
+      flex: 0 0 auto;
+    }
+
+    .fund-sede-card.is-open .fund-sede-chevron {
+      transform: rotate(180deg);
+      color: #d9ecff;
+    }
+
+    .fund-sede-accordion {
+      border: 1px solid transparent;
+      border-radius: 12px;
+      padding: 0 .72rem;
+      max-height: 0;
+      overflow: hidden;
+      background: rgba(10, 16, 24, .72);
+      transition: max-height .24s ease, padding .24s ease, border-color .24s ease;
+    }
+
+    .fund-sede-accordion.open {
+      max-height: 220px;
+      padding: .72rem;
+      border-color: rgba(79, 172, 254, .28);
+    }
+
+    .fund-sede-accordion-title {
+      margin: 0 0 .52rem;
+      font-size: .78rem;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .fund-sede-cursos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem;
+    }
+
+    .fund-curso-chip {
+      border: 1px solid rgba(79, 172, 254, .42);
+      background: rgba(79, 172, 254, .14);
+      color: #e7f3ff;
+      border-radius: 999px;
+      padding: .34rem .65rem;
+      font-size: .77rem;
+      cursor: pointer;
+      transition: background .2s ease, border-color .2s ease, transform .2s ease;
+    }
+
+    .fund-curso-chip:hover {
+      background: rgba(79, 172, 254, .24);
+      border-color: rgba(79, 172, 254, .62);
+      transform: translateY(-1px);
+    }
+
+    .fund-curso-empty {
+      color: var(--text-soft);
+      font-size: .78rem;
+    }
+
+    .fund-workspace {
+      margin-top: 1.25rem;
+    }
+
+    .fund-workspace-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: .8rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .fund-back-btn {
+      border: 1px solid rgba(255, 255, 255, .16);
+      background: rgba(255, 255, 255, .03);
+      color: var(--text);
+      border-radius: 10px;
+      padding: .45rem .75rem;
+      cursor: pointer;
+      font-size: .85rem;
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+    }
+
+    .fund-back-btn:hover {
+      border-color: rgba(79, 172, 254, .55);
+    }
+
+    .fund-workspace-head h3 {
+      margin: 0 0 .2rem;
+      font-size: 1.08rem;
+    }
+
+    .fund-workspace-head p {
+      margin: 0;
+      color: var(--text-soft);
+      font-size: .85rem;
+    }
+
+    .fund-head-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: .35rem;
+      min-width: 220px;
+    }
+
+    .fund-head-field {
+      display: flex;
+      flex-direction: column;
+      gap: .2rem;
+      width: 100%;
+      max-width: 260px;
+    }
+
+    .fund-head-field label {
+      font-size: .74rem;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .fund-head-field select {
+      border: 1px solid rgba(255, 255, 255, .13);
+      background: rgba(255, 255, 255, .03);
+      border-radius: 9px;
+      color: var(--text);
+      font-size: .83rem;
+      padding: .43rem .5rem;
+    }
+
+    .fund-scope-hint {
+      margin: 0;
+      font-size: .74rem;
+      color: var(--text-soft);
+      text-align: right;
+    }
+
+    .fund-tabs {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      border-bottom: 1px solid rgba(255, 255, 255, .08);
+      margin-bottom: 1rem;
+      padding-bottom: .75rem;
+    }
+
+    .fund-tab {
+      border: 1px solid rgba(255, 255, 255, .12);
+      background: rgba(255, 255, 255, .03);
+      color: var(--text-soft);
+      border-radius: 10px;
+      padding: .45rem .75rem;
+      cursor: pointer;
+      font-size: .85rem;
+    }
+
+    .fund-tab.active {
+      border-color: rgba(79, 172, 254, .65);
+      color: var(--text);
+      background: rgba(79, 172, 254, .14);
+    }
+
+    .fund-tab-panel {
+      display: none;
+    }
+
+    .fund-tab-panel.active {
+      display: block;
+    }
+
+    .fund-calendar-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .75rem;
+      flex-wrap: wrap;
+      margin-bottom: .5rem;
+    }
+
+    .fund-calendar-nav,
+    .fund-calendar-view-switch {
+      display: inline-flex;
+      gap: .4rem;
+      flex-wrap: wrap;
+    }
+
+    .fund-calendar-nav button,
+    .fund-calendar-view-switch button {
+      border: 1px solid rgba(255, 255, 255, .13);
+      background: rgba(255, 255, 255, .03);
+      color: var(--text-soft);
+      border-radius: 9px;
+      padding: .35rem .6rem;
+      cursor: pointer;
+      font-size: .79rem;
+    }
+
+    .fund-calendar-view-switch button.active {
+      border-color: rgba(79, 172, 254, .65);
+      color: var(--text);
+      background: rgba(79, 172, 254, .14);
+    }
+
+    .fund-calendar-range {
+      margin: 0 0 .9rem;
+      font-size: .95rem;
+      color: var(--text-soft);
+      font-weight: 500;
+    }
+
+    .fund-calendar-container {
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 14px;
+      background: rgba(8, 12, 18, .68);
+      padding: .75rem;
+    }
+
+    .fund-month-head,
+    .fund-calendar-grid--month {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: .5rem;
+    }
+
+    .fund-month-head span {
+      text-align: center;
+      font-size: .74rem;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .fund-day-cell {
+      min-height: 110px;
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 10px;
+      padding: .45rem;
+      display: flex;
+      flex-direction: column;
+      gap: .35rem;
+      background: rgba(255, 255, 255, .02);
+    }
+
+    .fund-day-cell.out-month {
+      opacity: .45;
+    }
+
+    .fund-day-cell.today {
+      border-color: rgba(79, 172, 254, .68);
+      box-shadow: 0 0 0 1px rgba(79, 172, 254, .2);
+    }
+
+    .fund-day-number {
+      font-size: .78rem;
+      color: var(--text-soft);
+    }
+
+    .fund-day-task {
+      font-size: .72rem;
+      border-radius: 7px;
+      padding: .18rem .35rem;
+      background: rgba(79, 172, 254, .17);
+      color: #d9ecff;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .fund-day-task--more {
+      background: rgba(255, 255, 255, .07);
+      color: var(--text-soft);
+    }
+
+    .fund-calendar-grid--week {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: .55rem;
+    }
+
+    .fund-week-day {
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 10px;
+      padding: .55rem;
+      min-height: 175px;
+      background: rgba(255, 255, 255, .02);
+    }
+
+    .fund-week-day.today {
+      border-color: rgba(79, 172, 254, .66);
+    }
+
+    .fund-week-day h5 {
+      margin: 0 0 .45rem;
+      font-size: .76rem;
+      color: var(--text-soft);
+    }
+
+    .fund-task-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: .35rem;
+    }
+
+    .fund-task-item {
+      border-radius: 8px;
+      padding: .38rem .42rem;
+      background: rgba(79, 172, 254, .15);
+      font-size: .73rem;
+      color: #e8f4ff;
+    }
+
+    .fund-task-item small {
+      display: block;
+      color: var(--text-soft);
+      margin-top: .15rem;
+      font-size: .68rem;
+    }
+
+    .fund-day-view {
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 10px;
+      padding: .75rem;
+      background: rgba(255, 255, 255, .02);
+    }
+
+    .fund-day-view h5 {
+      margin: 0 0 .65rem;
+      font-size: .83rem;
+      color: var(--text-soft);
+    }
+
+    .fund-next-tasks {
+      margin-top: .9rem;
+    }
+
+    .fund-next-tasks h4 {
+      margin: 0 0 .5rem;
+      font-size: .88rem;
+    }
+
+    .fund-next-tasks ul {
+      margin: 0;
+      padding-left: 1rem;
+      color: var(--text-soft);
+      font-size: .82rem;
+      line-height: 1.45;
+    }
+
+    .fund-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: .7rem;
+      margin-bottom: .85rem;
+    }
+
+    .fund-kpi-card {
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 11px;
+      padding: .68rem;
+      background: rgba(255, 255, 255, .03);
+    }
+
+    .fund-kpi-card span {
+      display: block;
+      font-size: .76rem;
+      color: var(--text-soft);
+      margin-bottom: .25rem;
+    }
+
+    .fund-kpi-card strong {
+      font-size: 1.08rem;
+    }
+
+    .fund-inv-toolbar {
+      margin-bottom: .7rem;
+    }
+
+    .fund-inv-toolbar input {
+      width: 100%;
+      max-width: 360px;
+      border: 1px solid rgba(255, 255, 255, .13);
+      background: rgba(255, 255, 255, .03);
+      border-radius: 9px;
+      color: var(--text);
+      font-size: .83rem;
+      padding: .45rem .55rem;
+    }
+
+    .fund-stock-badge {
+      display: inline-block;
+      border-radius: 999px;
+      font-size: .72rem;
+      padding: .12rem .45rem;
+      border: 1px solid transparent;
+    }
+
+    .fund-stock-badge.ok {
+      background: rgba(20, 186, 117, .15);
+      color: #9ef0ca;
+      border-color: rgba(20, 186, 117, .34);
+    }
+
+    .fund-stock-badge.bajo {
+      background: rgba(251, 191, 36, .15);
+      color: #ffe6a3;
+      border-color: rgba(251, 191, 36, .36);
+    }
+
+    .fund-stock-badge.critico {
+      background: rgba(255, 84, 113, .16);
+      color: #ffc4d1;
+      border-color: rgba(255, 84, 113, .36);
+    }
+
+    .fund-report-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: .8rem;
+    }
+
+    .fund-report-card {
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 11px;
+      padding: .72rem;
+      background: rgba(255, 255, 255, .02);
+    }
+
+    .fund-report-card h4 {
+      margin: 0 0 .45rem;
+      font-size: .86rem;
+    }
+
+    .fund-report-card ul {
+      margin: 0;
+      padding-left: 1rem;
+      color: var(--text-soft);
+      font-size: .8rem;
+      line-height: 1.45;
+    }
+
+    .fund-status {
+      margin-top: 1rem;
+      font-size: .83rem;
+      color: var(--text-soft);
+    }
+
+    .fund-users-admin {
+      margin-top: 1.1rem;
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 14px;
+      background: rgba(8, 12, 18, .68);
+      padding: .9rem;
+    }
+
+    .fund-users-admin-head {
+      margin-bottom: .5rem;
+    }
+
+    .fund-users-admin-head h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .fund-users-admin-head p {
+      margin: .25rem 0 0;
+      font-size: .8rem;
+      color: var(--text-soft);
+    }
+
+    .fund-users-admin-toolbar {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      margin-bottom: .65rem;
+    }
+
+    .fund-users-admin-toolbar button,
+    .fund-user-modal-actions button,
+    .fund-user-modal-close {
+      border: 1px solid rgba(255, 255, 255, .14);
+      background: rgba(255, 255, 255, .04);
+      color: var(--text);
+      border-radius: 9px;
+      padding: .4rem .65rem;
+      font-size: .79rem;
+      cursor: pointer;
+    }
+
+    .fund-users-admin-toolbar button:hover,
+    .fund-user-modal-actions button:hover,
+    .fund-user-modal-close:hover {
+      border-color: rgba(79, 172, 254, .55);
+    }
+
+    .fund-users-admin-status {
+      margin: 0 0 .6rem;
+      color: var(--text-soft);
+      font-size: .78rem;
+    }
+
+    .fund-user-roles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+    }
+
+    .fund-user-role-pill {
+      border: 1px solid rgba(79, 172, 254, .35);
+      background: rgba(79, 172, 254, .14);
+      color: #dceeff;
+      border-radius: 999px;
+      padding: .15rem .45rem;
+      font-size: .72rem;
+    }
+
+    .fund-user-action {
+      border: 1px solid rgba(255, 255, 255, .15);
+      background: rgba(255, 255, 255, .04);
+      color: var(--text);
+      border-radius: 8px;
+      padding: .28rem .5rem;
+      font-size: .74rem;
+      cursor: pointer;
+      margin-left: .25rem;
+    }
+
+    .fund-user-action.delete {
+      border-color: rgba(255, 84, 113, .45);
+      color: #ffc1cd;
+      background: rgba(255, 84, 113, .08);
+    }
+
+    .fund-user-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .58);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+      padding: 1rem;
+    }
+
+    .fund-user-modal-card {
+      width: min(720px, 100%);
+      max-height: 86vh;
+      overflow: auto;
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 14px;
+      background: #0c141f;
+      padding: .9rem;
+    }
+
+    .fund-user-modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .8rem;
+      margin-bottom: .7rem;
+    }
+
+    .fund-user-modal-head h4 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .fund-user-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .65rem;
+      margin-bottom: .7rem;
+    }
+
+    .fund-user-field {
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+    }
+
+    .fund-user-field.full {
+      grid-column: 1 / -1;
+    }
+
+    .fund-user-field label {
+      font-size: .73rem;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: .02em;
+    }
+
+    .fund-user-field input {
+      border: 1px solid rgba(255, 255, 255, .13);
+      background: rgba(255, 255, 255, .03);
+      border-radius: 9px;
+      color: var(--text);
+      font-size: .82rem;
+      padding: .4rem .5rem;
+    }
+
+    .fund-user-roles-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .45rem;
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 10px;
+      padding: .5rem;
+      background: rgba(255, 255, 255, .02);
+    }
+
+    .fund-user-role-option {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      font-size: .78rem;
+      color: var(--text-soft);
+    }
+
+    .fund-user-modal-actions {
+      margin-top: .8rem;
+      display: flex;
+      justify-content: flex-end;
+      gap: .45rem;
+    }
+
+    @media (max-width: 960px) {
+
+      .fund-sedes-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .fund-month-head,
+      .fund-calendar-grid--month,
+      .fund-calendar-grid--week {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+
+      .fund-sedes-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .fund-month-head,
+      .fund-calendar-grid--month,
+      .fund-calendar-grid--week,
+      .fund-kpis {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body class="sidebar-collapsed" data-current-module="fundacion">
+  <header id="app-header">
+    <div class="header-top">
+      <h1>MONSTRUO</h1>
+      <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
+        <i class="fas fa-bars"></i>
+      </button>
+    </div>
+
+    <nav id="dynamic-sidebar" class="side-nav"></nav>
+    <div class="header-actions">
+      <span id="who" class="pill shell-who-pill">Usuario</span>
+      <div class="footer-buttons-container">
+        <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+          <i class="fas fa-key"></i> <span>Cuenta</span>
+        </button>
+        <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+          <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="main-inner module-shell">
+      <div class="section-header module-tabs-header module-shell-header">
+        <div class="module-shell-title">
+          <h2 class="module-page-title">Fundación</h2>
+          <p class="module-shell-subtitle">Espacio base para comenzar el desarrollo del módulo Fundación en DEV</p>
+        </div>
+      </div>
+
+      <section class="section-block module-shell-content">
+        <div class="fund-intro">
+          <p>Selecciona una sede para desplegar sus cursos en acordeón. Al elegir un curso ingresarás a su panel de
+            <strong>planificación</strong>, <strong>inventario</strong> y <strong>reportes</strong>.
+          </p>
+        </div>
+
+        <section id="fund-sede-selector">
+          <div id="fund-sedes-grid" class="fund-sedes-grid"></div>
+        </section>
+
+        <section id="fund-users-admin" class="fund-users-admin">
+          <div class="fund-users-admin-head">
+            <h3>Usuarios Fundación</h3>
+            <p>Administra usuarios y roles operativos de Fundación directamente desde este módulo.</p>
+          </div>
+
+          <div class="fund-users-admin-toolbar">
+            <button id="fund-users-refresh" type="button"><i class="fas fa-rotate"></i> Actualizar</button>
+            <button id="fund-user-new" type="button"><i class="fas fa-user-plus"></i> Nuevo usuario</button>
+          </div>
+
+          <p id="fund-users-admin-status" class="fund-users-admin-status">Cargando usuarios de Fundación...</p>
+
+          <div class="table-responsive">
+            <table class="monstruo-table">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Roles</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="fund-users-body">
+                <tr>
+                  <td colspan="4">Cargando...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="fund-sede-workspace" class="fund-workspace hidden">
+          <div class="fund-workspace-head">
+            <button id="fund-back-to-sedes" class="fund-back-btn" type="button">
+              <i class="fas fa-arrow-left"></i> Cambiar sede
+            </button>
+
+            <div>
+              <h3 id="fund-sede-title">Sede</h3>
+              <p id="fund-sede-subtitle"></p>
+            </div>
+
+            <div class="fund-head-controls">
+              <div class="fund-head-field">
+                <label for="fund-curso-select">Curso</label>
+                <select id="fund-curso-select">
+                  <option value="all">Todos los cursos</option>
+                </select>
+              </div>
+              <p id="fund-scope-hint" class="fund-scope-hint"></p>
+            </div>
+          </div>
+
+          <div id="fund-tabs" class="fund-tabs" role="tablist">
+            <button class="fund-tab active" data-tab-target="planificacion" type="button">
+              <i class="fas fa-calendar-alt"></i> Planificación
+            </button>
+            <button class="fund-tab" data-tab-target="inventario" type="button">
+              <i class="fas fa-boxes-stacked"></i> Inventario
+            </button>
+            <button class="fund-tab" data-tab-target="reportes" type="button">
+              <i class="fas fa-chart-line"></i> Reportes
+            </button>
+          </div>
+
+          <section id="fund-tab-planificacion" class="fund-tab-panel active">
+            <div class="fund-calendar-toolbar">
+              <div class="fund-calendar-nav">
+                <button id="fund-cal-prev" type="button"><i class="fas fa-chevron-left"></i></button>
+                <button id="fund-cal-today" type="button">Hoy</button>
+                <button id="fund-cal-next" type="button"><i class="fas fa-chevron-right"></i></button>
+              </div>
+
+              <div id="fund-calendar-view-switch" class="fund-calendar-view-switch">
+                <button class="active" data-calendar-view="dia" type="button">Día</button>
+                <button data-calendar-view="semana" type="button">Semana</button>
+                <button data-calendar-view="mes" type="button">Mes</button>
+              </div>
+            </div>
+
+            <h4 id="fund-cal-range" class="fund-calendar-range"></h4>
+            <div id="fund-calendar-container" class="fund-calendar-container"></div>
+
+            <div class="fund-next-tasks">
+              <h4>Próximas tareas</h4>
+              <ul id="fund-next-tasks-list"></ul>
+            </div>
+          </section>
+
+          <section id="fund-tab-inventario" class="fund-tab-panel">
+            <div class="fund-kpis">
+              <article class="fund-kpi-card">
+                <span>Ítems registrados</span>
+                <strong id="fund-kpi-items">0</strong>
+              </article>
+              <article class="fund-kpi-card">
+                <span>Stock crítico</span>
+                <strong id="fund-kpi-critical">0</strong>
+              </article>
+              <article class="fund-kpi-card">
+                <span>Unidades totales</span>
+                <strong id="fund-kpi-units">0</strong>
+              </article>
+            </div>
+
+            <div class="fund-inv-toolbar">
+              <input id="fund-inventory-search" type="text"
+                placeholder="Buscar ítem por nombre o categoría (ej: notebook, insumos, mobiliario)">
+            </div>
+
+            <div class="table-responsive">
+              <table class="monstruo-table">
+                <thead>
+                  <tr>
+                    <th>Ítem</th>
+                    <th>Categoría</th>
+                    <th>Stock</th>
+                    <th>Estado</th>
+                    <th>Responsable</th>
+                  </tr>
+                </thead>
+                <tbody id="fund-inventory-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="fund-tab-reportes" class="fund-tab-panel">
+            <div class="fund-kpis">
+              <article class="fund-kpi-card">
+                <span>Tareas activas</span>
+                <strong id="fund-report-active">0</strong>
+              </article>
+              <article class="fund-kpi-card">
+                <span>Tareas completadas</span>
+                <strong id="fund-report-completed">0</strong>
+              </article>
+              <article class="fund-kpi-card">
+                <span>Cumplimiento estimado</span>
+                <strong id="fund-report-rate">0%</strong>
+              </article>
+            </div>
+
+            <div class="fund-report-grid">
+              <article class="fund-report-card">
+                <h4>Resumen de planificación</h4>
+                <ul id="fund-report-task-summary"></ul>
+              </article>
+
+              <article class="fund-report-card">
+                <h4>Riesgos de inventario</h4>
+                <ul id="fund-report-critical-list"></ul>
+              </article>
+
+              <article class="fund-report-card">
+                <h4>Agenda próxima (7 días)</h4>
+                <ul id="fund-report-agenda-list"></ul>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <p id="fund-status" class="fund-status">Verificando conectividad del módulo...</p>
+      </section>
+    </div>
+  </main>
+
+  <div id="fund-user-modal" class="fund-user-modal hidden" aria-hidden="true">
+    <div class="fund-user-modal-card">
+      <div class="fund-user-modal-head">
+        <h4 id="fund-user-modal-title">Nuevo usuario Fundación</h4>
+        <button id="fund-user-modal-close" class="fund-user-modal-close" type="button">Cerrar</button>
+      </div>
+
+      <form id="fund-user-form">
+        <div class="fund-user-form-grid">
+          <div class="fund-user-field">
+            <label for="fund-user-username">Usuario</label>
+            <input id="fund-user-username" type="text" required>
+          </div>
+          <div class="fund-user-field">
+            <label for="fund-user-password">Contraseña</label>
+            <input id="fund-user-password" type="password">
+          </div>
+          <div class="fund-user-field full">
+            <label>
+              <input id="fund-user-active" type="checkbox" checked>
+              Usuario activo
+            </label>
+          </div>
+          <div class="fund-user-field full">
+            <label>Roles de Fundación</label>
+            <div id="fund-user-role-options" class="fund-user-roles-grid"></div>
+          </div>
+        </div>
+
+        <div class="fund-user-modal-actions">
+          <button id="fund-user-cancel" type="button">Cancelar</button>
+          <button id="fund-user-save" type="submit">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../shared/js/utilidades.js?v=210"></script>
+  <script src="../shared/js/admin.js?v=5"></script>
+  <script src="js/fundacion.js?v=6"></script>
+  <script src="../shared/js/sidebar.js?v=89"></script>
+</body>
+
+</html>

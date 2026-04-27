@@ -10,7 +10,9 @@ Repositorio de desarrollo de Monstruo para Telconsulting.
 
 ## Documentación principal
 
+- [Índice de docs](plataforma/docs/README.md)
 - [Plan Maestro](plataforma/docs/PLAN_MAESTRO_MONSTRUO.md)
+- [Proyecto Contexto](plataforma/docs/PROYECTO_CONTEXTO.md)
 - [Proxy Inverso](plataforma/docs/PROXY_INVERSO.md)
 - [Arquitectura](plataforma/docs/ARQUITECTURA.md)
 - [Changelog](plataforma/docs/CHANGELOG.md)

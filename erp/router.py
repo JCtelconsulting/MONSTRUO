@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
-from core import deps, db
+from plataforma.core import deps, db
 from datetime import datetime, date
 import json
 from laudus import LaudusClient
 import service as facturacion_service
-from core import jobs_engine, bodega_service
+from plataforma.core import jobs_engine
+from bodega import service as bodega_service
 import indicators_service
 
 print("DEBUG: Loading facturacion.py module...")

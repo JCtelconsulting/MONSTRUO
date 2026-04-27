@@ -170,6 +170,41 @@ class Settings(BaseSettings):
             "fundacion:write",
             "audit:read"
         ],
+        "encargado_la_pintana": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+        ],
+        "encargado_maipu": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+        ],
+        "encargado_llay_llay": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+        ],
+        "encargado_huechuraba": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+        ],
+        "encargado_renca": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+        ],
+        "encargado_lo_espejo": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+        ],
+        "encargado_cerro_navia": [
+            "dashboard:read",
+            "fundacion:read",
+            "fundacion:write",
+        ],
     }
 
     class Config:
