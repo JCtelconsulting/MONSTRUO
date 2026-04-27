@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           if [ "${GITHUB_REF_NAME}" = "main" ]; then
             echo "branch=main" >> "$GITHUB_OUTPUT"
-            echo "env_file=/srv/monstruo/ops/env/.env.server" >> "$GITHUB_OUTPUT"
+            echo "env_file=/srv/monstruo/plataforma/ops/env/.env.server" >> "$GITHUB_OUTPUT"
             echo "project=monstruo" >> "$GITHUB_OUTPUT"
             echo "stack=monstruo" >> "$GITHUB_OUTPUT"
             echo "health=http://127.0.0.1:9000/health" >> "$GITHUB_OUTPUT"
