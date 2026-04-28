@@ -167,19 +167,31 @@ if [ "$HAS_GIT_REPO" = "1" ]; then
   APP_GIT_SHA="$(git rev-parse --short HEAD)"
 
   echo "[deploy] clean..."
+  # Exclusiones criticas: proteger datos PROD (tickets, adjuntos), envs y runtime.
+  # data/ y data/tickets/ son el filesystem de adjuntos PROD (17MB+ historial).
+  # ops/env/.env.server es env legacy PROD que aun puede estar en uso transicional.
+  # pre_migration_backup/ y mem_report.txt son artefactos historicos PROD a preservar.
   git clean -fd \
     -e ".env" \
     -e ".env.*" \
+    -e "data/" \
+    -e "data/tickets/" \
     -e "plataforma/data/" \
     -e "plataforma/data_runtime/" \
     -e "ticketera/data/" \
     -e "fundacion/data/" \
     -e "erp/data/" \
+    -e "ops/env/" \
+    -e "ops/env/.env.server" \
+    -e "plataforma/ops/env/.env.server" \
+    -e "plataforma/ops/env/.env.server.dev" \
     -e "backups/" \
+    -e "pre_migration_backup/" \
     -e "logs/" \
     -e "cache/" \
     -e "runner/" \
     -e "monstruo.db" \
+    -e "mem_report.txt" \
     -e "*.sqlite" \
     -e "*.sqlite3" \
     -e "*.db"
