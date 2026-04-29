@@ -1217,7 +1217,7 @@ def _serialize_email_route_row(row: Dict[str, Any]) -> Dict[str, Any]:
 def list_ticketera_routing_rules(*, only_active: bool = False) -> List[Dict[str, Any]]:
     conn = db.get_conn()
     try:
-        where = "WHERE is_active = 1" if only_active else ""
+        where = "WHERE is_active = true" if only_active else ""
         rows = conn.execute(
             f"""SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at
                 FROM ticket_config_email_routes
@@ -1287,7 +1287,7 @@ def upsert_ticketera_routing_rule(
                     normalized_type,
                     normalized_value,
                     normalized_categoria,
-                    1 if is_active else 0,
+                    bool(is_active),
                     now,
                     target_rule_id,
                 ),
@@ -1363,7 +1363,7 @@ def _resolve_routing_category_for_email(conn, origen_email: Optional[str]) -> Op
            FROM ticket_config_email_routes
            WHERE match_type = 'email'
              AND match_value = ?
-             AND is_active = 1
+             AND is_active = true
            LIMIT 1""",
         (normalized_email,),
     ).fetchone()
@@ -1378,7 +1378,7 @@ def _resolve_routing_category_for_email(conn, origen_email: Optional[str]) -> Op
            FROM ticket_config_email_routes
            WHERE match_type = 'domain'
              AND match_value = ?
-             AND is_active = 1
+             AND is_active = true
            LIMIT 1""",
         (domain,),
     ).fetchone()
