@@ -7,6 +7,10 @@
 # - Adjuntos persisten en plataforma/data_runtime/{tickets,compliance} vía symlink desde data/.
 # - Datos Postgres persisten como bind mount en plataforma/data/postgres (idéntico DEV/PROD).
 
+# Nombre del proyecto fijo: evita que Docker derive el nombre del directorio
+# y cree una red diferente a la esperada (monstruo-dev_default vs monstruo_dev_default).
+name: ${STACK_NAME:-monstruo-dev}
+
 services:
   db:
     image: postgres:16
