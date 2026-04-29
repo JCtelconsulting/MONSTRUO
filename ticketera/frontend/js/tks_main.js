@@ -908,9 +908,9 @@ return {
         if (tab === 'dashboard') loadDashboard(content, token);
         else if (tab === 'asignacion') loadAssignmentTimeline(content, token);
         else if (tab === 'lista') loadList(content, token);
-        else if (tab === 'kanban') loadKanban(content, token);
-        else if (tab === 'messages') loadMessageTemplates(content, token);
-        else if (tab === 'ops') loadOps(content, token);
+        else if (tab === 'kanban') { cache.kanban = null; loadKanban(content, token); }
+        else if (tab === 'messages') { cache.messages = null; loadMessageTemplates(content, token); }
+        else if (tab === 'ops') { cache.ops = null; loadOps(content, token); }
         else if (tab === 'reportes') loadArchivosReportes(content, token);
     }
 
@@ -3037,6 +3037,7 @@ window.confirmarAsignarCliente = async function(clienteId, clienteNombre) {
                         is_active: true
                     })
                 });
+                cache.messages = null;
                 window.showToast && window.showToast(`Regla creada para @${dominio}`, 'success');
             }
         }
