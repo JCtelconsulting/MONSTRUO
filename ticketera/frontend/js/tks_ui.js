@@ -5630,7 +5630,7 @@ return `
             <section class="tks-settings-panel">
                 <div class="tks-settings-head">
                     <div>
-                        <h3>Plantillas</h3>
+                        <h3>Plantillas de Correo</h3>
                         <p>Administra desde Ticketera el correo automático de acuse al cliente y los mensajes automáticos.</p>
                     </div>
                     <span class="tks-settings-scope">Admin / Encargado Mesa</span>
@@ -5644,26 +5644,14 @@ return `
 
                 <div class="tks-template-card-grid">${templateCards}</div>
             </section>
-        </div>
-        `;
-    }
 
-    function renderArchivosView(routingRules) {
-        // Obtenemos las categorias de algun estado (hardcode fallback) 
-        const categories = ['admin', 'ejecucion', 'general', 'redes', 'sistemas', 'implementaciones'];
-        // Si TksMain.messageSettingsState existe, usamos sus defaults
-        const routingRows = renderRoutingRulesTableRows(Array.isArray(routingRules) ? routingRules : []);
-        // El formulario de edicion actual usa editingRule global
-        const routingForm = renderRoutingRuleForm(null, buildCategoryOptionsHtml(categories, null), false);
-
-        return `
-        <div class="tks-settings-shell">
             <section class="tks-settings-panel">
                 <div class="tks-settings-head">
                     <div>
                         <h3>Enrutamiento y Asociación de Clientes</h3>
-                        <p>Define a qué área y cliente (Laudus) cae un ticket cuando entra por un remitente específico o por el dominio del correo.</p>
+                        <p>Define a qué área y cliente cae un ticket cuando entra por un remitente o dominio específico.</p>
                     </div>
+                    <span class="tks-settings-scope">Admin / Encargado Mesa</span>
                 </div>
 
                 ${routingForm}
@@ -5684,21 +5672,93 @@ return `
                     </table>
                 </div>
             </section>
-            
+        </div>
+        `;
+    }
+
+    function renderArchivosView() {
+        return `
+        <div class="tks-settings-shell">
             <section class="tks-settings-panel">
                 <div class="tks-settings-head">
                     <div>
-                        <h3>Historial de Archivados</h3>
-                        <p>Busca tickets antiguos, resueltos, cerrados o en papelera por cliente.</p>
+                        <h3>Tickets Archivados</h3>
+                        <p>Todos los tickets cerrados y resueltos. Asigna clientes para construir el historial y habilitar reportes.</p>
+                    </div>
+                    <span class="tks-settings-scope">Admin / Encargado Mesa</span>
+                </div>
+
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end">
+                    <div class="tks-form-group" style="margin:0;min-width:200px">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
+                        <input type="text" class="tks-input" id="tks-arch-filter-cliente" placeholder="Nombre o ID..." style="width:100%">
+                    </div>
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Categoría</label>
+                        <select class="tks-select" id="tks-arch-filter-cat" style="min-width:140px">
+                            <option value="">Todas</option>
+                            <option value="redes">Redes</option>
+                            <option value="sistemas">Sistemas</option>
+                            <option value="ejecucion">Ejecución</option>
+                            <option value="admin">Admin</option>
+                            <option value="general">General</option>
+                            <option value="implementaciones">Implementaciones</option>
+                        </select>
+                    </div>
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Estado</label>
+                        <select class="tks-select" id="tks-arch-filter-estado" style="min-width:130px">
+                            <option value="">Todos</option>
+                            <option value="cerrado">Cerrado</option>
+                            <option value="resuelto">Resuelto</option>
+                        </select>
+                    </div>
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
+                        <input type="date" class="tks-input" id="tks-arch-filter-desde" style="min-width:140px">
+                    </div>
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Hasta</label>
+                        <input type="date" class="tks-input" id="tks-arch-filter-hasta" style="min-width:140px">
+                    </div>
+                    <button class="tks-btn tks-btn-primary" onclick="window.loadArchivados()" style="align-self:flex-end">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+                    <button class="tks-btn tks-btn-ghost" onclick="window.resetArchivadosFiltros()" style="align-self:flex-end">
+                        Limpiar
+                    </button>
+                </div>
+
+                <div id="tks-archivados-results-container">
+                    <div style="text-align:center;padding:2rem"><i class="fas fa-circle-notch fa-spin"></i> Cargando archivados...</div>
+                </div>
+            </section>
+
+            <section class="tks-settings-panel">
+                <div class="tks-settings-head">
+                    <div>
+                        <h3>Reportes por Cliente</h3>
+                        <p>Exporta el historial de tickets de un cliente en un rango de fechas.</p>
                     </div>
                 </div>
-                <div style="display:flex;gap:1rem;margin-bottom:1rem">
-                    <input type="text" class="tks-input" id="tks-archivados-search-client" placeholder="ID o Nombre de Cliente..." style="max-width:300px">
-                    <button class="tks-btn tks-btn-primary" onclick="window.searchArchivadosByClient(document.getElementById('tks-archivados-search-client').value)"><i class="fas fa-search"></i> Buscar Historial</button>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end">
+                    <div class="tks-form-group" style="margin:0;min-width:220px">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
+                        <input type="text" class="tks-input" id="tks-reporte-cliente" placeholder="Nombre o ID de cliente..." style="width:100%">
+                    </div>
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
+                        <input type="date" class="tks-input" id="tks-reporte-desde" style="min-width:140px">
+                    </div>
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Hasta</label>
+                        <input type="date" class="tks-input" id="tks-reporte-hasta" style="min-width:140px">
+                    </div>
+                    <button class="tks-btn tks-btn-primary" onclick="window.exportarReporteCliente()" style="align-self:flex-end">
+                        <i class="fas fa-file-export"></i> Exportar CSV
+                    </button>
                 </div>
-                <div id="tks-archivados-results-container">
-                    <p style="opacity:0.6;font-size:0.9rem">Ingresa un cliente para cargar su historial de tickets.</p>
-                </div>
+                <div id="tks-reporte-resultado" style="margin-top:1rem"></div>
             </section>
         </div>
         `;

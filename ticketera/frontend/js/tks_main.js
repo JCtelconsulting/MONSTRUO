@@ -2183,29 +2183,14 @@ return { ticket, permissions };
         }
     }
 
-    // ---- ARCHIVOS Y REPORTES ----
+    // ---- ARCHIVADOS Y REPORTES ----
     async function loadArchivosReportes(container, token) {
         if (!container) return;
-        const controller = new AbortController();
-        panelAbortController = controller;
         container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:220px;"></div></div>';
-        try {
-            // Reutilizamos el endpoint para obtener settings de routing de correos y dominios
-            const dataRoutes = await TksApi.getDomainTemplateSettings({ signal: controller.signal, timeoutMs: 12000 });
-            if (token !== tabRequestToken || currentTab !== 'reportes') return;
-            hydrateMessageSettingsState(dataRoutes);
-            
-            // Renderiza la vista orquestadora para la pestaña
-            container.innerHTML = TksUI.renderArchivosView(messageSettingsState.routingRules);
-        } catch (e) {
-            if (e?.name === 'AbortError') return;
-            if (token !== tabRequestToken || currentTab !== 'reportes') return;
-            container.innerHTML = `<div class="tks-dashboard"><p style="color:red">Error cargando Archivos y Reportes: ${errorHtml(e)}</p></div>`;
-        } finally {
-            if (panelAbortController === controller) {
-                panelAbortController = null;
-            }
-        }
+        if (token !== tabRequestToken || currentTab !== 'reportes') return;
+        container.innerHTML = TksUI.renderArchivosView();
+        // Carga automática al entrar
+        window.loadArchivados();
     }
 
     // ---- OPS ----
@@ -2856,25 +2841,200 @@ document.addEventListener('DOMContentLoaded', () => {
     TksMain.init();
 });
 
-window.searchArchivadosByClient = async function(searchValue) {
+window.loadArchivados = async function() {
     const listContainer = document.getElementById('tks-archivados-results-container');
-    if(!listContainer) return;
+    if (!listContainer) return;
 
-    if(!searchValue || searchValue.trim() === '') {
-        listContainer.innerHTML = '<p style="opacity:0.6;font-size:0.9rem">Ingresa un ID de cliente o nombre para buscar su historial.</p>';
+    const cliente = (document.getElementById('tks-arch-filter-cliente')?.value || '').trim();
+    const cat = (document.getElementById('tks-arch-filter-cat')?.value || '').trim();
+    const estado = (document.getElementById('tks-arch-filter-estado')?.value || '').trim();
+    const desde = (document.getElementById('tks-arch-filter-desde')?.value || '').trim();
+    const hasta = (document.getElementById('tks-arch-filter-hasta')?.value || '').trim();
+
+    listContainer.innerHTML = '<div style="text-align:center;padding:2rem"><i class="fas fa-circle-notch fa-spin"></i> Cargando...</div>';
+
+    try {
+        const params = new URLSearchParams({ limit: '200' });
+        if (cliente) params.set('q', cliente);
+        if (cat) params.set('categoria', cat);
+        if (estado) params.set('status', estado);
+        if (desde) params.set('created_after', desde);
+        if (hasta) params.set('created_before', hasta);
+        // Si no hay filtro de estado, traemos cerrados y resueltos (excluye activos y papelera)
+        if (!estado) params.set('status', 'cerrado,resuelto');
+
+        const data = await fetchApi('/api/tks/tickets?' + params.toString());
+        const items = data?.items || [];
+
+        if (!items.length) {
+            listContainer.innerHTML = '<p style="opacity:0.6;font-size:0.9rem;padding:1rem 0">No hay tickets archivados con los filtros seleccionados.</p>';
+            return;
+        }
+
+        const esc = TksUI.escapeHtml.bind(TksUI);
+        const rows = items.map(t => {
+            const sinCliente = !t.customer_id && !t.cliente_nombre;
+            const clienteLabel = t.cliente_nombre
+                ? `<span>${esc(t.cliente_nombre)}</span>`
+                : `<span style="opacity:0.5;font-style:italic">Sin asignar</span>`;
+            const emailEsc = (t.origen_email || '').replace(/'/g, "\\'");
+            const asignarBtn = sinCliente
+                ? `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}')">
+                       <i class="fas fa-user-tag"></i> Asignar
+                   </button>`
+                : `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}')">
+                       <i class="fas fa-edit"></i>
+                   </button>`;
+            return `
+            <tr>
+                <td><span class="tks-code">${esc(t.codigo || '#' + t.id)}</span></td>
+                <td>${esc(t.titulo || '-')}</td>
+                <td>${esc(t.estado || '-')}</td>
+                <td>${esc(t.categoria || '-')}</td>
+                <td>${clienteLabel}</td>
+                <td>${esc(t.origen_email || '-')}</td>
+                <td>${t.created_at ? t.created_at.slice(0,10) : '-'}</td>
+                <td>${asignarBtn}</td>
+            </tr>`;
+        }).join('');
+
+        listContainer.innerHTML = `
+        <p style="font-size:0.85rem;opacity:0.6;margin-bottom:0.5rem">${items.length} ticket(s) encontrado(s)</p>
+        <div class="tks-pivot-container">
+            <table class="tks-pivot-table">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Título</th>
+                        <th>Estado</th>
+                        <th>Área</th>
+                        <th>Cliente</th>
+                        <th>Email origen</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    } catch (e) {
+        listContainer.innerHTML = `<p style="color:red">Error cargando archivados: ${e.message}</p>`;
+    }
+};
+
+window.resetArchivadosFiltros = function() {
+    ['tks-arch-filter-cliente','tks-arch-filter-cat','tks-arch-filter-estado',
+     'tks-arch-filter-desde','tks-arch-filter-hasta'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    window.loadArchivados();
+};
+
+window.abrirAsignarCliente = async function(ticketId, origenEmail) {
+    const q = window.prompt('Buscar cliente (nombre o RUT):');
+    if (q === null) return;
+
+    try {
+        const data = await fetchApi('/api/tks/customers/search?q=' + encodeURIComponent(q) + '&limit=10');
+        const items = data?.items || [];
+        if (!items.length) { window.showToast && window.showToast('No se encontraron clientes', 'warning'); return; }
+
+        const opciones = items.map((c, i) => `${i+1}. ${c.name || c.legal_name} (${c.id})`).join('\n');
+        const selStr = window.prompt(`Selecciona número:\n${opciones}`);
+        const sel = parseInt(selStr, 10);
+        if (!sel || sel < 1 || sel > items.length) return;
+
+        const cliente = items[sel - 1];
+
+        // Asignar cliente al ticket
+        await fetchApi(`/api/tks/tickets/${ticketId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customer_id: cliente.id, cliente_nombre: cliente.name || cliente.legal_name })
+        });
+
+        // Proponer crear regla de enrutamiento si hay email origen con dominio
+        if (origenEmail && origenEmail.includes('@')) {
+            const dominio = origenEmail.split('@')[1];
+            const crearRegla = window.confirm(
+                `¿Crear regla de enrutamiento para el dominio "${dominio}"?\n\nFuturos tickets de *@${dominio} se asociarán automáticamente a ${cliente.name || cliente.legal_name}.`
+            );
+            if (crearRegla) {
+                await fetchApi('/api/tks/settings/domain-templates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        match_type: 'domain',
+                        match_value: dominio,
+                        customer_id: cliente.id,
+                        customer_name: cliente.name || cliente.legal_name,
+                        categoria: '',
+                        is_active: true
+                    })
+                });
+                window.showToast && window.showToast(`Regla creada para @${dominio}`, 'success');
+            }
+        }
+
+        window.showToast && window.showToast('Cliente asignado correctamente', 'success');
+        window.loadArchivados();
+    } catch (e) {
+        window.showToast && window.showToast('Error asignando cliente: ' + e.message, 'error');
+    }
+};
+
+window.exportarReporteCliente = async function() {
+    const cliente = (document.getElementById('tks-reporte-cliente')?.value || '').trim();
+    const desde = (document.getElementById('tks-reporte-desde')?.value || '').trim();
+    const hasta = (document.getElementById('tks-reporte-hasta')?.value || '').trim();
+    const resultEl = document.getElementById('tks-reporte-resultado');
+
+    if (!cliente) {
+        if (resultEl) resultEl.innerHTML = '<p style="color:orange">Ingresa un cliente para generar el reporte.</p>';
         return;
     }
-    
-    listContainer.innerHTML = '<div style="text-align:center"><i class="fas fa-circle-notch fa-spin"></i> Buscando historial...</div>';
-    
+    if (resultEl) resultEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Generando...';
+
     try {
-        const data = await fetchApi('/api/tks/tickets?customer_id=' + encodeURIComponent(searchValue.trim()) + '&limit=100&trashed_only=false');
-        if(data && data.items && data.items.length > 0) {
-            listContainer.innerHTML = TksUI.renderTicketTable(data.items, { showStatus: true });
-        } else {
-             listContainer.innerHTML = '<p style="opacity:0.6;font-size:0.9rem">No se encontraron tickets en el historial para la busqueda indicada.</p>';
+        const params = new URLSearchParams({ q: cliente, limit: '500' });
+        if (desde) params.set('created_after', desde);
+        if (hasta) params.set('created_before', hasta);
+
+        const data = await fetchApi('/api/tks/tickets?' + params.toString());
+        const items = (data?.items || []).filter(t => ['cerrado','resuelto'].includes(t.estado));
+
+        if (!items.length) {
+            if (resultEl) resultEl.innerHTML = '<p style="opacity:0.6">Sin tickets para los filtros indicados.</p>';
+            return;
         }
-    } catch(e) {
-         listContainer.innerHTML = `<p style="color:red">Error al buscar el historial: ${e.message}</p>`;
+
+        const headers = ['Código','Título','Estado','Área','Cliente','Email Origen','Asignado a','Fecha Creación','Fecha Resolución'];
+        const csvRows = [headers.join(',')];
+        items.forEach(t => {
+            csvRows.push([
+                t.codigo || t.id,
+                `"${(t.titulo||'').replace(/"/g,'""')}"`,
+                t.estado || '',
+                t.categoria || '',
+                `"${(t.cliente_nombre||'').replace(/"/g,'""')}"`,
+                t.origen_email || '',
+                t.asignado_a || '',
+                t.created_at ? t.created_at.slice(0,10) : '',
+                t.resolved_at ? t.resolved_at.slice(0,10) : ''
+            ].join(','));
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte_${cliente.replace(/\s+/g,'_')}_${desde||'inicio'}_${hasta||'hoy'}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        if (resultEl) resultEl.innerHTML = `<p style="color:var(--tks-success)"><i class="fas fa-check"></i> ${items.length} tickets exportados.</p>`;
+    } catch (e) {
+        if (resultEl) resultEl.innerHTML = `<p style="color:red">Error generando reporte: ${e.message}</p>`;
     }
 };

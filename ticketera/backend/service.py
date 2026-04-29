@@ -3269,6 +3269,7 @@ def get_ticket(ticket_id: int) -> Optional[Dict[str, Any]]:
 
 def list_tickets(
     estado: Optional[str] = None,
+    estados: Optional[List[str]] = None,
     q: Optional[str] = None,
     categoria: Optional[str] = None,
     asignado_a: Optional[str] = None,
@@ -3298,7 +3299,11 @@ def list_tickets(
         else:
             where_clauses.append("COALESCE(is_trashed, FALSE) = FALSE")
 
-        if estado:
+        if estados:
+            placeholders = ", ".join(["?" for _ in estados])
+            where_clauses.append(f"estado IN ({placeholders})")
+            params.extend([e.lower() for e in estados])
+        elif estado:
             where_clauses.append("estado = ?")
             params.append(estado.lower())
 

@@ -403,6 +403,8 @@ async def list_tickets(
     asignado_a: Optional[str] = None,
     severidad: Optional[str] = None,
     customer_id: Optional[str] = None,
+    created_after: Optional[str] = Query(None, description="ISO date, ej: 2026-01-01"),
+    created_before: Optional[str] = Query(None, description="ISO date, ej: 2026-12-31"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = 0,
     sess: dict = Depends(deps.require_permission("tickets:read"))
@@ -412,17 +414,28 @@ async def list_tickets(
     scoped_asignado = _scoped_assignee(sess, asignado_a)
     status_norm = str(status or "").strip().lower() or None
     trashed_only = status_norm == "papelera"
-    return tickets_service.list_tickets(
-        estado=None if tech_scope or trashed_only else status_norm,
+
+    # Soporte de múltiples estados separados por coma (ej: "cerrado,resuelto")
+    estados_multiples = None
+    if status_norm and "," in status_norm:
+        estados_multiples = [s.strip() for s in status_norm.split(",") if s.strip()]
+        status_norm = None
+
+    result = tickets_service.list_tickets(
+        estado=None if tech_scope or trashed_only or estados_multiples else status_norm,
         q=None if tech_scope else q,
         categoria=None if tech_scope else categoria,
         asignado_a=scoped_asignado,
         severidad=None if tech_scope else severidad,
         customer_id=customer_id,
+        created_after=created_after,
+        created_before=created_before,
         limit=limit,
         offset=offset,
         trashed_only=trashed_only,
+        estados=estados_multiples,
     )
+    return result
 
 
 @router.post("/tickets", response_model=dict)
