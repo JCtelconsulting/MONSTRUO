@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalación de dependencias de Python
-COPY requirements.txt requirements.txt
+COPY fundacion/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiamos todo el repositorio pero el PYTHONPATH se ajustará por servicio
