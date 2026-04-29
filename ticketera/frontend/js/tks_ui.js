@@ -5676,6 +5676,40 @@ return `
         `;
     }
 
+    function renderAsignarClienteModal(ticketId, origenEmail, tituloTicket) {
+        return `
+        <div class="tks-modal-overlay open" id="tks-arch-asignar-modal">
+            <div class="tks-modal">
+                <div class="tks-modal-header">
+                    <h3><i class="fas fa-user-tag"></i> Asignar Cliente</h3>
+                    <button class="tks-modal-close" type="button" onclick="window.cerrarAsignarClienteModal()">&times;</button>
+                </div>
+                <div class="tks-modal-body">
+                    <div class="tks-settings-note" style="margin-bottom:1rem">
+                        <strong>${escapeHtml(tituloTicket || '')}</strong>
+                        ${origenEmail ? `<br><span style="opacity:0.7;font-size:0.85rem"><i class="fas fa-envelope"></i> ${escapeHtml(origenEmail)}</span>` : ''}
+                    </div>
+                    <div class="tks-form-group">
+                        <label>Buscar cliente</label>
+                        <div style="display:flex;gap:.5rem">
+                            <input id="tks-arch-asignar-search" class="tks-input" type="text"
+                                placeholder="Nombre o RUT..."
+                                onkeydown="if(event.key==='Enter') window.buscarClientesModal()">
+                            <button class="tks-btn tks-btn-primary tks-btn-sm" onclick="window.buscarClientesModal()">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="tks-arch-asignar-results" style="max-height:280px;overflow-y:auto;margin-top:0.5rem"></div>
+                </div>
+                <div class="tks-modal-footer" style="justify-content:space-between;align-items:center">
+                    <div id="tks-arch-asignar-count" style="font-size:.82rem;color:var(--tks-text-muted)"></div>
+                    <button class="tks-btn tks-btn-ghost" type="button" onclick="window.cerrarAsignarClienteModal()">Cancelar</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
     function renderArchivosView() {
         return `
         <div class="tks-settings-shell">
@@ -5691,7 +5725,7 @@ return `
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end">
                     <div class="tks-form-group" style="margin:0;min-width:200px">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
-                        <select class="tks-select" id="tks-arch-filter-cliente" style="min-width:200px">
+                        <select class="tks-select" id="tks-arch-filter-cliente" style="min-width:200px" onchange="window.loadArchivados()">
                             <option value="">Todos los clientes</option>
                         </select>
                     </div>
@@ -6091,6 +6125,7 @@ return `
         renderKanban,
         renderMessageTemplates,
         renderArchivosView,
+        renderAsignarClienteModal,
         renderMailTemplateEditorModal,
         renderAttachmentPreviewModal,
         renderOps,

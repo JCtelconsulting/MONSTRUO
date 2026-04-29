@@ -2897,11 +2897,12 @@ window.loadArchivados = async function() {
                 ? `<span>${esc(t.cliente_nombre)}</span>`
                 : `<span style="opacity:0.5;font-style:italic">Sin asignar</span>`;
             const emailEsc = (t.origen_email || '').replace(/'/g, "\\'");
+            const tituloEsc = (t.titulo || '').replace(/'/g, "\\'");
             const asignarBtn = sinCliente
-                ? `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}')">
+                ? `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}', '${tituloEsc}')">
                        <i class="fas fa-user-tag"></i> Asignar
                    </button>`
-                : `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}')">
+                : `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}', '${tituloEsc}')">
                        <i class="fas fa-edit"></i>
                    </button>`;
             return `
@@ -2950,34 +2951,62 @@ window.resetArchivadosFiltros = function() {
     window.loadArchivados();
 };
 
-window.abrirAsignarCliente = async function(ticketId, origenEmail) {
-    const q = window.prompt('Buscar cliente (nombre o RUT):');
-    if (q === null) return;
+window.cerrarAsignarClienteModal = function() {
+    const m = document.getElementById('tks-arch-asignar-modal');
+    if (m) m.remove();
+};
+
+window.buscarClientesModal = async function() {
+    const q = (document.getElementById('tks-arch-asignar-search')?.value || '').trim();
+    const resultsEl = document.getElementById('tks-arch-asignar-results');
+    const countEl = document.getElementById('tks-arch-asignar-count');
+    if (!resultsEl) return;
+
+    resultsEl.innerHTML = '<div style="padding:0.5rem;opacity:0.6"><i class="fas fa-circle-notch fa-spin"></i> Buscando...</div>';
+    try {
+        const qs = q ? `?q=${encodeURIComponent(q)}&limit=20` : '?limit=100';
+        const data = await fetchApi('/api/tks/customers/search' + qs);
+        const items = data?.items || [];
+        if (countEl) countEl.textContent = `${items.length} cliente(s)`;
+        if (!items.length) {
+            resultsEl.innerHTML = '<div style="padding:0.5rem;opacity:0.6">Sin resultados</div>';
+            return;
+        }
+        resultsEl.innerHTML = items.map(c => {
+            const nombre = TksUI.escapeHtml(c.name || c.legal_name || c.id);
+            const rut = c.vat_id ? `<span style="font-size:0.8rem;opacity:0.6"> · ${TksUI.escapeHtml(c.vat_id)}</span>` : '';
+            return `<div class="tks-assoc-result-item" style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;border-bottom:1px solid var(--tks-border);cursor:pointer"
+                        onmouseover="this.style.background='var(--tks-surface-hover)'" onmouseout="this.style.background=''"
+                        onclick="window.confirmarAsignarCliente('${TksUI.escapeHtml(c.id)}', '${nombre}')">
+                <span>${nombre}${rut}</span>
+                <button class="tks-btn tks-btn-primary tks-btn-sm">Seleccionar</button>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        resultsEl.innerHTML = `<div style="color:red;padding:0.5rem">Error: ${e.message}</div>`;
+    }
+};
+
+window.confirmarAsignarCliente = async function(clienteId, clienteNombre) {
+    const modal = document.getElementById('tks-arch-asignar-modal');
+    if (!modal) return;
+    const ticketId = modal.dataset.ticketId;
+    const origenEmail = modal.dataset.origenEmail;
 
     try {
-        const data = await fetchApi('/api/tks/customers/search?q=' + encodeURIComponent(q) + '&limit=10');
-        const items = data?.items || [];
-        if (!items.length) { window.showToast && window.showToast('No se encontraron clientes', 'warning'); return; }
-
-        const opciones = items.map((c, i) => `${i+1}. ${c.name || c.legal_name} (${c.id})`).join('\n');
-        const selStr = window.prompt(`Selecciona número:\n${opciones}`);
-        const sel = parseInt(selStr, 10);
-        if (!sel || sel < 1 || sel > items.length) return;
-
-        const cliente = items[sel - 1];
-
-        // Asignar cliente al ticket
         await fetchApi(`/api/tks/tickets/${ticketId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customer_id: cliente.id, cliente_nombre: cliente.name || cliente.legal_name })
+            body: JSON.stringify({ customer_id: clienteId, cliente_nombre: clienteNombre })
         });
 
-        // Proponer crear regla de enrutamiento si hay email origen con dominio
+        window.cerrarAsignarClienteModal();
+
+        // Proponer regla de dominio si hay email
         if (origenEmail && origenEmail.includes('@')) {
             const dominio = origenEmail.split('@')[1];
             const crearRegla = window.confirm(
-                `¿Crear regla de enrutamiento para el dominio "${dominio}"?\n\nFuturos tickets de *@${dominio} se asociarán automáticamente a ${cliente.name || cliente.legal_name}.`
+                `¿Crear regla automática para "@${dominio}"?\n\nFuturos tickets de ese dominio se asignarán a ${clienteNombre}.`
             );
             if (crearRegla) {
                 await fetchApi('/api/tks/settings/domain-templates', {
@@ -2986,8 +3015,8 @@ window.abrirAsignarCliente = async function(ticketId, origenEmail) {
                     body: JSON.stringify({
                         match_type: 'domain',
                         match_value: dominio,
-                        customer_id: cliente.id,
-                        customer_name: cliente.name || cliente.legal_name,
+                        customer_id: clienteId,
+                        customer_name: clienteNombre,
                         categoria: '',
                         is_active: true
                     })
@@ -3001,6 +3030,20 @@ window.abrirAsignarCliente = async function(ticketId, origenEmail) {
     } catch (e) {
         window.showToast && window.showToast('Error asignando cliente: ' + e.message, 'error');
     }
+};
+
+window.abrirAsignarCliente = async function(ticketId, origenEmail, tituloTicket) {
+    document.getElementById('tks-arch-asignar-modal')?.remove();
+    document.body.insertAdjacentHTML('beforeend',
+        TksUI.renderAsignarClienteModal(ticketId, origenEmail, tituloTicket)
+    );
+    const modal = document.getElementById('tks-arch-asignar-modal');
+    modal.dataset.ticketId = ticketId;
+    modal.dataset.origenEmail = origenEmail || '';
+    modal.addEventListener('click', e => { if (e.target === modal) window.cerrarAsignarClienteModal(); });
+    // Carga inicial con todos los clientes
+    window.buscarClientesModal();
+    document.getElementById('tks-arch-asignar-search')?.focus();
 };
 
 window.exportarReporteCliente = async function() {
