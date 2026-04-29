@@ -2749,25 +2749,17 @@ const TksUI = (() => {
         const viewSpan = Math.max(1, viewEndTs - viewStartTs);
         const spanDays = viewSpan / (24 * 3600 * 1000);
 
-        // Elegir granularidad de ticks: días si >3d, horas si <3d
+        // Ticks cada 3 horas, alineados a múltiplos de 3 (0, 3, 6, 9, 12, 15, 18, 21)
         const ticks = [];
-        if (spanDays > 3) {
-            // Un tick por día
-            const d = new Date(viewStartTs);
-            d.setHours(0, 0, 0, 0);
-            if (d.getTime() < viewStartTs) d.setDate(d.getDate() + 1);
-            while (d.getTime() <= viewEndTs) {
-                ticks.push({ ts: d.getTime(), label: d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }) });
-                d.setDate(d.getDate() + 1);
-            }
-        } else {
-            // Un tick cada 2 horas
-            const d = new Date(viewStartTs);
-            d.setMinutes(0, 0, 0);
-            while (d.getTime() <= viewEndTs) {
-                ticks.push({ ts: d.getTime(), label: `${String(d.getHours()).padStart(2,'0')}:00` });
-                d.setHours(d.getHours() + 2);
-            }
+        const d = new Date(viewStartTs);
+        // Redondear hacia arriba al próximo múltiplo de 3h
+        const h0 = d.getHours();
+        const nextMult3 = Math.ceil(h0 / 3) * 3;
+        d.setHours(nextMult3, 0, 0, 0);
+        while (d.getTime() <= viewEndTs) {
+            const label = d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+            ticks.push({ ts: d.getTime(), label });
+            d.setHours(d.getHours() + 3);
         }
 
         const tickLinesHtml = ticks.map(t => {
@@ -3113,10 +3105,10 @@ return `
         const showQueue = scopeMode !== 'mine';
         const generatedAt = payload.generated_at || '';
 
-        // Ventana visible: últimas 72h desde ahora (no todo el historial)
+        // Ventana visible: últimas 24h desde ahora
         const rangeEndTs = toTs(payload?.range?.end_at || generatedAt || new Date().toISOString()) || Date.now();
-        const fullRangeStartTs = toTs(payload?.range?.start_at || '') || (rangeEndTs - 72 * 3600 * 1000);
-        const rangeStartTs = Math.max(fullRangeStartTs, rangeEndTs - 72 * 3600 * 1000);
+        const fullRangeStartTs = toTs(payload?.range?.start_at || '') || (rangeEndTs - 24 * 3600 * 1000);
+        const rangeStartTs = Math.max(fullRangeStartTs, rangeEndTs - 24 * 3600 * 1000);
         const axis = buildTimelineAxisFromRange(rangeStartTs, rangeEndTs);
 
         const sortedTechnicians = [...technicians].sort((a, b) => {
