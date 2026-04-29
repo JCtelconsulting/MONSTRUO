@@ -3113,9 +3113,10 @@ return `
         const showQueue = scopeMode !== 'mine';
         const generatedAt = payload.generated_at || '';
 
-        // Usar el rango real del backend (72h) en vez de solo 8-18h del día
+        // Ventana visible: últimas 72h desde ahora (no todo el historial)
         const rangeEndTs = toTs(payload?.range?.end_at || generatedAt || new Date().toISOString()) || Date.now();
-        const rangeStartTs = toTs(payload?.range?.start_at || '') || (rangeEndTs - 72 * 3600 * 1000);
+        const fullRangeStartTs = toTs(payload?.range?.start_at || '') || (rangeEndTs - 72 * 3600 * 1000);
+        const rangeStartTs = Math.max(fullRangeStartTs, rangeEndTs - 72 * 3600 * 1000);
         const axis = buildTimelineAxisFromRange(rangeStartTs, rangeEndTs);
 
         const sortedTechnicians = [...technicians].sort((a, b) => {

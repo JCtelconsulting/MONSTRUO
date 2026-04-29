@@ -442,8 +442,23 @@ async def list_tickets(
         estados_multiples = [s.strip() for s in status_norm.split(",") if s.strip()]
         status_norm = None
 
+    # Sin filtro de estado explícito: excluir "cerrado" de la Lista (van a Archivados)
+    exclude_cerrado = (
+        not tech_scope
+        and not trashed_only
+        and not estados_multiples
+        and not status_norm
+    )
+    effective_estados = estados_multiples
+    effective_estado = None if tech_scope or trashed_only or estados_multiples else status_norm
+    if exclude_cerrado:
+        effective_estados = ["abierto", "en_progreso", "resuelto", "pendiente_cliente",
+                             "pendiente_compra", "pendiente_tercero", "pendiente_aprobacion_1",
+                             "en_analisis", "en_validacion", "reabierto"]
+        effective_estado = None
+
     result = tickets_service.list_tickets(
-        estado=None if tech_scope or trashed_only or estados_multiples else status_norm,
+        estado=effective_estado,
         q=None if tech_scope else q,
         categoria=None if tech_scope else categoria,
         asignado_a=scoped_asignado,
@@ -454,7 +469,7 @@ async def list_tickets(
         limit=limit,
         offset=offset,
         trashed_only=trashed_only,
-        estados=estados_multiples,
+        estados=effective_estados,
     )
     return result
 
