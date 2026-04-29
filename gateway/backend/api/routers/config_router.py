@@ -159,6 +159,8 @@ async def get_smtp_config(
         for key in keys:
             if key not in found:
                 config[key] = ""
+        config["mail_sandbox"] = settings.MAIL_SANDBOX
+        config["env_type"] = settings.ENV_TYPE
         return config
     finally:
         conn.close()

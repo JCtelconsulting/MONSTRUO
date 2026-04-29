@@ -1,3 +1,4 @@
+import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -69,7 +70,6 @@ def send_email_advanced(
     password = conf.get("smtp_password")
     from_name = conf.get("smtp_from_name", "Cobranza Monstruo")
 
-    import os
     if settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE"):
         logger.info(f"[EMAIL_MOCK] Would send to {to_email} subject '{subject}' (ENV={settings.ENV_TYPE})")
         if attachments:
@@ -145,7 +145,6 @@ def send_email_advanced(
                 print(f"[EMAIL] Attachment error ({a.get('filename')}): {e}")
 
     # Blindaje DEV/PROD (salvo override)
-    import os
     if settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE"):
         print(f"[EMAIL_MOCK] Would send to {to_addr} subject '{subject}' (ENV={settings.ENV_TYPE})")
         # En DEV simulamos éxito pero no enviamos
@@ -192,15 +191,19 @@ def send_email_with_attachments(
     Sends an email with optional attachments.
     attachments: [{"filename": "x.pdf", "content_type": "application/pdf", "data": b"..."}]
     """
-    conf = get_smtp_config()
-    if not conf:
-        print("[EMAIL] No SMTP config found")
-        return False
-
     to_emails = [e.strip() for e in (to_emails or []) if e and e.strip()]
     cc_emails = [e.strip() for e in (cc_emails or []) if e and e.strip()]
     if not to_emails:
         raise ValueError("to_emails vacío")
+
+    if settings.MAIL_SANDBOX or (settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE")):
+        logger.info(f"[EMAIL_MOCK] Would send to {to_emails} subject '{subject}' (ENV={settings.ENV_TYPE}, SANDBOX={settings.MAIL_SANDBOX})")
+        return True
+
+    conf = get_smtp_config()
+    if not conf:
+        print("[EMAIL] No SMTP config found")
+        return False
 
     host = conf.get("smtp_host")
     port = int(conf.get("smtp_port", 587))

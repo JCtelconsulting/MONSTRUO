@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     TICKET_AUTO_REPLY_REQUIRE_ALLOWLIST: bool = True
     TICKET_AUTO_REPLY_BLOCKED_LOCALPARTS: str = "noreply,no-reply,mailer-daemon,postmaster"
     ENV_TYPE: str = "dev"  # dev, prod, staging
+    MAIL_SANDBOX: bool = False  # True en DEV: simula envíos, no llega a clientes
     COMPLIANCE_EXPORT_DIR: str = ""
     COMPLIANCE_TZ: str = "America/Santiago"
     COMPLIANCE_EXPORT_HOUR: int = 2
