@@ -1307,7 +1307,7 @@ def upsert_ticketera_routing_rule(
                     normalized_type,
                     normalized_value,
                     normalized_categoria,
-                    1 if is_active else 0,
+                    bool(is_active),
                     normalized_actor,
                     now,
                     now,
