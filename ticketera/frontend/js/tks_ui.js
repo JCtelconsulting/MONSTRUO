@@ -2757,7 +2757,7 @@ const TksUI = (() => {
         const nextMult3 = Math.ceil(h0 / 3) * 3;
         d.setHours(nextMult3, 0, 0, 0);
         while (d.getTime() <= viewEndTs) {
-            const label = d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+            const label = `${String(d.getHours()).padStart(2,'0')}:00`;
             ticks.push({ ts: d.getTime(), label });
             d.setHours(d.getHours() + 3);
         }
