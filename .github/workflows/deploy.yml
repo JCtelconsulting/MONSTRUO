@@ -3,7 +3,7 @@ name: CI + Deploy
 on:
   pull_request:
   push:
-    branches: ["main", "dev", "main-gateway", "main-ticketera", "main-fundacion"]
+    branches: ["main", "dev", "main-gateway", "main-ticketera", "main-fundacion", "dev-gateway", "dev-ticketera", "dev-fundacion"]
   workflow_dispatch:
 
 concurrency:
