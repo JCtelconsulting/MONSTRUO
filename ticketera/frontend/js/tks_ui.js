@@ -2743,6 +2743,46 @@ const TksUI = (() => {
         return `${String(hour).padStart(2, '0')}:00`;
     }
 
+    function buildTimelineAxisFromRange(startTs, endTs) {
+        const viewStartTs = startTs;
+        const viewEndTs = endTs;
+        const viewSpan = Math.max(1, viewEndTs - viewStartTs);
+        const spanDays = viewSpan / (24 * 3600 * 1000);
+
+        // Elegir granularidad de ticks: días si >3d, horas si <3d
+        const ticks = [];
+        if (spanDays > 3) {
+            // Un tick por día
+            const d = new Date(viewStartTs);
+            d.setHours(0, 0, 0, 0);
+            if (d.getTime() < viewStartTs) d.setDate(d.getDate() + 1);
+            while (d.getTime() <= viewEndTs) {
+                ticks.push({ ts: d.getTime(), label: d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }) });
+                d.setDate(d.getDate() + 1);
+            }
+        } else {
+            // Un tick cada 2 horas
+            const d = new Date(viewStartTs);
+            d.setMinutes(0, 0, 0);
+            while (d.getTime() <= viewEndTs) {
+                ticks.push({ ts: d.getTime(), label: `${String(d.getHours()).padStart(2,'0')}:00` });
+                d.setHours(d.getHours() + 2);
+            }
+        }
+
+        const tickLinesHtml = ticks.map(t => {
+            const leftPct = ((t.ts - viewStartTs) / viewSpan) * 100;
+            return `<span class="tks-assign-grid-line labor" style="left:${leftPct.toFixed(3)}%"></span>`;
+        }).join('');
+
+        const rulerHtml = ticks.map(t => {
+            const leftPct = ((t.ts - viewStartTs) / viewSpan) * 100;
+            return `<span class="tks-assign-ruler-tick labor" style="--tick-left:${leftPct.toFixed(3)}%; left:${leftPct.toFixed(3)}%">${escapeHtml(t.label)}</span>`;
+        }).join('');
+
+        return { viewStartTs, viewEndTs, viewSpan, tickLinesHtml, rulerHtml };
+    }
+
     function buildTimelineAxis(dayStart) {
         const viewStartTs = dayStart.getTime() + (8 * 60 * 60 * 1000); // 8:00
         const viewEndTs = dayStart.getTime() + (18 * 60 * 60 * 1000); // 18:00
@@ -3072,11 +3112,11 @@ return `
         const scopeMode = String(payload.scope || '').trim().toLowerCase();
         const showQueue = scopeMode !== 'mine';
         const generatedAt = payload.generated_at || '';
-        const referenceTs = toTs(generatedAt || payload?.range?.end_at || new Date().toISOString()) || Date.now();
-        const dayStart = new Date(referenceTs);
-        dayStart.setHours(0, 0, 0, 0);
 
-        const axis = buildTimelineAxis(dayStart);
+        // Usar el rango real del backend (72h) en vez de solo 8-18h del día
+        const rangeEndTs = toTs(payload?.range?.end_at || generatedAt || new Date().toISOString()) || Date.now();
+        const rangeStartTs = toTs(payload?.range?.start_at || '') || (rangeEndTs - 72 * 3600 * 1000);
+        const axis = buildTimelineAxisFromRange(rangeStartTs, rangeEndTs);
 
         const sortedTechnicians = [...technicians].sort((a, b) => {
             const aName = String(a?.username || '').trim().toLowerCase();
@@ -3107,9 +3147,9 @@ return `
                 <div>
                     <h3><i class="fas fa-users-cog"></i> Asignación Técnica</h3>
                     <div class="tks-assign-head-meta-new">
-                        <span><strong>Día:</strong> ${escapeHtml(new Date(referenceTs).toLocaleDateString('es-CL'))}</span>
+                        <span><strong>Desde:</strong> ${escapeHtml(new Date(rangeStartTs).toLocaleDateString('es-CL'))}</span>
                         <span class="tks-sep">·</span>
-                        <span><strong>Actualizado:</strong> ${escapeHtml(formatTimeOnly(generatedAt))}</span>
+                        <span><strong>Actualizado:</strong> ${escapeHtml(formatExactDateTime(generatedAt))}</span>
                     </div>
                 </div>
             </div>
