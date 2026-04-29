@@ -3002,14 +3002,25 @@ window.confirmarAsignarCliente = async function(clienteId, clienteNombre) {
 
         window.cerrarAsignarClienteModal();
 
-        // Proponer regla de dominio si hay email
+        // Asociar masivamente otros tickets del mismo email/dominio
         if (origenEmail && origenEmail.includes('@')) {
             const dominio = origenEmail.split('@')[1];
+            const bulkResult = await fetchApi('/api/tks/tickets/bulk-assign-customer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ origen_email: origenEmail, customer_id: clienteId, customer_name: clienteNombre })
+            });
+            const totalExtra = (bulkResult?.updated || 0) - 1; // -1 porque el ticket actual ya fue asignado
+            if (totalExtra > 0) {
+                window.showToast && window.showToast(`${totalExtra} ticket(s) adicionales del mismo dominio también asignados a ${clienteNombre}`, 'info');
+            }
+
+            // Proponer crear regla de dominio para futuros tickets
             const crearRegla = window.confirm(
-                `¿Crear regla automática para "@${dominio}"?\n\nFuturos tickets de ese dominio se asignarán a ${clienteNombre}.`
+                `¿Crear regla automática para "@${dominio}"?\n\nFuturos tickets de ese dominio se asignarán automáticamente a ${clienteNombre}.`
             );
             if (crearRegla) {
-                await fetchApi('/api/tks/settings/domain-templates', {
+                await fetchApi('/api/tks/settings/routing-rules', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

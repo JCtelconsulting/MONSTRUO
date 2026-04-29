@@ -150,6 +150,8 @@ class TicketeraRoutingRuleIn(BaseModel):
     match_value: str
     categoria: str
     is_active: bool = True
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
 
 
 class SpecialtyUpsert(BaseModel):
@@ -375,8 +377,27 @@ async def upsert_ticketera_routing_rule(
             categoria=payload.categoria,
             is_active=payload.is_active,
             actor_id=sess.get("username", ""),
+            customer_id=payload.customer_id,
+            customer_name=payload.customer_name,
         )
         return {"ok": True, "rule": rule}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tickets/bulk-assign-customer", response_model=dict)
+async def bulk_assign_customer(
+    body: dict,
+    sess: dict = Depends(deps.require_permission("tickets:write")),
+):
+    """Asocia todos los tickets con el mismo email/dominio a un cliente."""
+    try:
+        result = tickets_service.bulk_assign_customer_by_email(
+            origen_email=body.get("origen_email", ""),
+            customer_id=body.get("customer_id", ""),
+            customer_name=body.get("customer_name", ""),
+        )
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -1236,6 +1236,8 @@ def upsert_ticketera_routing_rule(
     categoria: str,
     actor_id: str,
     is_active: bool = True,
+    customer_id: Optional[str] = None,
+    customer_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     normalized_type = str(match_type or "").strip().lower()
     if normalized_type not in EMAIL_ROUTE_MATCH_TYPES:
@@ -1293,12 +1295,14 @@ def upsert_ticketera_routing_rule(
         else:
             conn.execute(
                 """INSERT INTO ticket_config_email_routes
-                   (match_type, match_value, categoria, is_active, created_by, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   (match_type, match_value, categoria, is_active, created_by, created_at, updated_at, customer_id, customer_name)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(match_type, match_value) DO UPDATE SET
                        categoria = EXCLUDED.categoria,
                        is_active = EXCLUDED.is_active,
-                       updated_at = EXCLUDED.updated_at""",
+                       updated_at = EXCLUDED.updated_at,
+                       customer_id = EXCLUDED.customer_id,
+                       customer_name = EXCLUDED.customer_name""",
                 (
                     normalized_type,
                     normalized_value,
@@ -1307,6 +1311,8 @@ def upsert_ticketera_routing_rule(
                     normalized_actor,
                     now,
                     now,
+                    customer_id or None,
+                    customer_name or None,
                 ),
             )
         conn.commit()
@@ -9393,6 +9399,57 @@ def associate_email_to_client(email: str, customer_id: str, customer_name: str, 
     conn.commit()
     conn.close()
     return True
+
+def bulk_assign_customer_by_email(
+    origen_email: str,
+    customer_id: str,
+    customer_name: str,
+) -> Dict[str, Any]:
+    """
+    Asocia todos los tickets que tengan el mismo origen_email (o dominio)
+    al cliente indicado. Retorna cuántos tickets fueron actualizados.
+    """
+    email = str(origen_email or "").strip().lower()
+    if not email or not customer_id:
+        raise ValueError("Email y customer_id son requeridos")
+
+    conn = db.get_conn()
+    try:
+        # Tickets con mismo email exacto sin cliente asignado
+        by_email = conn.execute(
+            """UPDATE tks.tickets
+               SET customer_id = ?, cliente_nombre = ?
+               WHERE LOWER(COALESCE(origen_email, '')) = ?
+                 AND (customer_id IS NULL OR customer_id = '')
+               RETURNING id""",
+            (customer_id, customer_name, email),
+        ).fetchall()
+
+        # Tickets con mismo dominio sin cliente asignado
+        dominio = email.split("@")[1] if "@" in email else None
+        by_domain = []
+        if dominio:
+            by_domain = conn.execute(
+                """UPDATE tks.tickets
+                   SET customer_id = ?, cliente_nombre = ?
+                   WHERE LOWER(COALESCE(origen_email, '')) LIKE ?
+                     AND (customer_id IS NULL OR customer_id = '')
+                   RETURNING id""",
+                (customer_id, customer_name, f"%@{dominio}"),
+            ).fetchall()
+
+        conn.commit()
+        total = len(by_email) + len(by_domain)
+        return {
+            "ok": True,
+            "updated": total,
+            "by_email": len(by_email),
+            "by_domain": len(by_domain),
+            "dominio": dominio,
+        }
+    finally:
+        conn.close()
+
 
 def search_customers(q: str = "", limit: int = 0) -> List[Dict[str, Any]]:
     """Busca clientes en laudus_customers; con limit=0 devuelve todos."""
