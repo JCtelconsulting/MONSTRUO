@@ -61,9 +61,6 @@ dmypy.json
 .agent/
 runner/
 
-# Worktrees de desarrollo por app (no son parte del repo)
-worktrees/
-
 # Security keys
 *.pem
 *.key

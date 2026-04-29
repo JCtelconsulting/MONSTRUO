@@ -47,10 +47,7 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# 8. Ignorar worktrees de git (carpetas de desarrollo por app)
-worktrees/
-
-# 9. Ignorar archivos de build, logs y backups
+# 8. Ignorar archivos de build, logs y backups
 dist/
 build/
 *.egg-info/
