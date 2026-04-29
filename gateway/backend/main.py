@@ -245,15 +245,15 @@ app.include_router(config_router.router)
 app.include_router(ops.router)
 
 SERVICES_MAP = {
-    "ticketera": "http://ticketera:9005",
-    "tks": "http://ticketera:9005",
+    "ticketera": f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
+    "tks": f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
     "erp": "http://erp:8000",
     "bodega": "http://bodega:8000",
     "crm": "http://crm:8000",
     "pmo": "http://pmo:8000",
     "ia": "http://ia:8000",
     "zabbix": "http://zabbix:8000",
-    "fundacion": "http://fundacion:8000",
+    "fundacion": f"http://fundacion:{os.getenv('FUNDACION_PORT', '9006')}",
 }
 
 SERVICE_API_PREFIX = {
