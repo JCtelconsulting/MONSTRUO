@@ -928,14 +928,14 @@ async def get_tablero(
         "resuelto": [],
         "cerrado": []
     }
-    cutoff_72h = datetime.now(timezone.utc) - timedelta(hours=72)
+    cutoff_72h = datetime.now(timezone.utc) - timedelta(hours=24)
 
     for t in data["items"]:
         estado = t.get("estado", "abierto")
         if estado not in kanban:
             continue
         if estado == "cerrado":
-            # Solo mostrar cerrados recientes (menos de 72 horas)
+            # Solo mostrar cerrados recientes (menos de 24 horas)
             resolved_at = t.get("resolved_at") or t.get("updated_at") or ""
             if resolved_at:
                 try:
