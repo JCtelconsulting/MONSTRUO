@@ -2902,9 +2902,14 @@ window.loadArchivados = async function() {
                 ? `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}', '${tituloEsc}')">
                        <i class="fas fa-user-tag"></i> Asignar
                    </button>`
-                : `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}', '${tituloEsc}')">
-                       <i class="fas fa-edit"></i>
-                   </button>`;
+                : `<span style="display:flex;gap:0.3rem">
+                       <button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}', '${tituloEsc}')" title="Cambiar cliente">
+                           <i class="fas fa-edit"></i>
+                       </button>
+                       <button class="tks-btn tks-btn-ghost tks-btn-sm" style="color:var(--tks-danger)" onclick="window.desasignarCliente(${t.id})" title="Quitar cliente">
+                           <i class="fas fa-user-times"></i>
+                       </button>
+                   </span>`;
             return `
             <tr>
                 <td><span class="tks-code">${esc(t.codigo || '#' + t.id)}</span></td>
@@ -3028,7 +3033,7 @@ window.confirmarAsignarCliente = async function(clienteId, clienteNombre) {
                         match_value: dominio,
                         customer_id: clienteId,
                         customer_name: clienteNombre,
-                        categoria: '',
+                        categoria: 'general',
                         is_active: true
                     })
                 });
@@ -3040,6 +3045,21 @@ window.confirmarAsignarCliente = async function(clienteId, clienteNombre) {
         window.loadArchivados();
     } catch (e) {
         window.showToast && window.showToast('Error asignando cliente: ' + e.message, 'error');
+    }
+};
+
+window.desasignarCliente = async function(ticketId) {
+    if (!window.confirm('¿Quitar el cliente asignado a este ticket?')) return;
+    try {
+        await fetchApi(`/api/tks/tickets/${ticketId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customer_id: '', cliente_nombre: '' })
+        });
+        window.showToast && window.showToast('Cliente desasignado', 'success');
+        window.loadArchivados();
+    } catch (e) {
+        window.showToast && window.showToast('Error: ' + e.message, 'error');
     }
 };
 
