@@ -89,6 +89,59 @@ def main() -> int:
         if ref not in readme_text:
             errors.append(f"README.md no referencia {ref}")
 
+    # Guardas contrato canónico DEV/PROD (AGENTS.md §4) en docker-compose.yaml.
+    compose_path = ROOT / "docker-compose.yaml"
+    if not compose_path.exists():
+        errors.append("Falta docker-compose.yaml en raíz")
+    else:
+        compose_text = compose_path.read_text(encoding="utf-8")
+
+        # 1) Postgres NUNCA publica 5432 al host.
+        for forbidden in ('"5432:5432"', "'5432:5432'", "- 5432:5432"):
+            if forbidden in compose_text:
+                errors.append(
+                    f"docker-compose.yaml publica 5432 al host ({forbidden}); prohibido por contrato canónico"
+                )
+
+        # 2) Gateway debe publicar 9001 y ticketera 9005 (parametrizable con default).
+        if "${GATEWAY_PORT:-9001}:9001" not in compose_text:
+            errors.append(
+                "docker-compose.yaml: gateway debe publicar ${GATEWAY_PORT:-9001}:9001"
+            )
+        if "${TICKETERA_PORT:-9005}:9005" not in compose_text:
+            errors.append(
+                "docker-compose.yaml: ticketera debe publicar ${TICKETERA_PORT:-9005}:9005"
+            )
+
+        # 3) Bind canónico de datos Postgres (idéntico DEV/PROD).
+        if "./plataforma/data/postgres:/var/lib/postgresql/data" not in compose_text:
+            errors.append(
+                "docker-compose.yaml: db debe usar bind ./plataforma/data/postgres:/var/lib/postgresql/data"
+            )
+
+        # 4) Mounts críticos data_runtime/{tickets,compliance} en gateway y ticketera.
+        required_mounts = (
+            "./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets",
+            "./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance",
+        )
+        for mount in required_mounts:
+            if compose_text.count(mount) < 2:
+                errors.append(
+                    f"docker-compose.yaml: mount requerido en gateway y ticketera: {mount}"
+                )
+
+        # 5) ENV_FILE parametrizable con default DEV.
+        if "${ENV_FILE:-plataforma/ops/env/.env.server.dev}" not in compose_text:
+            errors.append(
+                "docker-compose.yaml: env_file debe ser ${ENV_FILE:-plataforma/ops/env/.env.server.dev}"
+            )
+
+        # 6) STACK_NAME parametrizable con default DEV en container_name.
+        if "${STACK_NAME:-monstruo-dev}" not in compose_text:
+            errors.append(
+                "docker-compose.yaml: container_name debe usar ${STACK_NAME:-monstruo-dev}"
+            )
+
     if errors:
         print("FAIL")
         for item in errors:

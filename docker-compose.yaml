@@ -1,4 +1,11 @@
-version: '3.8'
+# Contrato canónico DEV/PROD (AGENTS.md §4):
+# - DEV: STACK_NAME=monstruo-dev, POSTGRES_DB=monstruo_dev, ENV_FILE=plataforma/ops/env/.env.server.dev
+# - PROD: STACK_NAME=monstruo, POSTGRES_DB=monstruo, ENV_FILE=plataforma/ops/env/.env.server
+# Reglas no negociables:
+# - Postgres NUNCA publica 5432 al host (solo red interna docker).
+# - Gateway publica 9001, ticketera publica 9005 en ambos entornos.
+# - Adjuntos persisten en plataforma/data_runtime/{tickets,compliance} vía symlink desde data/.
+# - Datos Postgres persisten como bind mount en plataforma/data/postgres (idéntico DEV/PROD).
 
 services:
   db:
@@ -10,6 +17,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}
     volumes:
       - ./plataforma/data/postgres:/var/lib/postgresql/data
+    # NO exponer 5432 al host: la DB solo es accesible por la red interna docker.
     restart: unless-stopped
 
   gateway:
@@ -25,10 +33,13 @@ services:
       - PYTHONPATH=/app:/app/plataforma
       - PORT=9001
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    volumes:
+      - ./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets
+      - ./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance
     depends_on:
       - db
     restart: unless-stopped
-    command: ["uvicorn", "gateway.backend.main:app", "--host", "0.0.0.0", "--port", "9001"]
+    command: [ "uvicorn", "gateway.backend.main:app", "--host", "0.0.0.0", "--port", "9001" ]
 
   ticketera:
     build:
@@ -38,12 +49,15 @@ services:
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
     ports:
-      - "9005:9005"
+      - "${TICKETERA_PORT:-9005}:9005"
     environment:
       - PYTHONPATH=/app:/app/plataforma
       - PORT=9005
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    volumes:
+      - ./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets
+      - ./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance
     depends_on:
       - db
     restart: unless-stopped
-    command: ["uvicorn", "ticketera.backend.main:app", "--host", "0.0.0.0", "--port", "9005"]
+    command: [ "uvicorn", "ticketera.backend.main:app", "--host", "0.0.0.0", "--port", "9005" ]

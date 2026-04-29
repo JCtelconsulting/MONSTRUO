@@ -57,7 +57,27 @@ Estado funcional resumido:
 - `PROD` y `DEV` se separan por configuración y contratos, no por improvisación
 - una app nueva debe seguir un patrón definido en `CONTRATO_APPS.md`
 
+## Contrato canónico de compose DEV/PROD
+
+`docker-compose.yaml` en raíz es ahora un único contrato parametrizable que aplica idéntico en DEV y PROD. Reglas no negociables (validadas por `plataforma/tests/ci_repo_guard.py`):
+
+- Postgres NUNCA publica `5432` al host. La DB sólo es accesible por la red interna de docker.
+- Gateway publica `${GATEWAY_PORT:-9001}:9001`. Ticketera publica `${TICKETERA_PORT:-9005}:9005`.
+- Datos Postgres persisten como bind mount `./plataforma/data/postgres:/var/lib/postgresql/data` (idéntico DEV/PROD).
+- Adjuntos persisten como bind mount `./plataforma/data_runtime/{tickets,compliance}` en gateway y ticketera.
+- `env_file` se resuelve por `${ENV_FILE:-plataforma/ops/env/.env.server.dev}`.
+- `container_name` se deriva de `${STACK_NAME:-monstruo-dev}` (`monstruo-dev-*` en DEV, `monstruo-*` en PROD).
+
+Variables canónicas por entorno:
+
+- DEV: `STACK_NAME=monstruo-dev`, `POSTGRES_DB=monstruo_dev`, `ENV_FILE=plataforma/ops/env/.env.server.dev`
+- PROD: `STACK_NAME=monstruo`, `POSTGRES_DB=monstruo`, `ENV_FILE=plataforma/ops/env/.env.server`
+
+Migración PROD pendiente (ventana controlada con backup `pg_dump` previo): mover datos Postgres al bind `/srv/monstruo/plataforma/data/postgres`, exponer gateway en `9001` y ticketera en `9005`, ajustar `plataforma/ops/nginx/monstruo.conf` para `9001`/`9005`, actualizar `HEALTH_URL` en `.github/workflows/deploy.yml` a `9001`.
+
 ## Hitos recientes
+
+- 2026-04-29: `docker-compose.yaml` queda como contrato canónico único DEV/PROD parametrizado por `STACK_NAME`/`ENV_FILE`/`POSTGRES_DB`/`GATEWAY_PORT`/`TICKETERA_PORT`. Postgres no publica `5432`, persiste como bind `./plataforma/data/postgres` (preservando datos DEV existentes), gateway publica `9001`, ticketera publica `9005`, mounts críticos de adjuntos en `./plataforma/data_runtime/{tickets,compliance}`. Se extiende `plataforma/tests/ci_repo_guard.py` con guardas anti-regresión (prohíbe publicar `5432`, exige puertos `9001`/`9005`, bind Postgres canónico, mounts `data_runtime` y parametrización `ENV_FILE`/`STACK_NAME`). `python3 plataforma/tests/ci_repo_guard.py` → `PASS`. `docker compose --env-file plataforma/ops/env/.env.server.dev config` → válido sin warnings. Estado: contrato listo en DEV; migración PROD queda condicionada a ventana con backup + ajuste nginx + health URL.
 
 - 2026-04-28: Saneamiento canónico ejecutado en PROD (`192.168.60.5 / TERRENEITOR`) vía SSH sin sudo (árbol `/srv/monstruo` propiedad de `juan:juan`). Se creó `/srv/monstruo/plataforma/ops/env/` y se copió `.env.server` desde la fuente legacy `/srv/monstruo/ops/env/.env.server` (más reciente, 1580B). Evidencia: `src_sha=dst_sha=c707b960467bfc8f2f0e40c12462e3c48ff0999b8cef768a92bd202d3d6aa676` (PASS hashes coinciden), destino con `size=1580 perms=600 owner=juan:juan`, contenedores `monstruo-gateway`, `monstruo-ticketera` y `monstruo-postgres` siguen `Up 2 weeks` sin reinicio. Ruta canónica AGENTS.md §4 ahora disponible para que `deploy.yml` y `deploy.sh` la encuentren al promover. Estado operativo: **GO condicional** para `dev -> main`, pendiente autorización explícita del usuario (AGENTS.md §4 + §9).
 - 2026-04-27: CI deploy alineado a ruta canónica AGENTS.md §4: `.github/workflows/deploy.yml` ahora exporta `env_file=/srv/monstruo/plataforma/ops/env/.env.server` para `branch=main` (commit `c1c5498` en `dev`). Auditoría read-only en PROD (`192.168.60.5 / TERRENEITOR`) confirma que la ruta canónica todavía no existe en PROD (solo árbol legacy `/srv/monstruo/.env.server` y `/srv/monstruo/ops/env/.env.server`); decisión adoptada: **Opción B** — mantener fix canónico y sanear PROD en ventana controlada (mkdir `plataforma/ops/env` + copia de `.env.server`) antes de promover `dev -> main`.
