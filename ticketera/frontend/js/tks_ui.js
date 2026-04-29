@@ -5691,7 +5691,9 @@ return `
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end">
                     <div class="tks-form-group" style="margin:0;min-width:200px">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
-                        <input type="text" class="tks-input" id="tks-arch-filter-cliente" placeholder="Nombre o ID..." style="width:100%">
+                        <select class="tks-select" id="tks-arch-filter-cliente" style="min-width:200px">
+                            <option value="">Todos los clientes</option>
+                        </select>
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Categoría</label>
@@ -5744,7 +5746,9 @@ return `
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end">
                     <div class="tks-form-group" style="margin:0;min-width:220px">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
-                        <input type="text" class="tks-input" id="tks-reporte-cliente" placeholder="Nombre o ID de cliente..." style="width:100%">
+                        <select class="tks-select" id="tks-reporte-cliente-select" style="min-width:220px">
+                            <option value="">Selecciona un cliente...</option>
+                        </select>
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>

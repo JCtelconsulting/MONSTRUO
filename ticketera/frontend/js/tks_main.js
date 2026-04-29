@@ -2189,8 +2189,9 @@ return { ticket, permissions };
         container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:220px;"></div></div>';
         if (token !== tabRequestToken || currentTab !== 'reportes') return;
         container.innerHTML = TksUI.renderArchivosView();
-        // Carga automática al entrar
-        window.loadArchivados();
+        // Poblar select de clientes y luego cargar tickets
+        window.cargarClientesSelect('tks-arch-filter-cliente').then(() => window.loadArchivados());
+        window.cargarClientesSelect('tks-reporte-cliente-select');
     }
 
     // ---- OPS ----
@@ -2841,6 +2842,24 @@ document.addEventListener('DOMContentLoaded', () => {
     TksMain.init();
 });
 
+window.cargarClientesSelect = async function(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    try {
+        const data = await fetchApi('/api/tks/customers/search?limit=500');
+        const items = data?.items || [];
+        const current = sel.value;
+        sel.innerHTML = '<option value="">Todos los clientes</option>' +
+            items.map(c => {
+                const nombre = c.name || c.legal_name || c.id;
+                return `<option value="${TksUI.escapeHtml(c.id)}">${TksUI.escapeHtml(nombre)}</option>`;
+            }).join('');
+        if (current) sel.value = current;
+    } catch (e) {
+        // silencioso — el select queda con solo la opción "Todos"
+    }
+};
+
 window.loadArchivados = async function() {
     const listContainer = document.getElementById('tks-archivados-results-container');
     if (!listContainer) return;
@@ -2855,7 +2874,7 @@ window.loadArchivados = async function() {
 
     try {
         const params = new URLSearchParams({ limit: '200' });
-        if (cliente) params.set('q', cliente);
+        if (cliente) params.set('customer_id', cliente);
         if (cat) params.set('categoria', cat);
         if (estado) params.set('status', estado);
         if (desde) params.set('created_after', desde);
@@ -2888,7 +2907,7 @@ window.loadArchivados = async function() {
             return `
             <tr>
                 <td><span class="tks-code">${esc(t.codigo || '#' + t.id)}</span></td>
-                <td>${esc(t.titulo || '-')}</td>
+                <td><div class="tks-ticket-title fade-overflow" title="${esc(t.titulo || '')}" style="max-width:260px">${esc(t.titulo || '-')}</div></td>
                 <td>${esc(t.estado || '-')}</td>
                 <td>${esc(t.categoria || '-')}</td>
                 <td>${clienteLabel}</td>
@@ -2985,19 +3004,21 @@ window.abrirAsignarCliente = async function(ticketId, origenEmail) {
 };
 
 window.exportarReporteCliente = async function() {
-    const cliente = (document.getElementById('tks-reporte-cliente')?.value || '').trim();
+    const sel = document.getElementById('tks-reporte-cliente-select');
+    const cliente = (sel?.value || '').trim();
+    const clienteNombre = sel?.options[sel.selectedIndex]?.text || cliente;
     const desde = (document.getElementById('tks-reporte-desde')?.value || '').trim();
     const hasta = (document.getElementById('tks-reporte-hasta')?.value || '').trim();
     const resultEl = document.getElementById('tks-reporte-resultado');
 
     if (!cliente) {
-        if (resultEl) resultEl.innerHTML = '<p style="color:orange">Ingresa un cliente para generar el reporte.</p>';
+        if (resultEl) resultEl.innerHTML = '<p style="color:orange">Selecciona un cliente para generar el reporte.</p>';
         return;
     }
     if (resultEl) resultEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Generando...';
 
     try {
-        const params = new URLSearchParams({ q: cliente, limit: '500' });
+        const params = new URLSearchParams({ customer_id: cliente, limit: '500', status: 'cerrado,resuelto' });
         if (desde) params.set('created_after', desde);
         if (hasta) params.set('created_before', hasta);
 
@@ -3029,7 +3050,7 @@ window.exportarReporteCliente = async function() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `reporte_${cliente.replace(/\s+/g,'_')}_${desde||'inicio'}_${hasta||'hoy'}.csv`;
+        a.download = `reporte_${clienteNombre.replace(/\s+/g,'_')}_${desde||'inicio'}_${hasta||'hoy'}.csv`;
         a.click();
         URL.revokeObjectURL(url);
 
