@@ -3,7 +3,7 @@ name: CI + Deploy
 on:
   pull_request:
   push:
-    branches: ["main", "dev"]
+    branches: ["main", "dev", "main-gateway", "main-ticketera", "main-fundacion"]
   workflow_dispatch:
 
 concurrency:
@@ -36,7 +36,7 @@ jobs:
 
   deploy:
     needs: tests
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/main-gateway' || github.ref == 'refs/heads/main-ticketera' || github.ref == 'refs/heads/main-fundacion'
     runs-on: self-hosted
     environment: production
     timeout-minutes: 20
@@ -48,15 +48,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${GITHUB_REF_NAME}" = "main" ]; then
-            echo "branch=main" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF_NAME}" =~ ^main ]]; then
+            echo "branch=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "env_file=/srv/monstruo/plataforma/ops/env/.env.server" >> "$GITHUB_OUTPUT"
             echo "project=monstruo" >> "$GITHUB_OUTPUT"
             echo "stack=monstruo" >> "$GITHUB_OUTPUT"
-            echo "health=http://127.0.0.1:9000/health" >> "$GITHUB_OUTPUT"
+            echo "health=http://127.0.0.1:9001/health" >> "$GITHUB_OUTPUT"
             echo "deploy_path=/srv/monstruo" >> "$GITHUB_OUTPUT"
+            # Determinar qué servicio rebuild según la rama
+            case "${GITHUB_REF_NAME}" in
+              main-gateway)   echo "service=gateway"   >> "$GITHUB_OUTPUT" ;;
+              main-ticketera) echo "service=ticketera" >> "$GITHUB_OUTPUT" ;;
+              main-fundacion) echo "service=fundacion" >> "$GITHUB_OUTPUT" ;;
+              *)              echo "service="          >> "$GITHUB_OUTPUT" ;;
+            esac
           else
-            echo "Solo se permite el despliegue automático en la rama main hacia la VM de producción."
+            echo "Solo se permite el despliegue automático en ramas main* hacia producción."
             exit 1
           fi
       - name: Deploy to server
@@ -66,6 +73,7 @@ jobs:
           DEPLOY_ENV_FILE: ${{ steps.target.outputs.env_file }}
           DEPLOY_COMPOSE_PROJECT: ${{ steps.target.outputs.project }}
           DEPLOY_STACK_NAME: ${{ steps.target.outputs.stack }}
+          DEPLOY_SERVICE: ${{ steps.target.outputs.service }}
           HEALTH_URL: ${{ steps.target.outputs.health }}
         run: |
           set -euo pipefail
