@@ -107,7 +107,6 @@ def _get_effective_allowed_modules(sess: Dict[str, any]) -> List[str]:
     Usa la lógica centralizada de core.auth_service.
     """
     username = sess["username"]
-    print(f"[AUTH] Centralized calculation for {username}")
     return auth_service.get_effective_allowed_modules(
         username, 
         sess.get("roles") or []

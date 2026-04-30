@@ -1,8 +1,11 @@
+import logging
 import requests
 import time
 from typing import Optional
 from datetime import date, datetime
 from plataforma.core import db as core_db
+
+logger = logging.getLogger(__name__)
 
 # Cache simple en memoria para evitar llamadas excesivas
 _uf_cache = {"value": None, "timestamp": 0}
@@ -101,7 +104,7 @@ def get_uf_value() -> Optional[float]:
                 _save_uf_to_db(date.today(), value, source="mindicador")
                 return value
     except Exception as e:
-        print(f"Error fetching UF: {e}")
+        logger.error("Error fetching UF: %s", e)
 
     return _uf_cache["value"]  # Retornar viejo si falló el nuevo
 
@@ -165,6 +168,6 @@ def get_uf_value_for_date(d: date) -> Optional[float]:
                 _save_uf_to_db(d, val, source="mindicador")
             return val
     except Exception as e:
-        print(f"Error fetching UF for date {d}: {e}")
+        logger.error("Error fetching UF for date %s: %s", d, e)
 
     return None

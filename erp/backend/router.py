@@ -10,7 +10,6 @@ from plataforma.core import jobs_engine
 from bodega.backend.services import service as bodega_service
 from erp.backend.services import indicators_service
 
-print("DEBUG: Loading facturacion.py module...")
 
 router = APIRouter(prefix="/api/facturacion", tags=["facturacion"])
 

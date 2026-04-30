@@ -1,6 +1,9 @@
+import logging
 from typing import List, Optional, Dict, Any, Union
 from plataforma.core import db
 from bodega.backend.services import service as bodega_service
+
+logger = logging.getLogger(__name__)
 
 
 def create_invoice_draft(
@@ -178,11 +181,9 @@ def get_invoice(invoice_id: Union[int, str]) -> Optional[Dict[str, Any]]:
                                     (remote_id, res["id"]),
                                 )
                                 conn.commit()
-                            print(
-                                f"DEBUG: Fuzzy resolved Invoice {invoice_id} -> {remote_id}"
-                            )
+                            logger.debug("Fuzzy resolved Invoice %s -> %s", invoice_id, remote_id)
                     except Exception as e:
-                        print(f"Fuzzy match error in get_invoice: {e}")
+                        logger.warning("Fuzzy match error in get_invoice: %s", e)
 
                 if remote_id:
                     details = client.get_invoice_details(remote_id)
@@ -216,7 +217,7 @@ def get_invoice(invoice_id: Union[int, str]) -> Optional[Dict[str, Any]]:
                                 "legalName"
                             ) or details["customer"].get("name")
             except Exception as e:
-                print(f"Error fetching remote details for invoice {invoice_id}: {e}")
+                logger.error("Error fetching remote details for invoice %s: %s", invoice_id, e)
 
         return res
     finally:

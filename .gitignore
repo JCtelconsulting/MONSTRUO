@@ -35,7 +35,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 plataforma/data/
-plataforma/data_runtime/
+ticketera/data/
 plataforma/ops/guardian/*.sqlite*
 
 # Backups

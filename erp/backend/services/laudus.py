@@ -1,7 +1,10 @@
+import logging
 import os
+import json
 import requests
 from typing import Dict, Any, Optional
-import json
+
+logger = logging.getLogger(__name__)
 
 
 class LaudusClient:
@@ -20,7 +23,7 @@ class LaudusClient:
         Retorna True si éxito.
         """
         if not (self.username and self.password and self.vat_id):
-            print("WARN: Faltan credenciales LAUDUS_*")
+            logger.warning("Faltan credenciales LAUDUS_*")
             return False
 
         url = f"{self.base_url}/security/login"
@@ -36,10 +39,10 @@ class LaudusClient:
                 self.token = data.get("token")
                 return True
             else:
-                print(f"Laudus Login Failed: {resp.status_code} {resp.text[:100]}")
+                logger.warning("Laudus Login Failed: %s %s", resp.status_code, resp.text[:100])
                 return False
         except Exception as e:
-            print(f"Laudus Login Error: {e}")
+            logger.error("Laudus Login Error: %s", e)
             return False
 
     def _get_headers(self) -> Dict[str, str]:
@@ -101,10 +104,10 @@ class LaudusClient:
             resp = requests.get(url, headers=headers, timeout=60)
             if resp.status_code == 200:
                 return resp.content
-            print(f"Laudus PDF Error {invoice_id}: {resp.status_code}")
+            logger.warning("Laudus PDF Error %s: %s", invoice_id, resp.status_code)
             return None
         except Exception as e:
-            print(f"Laudus PDF Exception {invoice_id}: {e}")
+            logger.error("Laudus PDF Exception %s: %s", invoice_id, e)
             return None
 
     def get_invoice_details(self, invoice_id: str) -> Dict[str, Any]:
@@ -117,10 +120,10 @@ class LaudusClient:
             resp = requests.get(url, headers=self._get_headers(), timeout=(5, 30))
             if resp.status_code == 200:
                 return resp.json()
-            print(f"Laudus Details Error {invoice_id}: {resp.status_code}")
+            logger.warning("Laudus Details Error %s: %s", invoice_id, resp.status_code)
             return {}
         except Exception as e:
-            print(f"Laudus Details Exception {invoice_id}: {e}")
+            logger.error("Laudus Details Exception %s: %s", invoice_id, e)
             return {}
 
     def list_doc_types(self) -> list:
@@ -137,10 +140,10 @@ class LaudusClient:
                 if isinstance(data, dict) and "data" in data and isinstance(data["data"], list):
                     return data["data"]
                 return data if isinstance(data, list) else []
-            print(f"Laudus DocTypes Error: {resp.status_code} {resp.text[:200]}")
+            logger.warning("Laudus DocTypes Error: %s %s", resp.status_code, resp.text[:200])
             return []
         except Exception as e:
-            print(f"Laudus DocTypes Exception: {e}")
+            logger.error("Laudus DocTypes Exception: %s", e)
             return []
 
     def list_customer_contacts(self, customer_id: str) -> list:
@@ -157,10 +160,10 @@ class LaudusClient:
                 if isinstance(data, dict) and "data" in data and isinstance(data["data"], list):
                     return data["data"]
                 return data if isinstance(data, list) else []
-            print(f"Laudus Contacts Error: {resp.status_code} {resp.text[:200]}")
+            logger.warning("Laudus Contacts Error: %s %s", resp.status_code, resp.text[:200])
             return []
         except Exception as e:
-            print(f"Laudus Contacts Exception: {e}")
+            logger.error("Laudus Contacts Exception: %s", e)
             return []
 
     def create_sales_invoice(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -197,7 +200,7 @@ class LaudusClient:
                 return data if isinstance(data, list) else []
             return []
         except Exception as e:
-            print(f"Laudus Payments Error: {e}")
+            logger.error("Laudus Payments Error: %s", e)
             return []
 
     def get_invoice_receipts(self, invoice_id: str) -> list:
@@ -216,7 +219,7 @@ class LaudusClient:
                 return data if isinstance(data, list) else []
             return []
         except Exception as e:
-            print(f"Laudus Receipts Error: {e}")
+            logger.error("Laudus Receipts Error: %s", e)
             return []
 
     def get_all_customers(self) -> list:
@@ -245,10 +248,10 @@ class LaudusClient:
                 if isinstance(data, list):
                     return data
 
-            print(f"Laudus Customers Error: {resp.status_code}")
+            logger.warning("Laudus Customers Error: %s", resp.status_code)
             return []
         except Exception as e:
-            print(f"Laudus Customers Exception: {e}")
+            logger.error("Laudus Customers Exception: %s", e)
             return []
 
     def list_products(
@@ -279,7 +282,7 @@ class LaudusClient:
         try:
             resp = requests.post(url, json=payload, headers=self._get_headers(), timeout=90)
             if resp.status_code != 200:
-                print(f"Laudus Products Error: {resp.status_code} {resp.text[:200]}")
+                logger.warning("Laudus Products Error: %s %s", resp.status_code, resp.text[:200])
                 return []
 
             data = resp.json()
@@ -291,7 +294,7 @@ class LaudusClient:
                 return data
             return []
         except Exception as e:
-            print(f"Laudus Products Exception: {e}")
+            logger.error("Laudus Products Exception: %s", e)
             return []
 
     def get_product(self, product_id: str) -> Dict[str, Any]:
@@ -307,7 +310,7 @@ class LaudusClient:
                 return resp.json()
             return {}
         except Exception as e:
-            print(f"Laudus GetProduct Error: {e}")
+            logger.error("Laudus GetProduct Error: %s", e)
             return {}
 
     def get_product_sales_price(
@@ -374,7 +377,7 @@ class LaudusClient:
         try:
             resp = requests.post(url, json=payload, headers=self._get_headers(), timeout=90)
             if resp.status_code != 200:
-                print(f"Laudus InvoicesList Error: {resp.status_code} {resp.text[:200]}")
+                logger.warning("Laudus InvoicesList Error: %s %s", resp.status_code, resp.text[:200])
                 return []
 
             # Normalmente retorna lista JSON (no wrapper)
@@ -385,5 +388,5 @@ class LaudusClient:
                 return data["data"]
             return []
         except Exception as e:
-            print(f"Laudus InvoicesList Exception: {e}")
+            logger.error("Laudus InvoicesList Exception: %s", e)
             return []
