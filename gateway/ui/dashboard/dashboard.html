@@ -75,31 +75,105 @@
       font-size: 0.87rem;
     }
 
-    .dashboard-widget-card {
-      align-items: flex-start;
-      text-align: left;
-      min-height: 220px;
-    }
-
-    .dashboard-widget-head {
+    .syscon-summary {
       display: flex;
-      justify-content: space-between;
-      width: 100%;
-      margin-bottom: 0.85rem;
-      gap: 12px;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.9rem;
     }
 
-    .dashboard-widget-head h4 {
-      margin: 0;
-      font-size: 0.95rem;
-      letter-spacing: 0.3px;
-    }
-
-    .dashboard-widget-help {
-      color: var(--text-soft);
+    .syscon-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       font-size: 0.8rem;
-      line-height: 1.35;
-      margin-bottom: 0.65rem;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .syscon-badge--ok {
+      color: #7dffb0;
+      border-color: rgba(68,255,136,0.35);
+      background: rgba(68,255,136,0.08);
+    }
+
+    .syscon-badge--warn {
+      color: #ffd166;
+      border-color: rgba(255,209,102,0.35);
+      background: rgba(255,209,102,0.08);
+    }
+
+    .syscon-badge--error {
+      color: #ff9999;
+      border-color: rgba(255,68,68,0.35);
+      background: rgba(255,68,68,0.1);
+    }
+
+    .syscon-log {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.83rem;
+    }
+
+    .syscon-line {
+      display: grid;
+      grid-template-columns: 1.2rem 7rem 1fr 4rem;
+      gap: 0.6rem;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+    }
+
+    .syscon-line--ok {
+      background: rgba(68,255,136,0.04);
+      border-color: rgba(68,255,136,0.1);
+    }
+
+    .syscon-line--warn {
+      background: rgba(255,209,102,0.06);
+      border-color: rgba(255,209,102,0.18);
+    }
+
+    .syscon-line--error {
+      background: rgba(255,68,68,0.07);
+      border-color: rgba(255,68,68,0.2);
+    }
+
+    .syscon-icon { text-align: center; }
+    .syscon-source {
+      font-weight: 600;
+      color: var(--text-soft);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .syscon-msg {
+      color: rgba(226,233,240,0.9);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .syscon-ts {
+      text-align: right;
+      color: var(--text-soft);
+      font-size: 0.76rem;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 600px) {
+      .syscon-line {
+        grid-template-columns: 1.2rem 1fr 3rem;
+        grid-template-rows: auto auto;
+      }
+      .syscon-source { display: none; }
     }
 
     .monstruo-table {
@@ -162,75 +236,6 @@
       color: #ff9999;
       border-color: rgba(255, 68, 68, 0.45);
       background: rgba(255, 68, 68, 0.18);
-    }
-
-    .guide-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
-    }
-
-    .guide-card {
-      background: rgba(8, 12, 18, 0.86);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .guide-card h4 {
-      margin: 0;
-      font-size: 0.92rem;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-    }
-
-    .guide-desc {
-      font-size: 0.85rem;
-      color: var(--text-soft);
-      line-height: 1.4;
-    }
-
-    .guide-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.84rem;
-    }
-
-    .guide-list-item {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      padding: 7px 10px;
-      background: rgba(255, 255, 255, 0.02);
-    }
-
-    .guide-token {
-      font-family: 'Space Grotesk', monospace;
-      color: #e6f0f9;
-      font-size: 0.8rem;
-    }
-
-    .guide-value {
-      color: var(--text-soft);
-      font-size: 0.8rem;
-      text-align: right;
-    }
-
-    .guide-code {
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-      background: rgba(3, 5, 8, 0.9);
-      padding: 10px;
-      color: #c8f8d6;
-      font-size: 0.79rem;
-      white-space: pre-wrap;
-      line-height: 1.4;
     }
 
     @media (max-width: 720px) {
@@ -300,68 +305,11 @@
           </div>
         </div>
 
-        <div id="failures-container" class="dashboard-block"></div>
-
         <div class="dashboard-block">
-          <h3 class="dashboard-block-title">Ticketera 360°</h3>
-          <div id="tks-widget-container" class="dashboard-grid dashboard-grid--two"></div>
-        </div>
-      </section>
-
-      <section class="section-block" id="section-style-guide">
-        <div class="section-header">
-          <h3>Guía Visual de la App</h3>
-          <p>Base oficial obligatoria: patrones PMO + ERP. Todo módulo nuevo o editado debe respetar esta línea visual, incluyendo contenedor principal sin cuadro de fondo.</p>
-        </div>
-
-        <div class="guide-grid demo-stagger">
-          <article class="guide-card" style="--i:0;">
-            <h4>Fuente Oficial PMO + ERP</h4>
-            <p class="guide-desc">PMO y ERP son la referencia canónica de UX para MONSTRUO. No se aceptan variantes visuales paralelas.</p>
-            <div class="guide-list">
-              <div class="guide-list-item"><span class="guide-token">Layout</span><span class="guide-value">`section-block` + `section-header` (sin cuadro base)</span></div>
-              <div class="guide-list-item"><span class="guide-token">Navegación</span><span class="guide-value">`tab-bar` + `tab-btn`</span></div>
-              <div class="guide-list-item"><span class="guide-token">Datos</span><span class="guide-value">`monstruo-table` / `erp-table`</span></div>
-              <div class="guide-list-item"><span class="guide-token">Acción</span><span class="guide-value">`btn-primary` neon + dark surface</span></div>
-            </div>
-          </article>
-
-          <article class="guide-card" style="--i:1;">
-            <h4>Contrato de Componentes</h4>
-            <p class="guide-desc">La composición visual mínima debe ser uniforme para que cualquier agente pueda intervenir sin romper consistencia.</p>
-            <div class="demo-row">
-              <span class="demo-chip demo-chip--ok">Panel principal</span>
-              <span class="demo-chip demo-chip--info">Subsecciones</span>
-              <span class="demo-chip">Acciones arriba</span>
-            </div>
-            <pre class="guide-code">div.main-inner.module-shell
-  div.section-header.module-tabs-header.module-shell-header
-  div.tab-bar (si aplica)
-  section.section-block.module-shell-content</pre>
-          </article>
-
-          <article class="guide-card" style="--i:2;">
-            <h4>Estados y Feedback</h4>
-            <p class="guide-desc">Toda pantalla debe comunicar estados de carga, éxito y error sin cajas blancas ni estilos del navegador.</p>
-            <div class="demo-stack">
-              <div class="demo-toast demo-toast--ok">Guardado correcto</div>
-              <div class="demo-toast demo-toast--info">Sin actividad reciente</div>
-              <div class="demo-skeleton"></div>
-            </div>
-          </article>
-
-          <article class="guide-card" style="--i:3;">
-            <h4>Checklist para Agentes</h4>
-            <p class="guide-desc">Checklist obligatorio antes de cerrar un cambio de UI en cualquier módulo.</p>
-            <div class="guide-list">
-              <div class="guide-list-item"><span class="guide-token">1.</span><span class="guide-value">Paleta PMO/ERP (`--neon`, `--info`, `--danger`)</span></div>
-              <div class="guide-list-item"><span class="guide-token">2.</span><span class="guide-value">Sin cajas blancas o inputs nativos sin tema</span></div>
-              <div class="guide-list-item"><span class="guide-token">3.</span><span class="guide-value">Contenedor principal sin cuadro (transparente)</span></div>
-              <div class="guide-list-item"><span class="guide-token">4.</span><span class="guide-value">Tablas/modales en superficie oscura consistente</span></div>
-              <div class="guide-list-item"><span class="guide-token">5.</span><span class="guide-value">Evitar inline style salvo excepción justificada</span></div>
-              <div class="guide-list-item"><span class="guide-token">6.</span><span class="guide-value">No romper contratos públicos del módulo</span></div>
-            </div>
-          </article>
+          <h3 class="dashboard-block-title"><i class="fas fa-terminal"></i> Sistema</h3>
+          <div id="system-console">
+            <div class="dashboard-empty-ok"><i class="fas fa-circle-notch fa-spin"></i> Cargando...</div>
+          </div>
         </div>
       </section>
     </div>
@@ -392,32 +340,7 @@
       return raw.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
     }
 
-    function relativeHours(isoDate) {
-      const created = new Date(isoDate);
-      if (Number.isNaN(created.getTime())) return { label: '-', warn: false };
-      const diffHrs = Math.max(0, Math.round((Date.now() - created.getTime()) / 36e5));
-      if (diffHrs > 24) {
-        return { label: `${Math.round(diffHrs / 24)}d`, warn: true };
-      }
-      return { label: `${diffHrs}h`, warn: diffHrs > 4 };
-    }
-
-    function initDashboardInteractions() {
-      const tksContainer = document.getElementById('tks-widget-container');
-      if (!tksContainer) return;
-      tksContainer.addEventListener('click', (evt) => {
-        const row = evt.target.closest('tr[data-ticket-id]');
-        if (!row) return;
-        const ticketId = asNumber(row.dataset.ticketId, 0);
-        if (ticketId <= 0) return;
-        const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
-        const isDevPath = window.location.pathname.startsWith('/dev');
-        const targetBase = isProdHost
-          ? `https://ticketera.telconsulting.cl${isDevPath ? '/dev' : ''}/`
-          : `${window.location.protocol}//${window.location.hostname}:9005/`;
-        window.location.href = `${targetBase}?ticket_id=${ticketId}`;
-      });
-    }
+function initDashboardInteractions() {}
 
     function renderDashboardHeader(data) {
       const statusNode = document.getElementById('dashboard-status');
@@ -469,97 +392,76 @@
       }
     }
 
-    function renderRecentFailures(data) {
-      const failContainer = document.getElementById('failures-container');
-      if (!failContainer) return;
-      const failures = Array.isArray(data.recent_failures) ? data.recent_failures : [];
+    function _tsLabel(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '-';
+      const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+      if (diffMin < 1) return 'ahora';
+      if (diffMin < 60) return `hace ${diffMin}m`;
+      const diffHrs = Math.floor(diffMin / 60);
+      if (diffHrs < 24) return `hace ${diffHrs}h`;
+      return `hace ${Math.floor(diffHrs / 24)}d`;
+    }
 
-      if (!failures.length) {
-        failContainer.innerHTML = `
-          <h4 class="dashboard-block-title">Alertas Recientes</h4>
-          <div class="dashboard-empty-ok"><i class="fas fa-check-circle"></i> Todos los sistemas operativos</div>
-        `;
+    function renderSystemConsole(data) {
+      const container = document.getElementById('system-console');
+      if (!container) return;
+
+      const failures = Array.isArray(data.recent_failures) ? data.recent_failures : [];
+      const events = Array.isArray(data.system_events) ? data.system_events : [];
+      const staleRunning = (data.jobs_health && data.jobs_health.stale_running) || 0;
+      const failures24h = (data.jobs_health && data.jobs_health.failures_24h) || 0;
+
+      const logLines = [];
+      events.forEach((e) => {
+        const s = e.status || 'ok';
+        logLines.push({
+          icon: s === 'error' ? '🔴' : s === 'warn' ? '🟡' : '🟢',
+          label: escapeHtml(e.label || e.source || '-'),
+          msg: escapeHtml(truncate(e.msg || '', 95)),
+          ts: _tsLabel(e.ts),
+          raw_ts: e.ts || '',
+          severity: s,
+        });
+      });
+      failures.forEach((f) => {
+        logLines.push({
+          icon: '🔴',
+          label: escapeHtml(f.job_type || 'Job'),
+          msg: escapeHtml(truncate(f.error_msg || f.last_error || 'Error desconocido', 95)),
+          ts: _tsLabel(f.started_at || f.updated_at),
+          raw_ts: f.started_at || f.updated_at || '',
+          severity: 'error',
+        });
+      });
+      logLines.sort((a, b) => (b.raw_ts > a.raw_ts ? 1 : -1));
+
+      const summaryHtml = `
+        <div class="syscon-summary">
+          <span class="syscon-badge ${failures24h > 0 ? 'syscon-badge--error' : 'syscon-badge--ok'}">
+            <i class="fas fa-bolt"></i> ${failures24h} fallas 24h
+          </span>
+          <span class="syscon-badge ${staleRunning > 0 ? 'syscon-badge--warn' : 'syscon-badge--ok'}">
+            <i class="fas fa-hourglass-half"></i> ${staleRunning} jobs atascados
+          </span>
+        </div>`;
+
+      if (!logLines.length) {
+        container.innerHTML = summaryHtml + `
+          <div class="dashboard-empty-ok"><i class="fas fa-check-circle"></i> Todos los sistemas operativos</div>`;
         return;
       }
 
-      const rows = failures.map((f) => {
-        const jobType = escapeHtml(f.job_type || '-');
-        const err = escapeHtml(truncate(f.error_msg || f.last_error || '-', 70));
-        const startedAt = String(f.started_at || f.updated_at || '');
-        const hour = startedAt.length >= 16 ? escapeHtml(startedAt.substring(11, 16)) : '-';
-        return `<tr><td>${jobType}</td><td style="color:#ff8d8d">${err}</td><td>${hour}</td></tr>`;
-      }).join('');
+      const rows = logLines.map((l) => `
+        <div class="syscon-line syscon-line--${l.severity}">
+          <span class="syscon-icon">${l.icon}</span>
+          <span class="syscon-source">${l.label}</span>
+          <span class="syscon-msg">${l.msg}</span>
+          <span class="syscon-ts">${l.ts}</span>
+        </div>`).join('');
 
-      failContainer.innerHTML = `
-        <h4 class="dashboard-block-title">⚠️ Alertas Recientes</h4>
-        <div class="table-scroll">
-          <table class="monstruo-table">
-            <thead><tr><th>Job</th><th>Error</th><th>Hora</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    function renderTicketeraWidgets(tksData) {
-      const tksContainer = document.getElementById('tks-widget-container');
-      if (!tksContainer) return;
-      const topClientes = Array.isArray(tksData.top_clientes) ? tksData.top_clientes : [];
-      const pendingEmails = Array.isArray(tksData.pending_emails) ? tksData.pending_emails : [];
-
-      const clientsRows = topClientes.length
-        ? topClientes.map((c) => `
-            <tr>
-              <td>${escapeHtml(c.cliente || '-')}</td>
-              <td><strong>${asNumber(c.total, 0)}</strong></td>
-            </tr>
-          `).join('')
-        : `<tr><td colspan="2" style="text-align:center; opacity:0.62;">Sin actividad reciente</td></tr>`;
-
-      const emailRows = pendingEmails.length
-        ? pendingEmails.map((email) => {
-          const ticketId = asNumber(email.id, 0);
-          const rowAttr = ticketId > 0 ? ` data-ticket-id="${ticketId}"` : '';
-          const subject = escapeHtml(truncate(email.titulo || 'Sin asunto', 30));
-          const customer = escapeHtml(email.customer_id || '-');
-          const age = relativeHours(email.created_at);
-          return `
-            <tr class="dash-link-row"${rowAttr}>
-              <td>${subject}</td>
-              <td>${customer}</td>
-              <td class="${age.warn ? 'dash-age-warn' : ''}">${escapeHtml(age.label)}</td>
-            </tr>
-          `;
-        }).join('')
-        : `<tr><td colspan="3" style="text-align:center; opacity:0.62;">Todo al día</td></tr>`;
-
-      tksContainer.innerHTML = `
-        <div class="card dashboard-widget-card">
-          <div class="dashboard-widget-head">
-            <h4><i class="fas fa-building"></i> Top Clientes</h4>
-          </div>
-          <div class="dashboard-widget-help">Clientes con mayor actividad abierta en ticketera.</div>
-          <div class="table-scroll">
-            <table class="monstruo-table">
-              <thead><tr><th>Cliente</th><th>Tickets</th></tr></thead>
-              <tbody>${clientsRows}</tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card dashboard-widget-card">
-          <div class="dashboard-widget-head">
-            <h4><i class="fas fa-envelope-open-text"></i> Correos Pendientes</h4>
-          </div>
-          <div class="dashboard-widget-help">Correos recibidos sin respuesta operativa reciente.</div>
-          <div class="table-scroll">
-            <table class="monstruo-table">
-              <thead><tr><th>Asunto</th><th>Cliente</th><th>Hace</th></tr></thead>
-              <tbody>${emailRows}</tbody>
-            </table>
-          </div>
-        </div>
-      `;
+      container.innerHTML = summaryHtml + `<div class="syscon-log">${rows}</div>`;
     }
 
     async function loadDashboard() {
@@ -567,18 +469,7 @@
         const data = await window.fetchApi('/api/ops/dashboard');
         renderDashboardHeader(data || {});
         renderOpsCards((data && data.kpis) || {});
-        renderRecentFailures(data || {});
-
-        try {
-          const tksData = await window.fetchApi('/api/tks/dashboard/kpi');
-          renderTicketeraWidgets(tksData || {});
-        } catch (ticketErr) {
-          console.warn('No se pudo cargar widget Ticketera/KPI:', ticketErr);
-          const tksContainer = document.getElementById('tks-widget-container');
-          if (tksContainer) {
-            tksContainer.innerHTML = '<div class="dashboard-empty-ok">No se pudo cargar Ticketera 360° en este momento.</div>';
-          }
-        }
+        renderSystemConsole(data || {});
       } catch (err) {
         console.error('Dashboard Error', err);
       }

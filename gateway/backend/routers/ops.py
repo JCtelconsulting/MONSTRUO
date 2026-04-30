@@ -156,12 +156,93 @@ def get_dashboard_stats(
             FROM sys_jobs
             WHERE status = 'FAILED'
             ORDER BY updated_at DESC
-            LIMIT 5
+            LIMIT 10
             """
         )
 
         row = _fetchone_safe(conn, "SELECT count(*) as cnt FROM customers")
         stats["kpis"]["total_customers"] = row.get("cnt") or 0
+
+        # --- System console data ---
+        system_events = []
+
+        # Email polling last run
+        email_job = _fetchone_safe(
+            conn,
+            """
+            SELECT status, updated_at, last_error
+            FROM sys_jobs
+            WHERE job_type = 'EMAIL_POLLING'
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """
+        )
+        if email_job:
+            is_failed = email_job.get("status") == "FAILED"
+            system_events.append({
+                "source": "email_polling",
+                "label": "Email Polling",
+                "status": "error" if is_failed else "ok",
+                "msg": email_job.get("last_error") or ("OK" if not is_failed else "Fallo desconocido"),
+                "ts": email_job.get("updated_at") or "",
+            })
+            if is_failed:
+                stats["system_status"] = "degraded"
+
+        # SLA escalations last 24h
+        sla_escalations = _fetchall_safe(
+            conn,
+            """
+            SELECT id, titulo, updated_at
+            FROM tickets
+            WHERE severidad = 'critica'
+              AND estado NOT IN ('cerrado', 'resuelto')
+              AND updated_at >= ?
+            ORDER BY updated_at DESC
+            LIMIT 5
+            """,
+            (cutoff,),
+        )
+        for t in sla_escalations:
+            system_events.append({
+                "source": "sla",
+                "label": "SLA Breach",
+                "status": "warn",
+                "msg": f"Ticket #{t.get('id')} — {(t.get('titulo') or '')[:60]}",
+                "ts": t.get("updated_at") or "",
+            })
+
+        # Stale running jobs (stuck)
+        stale_cutoff = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        stale_jobs = _fetchall_safe(
+            conn,
+            """
+            SELECT job_type, updated_at
+            FROM sys_jobs
+            WHERE status = 'RUNNING'
+              AND updated_at <= ?
+            ORDER BY updated_at ASC
+            LIMIT 5
+            """,
+            (stale_cutoff,),
+        )
+        for j in stale_jobs:
+            system_events.append({
+                "source": "stale_job",
+                "label": "Job Atascado",
+                "status": "warn",
+                "msg": f"{j.get('job_type')} lleva más de 30 min en RUNNING",
+                "ts": j.get("updated_at") or "",
+            })
+            stats["system_status"] = "degraded"
+
+        # Recent job failures (last 24h count already computed, add detail)
+        stats["jobs_health"]["stale_running"] = len(stale_jobs)
+
+        # Sort events by ts descending
+        system_events.sort(key=lambda x: x.get("ts") or "", reverse=True)
+        stats["system_events"] = system_events
+
         if _should_use_legacy_fallback(stats):
             return _fetch_legacy_dashboard(sess) or stats
         return stats
