@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from plataforma.core import db
-from erp import sales_service  # We'll use list_invoices
+from erp.backend import sales_service
 from datetime import datetime
 
 def get_account_status(customer_id: str) -> Dict[str, Any]:

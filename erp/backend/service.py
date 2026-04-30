@@ -3,10 +3,10 @@ from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from plataforma.core import db
-import sales_service
+from erp.backend import sales_service
 from plataforma.core import email as email_service
-from laudus import LaudusClient
-import indicators_service
+from erp.backend.laudus import LaudusClient
+from erp.backend import indicators_service
 
 
 def _utc_now_iso() -> str:

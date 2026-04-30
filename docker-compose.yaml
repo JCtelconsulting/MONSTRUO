@@ -82,7 +82,61 @@ services:
     depends_on:
       - db
     restart: unless-stopped
-    command: [ "uvicorn", "fundacion.main:app", "--host", "0.0.0.0", "--port", "9006" ]
+    command: [ "uvicorn", "fundacion.backend.main:app", "--host", "0.0.0.0", "--port", "9006" ]
+
+  bodega:
+    build:
+      context: .
+      dockerfile: ./bodega/Dockerfile
+    container_name: ${STACK_NAME:-monstruo-dev}-bodega
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${BODEGA_PORT:-9007}:9007"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - PORT=9007
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    restart: unless-stopped
+    command: [ "uvicorn", "bodega.backend.main:app", "--host", "0.0.0.0", "--port", "9007" ]
+
+  crm:
+    build:
+      context: .
+      dockerfile: ./crm/Dockerfile
+    container_name: ${STACK_NAME:-monstruo-dev}-crm
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${CRM_PORT:-9008}:9008"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - PORT=9008
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    restart: unless-stopped
+    command: [ "uvicorn", "crm.backend.main:app", "--host", "0.0.0.0", "--port", "9008" ]
+
+  erp:
+    build:
+      context: .
+      dockerfile: ./erp/Dockerfile
+    container_name: ${STACK_NAME:-monstruo-dev}-erp
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${ERP_PORT:-9009}:9009"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - PORT=9009
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    restart: unless-stopped
+    command: [ "uvicorn", "erp.backend.main:app", "--host", "0.0.0.0", "--port", "9009" ]
 
   gta:
     build:

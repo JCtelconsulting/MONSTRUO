@@ -8,11 +8,9 @@ from fastapi import Cookie, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response as FastAPIResponse
 from fastapi.staticfiles import StaticFiles
 
-app_dir = Path(__file__).parent
-repo_root = app_dir.parent
+repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
-sys.path.append(str(app_dir))
 
 from plataforma.core.env_loader import load_runtime_env
 
@@ -24,10 +22,10 @@ from plataforma.core.web import build_login_redirect_url
 
 app = FastAPI(title="Monstruo - GTA API", version="1.0")
 
-ui_dir = app_dir / "ui"
+ui_dir = repo_root / "gta" / "ui"
 app.mount("/static", StaticFiles(directory=str(ui_dir)), name="gta_static")
 
-shared_ui_dir = repo_root / "gateway" / "shared" / "ui"
+shared_ui_dir = repo_root / "gateway" / "ui" / "shared" / "ui"
 if shared_ui_dir.exists():
     app.mount("/shared", StaticFiles(directory=str(shared_ui_dir)), name="shared_static")
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from typing import List, Optional
 from pydantic import BaseModel
-import service as bodega_service
+from bodega.backend import service as bodega_service
 from plataforma.core import deps, db, jobs_engine
 from plataforma.core.audit_decorator import audit_action
 

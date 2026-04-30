@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
+from pydantic import BaseModel
 from plataforma.core import db, deps
+from crm.backend import service as crm_service
 
 router = APIRouter(prefix="/api/crm", tags=["crm"])
 
@@ -10,19 +12,15 @@ async def search_customers(
     limit: int = 50,
     sess: dict = Depends(deps.require_permission("crm:read"))
 ):
-    """Search customers locally."""
     conn = db.get_conn()
     try:
         sql = "SELECT * FROM customers"
         params = []
-        
         if q:
             sql += " WHERE name LIKE ? OR rut LIKE ? OR fantasy_name LIKE ?"
             params = [f"%{q}%", f"%{q}%", f"%{q}%"]
-            
         sql += " ORDER BY name ASC LIMIT ?"
         params.append(limit)
-        
         cursor = conn.execute(sql, tuple(params))
         return [dict(row) for row in cursor.fetchall()]
     finally:
@@ -41,9 +39,6 @@ async def get_customer(
         return dict(row)
     finally:
         conn.close()
-
-import service as crm_service
-from pydantic import BaseModel
 
 class InteractionIn(BaseModel):
     type: str

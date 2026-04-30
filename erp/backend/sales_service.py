@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any, Union
 from plataforma.core import db
-from bodega import service as bodega_service
+from bodega.backend import service as bodega_service
 
 
 def create_invoice_draft(

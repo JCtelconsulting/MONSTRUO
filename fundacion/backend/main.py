@@ -8,26 +8,24 @@ from fastapi import Cookie, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response as FastAPIResponse
 from fastapi.staticfiles import StaticFiles
 
-app_dir = Path(__file__).parent
-repo_root = app_dir.parent
+repo_root = Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
-sys.path.append(str(app_dir))
 
 from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 
-import router as fundacion_router
+from fundacion.backend import router as fundacion_router
 from plataforma.core import deps
 from plataforma.core.web import build_login_redirect_url
 
 app = FastAPI(title="Monstruo - Fundación API", version="1.0")
 
-ui_dir = app_dir / "ui"
+ui_dir = repo_root / "fundacion" / "ui"
 app.mount("/static", StaticFiles(directory=str(ui_dir)), name="fundacion_static")
 
-shared_ui_dir = repo_root / "gateway" / "shared" / "ui"
+shared_ui_dir = repo_root / "gateway" / "ui" / "shared" / "ui"
 if shared_ui_dir.exists():
     app.mount("/shared", StaticFiles(directory=str(shared_ui_dir)), name="shared_static")
 
@@ -41,7 +39,7 @@ async def _proxy_to_gateway(target_path: str, request: Request) -> FastAPIRespon
         headers.pop("host", None)
         response = await client.request(
             request.method,
-            f"http://gateway:8000{target_path}",
+            f"http://gateway:9001{target_path}",
             content=content,
             headers=headers,
             params=request.query_params,
