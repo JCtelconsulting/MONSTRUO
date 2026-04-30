@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from plataforma.core import deps
 from ticketera.backend import service as tickets_service
 from plataforma.core.audit_decorator import audit_action
-from ticketera.backend.tickets import roles as ticket_roles
+from ticketera.backend.services import roles as ticket_roles
 
 router = APIRouter(prefix="/api/tks", tags=["tickets"])
 legacy_router = APIRouter(prefix="/api", tags=["tickets-legacy"])

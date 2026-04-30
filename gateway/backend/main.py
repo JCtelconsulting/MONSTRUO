@@ -16,7 +16,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Re
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response as FastAPIResponse
 from pydantic import BaseModel
 
-from .api.routers import admin_users, config_router, ops
+from .routers import admin_users, config_router, ops
 from plataforma.core import auth_service, db, deps, security
 from plataforma.core.config import settings as app_settings
 from plataforma.core.middleware import AuthIdentityMiddleware

@@ -25,8 +25,8 @@ from urllib import request as urlrequest
 from urllib import error as urlerror
 from plataforma.core import email_integration, email as email_sender, jobs_engine
 from plataforma.core.config import settings as app_settings
-from tickets import roles as ticket_roles
-from tickets import workflow as ticket_workflow
+from ticketera.backend.services import roles as ticket_roles
+from ticketera.backend.services import workflow as ticket_workflow
 
 logger = logging.getLogger(__name__)
 
