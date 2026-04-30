@@ -1,4 +1,4 @@
-# Crm — Documentación
+# CRM — Documentación
 
 Gestión de clientes y contactos comerciales.
 

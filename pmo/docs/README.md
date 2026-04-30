@@ -1,4 +1,4 @@
-# Pmo — Documentación
+# PMO — Documentación
 
 Oficina de Proyectos. Gestión de proyectos técnicos e implementaciones.
 

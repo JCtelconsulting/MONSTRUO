@@ -1,4 +1,4 @@
-# Ia — Documentación
+# IA — Documentación
 
 Asistente IA (ULTRON). Integración con modelos de lenguaje para soporte interno.
 
