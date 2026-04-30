@@ -14,12 +14,18 @@ logger = logging.getLogger(__name__)
 try:
     import psycopg
     from psycopg.rows import dict_row
-
     _HAVE_PSYCOPG3 = True
 except Exception:
     psycopg = None
     dict_row = None
     _HAVE_PSYCOPG3 = False
+
+try:
+    from psycopg_pool import ConnectionPool as _PsycopgPool
+    _HAVE_POOL = True
+except Exception:
+    _PsycopgPool = None
+    _HAVE_POOL = False
 
 try:
     import psycopg2
@@ -30,6 +36,8 @@ except Exception:
     psycopg2 = None
     RealDictCursor = None
     _HAVE_PSYCOPG2 = False
+
+_pool: "object | None" = None  # ConnectionPool instance when available
 
 from core.env_loader import load_runtime_env
 
@@ -85,9 +93,10 @@ def _convert_sql_for_postgres(sql: str) -> str:
 
 
 class PgConn:
-    def __init__(self, conn, use_psycopg3: bool):
+    def __init__(self, conn, use_psycopg3: bool, pool=None):
         self._conn = conn
         self._use_psycopg3 = use_psycopg3
+        self._pool = pool  # si viene del pool, close() lo devuelve en lugar de cerrarlo
 
     def execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None):
         sql = _convert_sql_for_postgres(sql)
@@ -104,7 +113,43 @@ class PgConn:
         self._conn.rollback()
 
     def close(self):
-        self._conn.close()
+        if self._pool is not None:
+            self._pool.putconn(self._conn)
+        else:
+            self._conn.close()
+
+
+def init_pool() -> None:
+    """
+    Inicializa el connection pool global (psycopg3 + psycopg-pool).
+    Llamar una vez en el startup de la app. Sin pool, get_conn() abre
+    conexiones directas como antes — comportamiento degradado pero funcional.
+    """
+    global _pool
+    if not _HAVE_PSYCOPG3 or not _HAVE_POOL:
+        logger.warning("[DB] psycopg_pool no disponible — operando sin pool (conexiones directas)")
+        return
+    if _pool is not None:
+        return
+
+    db_url = os.getenv("DB_URL", "").strip()
+    if not (db_url.startswith("postgres://") or db_url.startswith("postgresql://")):
+        return
+
+    min_size = int(os.getenv("DB_POOL_MIN", "2"))
+    max_size = int(os.getenv("DB_POOL_MAX", "10"))
+    try:
+        _pool = _PsycopgPool(
+            db_url,
+            min_size=min_size,
+            max_size=max_size,
+            kwargs={"row_factory": dict_row},
+            open=True,
+        )
+        logger.info("[DB] Connection pool iniciado min=%d max=%d", min_size, max_size)
+    except Exception as e:
+        logger.error("[DB] No se pudo iniciar pool: %s — operando sin pool", e)
+        _pool = None
 
 
 def get_conn():
@@ -113,6 +158,13 @@ def get_conn():
         raise RuntimeError(
             f"CRITICAL: PostgreSQL is required. Check DB_URL environment variable ({'empty' if not db_url else 'invalid'}). SQLite fallback has been disabled for safety."
         )
+
+    # Usar pool si está disponible
+    if _pool is not None:
+        conn = _pool.getconn()
+        pg_conn = PgConn(conn, use_psycopg3=True, pool=_pool)
+        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, pmo, ia, ops, fundacion, public;")
+        return pg_conn
 
     if _HAVE_PSYCOPG3:
         conn = psycopg.connect(db_url, row_factory=dict_row)
@@ -247,6 +299,7 @@ def _run_guarded_pg_section(conn, section_name: str, fn) -> None:
 
 
 def init_db() -> None:
+    init_pool()
     conn = get_conn()
     try:
         for schema_name in (
