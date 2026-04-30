@@ -4,11 +4,11 @@ from pydantic import BaseModel
 from plataforma.core import deps, db
 from datetime import datetime, date
 import json
-from erp.backend.laudus import LaudusClient
-from erp.backend import service as facturacion_service
+from erp.backend.services.laudus import LaudusClient
+from erp.backend.services import service as facturacion_service
 from plataforma.core import jobs_engine
 from bodega.backend import service as bodega_service
-from erp.backend import indicators_service
+from erp.backend.services import indicators_service
 
 print("DEBUG: Loading facturacion.py module...")
 
