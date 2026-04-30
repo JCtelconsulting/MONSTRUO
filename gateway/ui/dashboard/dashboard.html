@@ -36,9 +36,40 @@
       gap: 1.3rem;
     }
 
-    .dashboard-grid--kpi {
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    .apps-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.6rem;
       margin-top: 1rem;
+    }
+
+    .app-kpi-block {
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+
+    .app-kpi-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-soft);
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .app-kpi-header i {
+      color: var(--neon, #00f3ff);
+      font-size: 0.85rem;
+    }
+
+    .dashboard-grid--kpi {
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      margin-top: 0;
     }
 
     .dashboard-grid--two {
@@ -287,22 +318,50 @@
 
       <section class="section-block module-shell-content" id="section-general">
 
-        <div class="dashboard-grid dashboard-grid--kpi" id="ops-kpi-grid">
-          <div class="card card-terreno dashboard-card" id="kpi-card-tickets">
-            <i class="fas fa-ticket-alt"></i>
-            <h2>Tickets</h2>
-            <p>Cargando...</p>
+        <div class="apps-kpi-grid">
+
+          <div class="app-kpi-block">
+            <div class="app-kpi-header">
+              <i class="fas fa-headset"></i>
+              <span>Ticketera</span>
+            </div>
+            <div class="dashboard-grid dashboard-grid--kpi">
+              <div class="card card-terreno dashboard-card" id="kpi-tks-open">
+                <i class="fas fa-ticket-alt"></i>
+                <h2>—</h2><p>tickets abiertos</p>
+              </div>
+              <div class="card card-terreno dashboard-card" id="kpi-tks-critical">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h2>—</h2><p>críticos</p>
+              </div>
+              <div class="card card-gerencia dashboard-card" id="kpi-tks-customers">
+                <i class="fas fa-users"></i>
+                <h2>—</h2><p>clientes</p>
+              </div>
+            </div>
           </div>
-          <div class="card card-supervisor dashboard-card" id="kpi-card-sales">
-            <i class="fas fa-file-invoice-dollar"></i>
-            <h2>Ventas</h2>
-            <p>Cargando...</p>
+
+          <div class="app-kpi-block">
+            <div class="app-kpi-header">
+              <i class="fas fa-sitemap"></i>
+              <span>GTA</span>
+            </div>
+            <div class="dashboard-grid dashboard-grid--kpi">
+              <div class="card card-supervisor dashboard-card" id="kpi-gta-pendientes">
+                <i class="fas fa-clock"></i>
+                <h2>—</h2><p>pendientes</p>
+              </div>
+              <div class="card card-supervisor dashboard-card" id="kpi-gta-progreso">
+                <i class="fas fa-spinner"></i>
+                <h2>—</h2><p>en progreso</p>
+              </div>
+              <div class="card card-terreno dashboard-card" id="kpi-gta-quiebres">
+                <i class="fas fa-unlink"></i>
+                <h2>—</h2><p>quiebres abiertos</p>
+              </div>
+            </div>
           </div>
-          <div class="card card-gerencia dashboard-card" id="kpi-card-customers">
-            <i class="fas fa-users"></i>
-            <h2>Clientes</h2>
-            <p>Cargando...</p>
-          </div>
+
         </div>
 
         <div class="dashboard-block">
@@ -356,39 +415,48 @@ function initDashboardInteractions() {}
       statusNode.innerHTML = html;
     }
 
-    function renderOpsCards(kpis) {
-      const ticketsOpen = asNumber(kpis.tickets_open, 0);
-      const ticketsCritical = asNumber(kpis.tickets_critical, 0);
-      const salesTodayAmount = asNumber(kpis.sales_today_amount, 0);
-      const salesTodayCount = asNumber(kpis.sales_today_count, 0);
-      const totalCustomers = asNumber(kpis.total_customers, 0);
+    function renderTicketeraKpis(kpis) {
+      const open = asNumber(kpis.tickets_open, 0);
+      const critical = asNumber(kpis.tickets_critical, 0);
+      const customers = asNumber(kpis.total_customers, 0);
 
-      const cardTickets = document.getElementById('kpi-card-tickets');
-      if (cardTickets) {
-        cardTickets.classList.toggle('is-critical', ticketsCritical > 0);
-        cardTickets.innerHTML = `
-          <i class="fas fa-ticket-alt"></i>
-          <h2>${ticketsOpen} Tickets</h2>
-          <p>${ticketsCritical} críticos</p>
-        `;
+      const el = (id) => document.getElementById(id);
+
+      const cardOpen = el('kpi-tks-open');
+      if (cardOpen) {
+        cardOpen.classList.toggle('is-critical', open > 0);
+        cardOpen.innerHTML = `<i class="fas fa-ticket-alt"></i><h2>${open}</h2><p>tickets abiertos</p>`;
       }
-
-      const cardSales = document.getElementById('kpi-card-sales');
-      if (cardSales) {
-        cardSales.innerHTML = `
-          <i class="fas fa-file-invoice-dollar"></i>
-          <h2>$${new Intl.NumberFormat('es-CL', { notation: 'compact' }).format(salesTodayAmount)}</h2>
-          <p>${salesTodayCount} ventas hoy</p>
-        `;
+      const cardCrit = el('kpi-tks-critical');
+      if (cardCrit) {
+        cardCrit.classList.toggle('is-critical', critical > 0);
+        cardCrit.innerHTML = `<i class="fas fa-exclamation-triangle"></i><h2>${critical}</h2><p>críticos</p>`;
       }
+      const cardCust = el('kpi-tks-customers');
+      if (cardCust) {
+        cardCust.innerHTML = `<i class="fas fa-users"></i><h2>${customers}</h2><p>clientes</p>`;
+      }
+    }
 
-      const cardCustomers = document.getElementById('kpi-card-customers');
-      if (cardCustomers) {
-        cardCustomers.innerHTML = `
-          <i class="fas fa-users"></i>
-          <h2>${totalCustomers}</h2>
-          <p>clientes activos</p>
-        `;
+    function renderGtaKpis(stats) {
+      const pendientes = asNumber(stats.pendientes, 0);
+      const enProgreso = asNumber(stats.en_progreso, 0);
+      const quiebres = asNumber(stats.quiebres_abiertos, 0);
+
+      const el = (id) => document.getElementById(id);
+
+      const cardPend = el('kpi-gta-pendientes');
+      if (cardPend) {
+        cardPend.innerHTML = `<i class="fas fa-clock"></i><h2>${pendientes}</h2><p>pendientes</p>`;
+      }
+      const cardProg = el('kpi-gta-progreso');
+      if (cardProg) {
+        cardProg.innerHTML = `<i class="fas fa-spinner"></i><h2>${enProgreso}</h2><p>en progreso</p>`;
+      }
+      const cardQ = el('kpi-gta-quiebres');
+      if (cardQ) {
+        cardQ.classList.toggle('is-critical', quiebres > 0);
+        cardQ.innerHTML = `<i class="fas fa-unlink"></i><h2>${quiebres}</h2><p>quiebres abiertos</p>`;
       }
     }
 
@@ -466,10 +534,18 @@ function initDashboardInteractions() {}
 
     async function loadDashboard() {
       try {
-        const data = await window.fetchApi('/api/ops/dashboard');
-        renderDashboardHeader(data || {});
-        renderOpsCards((data && data.kpis) || {});
-        renderSystemConsole(data || {});
+        const [opsData, gtaData] = await Promise.allSettled([
+          window.fetchApi('/api/ops/dashboard'),
+          window.fetchApi('/api/gta/stats'),
+        ]);
+
+        const ops = opsData.status === 'fulfilled' ? (opsData.value || {}) : {};
+        const gta = gtaData.status === 'fulfilled' ? (gtaData.value || {}) : {};
+
+        renderDashboardHeader(ops);
+        renderTicketeraKpis((ops.kpis) || {});
+        renderGtaKpis(gta);
+        renderSystemConsole(ops);
       } catch (err) {
         console.error('Dashboard Error', err);
       }
