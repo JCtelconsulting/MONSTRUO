@@ -1,55 +1,52 @@
-import imaplib
-import email
-from email.header import decode_header
-import re
-import html
+from __future__ import annotations
+
 import base64
+import email
+import html
+import imaplib
+import logging
 import mimetypes
-from core import db
+import re
+import time
+from email.header import decode_header
+
+from plataforma.core import db
+
+logger = logging.getLogger(__name__)
+
+_IMAP_MAX_RETRIES = 3
+_IMAP_RETRY_BACKOFF = (2, 5, 10)
+
 
 def get_imap_config():
     conn = db.get_conn()
     try:
-        keys = ['imap_host', 'imap_port', 'imap_user', 'imap_password', 'email_polling_interval']
-        placeholders = ', '.join(['%s' for _ in keys])
+        keys = ["imap_host", "imap_port", "imap_user", "imap_password", "email_polling_interval"]
+        placeholders = ", ".join(["%s" for _ in keys])
         query = f"SELECT key, value FROM system_settings WHERE key IN ({placeholders})"
         cursor = conn.execute(query, tuple(keys))
         rows = cursor.fetchall()
-        
         config = {}
         for r in rows:
             if isinstance(r, dict):
-                config[r['key']] = r['value']
+                config[r["key"]] = r["value"]
             else:
                 config[r[0]] = r[1]
-                
-        if not config.get('imap_host'): return None
+        if not config.get("imap_host"):
+            return None
         return config
     finally:
         conn.close()
 
+
 def clean_html_content(html_content: str) -> str:
-    """
-    Cleans HTML content to plain text using regex.
-    Removes scripts, styles, and extra whitespace.
-    """
     if not html_content:
         return ""
-        
-    # Remove script and style elements
-    clean = re.sub(r'<(script|style).*?>.*?</\1>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-    
-    # Remove HTML tags
-    clean = re.sub(r'<[^>]+>', '\n', clean)
-    
-    # Decode HTML entities
+    clean = re.sub(r"<(script|style).*?>.*?</\1>", "", html_content, flags=re.DOTALL | re.IGNORECASE)
+    clean = re.sub(r"<[^>]+>", "\n", clean)
     clean = html.unescape(clean)
-    
-    # Collapse whitespace
     lines = [line.strip() for line in clean.splitlines()]
-    clean = '\n'.join([line for line in lines if line])
-    
-    return clean
+    return "\n".join(line for line in lines if line)
 
 
 def _decode_mime_value(raw_value) -> str:
@@ -78,12 +75,7 @@ def _normalize_content_id(raw_value) -> str:
 
 def _preferred_extension(content_type: str) -> str:
     guessed = mimetypes.guess_extension(str(content_type or "").strip().lower()) or ""
-    normalized = {
-        ".jpe": ".jpg",
-        ".jpeg": ".jpg",
-        ".tiff": ".tif",
-    }.get(guessed.lower(), guessed.lower())
-    return normalized
+    return {".jpe": ".jpg", ".jpeg": ".jpg", ".tiff": ".tif"}.get(guessed.lower(), guessed.lower())
 
 
 def _fallback_inline_filename(content_type: str, content_id: str, index: int) -> str:
@@ -100,45 +92,65 @@ def _decode_part_payload(part, payload: bytes) -> str:
     except Exception:
         return payload.decode("utf-8", errors="replace")
 
+
 class EmailProcessor:
     def __init__(self):
         self.config = get_imap_config()
+        self.mail: imaplib.IMAP4_SSL | None = None
 
-    def connect(self):
+    def connect(self) -> None:
         if not self.config:
             raise ValueError("No IMAP config found")
-            
-        host = self.config['imap_host']
-        port = int(self.config.get('imap_port', 993))
-        user = self.config['imap_user']
-        password = self.config['imap_password']
-        
-        self.mail = imaplib.IMAP4_SSL(host, port, timeout=30)
-        self.mail.login(user, password)
-        
-    def fetch_unread(self):
+
+        host = self.config["imap_host"]
+        port = int(self.config.get("imap_port", 993))
+        user = self.config["imap_user"]
+        password = self.config["imap_password"]
+
+        last_exc: Exception | None = None
+        for attempt in range(_IMAP_MAX_RETRIES):
+            try:
+                self.mail = imaplib.IMAP4_SSL(host, port, timeout=30)
+                self.mail.login(user, password)
+                return
+            except Exception as e:
+                last_exc = e
+                wait = _IMAP_RETRY_BACKOFF[min(attempt, len(_IMAP_RETRY_BACKOFF) - 1)]
+                logger.warning("[IMAP] Connect attempt %s/%s failed: %s — retrying in %ss", attempt + 1, _IMAP_MAX_RETRIES, e, wait)
+                time.sleep(wait)
+        raise ConnectionError(f"IMAP connect failed after {_IMAP_MAX_RETRIES} attempts: {last_exc}") from last_exc
+
+    def _ensure_connected(self) -> None:
+        try:
+            if self.mail is not None:
+                self.mail.noop()
+                return
+        except Exception:
+            pass
+        logger.info("[IMAP] Connection lost — reconnecting...")
+        self.connect()
+
+    def fetch_unread(self) -> list[dict]:
+        self._ensure_connected()
         self.mail.select("inbox")
-        status, messages = self.mail.search(None, 'UNSEEN')
+        status, messages = self.mail.search(None, "UNSEEN")
         if status != "OK":
             return []
-            
+
         email_ids = messages[0].split()
         emails = []
-        
         for e_id in email_ids:
             try:
                 res, msg = self.mail.fetch(e_id, "(RFC822)")
                 for response in msg:
                     if isinstance(response, tuple):
-                        msg = email.message_from_bytes(response[1])
-                        parsed = self.parse_email(msg)
+                        parsed = self.parse_email(email.message_from_bytes(response[1]))
                         emails.append(parsed)
             except Exception as e:
-                print(f"[IMAP] Error fetching email {e_id}: {e}")
-                
+                logger.error("[IMAP] Error fetching email %s: %s", e_id, e)
         return emails
-        
-    def parse_email(self, msg):
+
+    def parse_email(self, msg) -> dict:
         raw_subject = msg.get("Subject", "") or ""
         subject = ""
         try:
@@ -155,13 +167,14 @@ class EmailProcessor:
         message_id = msg.get("Message-ID", "unknown")
         in_reply_to = msg.get("In-Reply-To")
         references = msg.get("References")
-        
-        print(f"[IMAP] Parsing email ID={message_id} from={sender}")
-        
+
+        logger.debug("[IMAP] Parsing email ID=%s from=%s", message_id, sender)
+
         body = ""
         body_html = ""
         attachments = []
         inline_counter = 0
+
         if msg.is_multipart():
             for part in msg.walk():
                 if part.is_multipart():
@@ -180,7 +193,7 @@ class EmailProcessor:
                         if decoded_body and not body.strip():
                             body = decoded_body
                     except Exception as e:
-                        print(f"[IMAP] Error decoding part {content_type}: {e}")
+                        logger.warning("[IMAP] Error decoding part %s: %s", content_type, e)
                     continue
 
                 if content_type == "text/html" and not filename and "attachment" not in content_disposition:
@@ -189,7 +202,7 @@ class EmailProcessor:
                         if decoded_html and not body_html.strip():
                             body_html = decoded_html
                     except Exception as e:
-                        print(f"[IMAP] Error decoding part {content_type}: {e}")
+                        logger.warning("[IMAP] Error decoding part %s: %s", content_type, e)
                     continue
 
                 is_attachment_like = bool(filename or content_id or "attachment" in content_disposition or "inline" in content_disposition)
@@ -198,16 +211,14 @@ class EmailProcessor:
 
                 inline_counter += 1
                 resolved_filename = filename or _fallback_inline_filename(content_type, content_id, inline_counter)
-                attachments.append(
-                    {
-                        "filename": resolved_filename or "attachment.bin",
-                        "content_type": content_type or "application/octet-stream",
-                        "data_base64": base64.b64encode(payload).decode("ascii"),
-                        "content_id": content_id,
-                        "disposition": content_disposition,
-                        "is_inline": bool(content_id or "inline" in content_disposition),
-                    }
-                )
+                attachments.append({
+                    "filename": resolved_filename or "attachment.bin",
+                    "content_type": content_type or "application/octet-stream",
+                    "data_base64": base64.b64encode(payload).decode("ascii"),
+                    "content_id": content_id,
+                    "disposition": content_disposition,
+                    "is_inline": bool(content_id or "inline" in content_disposition),
+                })
         else:
             content_type = msg.get_content_type()
             try:
@@ -219,8 +230,8 @@ class EmailProcessor:
                     else:
                         body = decoded
             except Exception as e:
-                print(f"[IMAP] Error decoding single-part email: {e}")
-        
+                logger.warning("[IMAP] Error decoding single-part email: %s", e)
+
         if not body.strip() and body_html.strip():
             body = clean_html_content(body_html)
 
@@ -234,10 +245,14 @@ class EmailProcessor:
             "references": references,
             "attachments": attachments,
         }
-        
-    def close(self):
+
+    def close(self) -> None:
+        if self.mail is None:
+            return
         try:
             self.mail.close()
             self.mail.logout()
-        except:
+        except Exception:
             pass
+        finally:
+            self.mail = None

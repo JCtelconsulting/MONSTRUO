@@ -1,20 +1,22 @@
+from __future__ import annotations
+
 import asyncio
 import json
-import traceback
 import logging
+import traceback
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Optional
 
-from core import db
+from plataforma.core import db
 
-# Configuration
-POLL_INTERVAL = 30  # seconds
+POLL_INTERVAL = 30
 JOB_HANDLERS: Dict[str, Callable] = {}
 logger = logging.getLogger(__name__)
 
+
 def register_job(job_type: str, handler: Callable) -> None:
-    """Register a python function to a job type string."""
     JOB_HANDLERS[job_type] = handler
+
 
 def _as_payload_json(payload: Optional[dict]) -> str:
     return json.dumps(payload or {}, ensure_ascii=False)
@@ -39,12 +41,11 @@ async def enqueue_job(
     max_retries: int = 3,
     next_run_at: Optional[str] = None,
 ) -> int:
-    """Enqueue a job. Returns inserted job id."""
     conn = db.get_conn()
     try:
         now = db.now_utc_iso()
         row = conn.execute(
-            """INSERT INTO sys_jobs 
+            """INSERT INTO sys_jobs
                (job_type, status, payload, next_run_at, retries_count, max_retries, created_at, updated_at)
                VALUES (?, 'PENDING', ?, ?, 0, ?, ?, ?)
                RETURNING id""",
@@ -71,10 +72,6 @@ async def enqueue_unique_job(
     next_run_at: Optional[str] = None,
     update_existing_next_run: bool = False,
 ) -> Dict[str, Any]:
-    """
-    Enqueue a recurring job only if there is no PENDING/RETRY row for the same type.
-    Returns metadata: {enqueued, duplicate, job_id}.
-    """
     normalized_job = str(job_type or "").strip()
     if not normalized_job:
         raise ValueError("job_type requerido")
@@ -122,15 +119,11 @@ async def enqueue_unique_job(
         return {"enqueued": True, "duplicate": False, "job_id": int(inserted["id"])}
     except Exception as e:
         conn.rollback()
-        # Handle race condition when partial unique indexes are enabled.
         if "idx_sys_jobs_unique_pending_email" in str(e) or "idx_sys_jobs_unique_pending_notifications" in str(e):
             existing = conn.execute(
-                """SELECT id
-                   FROM sys_jobs
-                   WHERE job_type = ?
-                     AND status IN ('PENDING', 'RETRY')
-                   ORDER BY next_run_at ASC, id ASC
-                   LIMIT 1""",
+                """SELECT id FROM sys_jobs
+                   WHERE job_type = ? AND status IN ('PENDING', 'RETRY')
+                   ORDER BY next_run_at ASC, id ASC LIMIT 1""",
                 (normalized_job,),
             ).fetchone()
             return {
@@ -144,25 +137,16 @@ async def enqueue_unique_job(
 
 
 def recover_stale_running_jobs(stale_minutes: int = 20) -> Dict[str, Any]:
-    """
-    Move stale RUNNING jobs to RETRY. Returns summary by job_type.
-    """
     cutoff = (datetime.now(timezone.utc) - timedelta(minutes=max(1, int(stale_minutes or 20)))).isoformat()
     now = db.now_utc_iso()
-    stale_marker = (
-        f"[RECOVER_STALE] moved to RETRY at {now} because RUNNING exceeded {max(1, int(stale_minutes or 20))}m."
-    )
-    skipped_marker = (
-        f"[RECOVER_STALE] stale RUNNING could not move to RETRY at {now} due to active PENDING/RETRY for same recurring job_type."
-    )
+    stale_marker = f"[RECOVER_STALE] moved to RETRY at {now} because RUNNING exceeded {max(1, int(stale_minutes or 20))}m."
+    skipped_marker = f"[RECOVER_STALE] stale RUNNING could not move to RETRY at {now} due to active PENDING/RETRY for same recurring job_type."
     unique_recurring_types = {"EMAIL_POLLING", "PROCESS_NOTIFICATIONS"}
     conn = db.get_conn()
     try:
         stale_rows = conn.execute(
-            """SELECT id, job_type
-               FROM sys_jobs
-               WHERE status = 'RUNNING'
-                 AND updated_at::timestamptz < ?::timestamptz
+            """SELECT id, job_type FROM sys_jobs
+               WHERE status = 'RUNNING' AND updated_at::timestamptz < ?::timestamptz
                ORDER BY updated_at::timestamptz ASC, id ASC""",
             (cutoff,),
         ).fetchall()
@@ -174,40 +158,25 @@ def recover_stale_running_jobs(stale_minutes: int = 20) -> Dict[str, Any]:
             can_move_to_retry = True
             if job_type in unique_recurring_types:
                 existing = conn.execute(
-                    """SELECT id
-                       FROM sys_jobs
-                       WHERE job_type = ?
-                         AND status IN ('PENDING', 'RETRY')
-                         AND id <> ?
-                       ORDER BY id ASC
-                       LIMIT 1""",
+                    """SELECT id FROM sys_jobs
+                       WHERE job_type = ? AND status IN ('PENDING', 'RETRY') AND id <> ?
+                       ORDER BY id ASC LIMIT 1""",
                     (job_type, job_id),
                 ).fetchone()
                 can_move_to_retry = not bool(existing)
 
             if can_move_to_retry:
                 conn.execute(
-                    """UPDATE sys_jobs
-                       SET status = 'RETRY',
-                           next_run_at = ?,
-                           updated_at = ?,
-                           last_error = CASE
-                               WHEN COALESCE(last_error, '') = '' THEN ?
-                               ELSE (last_error || E'\n' || ?)
-                           END
+                    """UPDATE sys_jobs SET status = 'RETRY', next_run_at = ?, updated_at = ?,
+                           last_error = CASE WHEN COALESCE(last_error, '') = '' THEN ? ELSE (last_error || E'\n' || ?) END
                        WHERE id = ?""",
                     (now, now, stale_marker, stale_marker, job_id),
                 )
                 recovered_rows.append({"id": job_id, "job_type": job_type})
             else:
                 conn.execute(
-                    """UPDATE sys_jobs
-                       SET status = 'FAILED',
-                           updated_at = ?,
-                           last_error = CASE
-                               WHEN COALESCE(last_error, '') = '' THEN ?
-                               ELSE (last_error || E'\n' || ?)
-                           END
+                    """UPDATE sys_jobs SET status = 'FAILED', updated_at = ?,
+                           last_error = CASE WHEN COALESCE(last_error, '') = '' THEN ? ELSE (last_error || E'\n' || ?) END
                        WHERE id = ?""",
                     (now, skipped_marker, skipped_marker, job_id),
                 )
@@ -233,10 +202,8 @@ def cleanup_old_jobs(retention_days: int = 14) -> Dict[str, Any]:
     conn = db.get_conn()
     try:
         row = conn.execute(
-            """DELETE FROM sys_jobs
-               WHERE status IN ('COMPLETED', 'FAILED')
-                 AND updated_at::timestamptz < ?::timestamptz
-               RETURNING id""",
+            """DELETE FROM sys_jobs WHERE status IN ('COMPLETED', 'FAILED')
+               AND updated_at::timestamptz < ?::timestamptz RETURNING id""",
             (cutoff,),
         ).fetchall()
         conn.commit()
@@ -245,8 +212,7 @@ def cleanup_old_jobs(retention_days: int = 14) -> Dict[str, Any]:
         conn.close()
 
 
-async def process_job(job_row):
-    """Execute a single job with retry logic."""
+async def process_job(job_row: dict) -> None:
     job_id = int(job_row["id"])
     job_type = str(job_row["job_type"])
     payload_str = job_row.get("payload") or "{}"
@@ -258,96 +224,78 @@ async def process_job(job_row):
     now = db.now_utc_iso()
 
     if not handler:
-        # Fatal error, unknown handler
         conn.execute("UPDATE sys_jobs SET status='FAILED', last_error='Unknown Handler', updated_at=? WHERE id=?", (now, job_id))
         conn.commit()
         conn.close()
         return
 
     try:
-        # Parse payload
         payload = json.loads(payload_str) if isinstance(payload_str, str) else (payload_str or {})
         if not isinstance(payload, dict):
             payload = {}
-        
-        # Execute (Sync or Async support?)
-        # For simplicity, we assume handlers are functions we can call. 
-        # If they are async, we await them. If sync, we run in thread.
+
         if asyncio.iscoroutinefunction(handler):
             await handler(payload)
         else:
             await asyncio.to_thread(handler, payload)
-            
-        # Success
+
         conn.execute("UPDATE sys_jobs SET status='COMPLETED', updated_at=? WHERE id=?", (db.now_utc_iso(), job_id))
 
     except Exception as e:
         error_msg = str(e) + "\n" + traceback.format_exc()
-        print(f"[JobEngine] Job {job_id} ({job_type}) FAILED: {e}")
+        logger.error("[JobEngine] Job %s (%s) FAILED: %s", job_id, job_type, e)
 
         if retries < max_retries:
-            # Backoff: 2^retries * 60 seconds
             delay = (2 ** retries) * 60
             next_run = _next_run_iso(delay)
             conn.execute(
                 "UPDATE sys_jobs SET status='RETRY', retries_count=retries_count+1, next_run_at=?, last_error=?, updated_at=? WHERE id=?",
-                (next_run, error_msg, db.now_utc_iso(), job_id)
+                (next_run, error_msg, db.now_utc_iso(), job_id),
             )
         else:
-            # DLQ
             conn.execute(
                 "UPDATE sys_jobs SET status='FAILED', last_error=?, updated_at=? WHERE id=?",
-                (error_msg, db.now_utc_iso(), job_id)
+                (error_msg, db.now_utc_iso(), job_id),
             )
     finally:
         conn.commit()
         conn.close()
 
-async def worker_loop():
-    """Background loop to poll and execute jobs."""
-    print("[JobEngine] Worker started.")
+
+async def worker_loop() -> None:
+    logger.info("[JobEngine] Worker started.")
     while True:
         try:
             conn = db.get_conn()
             now = db.now_utc_iso()
             row = conn.execute(
                 """WITH candidate AS (
-                       SELECT id
-                       FROM sys_jobs
-                       WHERE status IN ('PENDING', 'RETRY')
-                         AND next_run_at::timestamptz <= ?::timestamptz
+                       SELECT id FROM sys_jobs
+                       WHERE status IN ('PENDING', 'RETRY') AND next_run_at::timestamptz <= ?::timestamptz
                        ORDER BY next_run_at::timestamptz ASC, id ASC
-                       LIMIT 1
-                       FOR UPDATE SKIP LOCKED
+                       LIMIT 1 FOR UPDATE SKIP LOCKED
                    )
-                   UPDATE sys_jobs j
-                   SET status = 'RUNNING',
-                       updated_at = ?
-                   FROM candidate c
-                   WHERE j.id = c.id
+                   UPDATE sys_jobs j SET status = 'RUNNING', updated_at = ?
+                   FROM candidate c WHERE j.id = c.id
                    RETURNING j.id, j.job_type, j.payload, j.retries_count, j.max_retries""",
                 (now, now),
             ).fetchone()
             conn.commit()
-            conn.close()  # Free connection for execution phase
+            conn.close()
 
             if row:
                 await process_job(dict(row))
                 continue
 
-            # No jobs, sleep
             await asyncio.sleep(POLL_INTERVAL)
 
         except asyncio.CancelledError:
-            print("[JobEngine] Stopping worker.")
+            logger.info("[JobEngine] Stopping worker.")
             break
         except Exception as e:
-            print(f"[JobEngine] Loop error: {e}")
+            logger.error("[JobEngine] Loop error: %s", e)
             await asyncio.sleep(POLL_INTERVAL)
 
-# ==========================================================================
-# SYSTEM JOBS IMPL
-# ==========================================================================
 
 async def cleanup_sys_jobs_job(payload: Optional[dict] = None) -> None:
     payload = payload or {}
@@ -355,9 +303,7 @@ async def cleanup_sys_jobs_job(payload: Optional[dict] = None) -> None:
     result = cleanup_old_jobs(retention_days=retention_days)
     logger.info(
         "[JobEngine] cleanup sys_jobs deleted=%s retention_days=%s cutoff=%s",
-        result.get("deleted"),
-        result.get("retention_days"),
-        result.get("cutoff"),
+        result.get("deleted"), result.get("retention_days"), result.get("cutoff"),
     )
     if bool(payload.get("recurring", True)):
         await enqueue_unique_job(
@@ -368,21 +314,21 @@ async def cleanup_sys_jobs_job(payload: Optional[dict] = None) -> None:
             update_existing_next_run=False,
         )
 
-async def recover_stale_jobs_job(payload: dict):
+
+async def recover_stale_jobs_job(payload: dict) -> None:
     stale_minutes = int(payload.get("stale_minutes", 20) or 20)
     result = recover_stale_running_jobs(stale_minutes=stale_minutes)
     if result.get("recovered", 0) > 0:
-        print(f"[JobEngine] Recovered {result['recovered']} stale jobs.")
-
+        logger.info("[JobEngine] Recovered %s stale jobs.", result["recovered"])
     if bool(payload.get("recurring", True)):
         await enqueue_unique_job(
             "RECOVER_STALE_JOBS",
             {"recurring": True, "stale_minutes": stale_minutes},
             max_retries=1,
-            next_run_at=_next_run_iso(10 * 60), # Cada 10 min
+            next_run_at=_next_run_iso(10 * 60),
             update_existing_next_run=False,
         )
 
-# Register default jobs
+
 register_job("CLEANUP_SYS_JOBS", cleanup_sys_jobs_job)
 register_job("RECOVER_STALE_JOBS", recover_stale_jobs_job)

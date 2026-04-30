@@ -1,7 +1,12 @@
-from core import db
-import json
-import hashlib
+from __future__ import annotations
 
+import hashlib
+import json
+import logging
+
+from plataforma.core import db
+
+logger = logging.getLogger(__name__)
 
 CHAIN_ALGO = "sha256"
 CHAIN_VERSION = 1
@@ -23,7 +28,7 @@ def log_audit(
     ip: str = "",
     severity: str = "info",
     metadata: dict = None,
-):
+) -> None:
     try:
         conn = db.get_conn()
         ts = db.now_utc_iso()
@@ -48,21 +53,12 @@ def log_audit(
                 chain_prev_hash, chain_hash, chain_algo, chain_version)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                ts,
-                actor,
-                action,
-                target,
-                ip,
-                severity,
-                meta_str,
-                prev_hash,
-                chain_hash,
-                CHAIN_ALGO,
-                CHAIN_VERSION,
+                ts, actor, action, target, ip, severity, meta_str,
+                prev_hash, chain_hash, CHAIN_ALGO, CHAIN_VERSION,
             ),
         )
         conn.commit()
     except Exception as e:
-        print(f"AUDIT FAIL: {e}")
+        logger.error("AUDIT FAIL: %s", e)
     finally:
         conn.close()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
@@ -8,19 +8,24 @@ from fastapi import Cookie, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response as FastAPIResponse
 from fastapi.staticfiles import StaticFiles
 
-repo_root = Path(__file__).resolve().parents[2]
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
 from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 
 from pmo.backend import router as pmo_router
-from plataforma.core import deps
+from plataforma.core import db, deps
 from plataforma.core.web import build_login_redirect_url
 
-app = FastAPI(title="Monstruo - PMO API", version="1.0")
+repo_root = Path(__file__).resolve().parents[2]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    yield
+
+
+app = FastAPI(title="Monstruo - PMO API", version="1.0", lifespan=lifespan)
 
 ui_dir = repo_root / "pmo" / "ui"
 app.mount("/static", StaticFiles(directory=str(ui_dir)), name="pmo_static")

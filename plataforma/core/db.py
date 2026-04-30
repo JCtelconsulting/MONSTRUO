@@ -2473,6 +2473,23 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_gta_v2", _migrate_gta_v2_section)
 
+        def _migrate_sys_notifications_section() -> None:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS core.sys_notifications (
+                id         SERIAL PRIMARY KEY,
+                user_id    TEXT NOT NULL,
+                message    TEXT NOT NULL,
+                severity   TEXT NOT NULL DEFAULT 'INFO',
+                read       BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TEXT NOT NULL DEFAULT ''
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sys_notif_user   ON core.sys_notifications(user_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sys_notif_read   ON core.sys_notifications(read);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sys_notif_ts     ON core.sys_notifications(created_at DESC);")
+
+        _run_guarded_pg_section(conn, "migrate_sys_notifications", _migrate_sys_notifications_section)
+
         # Automated Migrations Engine
         try:
             from core import migrations

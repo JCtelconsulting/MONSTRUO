@@ -1,33 +1,31 @@
-from datetime import datetime
-from core import db
+from __future__ import annotations
 
-from pathlib import Path
+import logging
+from datetime import datetime, timezone
 
-# In a real system, this would integrate with SMTP or Slack API.
-# For now, we simulate by writing to a dedicated log file.
-# code/app/core/notifications.py -> parents[3] = root
-LOG_FILE = Path(__file__).resolve().parents[3] / "notifications.log"
+from plataforma.core import db
 
-def send_notification(user_id: str, message: str, severity: str = "INFO"):
-    """
-    Send a notification to a local user.
-    mvp: Write to notifications.log
-    """
-    timestamp = datetime.now().isoformat()
-    
-    # 1. Console Output (for debugging/docker logs)
-    print(f"[NOTIF][{severity}] To {user_id}: {message}")
-    
-    # 2. Append to Log File (mvp inbox)
+logger = logging.getLogger(__name__)
+
+
+def send_notification(user_id: str, message: str, severity: str = "INFO") -> None:
+    timestamp = datetime.now(timezone.utc).isoformat()
     try:
-        with open(LOG_FILE, "a") as f:
-            f.write(f"[{timestamp}] [{severity}] User: {user_id} | Msg: {message}\n")
+        conn = db.get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO core.sys_notifications (user_id, message, severity, created_at)
+                   VALUES (%s, %s, %s, %s)""",
+                (str(user_id or ""), str(message or ""), str(severity or "INFO"), timestamp),
+            )
+            conn.commit()
+        finally:
+            conn.close()
     except Exception as e:
-        print(f"Failed to write notification log: {e}")
+        logger.error("Failed to save notification for %s: %s", user_id, e)
 
-# Map job severities or others
-def notify_ticket_escalation(ticket_id: int, title: str, assignee_id: str):
-    msg = f"TICKET #{ticket_id} '{title}' has ESCALATED to CRITICAL due to SLA breach."
-    # Notify assignee if exists, else notify admins/ops channel
+
+def notify_ticket_escalation(ticket_id: int, title: str, assignee_id: str) -> None:
+    msg = f"TICKET #{ticket_id} '{title}' ha escalado a CRITICO por SLA."
     target = assignee_id if assignee_id else "OPS_CHANNEL"
     send_notification(target, msg, "CRITICAL")

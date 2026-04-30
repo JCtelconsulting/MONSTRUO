@@ -1,28 +1,26 @@
-import os
-import re
-from pathlib import Path
-from typing import List, Optional
-from datetime import datetime, timezone
-import json
+from __future__ import annotations
 
-from core import db
+import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+from plataforma.core import db
+
+logger = logging.getLogger(__name__)
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
 
-def run_migrations():
-    """
-    Motor de migraciones automáticas para MONSTRUO.
-    Busca archivos .sql en plataforma/migrations/ y los ejecuta en orden alfabético.
-    """
-    print("[MIGRATIONS] Iniciando chequeo de migraciones...")
-    
+
+def run_migrations() -> None:
+    logger.info("[MIGRATIONS] Iniciando chequeo de migraciones...")
+
     if not MIGRATIONS_DIR.exists():
         os.makedirs(MIGRATIONS_DIR, exist_ok=True)
-        print(f"[MIGRATIONS] Directorio creado: {MIGRATIONS_DIR}")
+        logger.info("[MIGRATIONS] Directorio creado: %s", MIGRATIONS_DIR)
 
     conn = db.get_conn()
     try:
-        # 1. Asegurar tabla de logs
         conn.execute("""
             CREATE TABLE IF NOT EXISTS core.migration_log (
                 id SERIAL PRIMARY KEY,
@@ -34,69 +32,59 @@ def run_migrations():
         """)
         conn.commit()
 
-        # 2. Obtener lista de archivos
         files = sorted([f for f in os.listdir(MIGRATIONS_DIR) if f.endswith(".sql")])
         if not files:
-            print("[MIGRATIONS] No hay archivos de migración pendientes.")
+            logger.info("[MIGRATIONS] No hay archivos de migración pendientes.")
             return
 
-        # 3. Ejecutar pendientes
         for filename in files:
-            # Verificar si ya se aplicó
             row = conn.execute(
-                "SELECT success FROM core.migration_log WHERE filename = %s", 
-                (filename,)
+                "SELECT success FROM core.migration_log WHERE filename = %s",
+                (filename,),
             ).fetchone()
-            
+
             if row and row.get("success"):
                 continue
 
-            print(f"[MIGRATIONS] Aplicando: {filename}...")
+            logger.info("[MIGRATIONS] Aplicando: %s", filename)
             file_path = MIGRATIONS_DIR / filename
-            with open(file_path, "r", encoding="utf-8") as f:
-                sql_content = f.read()
+            sql_content = file_path.read_text(encoding="utf-8")
 
             try:
-                # Ejecutar el SQL (puede contener varias sentencias separadas por ;)
-                # Nota: psycopg2 permite múltiples sentencias en un execute
                 conn.execute(sql_content)
-                
-                # Registrar éxito
                 now = datetime.now(timezone.utc).isoformat()
-                if row: # Si existía pero falló, actualizamos
+                if row:
                     conn.execute(
                         "UPDATE core.migration_log SET success = TRUE, applied_at = %s, error_message = NULL WHERE filename = %s",
-                        (now, filename)
+                        (now, filename),
                     )
                 else:
                     conn.execute(
                         "INSERT INTO core.migration_log (filename, applied_at, success) VALUES (%s, %s, TRUE)",
-                        (filename, now)
+                        (filename, now),
                     )
                 conn.commit()
-                print(f"[MIGRATIONS] Éxito: {filename}")
+                logger.info("[MIGRATIONS] Éxito: %s", filename)
             except Exception as e:
                 conn.rollback()
                 now = datetime.now(timezone.utc).isoformat()
                 error_msg = str(e)
-                print(f"[MIGRATIONS] ERROR en {filename}: {error_msg}")
-                
+                logger.error("[MIGRATIONS] ERROR en %s: %s", filename, error_msg)
                 if row:
                     conn.execute(
                         "UPDATE core.migration_log SET success = FALSE, applied_at = %s, error_message = %s WHERE filename = %s",
-                        (now, error_msg, filename)
+                        (now, error_msg, filename),
                     )
                 else:
                     conn.execute(
                         "INSERT INTO core.migration_log (filename, applied_at, success, error_message) VALUES (%s, %s, FALSE, %s)",
-                        (filename, now, error_msg)
+                        (filename, now, error_msg),
                     )
                 conn.commit()
-                # Detenemos la cadena de migraciones si una falla por seguridad
                 break
-
     finally:
         conn.close()
+
 
 if __name__ == "__main__":
     run_migrations()
