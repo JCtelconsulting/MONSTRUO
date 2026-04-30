@@ -68,11 +68,18 @@ runner/
 # Local secrets (machine-specific)
 .secrets/
 
-# Runtime ticket attachments
+# Runtime data por módulo (excluir contenido, mantener carpeta vía .gitkeep)
 ticketera/data/tickets/
 ticketera/data/compliance/
 fundacion/data/
 erp/data/
+bodega/data/
+crm/data/
+gta/data/
+ia/data/
+pmo/data/
+zabbix/data/
+gateway/data/
 
 # Guardian runtime reports
 plataforma/ops/guardian/reportes/*.json

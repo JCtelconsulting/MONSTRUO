@@ -247,15 +247,15 @@ app.include_router(ops.router)
 
 SERVICES_MAP = {
     "ticketera": f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
-    "tks": f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
-    "erp": "http://erp:8000",
-    "bodega": "http://bodega:8000",
-    "crm": "http://crm:8000",
-    "pmo": "http://pmo:8000",
-    "ia": "http://ia:8000",
-    "zabbix": "http://zabbix:8000",
+    "tks":       f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
     "fundacion": f"http://fundacion:{os.getenv('FUNDACION_PORT', '9006')}",
-    "gta": f"http://gta:{os.getenv('GTA_PORT', '9012')}",
+    "bodega":    f"http://bodega:{os.getenv('BODEGA_PORT', '9007')}",
+    "crm":       f"http://crm:{os.getenv('CRM_PORT', '9008')}",
+    "erp":       f"http://erp:{os.getenv('ERP_PORT', '9009')}",
+    "pmo":       f"http://pmo:{os.getenv('PMO_PORT', '9010')}",
+    "ia":        f"http://ia:{os.getenv('IA_PORT', '9011')}",
+    "gta":       f"http://gta:{os.getenv('GTA_PORT', '9012')}",
+    "zabbix":    f"http://zabbix:{os.getenv('ZABBIX_PORT', '9013')}",
 }
 
 SERVICE_API_PREFIX = {

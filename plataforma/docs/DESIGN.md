@@ -364,16 +364,14 @@ MODULO/
 | --- | ------ | ------- | -- | ----- |
 | **gateway** | 9001 | `backend/` | `ui/` | Sidebar, login, dashboard, proxy central |
 | **ticketera** | 9005 | `backend/` | `ui/` | Multi-tab. Jobs en `backend/jobs/` |
-| **fundacion** | 9006 | `backend/` | `ui/` | CRUD simple. `main.py` y `router.py` en raíz (legacy) |
-| **erp** | — | raíz (legacy) | `ui/` | `main.py`, `router.py`, `service.py` en raíz |
-| **crm** | — | raíz (legacy) | `ui/` | `main.py`, `router.py`, `service.py` en raíz |
-| **bodega** | — | raíz (legacy) | `ui/` | `main.py`, `router.py`, `service.py` en raíz |
-| **gta** | 9012 | `backend/` | `ui/` | ✓ Estructura canónica |
-| **pmo** | 9009 | `backend/` | `ui/` | Vacío — pendiente de desarrollo |
-| **ia** | 9010 | `backend/` | `ui/` | Parcialmente desarrollado |
-| **zabbix** | 9011 | `backend/` | `ui/` | Vacío — proxy externo |
-
-> **Nota deuda técnica:** erp, crm, bodega y fundacion tienen `main.py` y `router.py` en la raíz del módulo (patrón legacy anterior a gta). Al modificar esas apps, mover la lógica a `backend/` siguiendo el estándar actual.
+| **fundacion** | 9006 | `backend/` | `ui/` | CRUD simple + proxy a gateway |
+| **bodega** | 9007 | `backend/` | `ui/` | WMS — inventario, catálogo, stock |
+| **crm** | 9008 | `backend/` | `ui/` | Clientes, interacciones, cuenta corriente |
+| **erp** | 9009 | `backend/` | `ui/` | Facturación, cobranza, integración Laudus |
+| **pmo** | 9010 | `backend/` | `ui/` | Pendiente de desarrollo |
+| **ia** | 9011 | `backend/` | `ui/` | Pendiente de desarrollo |
+| **gta** | 9012 | `backend/` | `ui/` | Gestión de tareas automatizada |
+| **zabbix** | 9013 | `backend/` | `ui/` | Proxy monitoreo infraestructura |
 
 ---
 
@@ -402,7 +400,7 @@ Tocar **5 lugares** en este orden:
      depends_on:
        - db
      restart: unless-stopped
-     command: ["uvicorn", "MODULO.main:app", "--host", "0.0.0.0", "--port", "PUERTO"]
+     command: ["uvicorn", "MODULO.backend.main:app", "--host", "0.0.0.0", "--port", "PUERTO"]
    ```
 
 3. **`gateway/ui/shared/ui/js/sidebar.js`** — agregar en ambos arrays (prod y dev):
@@ -425,18 +423,18 @@ Tocar **5 lugares** en este orden:
 
 ### Puertos asignados
 
-| Puerto | Servicio |
-| ------ | -------- |
-| 9001 | gateway |
-| 9005 | ticketera |
-| 9006 | fundacion |
-| 9007 | bodega |
-| 9008 | crm |
-| 9009 | pmo |
-| 9010 | ia |
-| 9011 | zabbix |
-| 9012 | gta |
-| 9013 | (próximo módulo) |
+| Puerto | Servicio | Variable de entorno |
+| ------ | -------- | ------------------- |
+| 9001 | gateway | `GATEWAY_PORT` |
+| 9005 | ticketera | `TICKETERA_PORT` |
+| 9006 | fundacion | `FUNDACION_PORT` |
+| 9007 | bodega | `BODEGA_PORT` |
+| 9008 | crm | `CRM_PORT` |
+| 9009 | erp | `ERP_PORT` |
+| 9010 | pmo | `PMO_PORT` |
+| 9011 | ia | `IA_PORT` |
+| 9012 | gta | `GTA_PORT` |
+| 9013 | zabbix | `ZABBIX_PORT` |
 
 ---
 
