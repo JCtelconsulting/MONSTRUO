@@ -119,10 +119,10 @@ def main() -> int:
                 "docker-compose.yaml: db debe usar bind ./plataforma/data/postgres:/var/lib/postgresql/data"
             )
 
-        # 4) Mounts críticos data_runtime/{tickets,compliance} en gateway y ticketera.
+        # 4) Mounts críticos ticketera/data/{tickets,compliance} en gateway y ticketera.
         required_mounts = (
-            "./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets",
-            "./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance",
+            "./ticketera/data/tickets:/app/ticketera/data/tickets",
+            "./ticketera/data/compliance:/app/ticketera/data/compliance",
         )
         for mount in required_mounts:
             if compose_text.count(mount) < 2:

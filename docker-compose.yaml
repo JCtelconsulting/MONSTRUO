@@ -4,7 +4,7 @@
 # Reglas no negociables:
 # - Postgres NUNCA publica 5432 al host (solo red interna docker).
 # - Gateway publica 9001, ticketera publica 9005 en ambos entornos.
-# - Adjuntos persisten en plataforma/data_runtime/{tickets,compliance} vía symlink desde data/.
+# - Adjuntos persisten en ticketera/data/{tickets,compliance} (bind mount directo, sin symlinks).
 # - Datos Postgres persisten como bind mount en plataforma/data/postgres (idéntico DEV/PROD).
 #
 # Tabla de puertos fijos:
@@ -50,8 +50,8 @@ services:
       - PORT=9001
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     volumes:
-      - ./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets
-      - ./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance
+      - ./ticketera/data/tickets:/app/ticketera/data/tickets
+      - ./ticketera/data/compliance:/app/ticketera/data/compliance
     depends_on:
       - db
     restart: unless-stopped
@@ -71,8 +71,8 @@ services:
       - PORT=9005
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     volumes:
-      - ./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets
-      - ./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance
+      - ./ticketera/data/tickets:/app/ticketera/data/tickets
+      - ./ticketera/data/compliance:/app/ticketera/data/compliance
     depends_on:
       - db
     restart: unless-stopped

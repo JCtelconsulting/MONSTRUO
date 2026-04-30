@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 import secrets
-import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -14,9 +13,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Inyectar el directorio actual en sys.path para que router/service sean locales.
-sys.path.append(str(Path(__file__).parent))
-
 from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
@@ -25,9 +21,9 @@ from plataforma.core import auth_service, db, deps, jobs_engine, security
 from plataforma.core.config import settings as app_settings
 from plataforma.core.middleware import AuthIdentityMiddleware
 from plataforma.core.web import build_login_redirect_url
-from .jobs import ticket_sla, email_jobs
-from . import router as tks_router
-from . import service as ticketera_service
+from ticketera.backend.jobs import ticket_sla, email_jobs
+from ticketera.backend import router as tks_router
+from ticketera.backend.services import service as ticketera_service
 
 ROOT_PATH = os.getenv("ROOT_PATH", "").strip()
 _WEAK_SECRET_MARKERS = {
@@ -39,7 +35,7 @@ _WEAK_SECRET_MARKERS = {
 
 
 def _resolve_shared_ui_dir() -> Optional[Path]:
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     shared_ui_dir = repo_root / "gateway" / "shared" / "ui"
     return shared_ui_dir if shared_ui_dir.exists() else None
 
