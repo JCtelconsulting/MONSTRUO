@@ -178,7 +178,6 @@ if [ "$HAS_GIT_REPO" = "1" ]; then
     -e "data/" \
     -e "data/tickets/" \
     -e "plataforma/data/" \
-    -e "plataforma/data_runtime/" \
     -e "ticketera/data/" \
     -e "fundacion/data/" \
     -e "erp/data/" \

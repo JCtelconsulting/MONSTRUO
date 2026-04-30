@@ -10,12 +10,12 @@ import sys
 
 THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parents[1]
-CODE_ROOT = PROJECT_ROOT / "plataforma" / "legacy" / "code"
-if str(CODE_ROOT) not in sys.path:
-    sys.path.insert(0, str(CODE_ROOT))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.core import db, jobs_engine, tickets_service, email
-from app.core.config import settings
+from plataforma.core import db, jobs_engine, email
+from plataforma.core.config import settings
+from ticketera.backend.services import service as tickets_service
 
 
 def setup_schema(conn: sqlite3.Connection) -> None:

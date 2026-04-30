@@ -16,14 +16,13 @@ THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parents[1]
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
-CODE_ROOT = PROJECT_ROOT / "plataforma" / "legacy" / "code"
-if str(CODE_ROOT) not in sys.path:
-    sys.path.insert(0, str(CODE_ROOT))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 DEV_ENV_FILE = "plataforma/ops/env/.env.server.dev"
 
 from _helpers import as_json, build_session, env_str, guard_prod_target, require_credentials
-from app.core.security import create_access_token
+from plataforma.core.security import create_access_token
 
 
 def parse_args() -> argparse.Namespace:
@@ -194,7 +193,7 @@ def main() -> int:
     # ------------------------------------------------------------
     try:
         inner_ownership = f"""
-from app.core import tickets_service
+from ticketera.backend.services import service as tickets_service
 
 ticket = tickets_service.create_ticket(
     titulo="E2E Ownership Assigned",
@@ -590,7 +589,7 @@ print("SUCCESS")
 import sys
 import logging
 logging.basicConfig(level=logging.INFO)
-from app.core import tickets_service
+from ticketera.backend.services import service as tickets_service
 
 payload = {{
     'subject': 'Re: E2E Ticketera Reply',
@@ -679,8 +678,9 @@ except Exception as e:
     try:
         inner_auto_reply = f"""
 import asyncio
-from app.core import db, tickets_service, jobs_engine, email
-from app.core.config import settings
+from plataforma.core import db, jobs_engine, email
+from ticketera.backend.services import service as tickets_service
+from plataforma.core.config import settings
 
 backup = {{
     "enabled": settings.TICKET_AUTO_REPLY_ENABLED,
@@ -1034,9 +1034,10 @@ print("SUCCESS")
         inner_channels = f"""
 import asyncio
 import logging
-from app.core import db, tickets_service
-from app.workers import integrations_worker
-from app.core.config import settings
+from plataforma.core import db
+from ticketera.backend.services import service as tickets_service
+# integrations_worker migrado — pendiente reimplementar en ticketera.backend
+from plataforma.core.config import settings
 
 logging.basicConfig(level=logging.INFO)
 
@@ -1170,7 +1171,7 @@ print("SUCCESS")
         inner_queue_seed = f"""
 import asyncio
 from datetime import datetime, timedelta, timezone
-from app.core import db, jobs_engine
+from plataforma.core import db, jobs_engine
 
 conn = db.get_conn()
 try:
@@ -1232,7 +1233,7 @@ print(f"SUCCESS STALE_ID={{stale_id}}")
             return fail(f"Recover stale respondió sin ok=true: {recovered}")
 
         inner_check_stale = f"""
-from app.core import db
+from plataforma.core import db
 conn = db.get_conn()
 try:
     row = conn.execute("SELECT status FROM sys_jobs WHERE id = ?", ({stale_job_id},)).fetchone()

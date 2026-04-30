@@ -81,8 +81,6 @@ def repo_checks() -> List[str]:
         PROJECT_ROOT / "plataforma/ops/control/limpiar_ram.sh",
         PROJECT_ROOT / "plataforma/ops/guardian/scripts/install_hooks.sh",
         PROJECT_ROOT / "plataforma/docs/estructura_repo.json",
-        PROJECT_ROOT / "plataforma/legacy/code/app/jobs/compliance_jobs.py",
-        PROJECT_ROOT / "plataforma/legacy/code/app/jobs/jira_parallel_jobs.py",
         PROJECT_ROOT / "plataforma/tests/e2e_ticketera.py",
         PROJECT_ROOT / "plataforma/tests/e2e_api_full.py",
         PROJECT_ROOT / "plataforma/tests/.README.md",
@@ -260,27 +258,6 @@ def repo_checks() -> List[str]:
             errors.append(f"{path} no usa MONSTRUO_TEST_USER")
         if "MONSTRUO_TEST_PASSWORD" not in text:
             errors.append(f"{path} no usa MONSTRUO_TEST_PASSWORD")
-
-    canonical_env_users = {
-        PROJECT_ROOT / "plataforma/legacy/code/app/main.py": "load_runtime_env(",
-        PROJECT_ROOT / "plataforma/legacy/code/app/core/config.py": "load_runtime_env(",
-        PROJECT_ROOT / "plataforma/legacy/code/app/core/db.py": "load_runtime_env(",
-        PROJECT_ROOT / "plataforma/legacy/code/app/core/ai/ai_local_openai_compat.py": "load_runtime_env(",
-        PROJECT_ROOT / "plataforma/legacy/code/scripts/sync_erp.py": "load_runtime_env(",
-        PROJECT_ROOT / "plataforma/legacy/code/scripts/sync_calendario_ejecutivo.py": "load_runtime_env(",
-    }
-    for path, marker in canonical_env_users.items():
-        text = read_text(path)
-        if marker not in text:
-            errors.append(f"{path} no usa carga canónica de env")
-
-    for path in [
-        PROJECT_ROOT / "plataforma/legacy/code/scripts/sync_erp.py",
-        PROJECT_ROOT / "plataforma/legacy/code/scripts/sync_calendario_ejecutivo.py",
-    ]:
-        text = read_text(path)
-        if "/srv/monstruo_dev/.env.server.dev" in text:
-            errors.append(f"{path} mantiene ruta hardcodeada a .env.server.dev de DEV")
 
     return errors
 

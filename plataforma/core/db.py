@@ -2538,4 +2538,3 @@ def upsert_invoice(
         conn.close()
 
 
-# Auth logic moved to app.core.security and app.core.auth_service

@@ -15,15 +15,14 @@ from unittest.mock import MagicMock, patch
 
 THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parents[1]
-CODE_ROOT = PROJECT_ROOT / "plataforma" / "legacy" / "code"
-if str(CODE_ROOT) not in sys.path:
-    sys.path.insert(0, str(CODE_ROOT))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.core.tickets import roles as ticket_roles
-from app.core.tickets import workflow as ticket_workflow
-from app.core import email_integration
-from app.core import jobs_engine
-from app.core import tickets_service
+from ticketera.backend.services import roles as ticket_roles
+from ticketera.backend.services import workflow as ticket_workflow
+from plataforma.core import email_integration
+from plataforma.core import jobs_engine
+from ticketera.backend.services import service as tickets_service
 
 
 class TicketRolesPolicyTests(unittest.TestCase):
@@ -107,7 +106,7 @@ class TicketTimelineTests(unittest.TestCase):
         empty_cursor = MagicMock(); empty_cursor.fetchall.return_value = []
         mock_conn.execute.side_effect = [comment_cursor, empty_cursor, empty_cursor]
 
-        with patch("app.core.tickets_service.db.get_conn", return_value=mock_conn):
+        with patch("ticketera.backend.services.service.db.get_conn", return_value=mock_conn):
             timeline = tickets_service.get_timeline(ticket_id=123, limit=10, include_emails=False)
 
         self.assertEqual(len(timeline), 2)
@@ -144,14 +143,14 @@ class TicketEmailNotificationTests(unittest.TestCase):
         conn = MagicMock()
 
         with (
-            patch("app.core.tickets_service.get_ticket", return_value=ticket),
-            patch("app.core.tickets_service.db.get_conn", return_value=conn),
-            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-20T12:00:00+00:00"),
+            patch("ticketera.backend.services.service.get_ticket", return_value=ticket),
+            patch("ticketera.backend.services.service.db.get_conn", return_value=conn),
+            patch("ticketera.backend.services.service.db.now_utc_iso", return_value="2026-03-20T12:00:00+00:00"),
             patch(
-                "app.core.tickets_service.email_sender.send_email_advanced",
+                "ticketera.backend.services.service.email_sender.send_email_advanced",
                 return_value={"from_addr": "soporte@example.com", "message_id": "<msg-assignment@example.com>"},
             ) as send_email,
-            patch("app.core.tickets_service._update_ticket_thread_metadata") as update_thread,
+            patch("ticketera.backend.services.service._update_ticket_thread_metadata") as update_thread,
         ):
             tickets_service.notify_client_assignment(ticket, "Especialista Uno")
 
@@ -185,15 +184,15 @@ class TicketEmailNotificationTests(unittest.TestCase):
         conn = MagicMock()
 
         with (
-            patch("app.core.tickets_service.get_ticket", return_value=ticket),
-            patch("app.core.tickets_service._get_auto_close_hours", return_value=36),
-            patch("app.core.tickets_service.db.get_conn", return_value=conn),
-            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-20T12:00:00+00:00"),
+            patch("ticketera.backend.services.service.get_ticket", return_value=ticket),
+            patch("ticketera.backend.services.service._get_auto_close_hours", return_value=36),
+            patch("ticketera.backend.services.service.db.get_conn", return_value=conn),
+            patch("ticketera.backend.services.service.db.now_utc_iso", return_value="2026-03-20T12:00:00+00:00"),
             patch(
-                "app.core.tickets_service.email_sender.send_email_advanced",
+                "ticketera.backend.services.service.email_sender.send_email_advanced",
                 return_value={"from_addr": "soporte@example.com", "message_id": "<msg-resolution@example.com>"},
             ) as send_email,
-            patch("app.core.tickets_service._update_ticket_thread_metadata") as update_thread,
+            patch("ticketera.backend.services.service._update_ticket_thread_metadata") as update_thread,
         ):
             tickets_service.notify_client_resolution(ticket)
 
@@ -220,7 +219,7 @@ class TicketEmailNotificationTests(unittest.TestCase):
         conn = MagicMock()
         conn.execute.return_value.fetchone.return_value = {"value": "48"}
 
-        with patch("app.core.tickets_service.db.get_conn", return_value=conn):
+        with patch("ticketera.backend.services.service.db.get_conn", return_value=conn):
             hours = tickets_service._get_auto_close_hours()
 
         self.assertEqual(hours, 48)
@@ -234,7 +233,7 @@ class TicketeraEpic11Tests(unittest.TestCase):
         cursor.fetchone.return_value = None
         conn.execute.return_value = cursor
 
-        with patch("app.core.tickets_service.db.get_conn", return_value=conn):
+        with patch("ticketera.backend.services.service.db.get_conn", return_value=conn):
             templates = tickets_service.list_ticketera_mail_templates()
 
         self.assertEqual(len(templates), 4)
@@ -292,14 +291,14 @@ class TicketeraEpic11Tests(unittest.TestCase):
         conn.execute.side_effect = _execute
 
         with (
-            patch("app.core.tickets_service.db.get_conn", return_value=conn),
-            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-23T12:00:00+00:00"),
-            patch("app.core.tickets_service.get_client_for_email", return_value=None),
-            patch("app.core.tickets_service._resolve_routing_category_for_email", return_value=None) as resolve_route,
-            patch("app.core.tickets_service.clasificar_ticket", return_value="general") as classify_ticket,
-            patch("app.core.tickets_service._find_customer_by_email", return_value=None),
-            patch("app.core.tickets_service._evaluate_ticket_sla"),
-            patch("app.core.tickets_service.get_ticket", return_value={"id": 55, "categoria": "general"}),
+            patch("ticketera.backend.services.service.db.get_conn", return_value=conn),
+            patch("ticketera.backend.services.service.db.now_utc_iso", return_value="2026-03-23T12:00:00+00:00"),
+            patch("ticketera.backend.services.service.get_client_for_email", return_value=None),
+            patch("ticketera.backend.services.service._resolve_routing_category_for_email", return_value=None) as resolve_route,
+            patch("ticketera.backend.services.service.clasificar_ticket", return_value="general") as classify_ticket,
+            patch("ticketera.backend.services.service._find_customer_by_email", return_value=None),
+            patch("ticketera.backend.services.service._evaluate_ticket_sla"),
+            patch("ticketera.backend.services.service.get_ticket", return_value={"id": 55, "categoria": "general"}),
         ):
             ticket = tickets_service.create_ticket(
                 titulo="Incidente sin regla",
@@ -365,8 +364,8 @@ class TicketeraEpic11Tests(unittest.TestCase):
         conn.execute.side_effect = [subject_cursor, body_cursor]
 
         with (
-            patch("app.core.tickets_service.db.get_conn", return_value=conn),
-            patch("app.core.tickets_service.email_sender.send_email_advanced") as send_email,
+            patch("ticketera.backend.services.service.db.get_conn", return_value=conn),
+            patch("ticketera.backend.services.service.email_sender.send_email_advanced") as send_email,
         ):
             tickets_service.notify_specialist_assignment("tecnico@example.com", ticket)
 
@@ -387,13 +386,13 @@ class TicketeraEpic11Tests(unittest.TestCase):
         conn = MagicMock()
 
         with (
-            patch("app.core.tickets_service.db.get_conn", return_value=conn),
-            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-26T16:00:00+00:00"),
+            patch("ticketera.backend.services.service.db.get_conn", return_value=conn),
+            patch("ticketera.backend.services.service.db.now_utc_iso", return_value="2026-03-26T16:00:00+00:00"),
             patch(
-                "app.core.tickets_service.email_sender.send_email_advanced",
+                "ticketera.backend.services.service.email_sender.send_email_advanced",
                 return_value={"from_addr": "soporte@example.com", "message_id": "<msg-status@example.com>"},
             ) as send_email,
-            patch("app.core.tickets_service._update_ticket_thread_metadata") as update_thread,
+            patch("ticketera.backend.services.service._update_ticket_thread_metadata") as update_thread,
         ):
             result = tickets_service._send_ticket_status_update_to_notify_emails(
                 ticket,
@@ -450,18 +449,18 @@ class TicketeraEpic11Tests(unittest.TestCase):
         }
 
         with (
-            patch("app.core.jobs_engine.db.get_conn", return_value=conn),
-            patch("app.core.jobs_engine.db.now_utc_iso", return_value="2026-03-26T18:30:00+00:00"),
-            patch("app.core.tickets_service.get_ticket", return_value=ticket),
-            patch("app.core.tickets_service._auto_reply_sender_allowed", return_value=(True, "allowed")),
-            patch("app.core.tickets_service._auto_reply_subject", return_value="Asunto auto") as reply_subject,
-            patch("app.core.tickets_service._auto_reply_body", return_value="<p>Cuerpo auto</p>") as reply_body,
+            patch("plataforma.core.jobs_engine.db.get_conn", return_value=conn),
+            patch("plataforma.core.jobs_engine.db.now_utc_iso", return_value="2026-03-26T18:30:00+00:00"),
+            patch("ticketera.backend.services.service.get_ticket", return_value=ticket),
+            patch("ticketera.backend.services.service._auto_reply_sender_allowed", return_value=(True, "allowed")),
+            patch("ticketera.backend.services.service._auto_reply_subject", return_value="Asunto auto") as reply_subject,
+            patch("ticketera.backend.services.service._auto_reply_body", return_value="<p>Cuerpo auto</p>") as reply_body,
             patch(
-                "app.core.email.send_email_advanced",
+                "plataforma.core.email.send_email_advanced",
                 return_value={"from_addr": "soporte@example.com", "message_id": "<auto-msg@example.com>"},
             ) as send_email,
-            patch("app.core.tickets_service._emit_system_comment"),
-            patch("app.core.tickets_service._update_ticket_thread_metadata"),
+            patch("ticketera.backend.services.service._emit_system_comment"),
+            patch("ticketera.backend.services.service._update_ticket_thread_metadata"),
         ):
             asyncio.run(jobs_engine.send_auto_response_job(payload))
 
@@ -533,16 +532,16 @@ class TicketeraEpic11Tests(unittest.TestCase):
         conn.execute.side_effect = main_execute
 
         with (
-            patch("app.core.tickets_service.db.get_conn", side_effect=[lock_conn, conn]),
-            patch("app.core.tickets_service.db.now_utc_iso", return_value="2026-03-23T15:00:00+00:00"),
+            patch("ticketera.backend.services.service.db.get_conn", side_effect=[lock_conn, conn]),
+            patch("ticketera.backend.services.service.db.now_utc_iso", return_value="2026-03-23T15:00:00+00:00"),
             patch(
-                "app.core.tickets_service.email_sender.send_email_advanced",
+                "ticketera.backend.services.service.email_sender.send_email_advanced",
                 return_value={"from_addr": "soporte@example.com", "message_id": "<reply@example.com>"},
             ) as send_email,
-            patch("app.core.tickets_service._maybe_mark_first_response"),
-            patch("app.core.tickets_service._update_ticket_thread_metadata"),
-            patch("app.core.tickets_service._evaluate_ticket_sla"),
-            patch("app.core.tickets_service.create_evidence_event"),
+            patch("ticketera.backend.services.service._maybe_mark_first_response"),
+            patch("ticketera.backend.services.service._update_ticket_thread_metadata"),
+            patch("ticketera.backend.services.service._evaluate_ticket_sla"),
+            patch("ticketera.backend.services.service.create_evidence_event"),
         ):
             result = tickets_service._send_ticket_reply_email(
                 ticket=ticket,
