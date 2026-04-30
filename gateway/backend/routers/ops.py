@@ -10,10 +10,7 @@ from fastapi import APIRouter, Depends
 from plataforma.core import db, deps, security
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
-LEGACY_OPS_FALLBACK_URL = os.getenv(
-    "LEGACY_OPS_FALLBACK_URL",
-    "http://172.17.0.1:9000/api/ops/dashboard",
-).strip()
+LEGACY_OPS_FALLBACK_URL = os.getenv("LEGACY_OPS_FALLBACK_URL", "").strip()
 
 
 def _fetchone_safe(conn, sql: str, params: tuple[Any, ...] = ()) -> Dict[str, Any]:

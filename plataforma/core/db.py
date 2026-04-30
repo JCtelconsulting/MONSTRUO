@@ -1,3 +1,4 @@
+import logging
 import os
 import hmac
 import hashlib
@@ -7,6 +8,8 @@ import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 try:
     import psycopg
@@ -240,7 +243,7 @@ def _run_guarded_pg_section(conn, section_name: str, fn) -> None:
             conn.execute(f"RELEASE SAVEPOINT {sp_name}")
         except Exception:
             pass
-        print(f"[DB-MIGRATION] WARN {section_name}: {e}")
+        logger.warning("[DB-MIGRATION] WARN {section_name}: {e}")
 
 
 def init_db() -> None:
@@ -539,7 +542,7 @@ def init_db() -> None:
                 (now_jobs,),
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN prune duplicados sys_jobs: {_e}")
+            logger.warning("[DB-MIGRATION] WARN prune duplicados sys_jobs: {_e}")
         # Dedupe fuerte para recurrentes de alta frecuencia.
         try:
             conn.execute(
@@ -555,7 +558,7 @@ def init_db() -> None:
                      AND status IN ('PENDING', 'RETRY')"""
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN índices únicos recurrentes sys_jobs: {_e}")
+            logger.warning("[DB-MIGRATION] WARN índices únicos recurrentes sys_jobs: {_e}")
 
         # Ticketera (EPIC 11)
         conn.execute("""
@@ -630,7 +633,7 @@ def init_db() -> None:
         try:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_attach_sha256 ON tks.ticket_attachments(sha256);")
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN índice idx_attach_sha256: {_e}")
+            logger.warning("[DB-MIGRATION] WARN índice idx_attach_sha256: {_e}")
 
         # --- Ticketera V3: Columnas extras en tickets (migración individual) ---
         _v3_columns = [
@@ -674,10 +677,10 @@ def init_db() -> None:
                     if is_critical:
                         # FAIL-FAST: Si es columna crítica para V3, no permitir arranque a medias
                         err_msg = f"[DB-MIGRATION] CRITICAL ERROR: No se pudo crear columna '{col_name}' necesaria para V3. Detalle: {_e}"
-                        print(err_msg)
+                        logger.error("%s", err_msg)
                         raise RuntimeError(err_msg) from _e
                     else:
-                        print(f"[DB-MIGRATION] WARN columna '{col_name}' ya existe o no se pudo crear: {_e}")
+                        logger.warning("[DB-MIGRATION] WARN columna '{col_name}' ya existe o no se pudo crear: {_e}")
 
         _run_guarded_pg_section(conn, "migrate_tickets_v3", _migrate_tickets_v3_section)
 
@@ -708,7 +711,7 @@ def init_db() -> None:
             try:
                 conn.execute(idx_sql)
             except Exception as _e:
-                print(f"[DB-MIGRATION] WARN índice: {_e}")
+                logger.warning("[DB-MIGRATION] WARN índice: {_e}")
 
         # --- Backfill de columnas Workflow/SLA para registros existentes ---
         try:
@@ -763,7 +766,7 @@ def init_db() -> None:
                    WHERE frt_due_at IS NULL"""
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN backfill workflow/sla: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill workflow/sla: {_e}")
 
         # --- Backfill papelera ---
         try:
@@ -774,7 +777,7 @@ def init_db() -> None:
                 "UPDATE tickets SET trash_reason = '' WHERE trash_reason IS NULL"
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN backfill papelera: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill papelera: {_e}")
 
         # --- Backfill retención por clase de seguridad ---
         try:
@@ -801,7 +804,7 @@ def init_db() -> None:
                       AND retention_until IS NULL"""
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN backfill retention: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill retention: {_e}")
 
         # --- Ticketera V3: Especialidades de Usuarios ---
         conn.execute("""
@@ -900,7 +903,7 @@ def init_db() -> None:
                     WHERE provider IS NULL OR attempt_count IS NULL"""
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN backfill ticket_notifications: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill ticket_notifications: {_e}")
 
         # --- PMO (Proyectos y Bitacora) ---
         conn.execute("""
@@ -1326,7 +1329,7 @@ def init_db() -> None:
             audit_has_triggers = _has_append_only_triggers(conn, "audit_logs")
             audit_consistent = _chain_table_is_consistent(conn, "audit_logs", audit_payload_fields)
             if not audit_consistent:
-                print("[DB-MIGRATION] WARN audit_logs chain inconsistente; se forzará re-backfill.")
+                logger.warning("[DB-MIGRATION] WARN audit_logs chain inconsistente; se forzará re-backfill.")
                 if audit_has_triggers:
                     _drop_append_only_triggers(conn, "audit_logs")
                 _backfill_chain_table(
@@ -1335,7 +1338,7 @@ def init_db() -> None:
                     audit_payload_fields,
                 )
             elif audit_has_triggers:
-                print("[DB-MIGRATION] INFO skip hash-chain backfill audit_logs (append-only activo y consistente)")
+                logger.info("[DB-MIGRATION] INFO skip hash-chain backfill audit_logs (append-only activo y consistente)")
             else:
                 _backfill_chain_table(
                     conn,
@@ -1346,7 +1349,7 @@ def init_db() -> None:
             evidence_has_triggers = _has_append_only_triggers(conn, "evidence_events")
             evidence_consistent = _chain_table_is_consistent(conn, "evidence_events", evidence_payload_fields)
             if not evidence_consistent:
-                print("[DB-MIGRATION] WARN evidence_events chain inconsistente; se forzará re-backfill.")
+                logger.warning("[DB-MIGRATION] WARN evidence_events chain inconsistente; se forzará re-backfill.")
                 if evidence_has_triggers:
                     _drop_append_only_triggers(conn, "evidence_events")
                 _backfill_chain_table(
@@ -1355,7 +1358,7 @@ def init_db() -> None:
                     evidence_payload_fields,
                 )
             elif evidence_has_triggers:
-                print("[DB-MIGRATION] INFO skip hash-chain backfill evidence_events (append-only activo y consistente)")
+                logger.info("[DB-MIGRATION] INFO skip hash-chain backfill evidence_events (append-only activo y consistente)")
             else:
                 _backfill_chain_table(
                     conn,
@@ -2422,7 +2425,7 @@ def init_db() -> None:
             from core import migrations
             migrations.run_migrations()
         except Exception as e:
-            print(f"[DB] ERROR running automated migrations: {e}")
+            logger.error("[DB] ERROR running automated migrations: %s", e)
 
         conn.commit()
     finally:

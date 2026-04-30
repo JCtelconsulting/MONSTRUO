@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
+
+logger = logging.getLogger(__name__)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -160,15 +163,65 @@ class ChangePasswordIn(BaseModel):
     new_password: str
 
 
-class PaymentLinkIn(BaseModel):
-    customer_id: str
-    amount: float
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
+    if _is_weak_secret(getattr(app_settings, "SECRET_KEY", "")):
+        if env_type == "prod":
+            raise RuntimeError("CRITICAL: SECRET_KEY inseguro en PROD.")
+        app_settings.SECRET_KEY = secrets.token_urlsafe(64)
+        logger.warning("[SECURITY] SECRET_KEY inseguro/ausente. Se generó una clave efímera.")
+
+    db.init_db()
+    _register_ticketera_jobs()
+
+    stale_minutes = int(getattr(app_settings, "JOBS_STALE_RUNNING_MINUTES", 20) or 20)
+    retention_days = int(getattr(app_settings, "SYS_JOBS_RETENTION_DAYS", 14) or 14)
+    recovered = jobs_engine.recover_stale_running_jobs(stale_minutes=stale_minutes)
+    cleaned = jobs_engine.cleanup_old_jobs(retention_days=retention_days)
+
+    await jobs_engine.enqueue_unique_job("CHECK_TICKET_SLA", payload={"recurring": True}, max_retries=1)
+    await jobs_engine.enqueue_unique_job(
+        "TKS_SLA_EVALUATE",
+        payload={"recurring": True, "limit": int(getattr(app_settings, "TKS_SLA_EVAL_LIMIT", 500) or 500)},
+        max_retries=1,
+    )
+    await jobs_engine.enqueue_unique_job("EMAIL_POLLING", payload={"recurring": True}, max_retries=0)
+    await jobs_engine.enqueue_unique_job("PROCESS_NOTIFICATIONS", payload={"recurring": True}, max_retries=0)
+    await jobs_engine.enqueue_unique_job("AUTO_CLOSE_TICKETS", payload={"recurring": True}, max_retries=0)
+    await jobs_engine.enqueue_unique_job(
+        "RECOVER_STALE_JOBS", payload={"recurring": True, "stale_minutes": stale_minutes}, max_retries=1
+    )
+    await jobs_engine.enqueue_unique_job(
+        "CLEANUP_SYS_JOBS", payload={"recurring": True, "retention_days": retention_days}, max_retries=1
+    )
+
+    worker_task = getattr(app.state, "job_worker_task", None)
+    if worker_task is None or worker_task.done():
+        app.state.job_worker_task = asyncio.create_task(jobs_engine.worker_loop())
+
+    logger.info(
+        "[Ticketera Startup] jobs scheduled | recovered_stale=%d | cleaned=%d",
+        recovered.get("recovered", 0),
+        cleaned.get("deleted", 0),
+    )
+
+    yield
+
+    worker_task = getattr(app.state, "job_worker_task", None)
+    if worker_task and not worker_task.done():
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
     title="Monstruo - Ticketera API",
     version="1.1",
     root_path=ROOT_PATH,
+    lifespan=lifespan,
 )
 app.add_middleware(AuthIdentityMiddleware)
 
@@ -180,83 +233,6 @@ if shared_ui_dir:
 
 app.include_router(tks_router.router)
 app.include_router(tks_router.legacy_router)
-
-
-@app.on_event("startup")
-async def startup() -> None:
-    env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
-    if _is_weak_secret(getattr(app_settings, "SECRET_KEY", "")):
-        if env_type == "prod":
-            raise RuntimeError("CRITICAL: SECRET_KEY inseguro en PROD.")
-        app_settings.SECRET_KEY = secrets.token_urlsafe(64)
-        print("[SECURITY] WARN: SECRET_KEY inseguro/ausente. Se generó una clave efímera.")
-
-    db.init_db()
-    _register_ticketera_jobs()
-
-    stale_minutes = int(getattr(app_settings, "JOBS_STALE_RUNNING_MINUTES", 20) or 20)
-    retention_days = int(getattr(app_settings, "SYS_JOBS_RETENTION_DAYS", 14) or 14)
-    recovered = jobs_engine.recover_stale_running_jobs(stale_minutes=stale_minutes)
-    cleaned = jobs_engine.cleanup_old_jobs(retention_days=retention_days)
-
-    await jobs_engine.enqueue_unique_job(
-        "CHECK_TICKET_SLA",
-        payload={"recurring": True},
-        max_retries=1,
-    )
-    await jobs_engine.enqueue_unique_job(
-        "TKS_SLA_EVALUATE",
-        payload={
-            "recurring": True,
-            "limit": int(getattr(app_settings, "TKS_SLA_EVAL_LIMIT", 500) or 500),
-        },
-        max_retries=1,
-    )
-    await jobs_engine.enqueue_unique_job(
-        "EMAIL_POLLING",
-        payload={"recurring": True},
-        max_retries=0,
-    )
-    await jobs_engine.enqueue_unique_job(
-        "PROCESS_NOTIFICATIONS",
-        payload={"recurring": True},
-        max_retries=0,
-    )
-    await jobs_engine.enqueue_unique_job(
-        "AUTO_CLOSE_TICKETS",
-        payload={"recurring": True},
-        max_retries=0,
-    )
-    await jobs_engine.enqueue_unique_job(
-        "RECOVER_STALE_JOBS",
-        payload={"recurring": True, "stale_minutes": stale_minutes},
-        max_retries=1,
-    )
-    await jobs_engine.enqueue_unique_job(
-        "CLEANUP_SYS_JOBS",
-        payload={"recurring": True, "retention_days": retention_days},
-        max_retries=1,
-    )
-
-    worker_task = getattr(app.state, "job_worker_task", None)
-    if worker_task is None or worker_task.done():
-        app.state.job_worker_task = asyncio.create_task(jobs_engine.worker_loop())
-
-    print(
-        f"[Ticketera Startup] jobs scheduled | recovered_stale={recovered.get('recovered', 0)} "
-        f"| cleaned={cleaned.get('deleted', 0)}"
-    )
-
-
-@app.on_event("shutdown")
-async def shutdown() -> None:
-    worker_task = getattr(app.state, "job_worker_task", None)
-    if worker_task and not worker_task.done():
-        worker_task.cancel()
-        try:
-            await worker_task
-        except asyncio.CancelledError:
-            pass
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -400,21 +376,3 @@ async def recover_stale_jobs(
         return {"ok": True, "recovered": recovered}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/cobranza/payment-link")
-async def generate_payment_link(
-    payload: PaymentLinkIn,
-    sess: dict = Depends(deps.require_permission("tickets:read")),
-):
-    customer_id = str(payload.customer_id or "").strip()
-    if not customer_id or payload.amount <= 0:
-        raise HTTPException(status_code=400, detail="customer_id y amount válidos son requeridos")
-
-    token = secrets.token_urlsafe(24)
-    expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
-    return {
-        "payment_url": f"https://pagos.monstruo.cl/pay/{token}?cid={customer_id}&amt={payload.amount:.0f}",
-        "token": token,
-        "expires_at": expires_at,
-    }

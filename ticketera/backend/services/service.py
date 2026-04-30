@@ -9181,7 +9181,7 @@ def _process_reply_email(
     attachments: Optional[List[Dict[str, Any]]] = None,
     body_html: Optional[str] = None,
 ):
-    print(f"[EMAIL] Reply to Ticket #{ticket_id} from {sender}")
+    logger.info("[EMAIL] Reply to Ticket #%s from %s", ticket_id, sender)
     conn = db.get_conn()
     try:
         now = db.now_utc_iso()
@@ -9243,7 +9243,7 @@ def _process_new_email_ticket(
     attachments: Optional[List[Dict[str, Any]]] = None,
     body_html: Optional[str] = None,
 ):
-    print(f"[EMAIL] New Ticket from {sender}")
+    logger.info("[EMAIL] New Ticket from %s", sender)
     
     # 1. Clasificación
     categoria = clasificar_ticket(subject, body)
@@ -9315,7 +9315,7 @@ def _process_new_email_ticket(
             references=references,
         )
 
-        print(f"[EMAIL] Created Ticket {codigo} (#{ticket_id})")
+        logger.info("[EMAIL] Created Ticket %s (#%s)", codigo, ticket_id)
 
         _emit_system_comment(
             conn,

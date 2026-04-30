@@ -2,10 +2,13 @@
 SLA (Service Level Agreement) checker for tickets (ESPAÑOL compatible).
 Runs periodically to escalate overdue tickets.
 """
+import logging
 from datetime import datetime, timedelta, timezone
 
 from plataforma.core import db, notifications, jobs_engine
 from ticketera.backend.services import service as tickets_service
+
+logger = logging.getLogger(__name__)
 
 
 def _next_run_iso(minutes: int) -> str:
@@ -47,33 +50,31 @@ async def check_ticket_sla(payload: dict = None):
         overdue = cursor.fetchall()
         
         if not overdue:
-            print(f"[SLA] No se encontraron tickets vencidos.")
+            logger.info("[SLA] No se encontraron tickets vencidos.")
         else:
-            print(f"[SLA] Se encontraron {len(overdue)} tickets vencidos. Escalando...")
-            
+            logger.info("[SLA] Se encontraron %d tickets vencidos. Escalando...", len(overdue))
+
             for ticket in overdue:
                 ticket_id = ticket["id"]
                 titulo = ticket["titulo"]
                 asignado = ticket["asignado_a"]
                 vence = ticket["vence_at"]
-                
-                # Escalar a 'critica'
+
                 conn.execute("""
-                    UPDATE tickets 
+                    UPDATE tickets
                     SET severidad = 'critica', updated_at = ?
                     WHERE id = ?
                 """, (now, ticket_id))
-                
-                print(f"[SLA] Ticket #{ticket_id} '{titulo}' escalado a critica (vencía: {vence})")
-                
-                # Notificación
+
+                logger.info("[SLA] Ticket #%s '%s' escalado a critica (vencía: %s)", ticket_id, titulo, vence)
+
                 notifications.notify_ticket_escalation(ticket_id, titulo, asignado)
-            
+
             conn.commit()
-            print(f"[SLA] Escalamiento completado. {len(overdue)} tickets actualizados.")
-        
+            logger.info("[SLA] Escalamiento completado. %d tickets actualizados.", len(overdue))
+
     except Exception as e:
-        print(f"[SLA] Error revisando SLA: {e}")
+        logger.error("[SLA] Error revisando SLA: %s", e)
         raise
     finally:
         conn.close()
@@ -87,10 +88,7 @@ async def evaluate_ticket_sla_job(payload: dict = None):
     payload = payload or {}
     limit = max(1, min(int(payload.get("limit", 500) or 500), 5000))
     result = tickets_service.run_sla_evaluation_batch(limit=limit)
-    print(
-        f"[SLA_EVAL] Processed={result.get('processed', 0)} "
-        f"limit={limit} at={result.get('evaluated_at')}"
-    )
+    logger.info("[SLA_EVAL] Processed=%d limit=%d at=%s", result.get('processed', 0), limit, result.get('evaluated_at'))
     if payload.get("recurring", True):
         await _schedule_unique(
             "TKS_SLA_EVALUATE",

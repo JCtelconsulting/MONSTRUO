@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlsplit
@@ -16,7 +18,9 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Re
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response as FastAPIResponse
 from pydantic import BaseModel
 
-from .routers import admin_users, config_router, ops
+logger = logging.getLogger(__name__)
+
+from gateway.backend.routers import admin_users, config_router, ops
 from plataforma.core import auth_service, db, deps, security
 from plataforma.core.config import settings as app_settings
 from plataforma.core.middleware import AuthIdentityMiddleware
@@ -30,10 +34,23 @@ _WEAK_SECRET_MARKERS = {
     "dev_only_change_me",
 }
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
+    if _is_weak_secret(getattr(app_settings, "SECRET_KEY", "")):
+        if env_type == "prod":
+            raise RuntimeError("CRITICAL: SECRET_KEY inseguro en PROD.")
+        app_settings.SECRET_KEY = secrets.token_urlsafe(64)
+        logger.warning("[SECURITY] SECRET_KEY inseguro/ausente. Se generó una clave efímera.")
+    db.init_db()
+    yield
+
+
 app = FastAPI(
     title="Monstruo OS - Gateway Perimetral",
     version="4.0",
     root_path=ROOT_PATH,
+    lifespan=lifespan,
 )
 app.add_middleware(AuthIdentityMiddleware)
 
@@ -316,16 +333,6 @@ async def _proxy_to_target(target_url: str, request: Request) -> FastAPIResponse
         )
 
 
-@app.on_event("startup")
-async def startup() -> None:
-    env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
-    if _is_weak_secret(getattr(app_settings, "SECRET_KEY", "")):
-        if env_type == "prod":
-            raise RuntimeError("CRITICAL: SECRET_KEY inseguro en PROD.")
-        app_settings.SECRET_KEY = secrets.token_urlsafe(64)
-        print("[SECURITY] WARN: SECRET_KEY inseguro/ausente. Se genero una clave efimera.")
-
-    db.init_db()
 
 
 @app.post("/api/auth/login")

@@ -10,7 +10,7 @@ from ticketera.backend.services import service as tickets_service
 logger = logging.getLogger(__name__)
 
 async def poll_email_job(payload: dict):
-    print("[JobEngine] Polling emails...")
+    logger.info("[JobEngine] Polling emails...")
     payload = payload or {}
     interval = 120
 
@@ -21,17 +21,15 @@ async def poll_email_job(payload: dict):
             processor.connect()
             emails = processor.fetch_unread()
             if emails:
-                print(f"[JobEngine] Found {len(emails)} unread emails.")
-            else:
-                pass
+                logger.info("[JobEngine] Found %d unread emails.", len(emails))
 
             for email_data in emails:
                 try:
                     tickets_service.handle_incoming_email(email_data)
                 except Exception as e:
-                    print(f"[JobEngine] Error handling email {email_data.get('message_id')}: {e}")
+                    logger.error("[JobEngine] Error handling email %s: %s", email_data.get('message_id'), e)
         except Exception as e:
-            print(f"[JobEngine] Email polling error: {e}")
+            logger.error("[JobEngine] Email polling error: %s", e)
         finally:
             processor.close()
             try:
