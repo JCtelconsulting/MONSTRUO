@@ -328,15 +328,15 @@
             <div class="dashboard-grid dashboard-grid--kpi">
               <div class="card card-terreno dashboard-card" id="kpi-tks-open">
                 <i class="fas fa-ticket-alt"></i>
-                <h2>—</h2><p>tickets abiertos</p>
+                <h2>—</h2><p>abiertos</p>
+              </div>
+              <div class="card card-gerencia dashboard-card" id="kpi-tks-closed">
+                <i class="fas fa-check-circle"></i>
+                <h2>—</h2><p>cerrados</p>
               </div>
               <div class="card card-terreno dashboard-card" id="kpi-tks-critical">
                 <i class="fas fa-exclamation-triangle"></i>
                 <h2>—</h2><p>críticos</p>
-              </div>
-              <div class="card card-gerencia dashboard-card" id="kpi-tks-customers">
-                <i class="fas fa-users"></i>
-                <h2>—</h2><p>clientes</p>
               </div>
             </div>
           </div>
@@ -417,24 +417,24 @@ function initDashboardInteractions() {}
 
     function renderTicketeraKpis(kpis) {
       const open = asNumber(kpis.tickets_open, 0);
+      const closed = asNumber(kpis.tickets_closed, 0);
       const critical = asNumber(kpis.tickets_critical, 0);
-      const customers = asNumber(kpis.total_customers, 0);
 
       const el = (id) => document.getElementById(id);
 
       const cardOpen = el('kpi-tks-open');
       if (cardOpen) {
         cardOpen.classList.toggle('is-critical', open > 0);
-        cardOpen.innerHTML = `<i class="fas fa-ticket-alt"></i><h2>${open}</h2><p>tickets abiertos</p>`;
+        cardOpen.innerHTML = `<i class="fas fa-ticket-alt"></i><h2>${open}</h2><p>abiertos</p>`;
+      }
+      const cardClosed = el('kpi-tks-closed');
+      if (cardClosed) {
+        cardClosed.innerHTML = `<i class="fas fa-check-circle"></i><h2>${closed}</h2><p>cerrados</p>`;
       }
       const cardCrit = el('kpi-tks-critical');
       if (cardCrit) {
         cardCrit.classList.toggle('is-critical', critical > 0);
         cardCrit.innerHTML = `<i class="fas fa-exclamation-triangle"></i><h2>${critical}</h2><p>críticos</p>`;
-      }
-      const cardCust = el('kpi-tks-customers');
-      if (cardCust) {
-        cardCust.innerHTML = `<i class="fas fa-users"></i><h2>${customers}</h2><p>clientes</p>`;
       }
     }
 

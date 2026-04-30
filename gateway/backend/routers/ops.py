@@ -123,6 +123,9 @@ def get_dashboard_stats(
         row = _fetchone_safe(conn, "SELECT count(*) as cnt FROM tickets WHERE estado != 'cerrado'")
         stats["kpis"]["tickets_open"] = row.get("cnt") or 0
 
+        row = _fetchone_safe(conn, "SELECT count(*) as cnt FROM tickets WHERE estado = 'cerrado'")
+        stats["kpis"]["tickets_closed"] = row.get("cnt") or 0
+
         row = _fetchone_safe(
             conn,
             "SELECT count(*) as cnt FROM tickets WHERE severidad = 'critica' AND estado != 'cerrado'"
