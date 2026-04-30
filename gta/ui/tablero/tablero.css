@@ -1,0 +1,2 @@
+/* Tablero — estilos adicionales (la mayoría están en gta.css) */
+.gta-tablero { display: flex; flex-direction: column; gap: 0; }

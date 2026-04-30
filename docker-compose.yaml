@@ -83,3 +83,21 @@ services:
       - db
     restart: unless-stopped
     command: [ "uvicorn", "fundacion.main:app", "--host", "0.0.0.0", "--port", "9006" ]
+
+  gta:
+    build:
+      context: .
+      dockerfile: ./gta/Dockerfile
+    container_name: ${STACK_NAME:-monstruo-dev}-gta
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${GTA_PORT:-9012}:9012"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - PORT=9012
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    restart: unless-stopped
+    command: [ "uvicorn", "gta.main:app", "--host", "0.0.0.0", "--port", "9012" ]

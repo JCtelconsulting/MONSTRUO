@@ -177,7 +177,7 @@ app = FastAPI(
 )
 app.add_middleware(AuthIdentityMiddleware)
 
-ui_dir = Path(__file__).parent.parent / "frontend"
+ui_dir = Path(__file__).parent.parent / "ui"
 shared_ui_dir = _resolve_shared_ui_dir()
 app.mount("/static", StaticFiles(directory=str(ui_dir)), name="ticketera_static")
 if shared_ui_dir:

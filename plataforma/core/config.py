@@ -88,6 +88,7 @@ class Settings(BaseSettings):
         {"id": "zabbix", "label": "Zabbix"},
         {"id": "fundacion", "label": "Fundación"},
         {"id": "config", "label": "Configuracion"},
+        {"id": "gta", "label": "GTA"},
     ]
 
     # Mapeo de prefijo de permiso a módulo de UI.
@@ -104,6 +105,7 @@ class Settings(BaseSettings):
         "zabbix": "zabbix",
         "fundacion": "fundacion",
         "admin.settings": "config",
+        "gta": "gta",
     }
     
     # Roles permitidos: admin, encargado_mesa, ops, finance, warehouse
@@ -127,8 +129,10 @@ class Settings(BaseSettings):
             "crm:write",
             "audit:read",
             "admin.settings",
-            "zabbix:read", # Permiso añadido para consistencia
-            "ia:read",     # Permiso añadido para consistencia
+            "zabbix:read",
+            "ia:read",
+            "gta:read",
+            "gta:write",
         ],
         "finance": [
             "dashboard:read",

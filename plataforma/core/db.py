@@ -258,6 +258,7 @@ def init_db() -> None:
             "ia",
             "ops",
             "fundacion",
+            "gta",
         ):
             conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name};")
 
@@ -2308,6 +2309,113 @@ def init_db() -> None:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_curso ON fundacion.fundacion_tareas(curso);")
 
         _run_guarded_pg_section(conn, "migrate_fundacion", _migrate_fundacion_section)
+
+        def _migrate_gta_section() -> None:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.tareas (
+                id          SERIAL PRIMARY KEY,
+                titulo      TEXT NOT NULL,
+                descripcion TEXT,
+                fecha_inicio TIMESTAMP NOT NULL,
+                fecha_fin    TIMESTAMP,
+                asignado_a   TEXT,
+                creado_by    TEXT,
+                prioridad    TEXT DEFAULT 'media',   -- baja, media, alta
+                tipo         TEXT,
+                estado       TEXT DEFAULT 'pendiente', -- pendiente, en_progreso, completado, bloqueado, cancelado
+                tags         TEXT DEFAULT '[]',
+                reporte      TEXT,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.comentarios (
+                id        SERIAL PRIMARY KEY,
+                tarea_id  INTEGER NOT NULL REFERENCES gta.tareas(id) ON DELETE CASCADE,
+                autor     TEXT NOT NULL,
+                texto     TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_tareas_estado    ON gta.tareas(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_tareas_asignado  ON gta.tareas(asignado_a);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_tareas_fecha     ON gta.tareas(fecha_inicio);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_comentarios_tarea ON gta.comentarios(tarea_id);")
+
+        _run_guarded_pg_section(conn, "migrate_gta", _migrate_gta_section)
+
+        def _migrate_gta_v2_section() -> None:
+            # Catálogo de procesos
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.procesos (
+                id                SERIAL PRIMARY KEY,
+                nombre            TEXT NOT NULL,
+                area              TEXT NOT NULL,
+                descripcion       TEXT,
+                sla_horas         INTEGER,
+                icono             TEXT,
+                pasos_definicion  TEXT DEFAULT '[]',   -- JSON: ["paso 1", "paso 2"]
+                campos_formulario TEXT DEFAULT '[]',   -- JSON: [{"key":"x","label":"X","type":"text"}]
+                estado            TEXT DEFAULT 'activo',
+                creado_por        TEXT,
+                created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Solicitudes enlazadas a procesos
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.solicitudes (
+                id           SERIAL PRIMARY KEY,
+                proceso_id   INTEGER REFERENCES gta.procesos(id) ON DELETE SET NULL,
+                titulo       TEXT NOT NULL,
+                descripcion  TEXT,
+                area         TEXT NOT NULL,
+                prioridad    TEXT DEFAULT 'media',      -- baja, media, alta
+                estado       TEXT DEFAULT 'pendiente',  -- pendiente, en_progreso, completado, bloqueado, cancelado
+                creado_por   TEXT,
+                asignado_a   TEXT,
+                pasos_estado TEXT DEFAULT '[]',         -- JSON: [{"completado":false,"bloqueado":false}]
+                campos_extra TEXT DEFAULT '{}',         -- JSON con valores de campos_formulario
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Quiebres de proceso
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.quiebres (
+                id               SERIAL PRIMARY KEY,
+                descripcion      TEXT NOT NULL,
+                area             TEXT NOT NULL,
+                tipo             TEXT DEFAULT 'sin_proceso',  -- sin_proceso, paso_bloqueado, sla_vencido
+                solicitud_id     INTEGER REFERENCES gta.solicitudes(id) ON DELETE SET NULL,
+                reportado_por    TEXT,
+                estado           TEXT DEFAULT 'abierto',      -- abierto, resuelto
+                nota_resolucion  TEXT,
+                resuelto_por     TEXT,
+                resuelto_at      TIMESTAMP,
+                created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Comentarios de solicitudes
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.comentarios_solicitudes (
+                id           SERIAL PRIMARY KEY,
+                solicitud_id INTEGER NOT NULL REFERENCES gta.solicitudes(id) ON DELETE CASCADE,
+                autor        TEXT NOT NULL,
+                texto        TEXT NOT NULL,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_procesos_area      ON gta.procesos(area);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_procesos_estado    ON gta.procesos(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_solicitudes_estado ON gta.solicitudes(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_solicitudes_area   ON gta.solicitudes(area);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_solicitudes_proc   ON gta.solicitudes(proceso_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_quiebres_estado    ON gta.quiebres(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_comentarios_sol    ON gta.comentarios_solicitudes(solicitud_id);")
+
+        _run_guarded_pg_section(conn, "migrate_gta_v2", _migrate_gta_v2_section)
 
         # Automated Migrations Engine
         try:

@@ -1,0 +1,55 @@
+<div class="gta-tablero">
+
+    <!-- KPIs -->
+    <div class="gta-kpi-row" id="tablero-kpis">
+        <div class="gta-kpi-card">
+            <div class="gta-kpi-val" id="kpi-total">—</div>
+            <div class="gta-kpi-lbl">Total activas</div>
+        </div>
+        <div class="gta-kpi-card kpi-warning">
+            <div class="gta-kpi-val" id="kpi-en-progreso">—</div>
+            <div class="gta-kpi-lbl">En progreso</div>
+        </div>
+        <div class="gta-kpi-card kpi-danger">
+            <div class="gta-kpi-val" id="kpi-vencidas">—</div>
+            <div class="gta-kpi-lbl">Vencidas / urgentes</div>
+        </div>
+        <div class="gta-kpi-card kpi-ok">
+            <div class="gta-kpi-val" id="kpi-completadas">—</div>
+            <div class="gta-kpi-lbl">Completadas hoy</div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="gta-tablero-filters">
+        <select id="filtro-area" class="input-dark" onchange="Tablero.filtrar()" style="min-width:160px;">
+            <option value="">Todas las áreas</option>
+            <option value="comercial">Comercial</option>
+            <option value="preventa">Preventa</option>
+            <option value="redes">Redes</option>
+            <option value="sistemas">Sistemas</option>
+            <option value="finanzas">Finanzas</option>
+            <option value="proveedores">Proveedores</option>
+            <option value="capital_humano">Capital Humano</option>
+            <option value="bodega">Bodega</option>
+            <option value="ia">Especialista IA</option>
+        </select>
+        <select id="filtro-prioridad" class="input-dark" onchange="Tablero.filtrar()" style="min-width:140px;">
+            <option value="">Toda prioridad</option>
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="baja">Baja</option>
+        </select>
+        <button class="btn-secondary" onclick="Tablero.cargar()" style="padding:8px 14px;">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+        <button class="btn-secondary gta-quiebre-trigger" onclick="GtaCore.abrirModalQuiebre()" style="margin-left:auto;">
+            <i class="fas fa-flag"></i> Reportar quiebre
+        </button>
+    </div>
+
+    <!-- Kanban por área -->
+    <div class="gta-kanban" id="tablero-kanban">
+        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando solicitudes...</div>
+    </div>
+</div>

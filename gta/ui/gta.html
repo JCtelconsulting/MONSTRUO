@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTA | Monstruo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="shared/css/monstruo.css?v=75" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="css/gta.css?v=2" />
+</head>
+
+<body class="sidebar-collapsed gta-shell" data-current-module="gta">
+    <header id="app-header">
+        <div class="header-top">
+            <h1>MONSTRUO</h1>
+            <button id="sidebar-toggle" class="btn-icon"><i class="fas fa-bars"></i></button>
+        </div>
+        <nav id="dynamic-sidebar" class="side-nav"></nav>
+        <div class="header-actions">
+            <span id="who" class="pill shell-who-pill">Usuario</span>
+            <div class="footer-buttons-container">
+                <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i> <span>Cuenta</span>
+                </button>
+                <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="main-inner module-shell">
+
+            <!-- HEADER -->
+            <div class="section-header module-tabs-header module-shell-header">
+                <div class="module-shell-title">
+                    <h2 class="module-page-title">Gestión de Tareas (GTA)</h2>
+                    <p class="module-shell-subtitle">Solicitudes, procesos y seguimiento por área</p>
+                </div>
+                <div class="module-shell-actions">
+                    <div id="gta-quiebres-badge" style="display:none;">
+                        <button class="btn-secondary gta-quiebres-btn" onclick="GtaCore.irAQuiebres()">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span id="gta-quiebres-count">0</span> Quiebres
+                        </button>
+                    </div>
+                    <button class="btn-primary" id="btn-nueva-solicitud" onclick="GtaCore.abrirCatalogo()">
+                        <i class="fas fa-plus"></i> Nueva Solicitud
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABS -->
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="tablero" onclick="GtaCore.loadTab('tablero', this)">
+                    <i class="fas fa-columns"></i> Tablero
+                </button>
+                <button class="tab-btn" data-tab="catalogo" onclick="GtaCore.loadTab('catalogo', this)">
+                    <i class="fas fa-book-open"></i> Catálogo
+                </button>
+                <button class="tab-btn" data-tab="quiebres" id="tab-btn-quiebres" onclick="GtaCore.loadTab('quiebres', this)">
+                    <i class="fas fa-exclamation-triangle"></i> Quiebres
+                </button>
+                <button class="tab-btn gta-tab-admin" data-tab="procesos" onclick="GtaCore.loadTab('procesos', this)">
+                    <i class="fas fa-sitemap"></i> Procesos
+                </button>
+            </div>
+
+            <!-- CONTENIDO DINÁMICO -->
+            <section class="section-block module-shell-content module-shell-content-fill">
+                <div id="tab-content" style="flex:1; overflow:auto; display:flex; flex-direction:column;"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- ── DRAWER: Detalle de Solicitud ─────────────────────────────── -->
+    <div id="gta-drawer" class="gta-drawer">
+        <div class="gta-drawer-header">
+            <div>
+                <div class="gta-drawer-eyebrow" id="drawer-area-label">Área</div>
+                <h3 id="drawer-titulo">Solicitud</h3>
+            </div>
+            <button class="btn-icon" onclick="GtaCore.cerrarDrawer()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="gta-drawer-body" id="drawer-body">
+            <!-- Inyectado por JS -->
+        </div>
+    </div>
+    <div id="gta-drawer-overlay" class="gta-drawer-overlay" onclick="GtaCore.cerrarDrawer()"></div>
+
+    <!-- ── MODAL: Nueva Solicitud desde Catálogo ────────────────────── -->
+    <div class="modal-backdrop" id="modal-nueva-solicitud">
+        <div class="modal-content" style="max-width:560px;">
+            <div class="modal-header">
+                <h2 id="modal-solicitud-titulo">Nueva Solicitud</h2>
+                <button class="modal-close-btn" onclick="GtaCore.cerrarModalSolicitud()">×</button>
+            </div>
+            <div class="modal-body" id="modal-solicitud-body">
+                <!-- Pasos del proceso inyectados por JS -->
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button class="btn-secondary" onclick="GtaCore.cerrarModalSolicitud()">Cancelar</button>
+                <button class="btn-primary" id="btn-confirmar-solicitud" onclick="GtaCore.confirmarSolicitud()">
+                    <i class="fas fa-paper-plane"></i> Enviar Solicitud
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── MODAL: Reportar Quiebre ──────────────────────────────────── -->
+    <div class="modal-backdrop" id="modal-quiebre">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+                <h2>Reportar Quiebre de Proceso</h2>
+                <button class="modal-close-btn" onclick="GtaCore.cerrarModalQuiebre()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="field">
+                    <label>Descripción del problema</label>
+                    <textarea id="quiebre-descripcion" class="input-dark" rows="4"
+                        placeholder="¿Qué pasó? ¿Qué proceso se rompió o no existe?"></textarea>
+                </div>
+                <div class="field" style="margin-top:14px;">
+                    <label>Área involucrada</label>
+                    <select id="quiebre-area" class="input-dark">
+                        <option value="">Selecciona un área...</option>
+                        <option value="comercial">Comercial</option>
+                        <option value="preventa">Preventa</option>
+                        <option value="redes">Redes</option>
+                        <option value="sistemas">Sistemas</option>
+                        <option value="finanzas">Finanzas</option>
+                        <option value="proveedores">Proveedores</option>
+                        <option value="capital_humano">Capital Humano</option>
+                        <option value="bodega">Bodega</option>
+                        <option value="ia">Especialista IA</option>
+                    </select>
+                </div>
+                <div class="field" style="margin-top:14px;">
+                    <label>Solicitud relacionada (opcional)</label>
+                    <input type="text" id="quiebre-solicitud-ref" class="input-dark" placeholder="ID de solicitud si aplica">
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button class="btn-secondary" onclick="GtaCore.cerrarModalQuiebre()">Cancelar</button>
+                <button class="btn-primary" onclick="GtaCore.enviarQuiebre()">
+                    <i class="fas fa-flag"></i> Reportar Quiebre
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="shared/js/utilidades.js?v=210"></script>
+    <script src="shared/js/admin.js?v=5"></script>
+    <script src="shared/js/sidebar.js?v=88"></script>
+    <script src="js/gta_api.js?v=2"></script>
+    <script src="js/gta_ui.js?v=2"></script>
+    <script src="js/gta_main.js?v=2"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initLogout) window.initLogout();
+            GtaCore.init();
+        });
+    </script>
+</body>
+</html>

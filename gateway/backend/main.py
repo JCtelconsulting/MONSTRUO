@@ -37,9 +37,10 @@ app = FastAPI(
 )
 app.add_middleware(AuthIdentityMiddleware)
 
-ui_dir = Path(__file__).parent.parent / "frontend"
+ui_dir = Path(__file__).parent.parent / "ui"
 repo_root = Path(__file__).resolve().parents[2]
 fundacion_ui_dir = repo_root / "fundacion" / "ui"
+gta_ui_dir = repo_root / "gta" / "ui"
 
 
 def _public_prefix(request: Request) -> str:
@@ -254,6 +255,7 @@ SERVICES_MAP = {
     "ia": "http://ia:8000",
     "zabbix": "http://zabbix:8000",
     "fundacion": f"http://fundacion:{os.getenv('FUNDACION_PORT', '9006')}",
+    "gta": f"http://gta:{os.getenv('GTA_PORT', '9012')}",
 }
 
 SERVICE_API_PREFIX = {
@@ -266,6 +268,7 @@ SERVICE_API_PREFIX = {
     "ia": "ultron",
     "zabbix": "zabbix",
     "fundacion": "fundacion",
+    "gta": "gta",
 }
 
 
@@ -538,6 +541,24 @@ async def fundacion_root_slash():
 @app.get("/fundacion/fundacion.html")
 async def fundacion_canonical_redirect(request: Request):
     return RedirectResponse(_prefixed_path(request, "/fundacion/"), status_code=302)
+
+
+@app.get("/gta")
+async def gta_root(request: Request):
+    return RedirectResponse(_prefixed_path(request, "/gta/"), status_code=302)
+
+
+@app.get("/gta/")
+async def gta_root_slash():
+    index_path = gta_ui_dir / "gta.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="gta_ui_not_found")
+    return HTMLResponse(index_path.read_text(encoding="utf-8"))
+
+
+@app.get("/gta/gta.html")
+async def gta_canonical_redirect(request: Request):
+    return RedirectResponse(_prefixed_path(request, "/gta/"), status_code=302)
 
 
 @app.get("/fundacion/{asset_path:path}")
