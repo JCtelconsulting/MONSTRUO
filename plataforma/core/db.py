@@ -2490,6 +2490,83 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_sys_notifications", _migrate_sys_notifications_section)
 
+        def _migrate_sys_role_permissions_section() -> None:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS core.sys_role_permissions (
+                id          SERIAL PRIMARY KEY,
+                role        TEXT NOT NULL,
+                permission  TEXT NOT NULL,
+                label       TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                updated_at  TEXT NOT NULL DEFAULT '',
+                UNIQUE(role, permission)
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_role_perms_role ON core.sys_role_permissions(role);")
+            # Seed from config.py defaults if table is empty
+            count = conn.execute("SELECT COUNT(*) AS n FROM core.sys_role_permissions").fetchone()
+            if count and int(count["n"]) == 0:
+                try:
+                    from plataforma.core.config import settings as _s
+                    now = now_utc_iso()
+                    _PERM_LABELS = {
+                        "*": "Acceso total del sistema",
+                        "dashboard:read": "Dashboard: lectura",
+                        "tickets:read": "Ticketera: lectura",
+                        "tickets:write": "Ticketera: gestión operativa",
+                        "tickets:compliance": "Ticketera: compliance y evidencias",
+                        "audit:read": "Auditoría: lectura",
+                        "audit:export": "Auditoría: exportación",
+                        "invoice:read": "Facturación: lectura",
+                        "invoice:sync": "Facturación: sincronización",
+                        "invoice:write": "Facturación: edición",
+                        "invoice:void": "Facturación: anulación",
+                        "payment:write": "Pagos: gestión",
+                        "crm:read": "CRM: lectura",
+                        "crm:write": "CRM: edición",
+                        "bodega:read": "Bodega: lectura",
+                        "bodega:write": "Bodega: edición",
+                        "pmo:read": "PMO: lectura",
+                        "pmo:write": "PMO: edición",
+                        "finanzas:read": "Finanzas: lectura",
+                        "reports:read": "Reportes: lectura",
+                        "fundacion:read": "Fundación: lectura",
+                        "fundacion:write": "Fundación: escritura",
+                        "admin.settings": "Configuración administrativa",
+                        "zabbix:read": "Zabbix: lectura",
+                        "ia:read": "IA: lectura",
+                        "gta:read": "GTA: lectura",
+                        "gta:write": "GTA: gestión",
+                    }
+                    _ROLE_DESCS = {
+                        "admin": "Control total de plataforma, seguridad y configuración global.",
+                        "encargado_mesa": "Gestiona flujo de ticketera, asignación, seguimiento y cumplimiento.",
+                        "ops": "Operación técnica transversal para atención y despacho de tickets.",
+                        "redes": "Ejecución técnica en networking e incidencias de conectividad.",
+                        "sistemas": "Ejecución técnica en servidores, plataformas y sistemas.",
+                        "implementaciones": "Ejecución de despliegues/proyectos con alcance técnico.",
+                        "finance": "Gestión financiera y cobranza con foco contable.",
+                        "warehouse": "Gestión operativa de inventario y movimientos de bodega.",
+                        "gerencia": "Visión ejecutiva y lectura de indicadores/estado operacional.",
+                        "monitora": "Planificación global y gestión de todas las tareas de la Fundación.",
+                        "ejecutiva": "Acceso a planificación propia y reporte de actividades.",
+                        "fundacion": "Gestión integral del módulo Fundación.",
+                    }
+                    for role, perms in _s.ROLE_PERMISSIONS.items():
+                        desc = _ROLE_DESCS.get(role, "Rol operativo de plataforma.")
+                        for perm in (perms or []):
+                            label = _PERM_LABELS.get(perm, perm)
+                            conn.execute(
+                                """INSERT INTO core.sys_role_permissions (role, permission, label, description, updated_at)
+                                   VALUES (%s, %s, %s, %s, %s)
+                                   ON CONFLICT (role, permission) DO NOTHING""",
+                                (role, perm, label, desc, now),
+                            )
+                except Exception as seed_err:
+                    logger.warning("[DB] Could not seed sys_role_permissions: %s", seed_err)
+
+        _run_guarded_pg_section(conn, "migrate_sys_role_permissions", _migrate_sys_role_permissions_section)
+
         # Automated Migrations Engine
         try:
             from core import migrations

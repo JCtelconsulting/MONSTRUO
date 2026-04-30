@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from plataforma.core import db, deps
 from plataforma.core.config import settings
@@ -76,7 +79,13 @@ PERMISSION_LABELS = {
     "fundacion:read": "Fundacion: lectura",
     "fundacion:write": "Fundacion: escritura",
     "admin.settings": "Configuracion administrativa",
+    "zabbix:read": "Zabbix: lectura",
+    "ia:read": "IA: lectura",
+    "gta:read": "GTA: lectura",
+    "gta:write": "GTA: gestion",
 }
+
+ALL_PERMISSIONS = sorted(PERMISSION_LABELS.keys())
 
 
 def _permission_label(permission: str) -> str:
@@ -91,33 +100,116 @@ def _permission_label(permission: str) -> str:
     return normalized
 
 
-@router.get("/role-scopes", summary="Get role scopes")
+def _build_role_item(role: str, rows: list) -> dict:
+    permissions = []
+    seen: set = set()
+    for row in rows:
+        perm = str(row["permission"] or "").strip().lower()
+        if not perm or perm in seen:
+            continue
+        seen.add(perm)
+        permissions.append(perm)
+    description = rows[0]["description"] if rows else ROLE_DESCRIPTIONS.get(role, "Rol operativo de plataforma.")
+    return {
+        "role": role,
+        "label": ROLE_LABELS.get(role, role),
+        "description": description,
+        "permissions": permissions,
+        "permissions_detail": [
+            {"id": p, "label": _permission_label(p)} for p in permissions
+        ],
+    }
+
+
+@router.get("/role-scopes", summary="Get role scopes from DB")
 async def get_role_scopes(
     sess: dict = Depends(deps.require_permission("admin.settings")),
 ):
-    items = []
-    for role in sorted(settings.ROLE_PERMISSIONS.keys()):
-        permissions = []
-        seen = set()
-        for raw_permission in settings.ROLE_PERMISSIONS.get(role, []) or []:
-            permission = str(raw_permission or "").strip().lower()
-            if not permission or permission in seen:
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT role, permission, label, description FROM core.sys_role_permissions ORDER BY role, id"
+        ).fetchall()
+
+        # Group by role
+        grouped: dict[str, list] = {}
+        for row in rows:
+            role = str(row["role"])
+            grouped.setdefault(role, []).append(row)
+
+        # Ensure all config roles appear even if not in DB yet
+        all_roles = set(settings.ROLE_PERMISSIONS.keys()) | set(grouped.keys())
+        items = []
+        for role in sorted(all_roles):
+            if role in grouped:
+                items.append(_build_role_item(role, grouped[role]))
+            else:
+                # Fallback from config for roles not yet seeded in DB
+                fallback_perms = settings.ROLE_PERMISSIONS.get(role, [])
+                items.append({
+                    "role": role,
+                    "label": ROLE_LABELS.get(role, role),
+                    "description": ROLE_DESCRIPTIONS.get(role, "Rol operativo de plataforma."),
+                    "permissions": list(fallback_perms),
+                    "permissions_detail": [{"id": p, "label": _permission_label(p)} for p in fallback_perms],
+                })
+        return {"items": items, "all_permissions": [
+            {"id": p, "label": _permission_label(p)} for p in ALL_PERMISSIONS
+        ]}
+    finally:
+        conn.close()
+
+
+class RoleScopeUpdate(BaseModel):
+    description: str = ""
+    permissions: List[str]
+
+
+@router.put("/role-scopes/{role}", summary="Update permissions for a role")
+async def update_role_scope(
+    role: str,
+    body: RoleScopeUpdate,
+    sess: dict = Depends(deps.require_permission("admin.settings")),
+):
+    role = str(role or "").strip().lower()
+    if not role:
+        raise HTTPException(status_code=400, detail="role requerido")
+
+    # Protect admin from losing full access
+    if role == "admin" and "*" not in body.permissions:
+        raise HTTPException(status_code=400, detail="El rol admin siempre debe tener permiso '*'")
+
+    conn = db.get_conn()
+    try:
+        now = db.now_utc_iso()
+        description = str(body.description or ROLE_DESCRIPTIONS.get(role, "Rol operativo de plataforma."))
+
+        # Delete existing permissions for this role
+        conn.execute("DELETE FROM core.sys_role_permissions WHERE role = %s", (role,))
+
+        # Insert new set
+        for perm in body.permissions:
+            perm = str(perm or "").strip().lower()
+            if not perm:
                 continue
-            seen.add(permission)
-            permissions.append(permission)
-        items.append(
-            {
-                "role": role,
-                "label": ROLE_LABELS.get(role, role),
-                "description": ROLE_DESCRIPTIONS.get(role, "Rol operativo de plataforma."),
-                "permissions": permissions,
-                "permissions_detail": [
-                    {"id": permission, "label": _permission_label(permission)}
-                    for permission in permissions
-                ],
-            }
-        )
-    return {"items": items}
+            label = _permission_label(perm)
+            conn.execute(
+                """INSERT INTO core.sys_role_permissions (role, permission, label, description, updated_at)
+                   VALUES (%s, %s, %s, %s, %s)
+                   ON CONFLICT (role, permission) DO UPDATE SET
+                       label = excluded.label,
+                       description = excluded.description,
+                       updated_at = excluded.updated_at""",
+                (role, perm, label, description, now),
+            )
+
+        conn.commit()
+        return {"ok": True, "role": role, "permissions": body.permissions}
+    except Exception as exc:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error guardando permisos: {exc}") from exc
+    finally:
+        conn.close()
 
 
 @router.get("/smtp", summary="Get SMTP config")
@@ -127,19 +219,10 @@ async def get_smtp_config(
     conn = db.get_conn()
     try:
         keys = [
-            "smtp_host",
-            "smtp_port",
-            "smtp_user",
-            "smtp_password",
-            "smtp_from_name",
-            "imap_host",
-            "imap_port",
-            "imap_user",
-            "imap_password",
-            "email_polling_interval",
-            "ticket_auto_reply_enabled",
-            "ticket_auto_reply_time",
-            "ticket_auto_close_time",
+            "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from_name",
+            "imap_host", "imap_port", "imap_user", "imap_password",
+            "email_polling_interval", "ticket_auto_reply_enabled",
+            "ticket_auto_reply_time", "ticket_auto_close_time",
         ]
         placeholders = ", ".join(["?" for _ in keys])
         rows = conn.execute(
@@ -147,8 +230,8 @@ async def get_smtp_config(
             tuple(keys),
         ).fetchall()
 
-        config = {}
-        found = set()
+        config: dict = {}
+        found: set = set()
         for row in rows:
             key = row["key"]
             value = row["value"]
@@ -175,18 +258,11 @@ async def update_smtp_config(
     try:
         now = db.now_utc_iso()
         allowed = {
-            "smtp_host": False,
-            "smtp_port": False,
-            "smtp_user": False,
-            "smtp_from_name": False,
-            "smtp_password": True,
-            "imap_host": False,
-            "imap_port": False,
-            "imap_user": False,
-            "imap_password": True,
-            "email_polling_interval": False,
-            "ticket_auto_reply_enabled": False,
-            "ticket_auto_reply_time": False,
+            "smtp_host": False, "smtp_port": False, "smtp_user": False,
+            "smtp_from_name": False, "smtp_password": True,
+            "imap_host": False, "imap_port": False, "imap_user": False,
+            "imap_password": True, "email_polling_interval": False,
+            "ticket_auto_reply_enabled": False, "ticket_auto_reply_time": False,
             "ticket_auto_close_time": False,
         }
 

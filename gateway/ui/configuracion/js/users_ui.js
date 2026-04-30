@@ -7,6 +7,9 @@ const UsersUI = (() => {
     let _tableActionsBound = false;
     let _roleScopes = new Map();
     let _roleScopeItems = [];
+    let _allPermissions = [];      // [{id, label}] from API
+    let _editingRole = null;       // role being edited in modal
+    let _editingRolePerms = [];    // current draft permissions
 
     const PROTECTED_USER = 'juan.lopez@telconsulting.cl';
 
@@ -453,16 +456,121 @@ const UsersUI = (() => {
 
         body.innerHTML = _roleScopeItems.map((item) => {
             const perms = Array.isArray(item.permissions) ? item.permissions : [];
+            const encodedRole = encodeDataset(item.role);
             return `
-                <article class="cfg-role-guide-row">
+                <article class="cfg-role-guide-row" data-role="${encodedRole}" title="Clic para editar permisos">
                     <div class="cfg-role-guide-head">
-                        <div class="cfg-role-guide-title">${escapeHtml(item.label || roleLabel(item.role) || item.role)}</div>
+                        <div class="cfg-role-guide-title">
+                            ${escapeHtml(item.label || roleLabel(item.role) || item.role)}
+                            <span class="cfg-role-edit-hint"><i class="fas fa-pencil-alt"></i> editar</span>
+                        </div>
                         <p class="cfg-role-guide-desc">${escapeHtml(item.description || 'Rol operativo de plataforma.')}</p>
                     </div>
                     <div class="cfg-role-guide-perms">${renderScopePills(perms)}</div>
                 </article>
             `;
         }).join('');
+
+        body.querySelectorAll('.cfg-role-guide-row[data-role]').forEach((row) => {
+            row.addEventListener('click', () => {
+                const role = decodeDataset(row.dataset.role || '');
+                if (role) openRolePermsModal(role);
+            });
+        });
+    }
+
+    function _getEffectivePermissions() {
+        if (_allPermissions.length > 0) return _allPermissions;
+        // fallback: build from PERMISSION_LABELS keys in users_ui
+        return Object.keys({
+            '*': 1, 'dashboard:read': 1, 'tickets:read': 1, 'tickets:write': 1,
+            'tickets:compliance': 1, 'audit:read': 1, 'audit:export': 1,
+            'invoice:read': 1, 'invoice:sync': 1, 'invoice:write': 1, 'invoice:void': 1,
+            'payment:write': 1, 'crm:read': 1, 'crm:write': 1, 'bodega:read': 1,
+            'bodega:write': 1, 'pmo:read': 1, 'pmo:write': 1, 'finanzas:read': 1,
+            'reports:read': 1, 'fundacion:read': 1, 'fundacion:write': 1,
+            'admin.settings': 1, 'zabbix:read': 1, 'ia:read': 1, 'gta:read': 1, 'gta:write': 1,
+        }).map(id => ({ id, label: permissionFallbackLabel(id) }));
+    }
+
+    function openRolePermsModal(role) {
+        const roleItem = _roleScopes.get(normalizeKey(role));
+        if (!roleItem) return;
+
+        _editingRole = role;
+        _editingRolePerms = [...(roleItem.permissions || [])];
+
+        const modal = document.getElementById('modalRolePerms');
+        const title = document.getElementById('modalRolePermsTitle');
+        const desc = document.getElementById('modalRolePermsDesc');
+        const adminNotice = document.getElementById('modalRolePermsAdminNotice');
+        const grid = document.getElementById('permGrid');
+        if (!modal) return;
+
+        title.textContent = `Permisos: ${roleItem.label || role}`;
+        desc.textContent = roleItem.description || '';
+        adminNotice.style.display = role === 'admin' ? 'block' : 'none';
+
+        const allPerms = _getEffectivePermissions();
+        grid.innerHTML = '';
+
+        allPerms.forEach(({ id, label }) => {
+            const isChecked = _editingRolePerms.includes(id);
+            const isLocked = role === 'admin' && id === '*';
+
+            const div = document.createElement('div');
+            div.className = `perm-check-item${isChecked ? ' is-checked' : ''}`;
+            div.innerHTML = `
+                <input type="checkbox" ${isChecked ? 'checked' : ''} ${isLocked ? 'disabled' : ''}>
+                <span class="perm-check-mark">${isChecked ? '✓' : ''}</span>
+                <span class="perm-check-label">${escapeHtml(label || id)}</span>
+            `;
+            if (!isLocked) {
+                div.addEventListener('click', () => {
+                    const cb = div.querySelector('input');
+                    cb.checked = !cb.checked;
+                    if (cb.checked) {
+                        if (!_editingRolePerms.includes(id)) _editingRolePerms.push(id);
+                        div.classList.add('is-checked');
+                        div.querySelector('.perm-check-mark').textContent = '✓';
+                    } else {
+                        _editingRolePerms = _editingRolePerms.filter(p => p !== id);
+                        div.classList.remove('is-checked');
+                        div.querySelector('.perm-check-mark').textContent = '';
+                    }
+                });
+            }
+            grid.appendChild(div);
+        });
+
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeRolePermsModal() {
+        const modal = document.getElementById('modalRolePerms');
+        if (!modal) return;
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        _editingRole = null;
+        _editingRolePerms = [];
+    }
+
+    async function saveRolePerms() {
+        if (!_editingRole) return;
+        const roleItem = _roleScopes.get(normalizeKey(_editingRole));
+        const description = roleItem?.description || '';
+        try {
+            await window.fetchApi(`/api/config/role-scopes/${encodeURIComponent(_editingRole)}`, {
+                method: 'PUT',
+                body: { description, permissions: _editingRolePerms },
+            });
+            closeRolePermsModal();
+            await load();
+            if (window.showToast) window.showToast(`Permisos de "${_editingRole}" actualizados.`, 'success');
+        } catch (err) {
+            alert(`Error al guardar: ${err.message}`);
+        }
     }
 
     function renderUserScopeGuide() {
@@ -574,6 +682,7 @@ const UsersUI = (() => {
             const scopesItems = Array.isArray(scopesDataRaw?.items) && scopesDataRaw.items.length
                 ? scopesDataRaw.items
                 : fallbackRoleScopes();
+            _allPermissions = Array.isArray(scopesDataRaw?.all_permissions) ? scopesDataRaw.all_permissions : [];
             setRoleScopes(scopesItems);
 
             renderTable();
@@ -791,12 +900,31 @@ const UsersUI = (() => {
         }
     }
 
+    // Wire up role perms modal buttons once DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        const closeBtn = document.getElementById('btnCloseRolePermsModal');
+        const cancelBtn = document.getElementById('btnCancelRolePerms');
+        const saveBtn = document.getElementById('btnSaveRolePerms');
+        const modal = document.getElementById('modalRolePerms');
+        if (closeBtn) closeBtn.addEventListener('click', closeRolePermsModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeRolePermsModal);
+        if (saveBtn) saveBtn.addEventListener('click', saveRolePerms);
+        if (modal) {
+            modal.addEventListener('click', (evt) => {
+                if (evt.target === modal) closeRolePermsModal();
+            });
+        }
+    });
+
     return {
         load,
         openModal,
         closeModal,
         saveUser,
         deleteUser,
+        openRolePermsModal,
+        closeRolePermsModal,
+        saveRolePerms,
     };
 })();
 

@@ -841,6 +841,79 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Role permissions editor */
+        .cfg-panel-topbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .cfg-role-guide-row {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .cfg-role-guide-row:hover {
+            background: rgba(255,255,255,0.04);
+        }
+        .cfg-role-edit-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted, #888);
+            margin-top: 0.25rem;
+        }
+        /* Modal permisos rol */
+        #modalRolePerms .cfg-modal-card {
+            max-width: 680px;
+            width: 95vw;
+        }
+        .perm-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.4rem;
+            max-height: 380px;
+            overflow-y: auto;
+            padding: 0.5rem 0;
+        }
+        .perm-check-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.1s;
+            user-select: none;
+        }
+        .perm-check-item:hover { background: rgba(255,255,255,0.06); }
+        .perm-check-item.is-checked { background: rgba(99,179,237,0.12); }
+        .perm-check-item input[type="checkbox"] { display: none; }
+        .perm-check-mark {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1.5px solid #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            flex-shrink: 0;
+            transition: background 0.1s, border-color 0.1s;
+        }
+        .perm-check-item.is-checked .perm-check-mark {
+            background: var(--accent, #63b3ed);
+            border-color: var(--accent, #63b3ed);
+            color: #fff;
+        }
+        .perm-check-label {
+            font-size: 0.8rem;
+            color: var(--text-main, #eee);
+        }
+        .perm-admin-notice {
+            font-size: 0.78rem;
+            color: var(--kpi-orange, #f6c56a);
+            margin-bottom: 0.75rem;
+        }
     </style>
 </head>
 
@@ -1043,8 +1116,12 @@
                     </div>
 
                     <div class="panel cfg-panel">
-                        <h4 class="cfg-subtitle"><i class="fas fa-shield-alt"></i> Permisos por Rol</h4>
-                        <p class="cfg-panel-subtitle">Referencia de alcances para cada rol existente.</p>
+                        <div class="cfg-panel-topbar">
+                            <div>
+                                <h4 class="cfg-subtitle"><i class="fas fa-shield-alt"></i> Permisos por Rol</h4>
+                                <p class="cfg-panel-subtitle">Haz clic en un rol para editar sus permisos.</p>
+                            </div>
+                        </div>
                         <div class="cfg-role-guide">
                             <div id="cfgRoleGuideBody" class="cfg-role-guide-list">
                                 <div class="cfg-role-guide-empty">Cargando matriz de alcances...</div>
@@ -1098,9 +1175,30 @@
         </div>
     </div>
 
+    <!-- Modal: editar permisos de un rol -->
+    <div id="modalRolePerms" class="cfg-modal-overlay" aria-hidden="true" style="display:none;">
+        <div class="cfg-modal-card">
+            <div class="cfg-modal-header">
+                <h3 id="modalRolePermsTitle">Editar Permisos</h3>
+                <button type="button" class="cfg-modal-close" id="btnCloseRolePermsModal">&times;</button>
+            </div>
+            <div style="padding: 0 1.5rem 1.5rem;">
+                <p id="modalRolePermsDesc" class="cfg-panel-subtitle" style="margin-bottom:1rem;"></p>
+                <div id="modalRolePermsAdminNotice" class="perm-admin-notice" style="display:none;">
+                    El rol <strong>admin</strong> siempre tiene acceso total (*). No puedes quitarle ese permiso.
+                </div>
+                <div id="permGrid" class="perm-grid"></div>
+                <div class="cfg-modal-actions" style="margin-top:1.25rem;">
+                    <button type="button" class="btn-secondary" id="btnCancelRolePerms">Cancelar</button>
+                    <button type="button" class="btn-primary" id="btnSaveRolePerms">Guardar cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="../shared/js/utilidades.js?v=210"></script>
     <script src="../shared/js/admin.js?v=5"></script>
-    <script src="js/users_ui.js?v=18"></script>
+    <script src="js/users_ui.js?v=19"></script>
     <script>
         // ===================================================================
         // CFG TICKETERA
