@@ -5,7 +5,7 @@ Runs periodically to escalate overdue tickets.
 from datetime import datetime, timedelta, timezone
 
 from plataforma.core import db, notifications, jobs_engine
-from ticketera.backend import service as tickets_service
+from ticketera.backend.services import service as tickets_service
 
 
 def _next_run_iso(minutes: int) -> str:

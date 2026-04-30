@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from pydantic import BaseModel
 from plataforma.core import db, deps
-from crm.backend import service as crm_service
+from crm.backend.services import service as crm_service
 
 router = APIRouter(prefix="/api/crm", tags=["crm"])
 

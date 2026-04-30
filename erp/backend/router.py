@@ -7,7 +7,7 @@ import json
 from erp.backend.services.laudus import LaudusClient
 from erp.backend.services import service as facturacion_service
 from plataforma.core import jobs_engine
-from bodega.backend import service as bodega_service
+from bodega.backend.services import service as bodega_service
 from erp.backend.services import indicators_service
 
 print("DEBUG: Loading facturacion.py module...")

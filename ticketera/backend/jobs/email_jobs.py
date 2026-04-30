@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from plataforma.core import db, email, email_integration, jobs_engine
-from ticketera.backend import service as tickets_service
+from ticketera.backend.services import service as tickets_service
 
 logger = logging.getLogger(__name__)
 

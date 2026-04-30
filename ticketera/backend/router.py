@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from plataforma.core import deps
-from ticketera.backend import service as tickets_service
+from ticketera.backend.services import service as tickets_service
 from plataforma.core.audit_decorator import audit_action
 from ticketera.backend.services import roles as ticket_roles
 
