@@ -304,10 +304,10 @@ def _parse_timezone_name(raw_value: Any) -> timezone | ZoneInfo:
         return timezone.utc
 
 def _default_compliance_export_dir() -> str:
-    return str(Path(__file__).resolve().parent / "data" / "compliance")
+    return str(Path(__file__).resolve().parent.parent / "data" / "compliance")
 
 def _default_ticket_attachments_dir() -> str:
-    return str(Path(__file__).resolve().parent / "data" / "tickets")
+    return str(Path(__file__).resolve().parent.parent / "data" / "tickets")
 
 COMPLIANCE_TZ = _parse_timezone_name(getattr(app_settings, "COMPLIANCE_TZ", "America/Santiago"))
 COMPLIANCE_EXPORT_DIR = (
