@@ -1,4 +1,4 @@
-# GTA — Gestión de Tareas Automatizada
+# GTA — Gestión de Tareas Automatizadas
 
 Módulo de gestión interna de procesos entre áreas. Reemplaza el flujo de correos internos con un catálogo de procesos guiados, seguimiento de pasos, SLA semáforo y escalamiento de quiebres a gerencia.
 

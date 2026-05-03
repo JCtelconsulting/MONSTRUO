@@ -1,6 +1,6 @@
 # Gta — Documentación
 
-Gestión de Tareas Automatizada. Solicitudes entre áreas, procesos guiados y quiebres de proceso.
+Gestión de Tareas Automatizadas. Solicitudes entre áreas, procesos guiados y quiebres de proceso.
 
 ## Estructura
 
