@@ -40,21 +40,21 @@ window.GtaCore = (() => {
         container.innerHTML = `<div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>`;
 
         try {
-            const resp = await fetch(`${tabName}/${tabName}.html`);
+            const resp = await fetch(`static/${tabName}/${tabName}.html`);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             container.innerHTML = await resp.text();
 
             if (!_loadedResources.has(`css-${tabName}`)) {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `${tabName}/${tabName}.css?v=2`;
+                link.href = `static/${tabName}/${tabName}.css?v=3`;
                 document.head.appendChild(link);
                 _loadedResources.add(`css-${tabName}`);
             }
 
             if (!_loadedResources.has(`js-${tabName}`)) {
                 const script = document.createElement('script');
-                script.src = `${tabName}/${tabName}.js?v=2`;
+                script.src = `static/${tabName}/${tabName}.js?v=3`;
                 document.body.appendChild(script);
                 _loadedResources.add(`js-${tabName}`);
                 await new Promise(r => { script.onload = r; script.onerror = r; });
