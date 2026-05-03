@@ -1,6 +1,6 @@
 # ticketera/backend/services/service/__init__.py
 """
-Service package — re-exports everything from _impl to preserve the original
+Service package — re-exports everything from submodules to preserve the original
 service.py public interface.
 
 Consumers use:
@@ -8,12 +8,23 @@ Consumers use:
     tickets_service.some_function()
 
 All names (public and private) must be available at this module level.
+
+Module split:
+    _helpers.py        — constants and pure utility functions
+    _classify.py       — auto-classification/assignment
+    _notifications.py  — channel notifications dispatch
+    _crud.py           — main ticket CRUD (orchestrator)
+    _sla.py            — SLA/compliance/evidence
+    _specialties.py    — specialty management
+    _email.py          — incoming email processing
+    _customers.py      — client association/directory
 """
 
-# ── Public names (wildcard-safe) ─────────────────────────────────────────────
-from ._impl import (  # noqa: F401
+# ── _helpers: constants, classes, and pure utility functions ─────────────────
+from ._helpers import (  # noqa: F401
     # Classes
     ConflictError,
+    _IncomingEmailHtmlSanitizer,
 
     # Constants
     CATEGORIAS_VALIDAS,
@@ -102,7 +113,7 @@ from ._impl import (  # noqa: F401
     TICKETERA_MAIL_TEMPLATE_DEFS,
     KEYWORDS_CATEGORIAS,
 
-    # Public functions
+    # Public helper functions
     normalize_ticket_security_class,
     normalize_ticket_type,
     normalize_subestado,
@@ -123,86 +134,8 @@ from ._impl import (  # noqa: F401
     normalize_adapter_mode,
     normalize_channel_name,
     normalize_notification_status,
-    clasificar_ticket,
-    auto_asignar,
-    incrementar_carga,
-    decrementar_carga,
-    programar_notificaciones,
-    marcar_notificacion_vista,
-    get_notificaciones_pendientes,
-    log_notification_attempt,
-    notify_client_resolution,
-    process_pending_notifications,
-    get_jobs_queue_health,
-    get_channels_status,
-    list_channel_notifications,
-    retry_channel_notification,
-    generar_codigo,
-    run_sla_evaluation_batch,
-    create_ticket,
-    get_ticket,
-    list_tickets,
-    claim_ticket,
-    update_ticket,
-    move_ticket_to_trash,
-    restore_ticket_from_trash,
-    add_comment,
-    get_ticket_email_draft,
-    acquire_ticket_email_draft_lock,
-    heartbeat_ticket_email_draft_lock,
-    save_ticket_email_draft,
-    upload_ticket_email_draft_attachments,
-    delete_ticket_email_draft_attachment,
-    discard_ticket_email_draft,
-    send_ticket_email_draft,
-    get_dashboard_kpi,
-    transition_ticket,
-    approve_ticket_change,
-    list_ticket_approvals,
-    get_ticket_workflow,
-    reply_ticket_email,
-    get_ticket_emails,
-    upload_ticket_attachments,
-    list_ticket_attachments,
-    get_ticket_attachment_for_download,
-    get_timeline,
-    get_stats,
-    get_assignment_timeline,
-    get_sla_metrics,
-    list_sla_breaches,
-    upsert_automation_rule,
-    list_automation_rules,
-    create_evidence_event,
-    list_evidence_events,
-    list_ticket_legal_holds,
-    create_ticket_legal_hold,
-    release_ticket_legal_hold,
-    run_compliance_export,
-    list_compliance_export_runs,
-    run_compliance_purge,
-    list_compliance_purge_runs,
-    verify_hash_chain,
-    record_parallel_kpi_snapshot,
-    list_parallel_kpi_daily,
-    record_parallel_go_no_go_decision,
-    list_specialties,
-    upsert_specialty,
-    toggle_availability,
-    delete_specialty,
-    should_schedule_auto_reply,
-    schedule_auto_reply_for_ticket,
-    handle_incoming_email,
-    associate_email_to_client,
-    bulk_assign_customer_by_email,
-    search_customers,
-    get_client_for_email,
-    get_directorio_clientes,
-    get_directorio_metricas,
-)
 
-# ── Private names (not exported by `import *` but used internally or tested) ──
-from ._impl import (  # noqa: F401
-    _IncomingEmailHtmlSanitizer,
+    # Private helper functions
     _clamp_int,
     _parse_business_days,
     _parse_escalation_windows,
@@ -298,8 +231,104 @@ from ._impl import (  # noqa: F401
     _add_business_minutes,
     _frt_due_iso,
     _ttr_due_iso,
-    _schedule_next_process_notifications,
+)
+
+# ── _classify: auto-classification and auto-assignment ───────────────────────
+from ._classify import (  # noqa: F401
+    clasificar_ticket,
+    auto_asignar,
+    incrementar_carga,
+    decrementar_carga,
+)
+
+# ── _notifications: escalated notifications and channel dispatch ─────────────
+from ._notifications import (  # noqa: F401
+    programar_notificaciones,
+    marcar_notificacion_vista,
+    get_notificaciones_pendientes,
+    log_notification_attempt,
+    notify_client_resolution,
+    process_pending_notifications,
     _get_auto_close_hours,
+    _schedule_next_process_notifications,
+    get_jobs_queue_health,
+    get_channels_status,
+    list_channel_notifications,
+    retry_channel_notification,
+)
+
+# ── _specialties: specialty management ───────────────────────────────────────
+from ._specialties import (  # noqa: F401
+    list_specialties,
+    upsert_specialty,
+    toggle_availability,
+    delete_specialty,
+    _resolve_role_specialties,
+    _active_ticket_load_map,
+    _list_specialties_with_role_fallback,
+)
+
+# ── _sla: SLA metrics, compliance, evidence, legal holds ─────────────────────
+from ._sla import (  # noqa: F401
+    get_sla_metrics,
+    list_sla_breaches,
+    upsert_automation_rule,
+    list_automation_rules,
+    create_evidence_event,
+    list_evidence_events,
+    list_ticket_legal_holds,
+    create_ticket_legal_hold,
+    release_ticket_legal_hold,
+    run_compliance_export,
+    list_compliance_export_runs,
+    run_compliance_purge,
+    list_compliance_purge_runs,
+    verify_hash_chain,
+    record_parallel_go_no_go_decision,
+    list_parallel_kpi_daily,
+    record_parallel_kpi_snapshot,
+    _normalize_iso_utc,
+    _normalize_compliance_scope,
+    _artifact_exists_with_hash,
+    _compliance_run_duplicate_decision,
+    _retention_case_sql,
+    _list_purge_candidates,
+)
+
+# ── _crud: main ticket CRUD orchestrator ─────────────────────────────────────
+from ._crud import (  # noqa: F401
+    generar_codigo,
+    run_sla_evaluation_batch,
+    create_ticket,
+    get_ticket,
+    list_tickets,
+    claim_ticket,
+    update_ticket,
+    move_ticket_to_trash,
+    restore_ticket_from_trash,
+    add_comment,
+    get_ticket_email_draft,
+    acquire_ticket_email_draft_lock,
+    heartbeat_ticket_email_draft_lock,
+    save_ticket_email_draft,
+    upload_ticket_email_draft_attachments,
+    delete_ticket_email_draft_attachment,
+    discard_ticket_email_draft,
+    send_ticket_email_draft,
+    get_dashboard_kpi,
+    transition_ticket,
+    approve_ticket_change,
+    list_ticket_approvals,
+    get_ticket_workflow,
+    reply_ticket_email,
+    get_ticket_emails,
+    upload_ticket_attachments,
+    list_ticket_attachments,
+    get_ticket_attachment_for_download,
+    get_timeline,
+    get_stats,
+    get_assignment_timeline,
+    # Private helpers defined in _crud
     _workflow_next,
     _workflow_can_transition,
     _normalize_transition_target,
@@ -339,15 +368,13 @@ from ._impl import (  # noqa: F401
     _persist_incoming_attachments,
     _assignment_phase_from_subestado,
     _build_assignment_segments,
-    _normalize_iso_utc,
-    _normalize_compliance_scope,
-    _artifact_exists_with_hash,
-    _compliance_run_duplicate_decision,
-    _retention_case_sql,
-    _list_purge_candidates,
-    _resolve_role_specialties,
-    _active_ticket_load_map,
-    _list_specialties_with_role_fallback,
+)
+
+# ── _email: incoming email processing ────────────────────────────────────────
+from ._email import (  # noqa: F401
+    should_schedule_auto_reply,
+    schedule_auto_reply_for_ticket,
+    handle_incoming_email,
     _extract_message_ids,
     _message_id_variants,
     _normalize_message_id,
@@ -362,4 +389,14 @@ from ._impl import (  # noqa: F401
     _auto_reply_body,
     _process_reply_email,
     _process_new_email_ticket,
+)
+
+# ── _customers: client association and directory ──────────────────────────────
+from ._customers import (  # noqa: F401
+    associate_email_to_client,
+    bulk_assign_customer_by_email,
+    search_customers,
+    get_client_for_email,
+    get_directorio_clientes,
+    get_directorio_metricas,
 )
