@@ -21,9 +21,7 @@ from pathlib import Path
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 from urllib import parse as urlparse
-from urllib import request as urlrequest
-from urllib import error as urlerror
-from plataforma.core import email_integration, email as email_sender, jobs_engine
+from plataforma.core import email as email_sender, jobs_engine, google_chat
 from plataforma.core.config import settings as app_settings
 from ticketera.backend.services import roles as ticket_roles
 from ticketera.backend.services import workflow as ticket_workflow
@@ -403,47 +401,6 @@ def _attachment_storage_name(filename: str) -> str:
 
 WORKFLOW_RULES = ticket_workflow.WORKFLOW_RULES
 
-JIRA_STATUS_MAP = {
-    "to do": "abierto",
-    "open": "abierto",
-    "abierto": "abierto",
-    "in progress": "en_progreso",
-    "en progreso": "en_progreso",
-    "doing": "en_progreso",
-    "done": "cerrado",
-    "closed": "cerrado",
-    "resuelto": "resuelto",
-    "resolved": "resuelto",
-}
-
-JIRA_PRIORITY_TO_SEVERIDAD = {
-    "highest": "critica",
-    "critical": "critica",
-    "high": "alta",
-    "medium": "media",
-    "normal": "media",
-    "low": "baja",
-    "lowest": "baja",
-}
-
-JIRA_SYNC_RUN_TYPES = {"bootstrap", "delta"}
-JIRA_SYNC_RUN_STATUS = {"running", "completed", "failed", "completed_with_errors"}
-JIRA_SYNC_DEFAULT_LIMIT = 200
-JIRA_SYNC_MAX_LIMIT = 500
-JIRA_SYNC_CURSOR_NAME = "jira_delta_last_updated"
-
-JIRA_BASE_URL = str(getattr(app_settings, "JIRA_BASE_URL", "") or "").strip().rstrip("/")
-JIRA_USER = str(getattr(app_settings, "JIRA_USER", "") or "").strip()
-JIRA_API_TOKEN = str(getattr(app_settings, "JIRA_API_TOKEN", "") or "").strip()
-JIRA_PROJECT_KEYS = str(getattr(app_settings, "JIRA_PROJECT_KEYS", "") or "").strip()
-JIRA_SYNC_ENABLED = bool(getattr(app_settings, "JIRA_SYNC_ENABLED", False))
-JIRA_SYNC_DAILY_HOUR = _clamp_int(
-    getattr(app_settings, "JIRA_SYNC_DAILY_HOUR", 3),
-    default_value=3,
-    min_value=0,
-    max_value=23,
-)
-JIRA_SYNC_TZ = _parse_timezone_name(getattr(app_settings, "JIRA_SYNC_TZ", "America/Santiago"))
 AUTO_REPLY_MAX_REFERENCES = 20
 EMAIL_ROUTE_MATCH_TYPES = {"email", "domain"}
 AUTO_REPLY_SUBJECT_SETTING_KEY = "ticket_auto_reply_subject_template"
@@ -1512,12 +1469,19 @@ def notify_client_assignment(ticket: Dict[str, Any], assignee_name: str) -> None
     finally:
         conn.close()
 
+def _google_chat_assignment_text(username: str, ticket: Dict[str, Any]) -> str:
+    codigo = ticket.get("codigo") or f"#{ticket.get('id', '?')}"
+    titulo = ticket.get("titulo") or "Sin título"
+    severidad = ticket.get("severidad") or "-"
+    return f"🎫 *Nuevo ticket asignado* [{codigo}]\n*{titulo}*\nSeveridad: {severidad}\nAsignado a: {username}"
+
+
 def notify_specialist_assignment(username: str, ticket: Dict[str, Any]) -> None:
-    """Notifica al especialista por correo sobre su nueva asignación."""
+    """Notifica al especialista por correo y Google Chat sobre su nueva asignación."""
     # Los usernames son correos en este sistema
     if not username or "@" not in username:
         return
-    
+
     ticket_id = int(ticket["id"])
     template_conn = db.get_conn()
     try:
@@ -1529,7 +1493,7 @@ def notify_specialist_assignment(username: str, ticket: Dict[str, Any]) -> None:
         body_html = _append_specialist_sla_note(body_html)
     finally:
         template_conn.close()
-    
+
     try:
         email_sender.send_email_advanced(
             to_email=username,
@@ -1537,7 +1501,23 @@ def notify_specialist_assignment(username: str, ticket: Dict[str, Any]) -> None:
             html_body=body_html
         )
     except Exception as e:
-        logger.error(f"[AssignmentNotify] Specialist fail user={username}: {e}")
+        logger.error(f"[AssignmentNotify] Specialist email fail user={username}: {e}")
+
+    # Google Chat DM al especialista
+    bot_token = str(getattr(app_settings, "GOOGLE_CHAT_BOT_TOKEN", "") or "").strip()
+    if bot_token:
+        try:
+            google_chat.send_dm(bot_token, username, _google_chat_assignment_text(username, ticket))
+        except Exception as e:
+            logger.error(f"[AssignmentNotify] Google Chat DM fail user={username}: {e}")
+
+    # Google Chat al espacio compartido
+    space_webhook = str(getattr(app_settings, "GOOGLE_CHAT_SPACE_WEBHOOK", "") or "").strip()
+    if space_webhook:
+        try:
+            google_chat.send_space_message(space_webhook, _google_chat_assignment_text(username, ticket))
+        except Exception as e:
+            logger.error(f"[AssignmentNotify] Google Chat space fail ticket={ticket_id}: {e}")
 
 def notify_helpdesk_new_ticket(ticket: Dict[str, Any]) -> None:
     """Notifica por correo al encargado de mesa cuando entra un ticket."""
@@ -1734,7 +1714,7 @@ def normalize_adapter_mode(value: Optional[str], default_mode: str = "disabled")
 
 def normalize_channel_name(value: Optional[str]) -> str:
     raw = (value or "").strip().lower()
-    if raw in {"whatsapp", "3cx", "app"}:
+    if raw in {"app", "google_chat"}:
         return raw
     return ""
 
@@ -1746,18 +1726,14 @@ def normalize_notification_status(value: Optional[str], default_status: str = "p
 
 def _channel_adapter_mode(channel: str) -> str:
     normalized = normalize_channel_name(channel)
-    if normalized == "whatsapp":
-        return normalize_adapter_mode(getattr(app_settings, "WHATSAPP_ADAPTER_MODE", "disabled"), "disabled")
-    if normalized == "3cx":
-        return normalize_adapter_mode(getattr(app_settings, "THREECX_ADAPTER_MODE", "disabled"), "disabled")
+    if normalized == "google_chat":
+        return normalize_adapter_mode(getattr(app_settings, "GOOGLE_CHAT_ADAPTER_MODE", "disabled"), "disabled")
     return "disabled"
 
 def _channel_provider_name(channel: str) -> str:
     normalized = normalize_channel_name(channel)
-    if normalized == "whatsapp":
-        return "whatsapp_http"
-    if normalized == "3cx":
-        return "threecx_http"
+    if normalized == "google_chat":
+        return "google_chat_http"
     return ""
 
 def _channel_retry_delay_seconds(next_attempt: int) -> int:
@@ -2179,10 +2155,9 @@ def decrementar_carga(username: str, specialty: Optional[str] = None) -> None:
 # ==========================================================================
 def programar_notificaciones(ticket_id: int, user_id: str) -> None:
     """
-    Programa 3 niveles de notificación:
+    Programa 2 niveles de notificación:
     1. Inmediato → in-app
-    2. +5 min → WhatsApp/Telegram
-    3. +20 min → Llamada 3CX
+    2. +5 min → Google Chat DM al especialista
     """
     conn = db.get_conn()
     try:
@@ -2191,8 +2166,7 @@ def programar_notificaciones(ticket_id: int, user_id: str) -> None:
 
         niveles = [
             (1, "app", now),
-            (2, "whatsapp", now + timedelta(minutes=5)),
-            (3, "3cx", now + timedelta(minutes=20)),
+            (2, "google_chat", now + timedelta(minutes=5)),
         ]
 
         for level, channel, scheduled in niveles:
@@ -2410,7 +2384,7 @@ async def process_pending_notifications(payload: Dict[str, Any] = None):
                    locked_at = NULL,
                    updated_at = ?
                WHERE status = 'pending'
-                 AND channel IN ('whatsapp', '3cx')
+                 AND channel IN ('google_chat')
                  AND COALESCE(attempt_count, 0) >= COALESCE(NULLIF(max_attempts, 0), ?)""",
             (now, CHANNELS_MAX_ATTEMPTS),
         )
@@ -2419,7 +2393,7 @@ async def process_pending_notifications(payload: Dict[str, Any] = None):
                    SELECT tn.id
                    FROM ticket_notifications tn
                    WHERE tn.status = 'pending'
-                     AND tn.channel IN ('whatsapp', '3cx')
+                     AND tn.channel IN ('google_chat')
                      AND COALESCE(tn.next_retry_at, tn.scheduled_at)::timestamptz <= ?::timestamptz
                      AND COALESCE(tn.attempt_count, 0) < COALESCE(NULLIF(tn.max_attempts, 0), ?)
                    ORDER BY COALESCE(tn.next_retry_at, tn.scheduled_at) ASC, tn.id ASC
@@ -2444,7 +2418,7 @@ async def process_pending_notifications(payload: Dict[str, Any] = None):
         for row in claimed_rows:
             notif_id = int(row["id"])
             channel = normalize_channel_name(row.get("channel"))
-            job_type = "WHATSAPP_NOTIFY" if channel == "whatsapp" else "3CX_CALL" if channel == "3cx" else ""
+            job_type = "GOOGLE_CHAT_NOTIFY" if channel == "google_chat" else ""
             if not job_type:
                 conn = db.get_conn()
                 try:
@@ -2512,7 +2486,7 @@ def get_jobs_queue_health() -> Dict[str, Any]:
                       ) AS created_last_hour
                FROM sys_jobs
                WHERE job_type IN ('EMAIL_POLLING', 'PROCESS_NOTIFICATIONS', 'CHECK_TICKET_SLA', 'TKS_SLA_EVALUATE',
-                                  'COMPLIANCE_EXPORT_DAILY', 'COMPLIANCE_PURGE_DAILY', 'JIRA_DELTA_SYNC_DAILY')
+                                  'COMPLIANCE_EXPORT_DAILY', 'COMPLIANCE_PURGE_DAILY', 'GOOGLE_CHAT_NOTIFY')
                GROUP BY job_type
                ORDER BY job_type""",
             (now_iso, stale_cutoff, now_iso),
@@ -2542,15 +2516,10 @@ def get_jobs_queue_health() -> Dict[str, Any]:
 def get_channels_status() -> Dict[str, Any]:
     now = db.now_utc_iso()
     adapters = {
-        "whatsapp": {
-            "mode": _channel_adapter_mode("whatsapp"),
-            "provider": _channel_provider_name("whatsapp"),
-            "configured": bool((getattr(app_settings, "WHATSAPP_BASE_URL", "") or "").strip()),
-        },
-        "3cx": {
-            "mode": _channel_adapter_mode("3cx"),
-            "provider": _channel_provider_name("3cx"),
-            "configured": bool((getattr(app_settings, "THREECX_BASE_URL", "") or "").strip()),
+        "google_chat": {
+            "mode": _channel_adapter_mode("google_chat"),
+            "provider": _channel_provider_name("google_chat"),
+            "configured": bool((getattr(app_settings, "GOOGLE_CHAT_SPACE_WEBHOOK", "") or "").strip()),
         },
     }
     conn = db.get_conn()
@@ -2558,22 +2527,22 @@ def get_channels_status() -> Dict[str, Any]:
         rows = conn.execute(
             """SELECT channel, status, COUNT(*) AS total
                FROM ticket_notifications
-               WHERE channel IN ('whatsapp', '3cx')
+               WHERE channel IN ('google_chat')
                GROUP BY channel, status"""
         ).fetchall()
-        queue = {"by_channel": {"whatsapp": {}, "3cx": {}}, "totals": {}}
+        queue = {"by_channel": {"google_chat": {}}, "totals": {}}
         for row in rows:
             channel = normalize_channel_name(row.get("channel"))
             status = normalize_notification_status(row.get("status"))
             total = int(row.get("total") or 0)
-            if channel in {"whatsapp", "3cx"}:
+            if channel == "google_chat":
                 queue["by_channel"][channel][status] = total
             queue["totals"][status] = int(queue["totals"].get(status, 0)) + total
 
         due_row = conn.execute(
             """SELECT COUNT(*) AS total
                FROM ticket_notifications
-               WHERE channel IN ('whatsapp', '3cx')
+               WHERE channel IN ('google_chat')
                  AND status = 'pending'
                  AND COALESCE(next_retry_at, scheduled_at)::timestamptz <= ?::timestamptz""",
             (now,),
@@ -2605,12 +2574,12 @@ def list_channel_notifications(
     status_norm = normalize_notification_status(status, default_status="")
     channel_norm = normalize_channel_name(channel)
 
-    where = ["tn.channel IN ('whatsapp', '3cx')"]
+    where = ["tn.channel IN ('google_chat')"]
     params: List[Any] = []
     if status_norm:
         where.append("tn.status = ?")
         params.append(status_norm)
-    if channel_norm in {"whatsapp", "3cx"}:
+    if channel_norm == "google_chat":
         where.append("tn.channel = ?")
         params.append(channel_norm)
     where_sql = " AND ".join(where)
@@ -2666,8 +2635,8 @@ def retry_channel_notification(
             raise ValueError("Notificación no encontrada")
         item = dict(row)
         channel = normalize_channel_name(item.get("channel"))
-        if channel not in {"whatsapp", "3cx"}:
-            raise ValueError("Solo se permiten retries para canales externos (whatsapp/3cx)")
+        if channel != "google_chat":
+            raise ValueError("Solo se permiten retries para canales externos (google_chat)")
         status_now = normalize_notification_status(item.get("status"))
         if status_now == "dispatching":
             raise ValueError("Notificación en curso de despacho; espere a que termine")
@@ -6376,7 +6345,7 @@ def get_assignment_timeline(
     }
 
 # ==========================================================================
-# SLA / BREACHES / AUTOMATIONS / EVIDENCE / JIRA IMPORT
+# SLA / BREACHES / AUTOMATIONS / EVIDENCE
 # ==========================================================================
 def get_sla_metrics(
     date_from: Optional[str] = None,
@@ -7592,1058 +7561,6 @@ def verify_hash_chain(
     finally:
         conn.close()
 
-def import_jira_issues(
-    issues: List[Dict[str, Any]],
-    imported_by: str,
-    dry_run: bool = False,
-) -> Dict[str, Any]:
-    created_items: List[Dict[str, Any]] = []
-    errors: List[Dict[str, Any]] = []
-    payload_snapshot = {"count": len(issues), "dry_run": bool(dry_run)}
-
-    for issue in issues:
-        key = (issue.get("key") or "").strip()
-        summary = (issue.get("summary") or key or "Ticket importado desde Jira").strip()
-        description = (issue.get("description") or "").strip()
-        if key:
-            description = f"[JIRA:{key}] {description}".strip()
-
-        jira_priority = (issue.get("priority") or "medium").strip().lower()
-        severidad = JIRA_PRIORITY_TO_SEVERIDAD.get(jira_priority, "media")
-        jira_status = (issue.get("status") or "open").strip().lower()
-        target_state = JIRA_STATUS_MAP.get(jira_status, "abierto")
-        reporter_email = (issue.get("reporter_email") or "").strip() or None
-        reporter_name = (issue.get("reporter_name") or "").strip() or None
-        issue_type = (issue.get("issue_type") or "incidencia").strip().lower()
-        security_class = normalize_ticket_security_class(issue.get("ticket_security_class"))
-
-        if dry_run:
-            created_items.append(
-                {
-                    "jira_key": key,
-                    "preview_title": summary,
-                    "preview_state": target_state,
-                    "preview_severity": severidad,
-                    "preview_security_class": security_class,
-                }
-            )
-            continue
-
-        try:
-            created = create_ticket(
-                titulo=summary,
-                descripcion=description,
-                creador_id=f"jira_import:{imported_by}",
-                severidad=severidad,
-                tipo=issue_type if issue_type in {"incidencia", "requerimiento", "cambio"} else "incidencia",
-                categoria=issue.get("categoria") or "general",
-                origen_email=reporter_email,
-                cliente_nombre=reporter_name,
-                ticket_security_class=security_class,
-            )
-            ticket_id = int(created["id"])
-
-            patch_data: Dict[str, Any] = {}
-            if issue.get("assignee"):
-                patch_data["asignado_a"] = issue.get("assignee")
-            if target_state in ESTADOS_VALIDOS and target_state != "abierto":
-                patch_data["estado"] = target_state
-            if patch_data:
-                update_ticket(ticket_id, patch_data, actor_id=f"jira_import:{imported_by}")
-
-            comments = issue.get("comments") or []
-            if isinstance(comments, list):
-                for c in comments:
-                    author = (c.get("author") or "jira").strip() if isinstance(c, dict) else "jira"
-                    body = (c.get("body") or "").strip() if isinstance(c, dict) else str(c).strip()
-                    if body:
-                        add_comment(ticket_id, f"jira:{author}", body, "jira_import")
-
-            created_items.append(
-                {
-                    "jira_key": key,
-                    "ticket_id": ticket_id,
-                    "ticket_code": created.get("codigo"),
-                    "estado": patch_data.get("estado", "abierto"),
-                }
-            )
-        except Exception as e:
-            errors.append({"jira_key": key, "error": str(e)})
-
-    result = {
-        "ok": len(errors) == 0,
-        "dry_run": bool(dry_run),
-        "imported": len(created_items),
-        "failed": len(errors),
-        "items": created_items,
-        "errors": errors,
-    }
-
-    conn = db.get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO jira_import_runs (imported_by, payload_json, result_json, created_at)
-               VALUES (?, ?, ?, ?)""",
-            (
-                imported_by,
-                json.dumps(payload_snapshot, ensure_ascii=False),
-                json.dumps(result, ensure_ascii=False),
-                db.now_utc_iso(),
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    try:
-        create_evidence_event(
-            control_id="A.5.37",
-            artifact_ref="jira_import_runs",
-            owner=imported_by,
-            integrity_hash="",
-            metadata={"dry_run": bool(dry_run), "imported": len(created_items), "failed": len(errors)},
-        )
-    except Exception as e:
-        logger.warning(f"[import_jira_issues] evidence_event no crítico falló: {e}")
-
-    return result
-
-def _jira_project_keys_from_raw(raw_value: Optional[str]) -> List[str]:
-    items = [x.strip() for x in str(raw_value or "").split(",")]
-    return [x for x in items if x]
-
-def _jira_effective_project_keys(project_keys: Optional[List[str]] = None) -> List[str]:
-    if project_keys:
-        return [x.strip() for x in project_keys if str(x).strip()]
-    return _jira_project_keys_from_raw(JIRA_PROJECT_KEYS)
-
-def _jira_is_live_configured() -> bool:
-    return bool(JIRA_BASE_URL and JIRA_USER and JIRA_API_TOKEN)
-
-def _jira_build_auth_header() -> str:
-    token = base64.b64encode(f"{JIRA_USER}:{JIRA_API_TOKEN}".encode("utf-8")).decode("ascii")
-    return f"Basic {token}"
-
-def _jira_description_to_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, dict):
-        # Soporte básico para descripciones en formato Atlassian Document Format.
-        if isinstance(value.get("content"), list):
-            chunks: List[str] = []
-            def _walk(items: List[Any]) -> None:
-                for item in items:
-                    if not isinstance(item, dict):
-                        continue
-                    text = item.get("text")
-                    if isinstance(text, str) and text.strip():
-                        chunks.append(text)
-                    child = item.get("content")
-                    if isinstance(child, list):
-                        _walk(child)
-            _walk(value.get("content") or [])
-            if chunks:
-                return " ".join(chunks).strip()
-        return _stable_json(value)
-    return str(value)
-
-def _jira_comment_body_to_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, dict):
-        return _jira_description_to_text(value)
-    return str(value)
-
-def _jira_issue_author(issue_like: Any) -> str:
-    if isinstance(issue_like, str):
-        return issue_like.strip()
-    if isinstance(issue_like, dict):
-        for key in ("displayName", "name", "emailAddress", "accountId"):
-            raw = issue_like.get(key)
-            if raw and str(raw).strip():
-                return str(raw).strip()
-    return ""
-
-def _jira_status_to_estado(status_name: str) -> str:
-    raw = (status_name or "").strip().lower()
-    return JIRA_STATUS_MAP.get(raw, "abierto")
-
-def _jira_issue_type_to_tipo(issue_type: str) -> str:
-    normalized = (issue_type or "incidencia").strip().lower()
-    if normalized in TIPOS_TICKET_VALIDOS:
-        return normalized
-    mapping = {
-        "incident": "incidencia",
-        "service request": "requerimiento",
-        "change": "cambio",
-        "task": "requerimiento",
-        "bug": "incidencia",
-        "story": "requerimiento",
-    }
-    return mapping.get(normalized, "incidencia")
-
-def _jira_request_json(path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    if not _jira_is_live_configured():
-        raise ValueError("Jira no configurado: revisar JIRA_BASE_URL/JIRA_USER/JIRA_API_TOKEN")
-    safe_path = "/" + str(path or "").lstrip("/")
-    query = ""
-    if params:
-        encoded = urlparse.urlencode(params, doseq=True)
-        query = f"?{encoded}" if encoded else ""
-    url = f"{JIRA_BASE_URL}{safe_path}{query}"
-    req = urlrequest.Request(url=url, method="GET")
-    req.add_header("Accept", "application/json")
-    req.add_header("Authorization", _jira_build_auth_header())
-    try:
-        with urlrequest.urlopen(req, timeout=30) as resp:
-            body = resp.read().decode("utf-8", errors="replace")
-            if not body.strip():
-                return {}
-            parsed = json.loads(body)
-            return parsed if isinstance(parsed, dict) else {}
-    except urlerror.HTTPError as e:
-        detail = ""
-        try:
-            detail = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            detail = str(e)
-        raise ValueError(f"Jira API error HTTP {int(e.code or 500)}: {detail[:500]}")
-    except Exception as e:
-        raise ValueError(f"Jira API error: {e}")
-
-def _jira_jql_timestamp(iso_value: str) -> str:
-    dt = _parse_dt(iso_value) or _now_dt()
-    dt = _ensure_utc(dt)
-    return dt.strftime("%Y-%m-%d %H:%M")
-
-def _jira_fetch_issues_live(
-    *,
-    project_keys: List[str],
-    run_type: str,
-    only_open: bool,
-    updated_since: Optional[str],
-    limit: int,
-) -> List[Dict[str, Any]]:
-    if not project_keys:
-        raise ValueError("No hay proyectos Jira configurados (JIRA_PROJECT_KEYS)")
-
-    projects = ",".join(project_keys)
-    if run_type == "bootstrap":
-        jql = f"project in ({projects}) AND statusCategory != Done ORDER BY updated ASC"
-    else:
-        if updated_since:
-            ts = _jira_jql_timestamp(updated_since)
-            jql = f"project in ({projects}) AND updated >= \"{ts}\" ORDER BY updated ASC"
-        else:
-            jql = f"project in ({projects}) ORDER BY updated ASC"
-        if only_open:
-            jql = f"project in ({projects}) AND statusCategory != Done ORDER BY updated ASC"
-
-    page_size = max(1, min(limit, 100))
-    max_rows = max(1, min(limit, JIRA_SYNC_MAX_LIMIT))
-    start_at = 0
-    out: List[Dict[str, Any]] = []
-
-    while len(out) < max_rows:
-        payload = _jira_request_json(
-            "/rest/api/2/search",
-            {
-                "jql": jql,
-                "startAt": start_at,
-                "maxResults": page_size,
-                "fields": "summary,description,status,priority,issuetype,assignee,reporter,updated,comment",
-            },
-        )
-        issues = payload.get("issues") if isinstance(payload, dict) else None
-        if not isinstance(issues, list) or not issues:
-            break
-        out.extend([x for x in issues if isinstance(x, dict)])
-        if len(issues) < page_size:
-            break
-        start_at += len(issues)
-        if start_at >= max_rows:
-            break
-
-    return out[:max_rows]
-
-def _normalize_jira_issue_payload(issue: Dict[str, Any]) -> Dict[str, Any]:
-    if not isinstance(issue, dict):
-        raise ValueError("Issue inválido")
-
-    fields = issue.get("fields")
-    if isinstance(fields, dict):
-        key = (issue.get("key") or "").strip()
-        summary = (fields.get("summary") or key or "Ticket Jira").strip()
-        description = _jira_description_to_text(fields.get("description"))
-        status_name = _jira_issue_author(fields.get("status"))
-        priority_name = _jira_issue_author(fields.get("priority"))
-        issue_type_name = _jira_issue_author(fields.get("issuetype"))
-        assignee = _jira_issue_author(fields.get("assignee"))
-        reporter_email = ""
-        reporter_name = _jira_issue_author(fields.get("reporter"))
-        if isinstance(fields.get("reporter"), dict):
-            reporter_email = str(fields["reporter"].get("emailAddress") or "").strip()
-        updated_at = (fields.get("updated") or issue.get("updated") or db.now_utc_iso()).strip()
-        comments: List[Dict[str, str]] = []
-        comment_node = fields.get("comment")
-        comment_items = comment_node.get("comments") if isinstance(comment_node, dict) else []
-        if isinstance(comment_items, list):
-            for c in comment_items:
-                if not isinstance(c, dict):
-                    continue
-                comments.append(
-                    {
-                        "author": _jira_issue_author(c.get("author")) or "jira",
-                        "body": _jira_comment_body_to_text(c.get("body")),
-                    }
-                )
-        return {
-            "key": key,
-            "summary": summary,
-            "description": description,
-            "status": status_name or "open",
-            "priority": priority_name or "medium",
-            "issue_type": issue_type_name or "incidencia",
-            "assignee": assignee or None,
-            "reporter_email": reporter_email or None,
-            "reporter_name": reporter_name or None,
-            "comments": comments,
-            "updated_at": updated_at,
-        }
-
-    key = (issue.get("key") or "").strip()
-    return {
-        "key": key,
-        "summary": (issue.get("summary") or key or "Ticket Jira").strip(),
-        "description": (issue.get("description") or "").strip(),
-        "status": (issue.get("status") or "open").strip(),
-        "priority": (issue.get("priority") or "medium").strip(),
-        "issue_type": (issue.get("issue_type") or issue.get("issuetype") or "incidencia").strip(),
-        "assignee": (issue.get("assignee") or "").strip() or None,
-        "reporter_email": (issue.get("reporter_email") or "").strip() or None,
-        "reporter_name": (issue.get("reporter_name") or "").strip() or None,
-        "comments": issue.get("comments") if isinstance(issue.get("comments"), list) else [],
-        "updated_at": (issue.get("updated_at") or issue.get("updated") or db.now_utc_iso()).strip(),
-    }
-
-def _jira_get_cursor(cursor_name: str = JIRA_SYNC_CURSOR_NAME) -> Optional[str]:
-    conn = db.get_conn()
-    try:
-        row = conn.execute(
-            "SELECT cursor_value FROM jira_sync_cursor WHERE cursor_name = ? LIMIT 1",
-            (cursor_name,),
-        ).fetchone()
-        if not row:
-            return None
-        value = str(row.get("cursor_value") or "").strip()
-        return value or None
-    finally:
-        conn.close()
-
-def _jira_set_cursor(cursor_value: str, cursor_name: str = JIRA_SYNC_CURSOR_NAME) -> None:
-    now = db.now_utc_iso()
-    conn = db.get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO jira_sync_cursor (cursor_name, cursor_value, updated_at)
-               VALUES (?, ?, ?)
-               ON CONFLICT(cursor_name) DO UPDATE SET
-                   cursor_value = EXCLUDED.cursor_value,
-                   updated_at = EXCLUDED.updated_at""",
-            (cursor_name, cursor_value, now),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-def _jira_start_sync_run(run_type: str, actor: str, context: Dict[str, Any], cursor_before: Optional[str]) -> int:
-    normalized = (run_type or "").strip().lower()
-    if normalized not in JIRA_SYNC_RUN_TYPES:
-        normalized = "delta"
-    now = db.now_utc_iso()
-    conn = db.get_conn()
-    try:
-        row = conn.execute(
-            """INSERT INTO jira_sync_runs
-               (run_type, actor, status, context_json, counts_json, error_summary, cursor_before, cursor_after, started_at, created_at)
-               VALUES (?, ?, 'running', ?, '{}', '', ?, '', ?, ?)
-               RETURNING id""",
-            (
-                normalized,
-                actor,
-                _stable_json(context or {}),
-                (cursor_before or "").strip(),
-                now,
-                now,
-            ),
-        ).fetchone()
-        conn.commit()
-        return int(row["id"]) if row else 0
-    finally:
-        conn.close()
-
-def _jira_finish_sync_run(
-    run_id: int,
-    *,
-    status: str,
-    counts: Dict[str, Any],
-    error_summary: str = "",
-    cursor_after: Optional[str] = None,
-) -> None:
-    normalized_status = (status or "").strip().lower()
-    if normalized_status not in JIRA_SYNC_RUN_STATUS:
-        normalized_status = "failed"
-    conn = db.get_conn()
-    try:
-        conn.execute(
-            """UPDATE jira_sync_runs
-               SET status = ?,
-                   counts_json = ?,
-                   error_summary = ?,
-                   cursor_after = ?,
-                   ended_at = ?
-               WHERE id = ?""",
-            (
-                normalized_status,
-                _stable_json(counts or {}),
-                (error_summary or "").strip()[:4000],
-                (cursor_after or "").strip(),
-                db.now_utc_iso(),
-                int(run_id),
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-def _jira_upsert_map_row(
-    *,
-    jira_issue_key: str,
-    jira_updated_at: str,
-    monstruo_ticket_id: int,
-    sync_status: str,
-    last_error: str,
-) -> None:
-    now = db.now_utc_iso()
-    conn = db.get_conn()
-    try:
-        conn.execute(
-            """INSERT INTO jira_issue_map
-               (jira_issue_key, jira_updated_at, monstruo_ticket_id, sync_status, last_sync_at, last_error, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(jira_issue_key) DO UPDATE SET
-                   jira_updated_at = EXCLUDED.jira_updated_at,
-                   monstruo_ticket_id = EXCLUDED.monstruo_ticket_id,
-                   sync_status = EXCLUDED.sync_status,
-                   last_sync_at = EXCLUDED.last_sync_at,
-                   last_error = EXCLUDED.last_error,
-                   updated_at = EXCLUDED.updated_at""",
-            (
-                jira_issue_key,
-                jira_updated_at,
-                int(monstruo_ticket_id),
-                sync_status,
-                now,
-                (last_error or "").strip()[:2000],
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-def _jira_load_existing_map(jira_issue_key: str) -> Optional[Dict[str, Any]]:
-    conn = db.get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM jira_issue_map WHERE jira_issue_key = ? LIMIT 1",
-            (jira_issue_key,),
-        ).fetchone()
-        return dict(row) if row else None
-    finally:
-        conn.close()
-
-def _jira_apply_issue_to_ticket(issue: Dict[str, Any], actor: str, existing_ticket_id: Optional[int] = None) -> Dict[str, Any]:
-    issue_key = (issue.get("key") or "").strip()
-    if not issue_key:
-        raise ValueError("Issue Jira sin key")
-
-    jira_priority = (issue.get("priority") or "medium").strip().lower()
-    severidad = JIRA_PRIORITY_TO_SEVERIDAD.get(jira_priority, "media")
-    jira_status = (issue.get("status") or "open").strip()
-    target_state = _jira_status_to_estado(jira_status)
-    issue_type = _jira_issue_type_to_tipo(str(issue.get("issue_type") or "incidencia"))
-    summary = (issue.get("summary") or issue_key or "Ticket Jira").strip()
-    description = (issue.get("description") or "").strip()
-    if issue_key:
-        description = f"[JIRA:{issue_key}] {description}".strip()
-
-    patch_data: Dict[str, Any] = {"severidad": severidad}
-    assignee = (issue.get("assignee") or "").strip() if isinstance(issue.get("assignee"), str) else ""
-    if assignee:
-        patch_data["asignado_a"] = assignee
-    if target_state in ESTADOS_VALIDOS and target_state != "abierto":
-        patch_data["estado"] = target_state
-
-    if existing_ticket_id:
-        ticket_id = int(existing_ticket_id)
-        updated = update_ticket(ticket_id, patch_data, actor_id=f"jira_sync:{actor}")
-        if not updated:
-            raise ValueError(f"Ticket asociado no encontrado para issue {issue_key}")
-        return {
-            "action": "updated",
-            "ticket_id": ticket_id,
-            "ticket_code": updated.get("codigo"),
-            "estado": updated.get("estado"),
-        }
-
-    created = create_ticket(
-        titulo=summary,
-        descripcion=description,
-        creador_id=f"jira_import:{actor}",
-        severidad=severidad,
-        tipo=issue_type,
-        categoria=issue.get("categoria") or "general",
-        origen_email=issue.get("reporter_email"),
-        cliente_nombre=issue.get("reporter_name"),
-        ticket_security_class=normalize_ticket_security_class(issue.get("ticket_security_class")),
-    )
-    ticket_id = int(created["id"])
-    if patch_data:
-        update_ticket(ticket_id, patch_data, actor_id=f"jira_sync:{actor}")
-
-    comments = issue.get("comments") or []
-    if isinstance(comments, list):
-        for c in comments:
-            if not isinstance(c, dict):
-                continue
-            author = (c.get("author") or "jira").strip()
-            body = (c.get("body") or "").strip()
-            if body:
-                add_comment(ticket_id, f"jira:{author}", body, "jira_import")
-
-    refreshed = get_ticket(ticket_id) or created
-    return {
-        "action": "imported",
-        "ticket_id": ticket_id,
-        "ticket_code": refreshed.get("codigo"),
-        "estado": refreshed.get("estado"),
-    }
-
-def _run_jira_sync(
-    *,
-    run_type: str,
-    actor: str,
-    dry_run: bool,
-    issues_input: Optional[List[Dict[str, Any]]],
-    project_keys: Optional[List[str]],
-    limit: int,
-    since: Optional[str] = None,
-) -> Dict[str, Any]:
-    normalized_type = (run_type or "").strip().lower()
-    if normalized_type not in JIRA_SYNC_RUN_TYPES:
-        raise ValueError("run_type inválido")
-
-    normalized_limit = max(1, min(int(limit or JIRA_SYNC_DEFAULT_LIMIT), JIRA_SYNC_MAX_LIMIT))
-    normalized_since = _normalize_iso_utc(since) if since else None
-    keys = _jira_effective_project_keys(project_keys)
-    cursor_before = normalized_since if normalized_type == "delta" else None
-    if normalized_type == "delta" and not cursor_before:
-        cursor_before = _jira_get_cursor() or (_now_dt() - timedelta(days=1)).isoformat()
-
-    issues_raw: List[Dict[str, Any]] = []
-    source = "payload"
-    if issues_input:
-        issues_raw = [x for x in issues_input if isinstance(x, dict)]
-    else:
-        source = "jira_api"
-        if not JIRA_SYNC_ENABLED:
-            raise ValueError("JIRA_SYNC_ENABLED=false")
-        if not _jira_is_live_configured():
-            raise ValueError("Jira no configurado para sincronización live")
-        issues_raw = _jira_fetch_issues_live(
-            project_keys=keys,
-            run_type=normalized_type,
-            only_open=(normalized_type == "bootstrap"),
-            updated_since=cursor_before,
-            limit=normalized_limit,
-        )
-
-    context = {
-        "source": source,
-        "project_keys": keys,
-        "limit": normalized_limit,
-        "dry_run": bool(dry_run),
-        "cursor_before": cursor_before,
-        "issues_received": len(issues_raw),
-    }
-    run_id = _jira_start_sync_run(normalized_type, actor, context, cursor_before)
-    if not run_id:
-        raise ValueError("No se pudo crear jira_sync_run")
-
-    imported_items: List[Dict[str, Any]] = []
-    error_items: List[Dict[str, Any]] = []
-    imported = 0
-    updated = 0
-    skipped = 0
-    failed = 0
-    max_seen_updated = cursor_before
-
-    try:
-        for issue_raw in issues_raw:
-            try:
-                issue = _normalize_jira_issue_payload(issue_raw)
-                issue_key = (issue.get("key") or "").strip()
-                if not issue_key:
-                    raise ValueError("Issue Jira sin key")
-                issue_updated = _normalize_iso_utc(issue.get("updated_at")) or db.now_utc_iso()
-                if not max_seen_updated or (_parse_dt(issue_updated) and _parse_dt(max_seen_updated) and _parse_dt(issue_updated) > _parse_dt(max_seen_updated)):
-                    max_seen_updated = issue_updated
-
-                current_map = _jira_load_existing_map(issue_key)
-                if current_map and str(current_map.get("jira_updated_at") or "").strip() == issue_updated:
-                    skipped += 1
-                    imported_items.append(
-                        {
-                            "jira_key": issue_key,
-                            "action": "skipped",
-                            "ticket_id": int(current_map.get("monstruo_ticket_id") or 0),
-                            "jira_updated_at": issue_updated,
-                        }
-                    )
-                    continue
-
-                if dry_run:
-                    action = "updated" if current_map else "imported"
-                    if action == "updated":
-                        updated += 1
-                    else:
-                        imported += 1
-                    imported_items.append(
-                        {
-                            "jira_key": issue_key,
-                            "action": action,
-                            "ticket_id": int(current_map.get("monstruo_ticket_id") or 0) if current_map else None,
-                            "preview_estado": _jira_status_to_estado(str(issue.get("status") or "open")),
-                            "preview_severidad": JIRA_PRIORITY_TO_SEVERIDAD.get(
-                                str(issue.get("priority") or "medium").lower(),
-                                "media",
-                            ),
-                            "jira_updated_at": issue_updated,
-                        }
-                    )
-                    continue
-
-                applied = _jira_apply_issue_to_ticket(
-                    issue=issue,
-                    actor=actor,
-                    existing_ticket_id=int(current_map["monstruo_ticket_id"]) if current_map else None,
-                )
-                action = applied.get("action") or ("updated" if current_map else "imported")
-                if action == "updated":
-                    updated += 1
-                else:
-                    imported += 1
-                _jira_upsert_map_row(
-                    jira_issue_key=issue_key,
-                    jira_updated_at=issue_updated,
-                    monstruo_ticket_id=int(applied.get("ticket_id") or 0),
-                    sync_status="synced",
-                    last_error="",
-                )
-                imported_items.append(
-                    {
-                        "jira_key": issue_key,
-                        "action": action,
-                        "ticket_id": int(applied.get("ticket_id") or 0),
-                        "ticket_code": applied.get("ticket_code"),
-                        "estado": applied.get("estado"),
-                        "jira_updated_at": issue_updated,
-                    }
-                )
-            except Exception as issue_error:
-                failed += 1
-                issue_key = str(issue_raw.get("key") or "").strip() if isinstance(issue_raw, dict) else ""
-                error_items.append({"jira_key": issue_key, "error": str(issue_error)})
-                if issue_key and not dry_run:
-                    current_map = _jira_load_existing_map(issue_key)
-                    if current_map:
-                        _jira_upsert_map_row(
-                            jira_issue_key=issue_key,
-                            jira_updated_at=str(current_map.get("jira_updated_at") or db.now_utc_iso()),
-                            monstruo_ticket_id=int(current_map.get("monstruo_ticket_id") or 0),
-                            sync_status="error",
-                            last_error=str(issue_error),
-                        )
-        if normalized_type == "delta" and not dry_run and max_seen_updated:
-            _jira_set_cursor(max_seen_updated)
-
-        status = "completed" if failed == 0 else "completed_with_errors"
-        counts = {
-            "imported": imported,
-            "updated": updated,
-            "skipped": skipped,
-            "failed": failed,
-            "total_processed": imported + updated + skipped + failed,
-        }
-        _jira_finish_sync_run(
-            run_id,
-            status=status,
-            counts=counts,
-            error_summary="; ".join([x["error"] for x in error_items][:20]),
-            cursor_after=max_seen_updated if normalized_type == "delta" else "",
-        )
-    except Exception as run_error:
-        _jira_finish_sync_run(
-            run_id,
-            status="failed",
-            counts={
-                "imported": imported,
-                "updated": updated,
-                "skipped": skipped,
-                "failed": failed + 1,
-            },
-            error_summary=str(run_error),
-            cursor_after=max_seen_updated if normalized_type == "delta" else "",
-        )
-        raise
-
-    try:
-        create_evidence_event(
-            control_id="A.5.37",
-            artifact_ref=f"jira_sync_run:{run_id}",
-            owner=actor,
-            integrity_hash="",
-            metadata={
-                "run_type": normalized_type,
-                "dry_run": bool(dry_run),
-                "source": source,
-                "imported": imported,
-                "updated": updated,
-                "skipped": skipped,
-                "failed": failed,
-                "cursor_before": cursor_before or "",
-                "cursor_after": max_seen_updated or "",
-            },
-        )
-    except Exception as e:
-        logger.warning(f"[jira_sync] evidence_event no crítico falló: {e}")
-
-    return {
-        "ok": failed == 0,
-        "run_id": run_id,
-        "run_type": normalized_type,
-        "dry_run": bool(dry_run),
-        "source": source,
-        "cursor_before": cursor_before,
-        "cursor_after": max_seen_updated if normalized_type == "delta" else None,
-        "imported": imported,
-        "updated": updated,
-        "skipped": skipped,
-        "failed": failed,
-        "items": imported_items[:300],
-        "errors": error_items[:200],
-    }
-
-def run_jira_bootstrap_open(
-    actor: str,
-    dry_run: bool = False,
-    issues: Optional[List[Dict[str, Any]]] = None,
-    project_keys: Optional[List[str]] = None,
-    limit: int = JIRA_SYNC_DEFAULT_LIMIT,
-) -> Dict[str, Any]:
-    return _run_jira_sync(
-        run_type="bootstrap",
-        actor=actor,
-        dry_run=bool(dry_run),
-        issues_input=issues,
-        project_keys=project_keys,
-        limit=limit,
-        since=None,
-    )
-
-def run_jira_delta_sync(
-    actor: str,
-    dry_run: bool = False,
-    issues: Optional[List[Dict[str, Any]]] = None,
-    project_keys: Optional[List[str]] = None,
-    limit: int = JIRA_SYNC_DEFAULT_LIMIT,
-    since: Optional[str] = None,
-) -> Dict[str, Any]:
-    return _run_jira_sync(
-        run_type="delta",
-        actor=actor,
-        dry_run=bool(dry_run),
-        issues_input=issues,
-        project_keys=project_keys,
-        limit=limit,
-        since=since,
-    )
-
-def list_jira_sync_runs(
-    run_type: Optional[str] = None,
-    status: Optional[str] = None,
-    limit: int = 100,
-    offset: int = 0,
-) -> Dict[str, Any]:
-    conn = db.get_conn()
-    try:
-        limit = max(1, min(int(limit or 100), 500))
-        offset = max(0, int(offset or 0))
-        where = ["1=1"]
-        params: List[Any] = []
-        if run_type:
-            where.append("run_type = ?")
-            params.append((run_type or "").strip().lower())
-        if status:
-            where.append("status = ?")
-            params.append((status or "").strip().lower())
-        where_sql = " AND ".join(where)
-        total = conn.execute(
-            f"SELECT COUNT(*) AS c FROM jira_sync_runs WHERE {where_sql}",
-            params,
-        ).fetchone()
-        rows = conn.execute(
-            f"""SELECT *
-                FROM jira_sync_runs
-                WHERE {where_sql}
-                ORDER BY started_at DESC, id DESC
-                LIMIT ? OFFSET ?""",
-            (*params, limit, offset),
-        ).fetchall()
-        return {
-            "items": [dict(r) for r in rows],
-            "total": int(total["c"] or 0),
-            "limit": limit,
-            "offset": offset,
-        }
-    finally:
-        conn.close()
-
-def _normalized_snapshot_date(value: Optional[str]) -> str:
-    if not value:
-        return datetime.now(JIRA_SYNC_TZ).date().isoformat()
-    parsed = _parse_dt(value)
-    if parsed:
-        return _ensure_utc(parsed).date().isoformat()
-    raw = str(value).strip()
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", raw):
-        return raw
-    raise ValueError(f"snapshot_date inválida: {value}")
-
-def _jira_count_open_live(project_keys: List[str]) -> Optional[int]:
-    if not JIRA_SYNC_ENABLED or not _jira_is_live_configured():
-        return None
-    if not project_keys:
-        return None
-    projects = ",".join(project_keys)
-    jql = f"project in ({projects}) AND statusCategory != Done"
-    payload = _jira_request_json(
-        "/rest/api/2/search",
-        {
-            "jql": jql,
-            "startAt": 0,
-            "maxResults": 1,
-            "fields": "key",
-        },
-    )
-    total = payload.get("total")
-    try:
-        return int(total)
-    except Exception:
-        return None
-
-def record_parallel_kpi_snapshot(
-    snapshot_date: Optional[str] = None,
-    source: str = "parallel_daily",
-) -> Dict[str, Any]:
-    snap_date = _normalized_snapshot_date(snapshot_date)
-    project_keys = _jira_effective_project_keys(None)
-    now = db.now_utc_iso()
-    conn = db.get_conn()
-    try:
-        monstruo_open = conn.execute(
-            """SELECT COUNT(*) AS c
-               FROM jira_issue_map m
-               JOIN tickets t ON t.id = m.monstruo_ticket_id
-               WHERE t.estado NOT IN ('resuelto','cerrado')"""
-        ).fetchone()
-        sev1_open = conn.execute(
-            """SELECT COUNT(*) AS c
-               FROM jira_issue_map m
-               JOIN tickets t ON t.id = m.monstruo_ticket_id
-               WHERE t.estado NOT IN ('resuelto','cerrado')
-                 AND t.severidad = 'critica'"""
-        ).fetchone()
-        mismatch = conn.execute(
-            """SELECT COUNT(*) AS c
-               FROM jira_issue_map m
-               LEFT JOIN tickets t ON t.id = m.monstruo_ticket_id
-               WHERE t.id IS NULL"""
-        ).fetchone()
-        duplicates = conn.execute(
-            """SELECT COALESCE(SUM(cnt - 1), 0) AS c
-               FROM (
-                   SELECT monstruo_ticket_id, COUNT(*) AS cnt
-                   FROM jira_issue_map
-                   GROUP BY monstruo_ticket_id
-                   HAVING COUNT(*) > 1
-               ) d"""
-        ).fetchone()
-        failed_runs = conn.execute(
-            """SELECT COUNT(*) AS c
-               FROM jira_sync_runs
-               WHERE started_at::date = ?::date
-                 AND status IN ('failed','completed_with_errors')""",
-            (snap_date,),
-        ).fetchone()
-    finally:
-        conn.close()
-
-    sla = get_sla_metrics()
-    sla_total = int(sla.get("frt_on_time", 0)) + int(sla.get("frt_breached", 0)) + int(sla.get("ttr_on_time", 0)) + int(sla.get("ttr_breached", 0))
-    sla_on_time = int(sla.get("frt_on_time", 0)) + int(sla.get("ttr_on_time", 0))
-    sla_pct = round((sla_on_time / sla_total * 100.0), 2) if sla_total > 0 else 100.0
-
-    jira_open_live = None
-    jira_open_error = ""
-    try:
-        jira_open_live = _jira_count_open_live(project_keys)
-    except Exception as e:
-        jira_open_error = str(e)
-        jira_open_live = None
-
-    monstruo_open_count = int((monstruo_open or {}).get("c") or 0)
-    total_jira_open = int(jira_open_live) if jira_open_live is not None else monstruo_open_count
-
-    details = {
-        "source": source,
-        "jira_live_open_error": jira_open_error,
-        "project_keys": project_keys,
-        "sla": {
-            "frt_on_time": int(sla.get("frt_on_time", 0)),
-            "frt_breached": int(sla.get("frt_breached", 0)),
-            "ttr_on_time": int(sla.get("ttr_on_time", 0)),
-            "ttr_breached": int(sla.get("ttr_breached", 0)),
-        },
-        "generated_at": now,
-    }
-
-    conn2 = db.get_conn()
-    try:
-        conn2.execute(
-            """INSERT INTO parallel_kpi_daily
-               (snapshot_date, source, total_jira_open, total_monstruo_open, sev1_open,
-                sla_compliance_pct, mismatch_count, duplicate_count, failed_sync_runs,
-                details_json, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(snapshot_date) DO UPDATE SET
-                   source = EXCLUDED.source,
-                   total_jira_open = EXCLUDED.total_jira_open,
-                   total_monstruo_open = EXCLUDED.total_monstruo_open,
-                   sev1_open = EXCLUDED.sev1_open,
-                   sla_compliance_pct = EXCLUDED.sla_compliance_pct,
-                   mismatch_count = EXCLUDED.mismatch_count,
-                   duplicate_count = EXCLUDED.duplicate_count,
-                   failed_sync_runs = EXCLUDED.failed_sync_runs,
-                   details_json = EXCLUDED.details_json,
-                   updated_at = EXCLUDED.updated_at""",
-            (
-                snap_date,
-                source,
-                total_jira_open,
-                monstruo_open_count,
-                int((sev1_open or {}).get("c") or 0),
-                sla_pct,
-                int((mismatch or {}).get("c") or 0),
-                int((duplicates or {}).get("c") or 0),
-                int((failed_runs or {}).get("c") or 0),
-                _stable_json(details),
-                now,
-                now,
-            ),
-        )
-        conn2.commit()
-        row = conn2.execute(
-            "SELECT * FROM parallel_kpi_daily WHERE snapshot_date = ?",
-            (snap_date,),
-        ).fetchone()
-        return dict(row) if row else {}
-    finally:
-        conn2.close()
-
-def list_parallel_kpi_daily(
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-) -> Dict[str, Any]:
-    if not date_from and not date_to:
-        record_parallel_kpi_snapshot()
-
-    where = ["1=1"]
-    params: List[Any] = []
-    if date_from:
-        where.append("snapshot_date >= ?")
-        params.append(_normalized_snapshot_date(date_from))
-    if date_to:
-        where.append("snapshot_date <= ?")
-        params.append(_normalized_snapshot_date(date_to))
-
-    conn = db.get_conn()
-    try:
-        rows = conn.execute(
-            f"""SELECT *
-                FROM parallel_kpi_daily
-                WHERE {' AND '.join(where)}
-                ORDER BY snapshot_date DESC""",
-            params,
-        ).fetchall()
-        return {"items": [dict(r) for r in rows], "total": len(rows)}
-    finally:
-        conn.close()
-
-def get_jira_reconciliation_daily(snapshot_date: Optional[str] = None) -> Dict[str, Any]:
-    snap = _normalized_snapshot_date(snapshot_date)
-    snapshot = record_parallel_kpi_snapshot(snapshot_date=snap, source="reconciliation")
-
-    conn = db.get_conn()
-    try:
-        missing = conn.execute(
-            """SELECT m.jira_issue_key, m.monstruo_ticket_id, m.sync_status, m.last_error
-               FROM jira_issue_map m
-               LEFT JOIN tickets t ON t.id = m.monstruo_ticket_id
-               WHERE t.id IS NULL
-               ORDER BY m.updated_at DESC
-               LIMIT 200"""
-        ).fetchall()
-        latest_runs = conn.execute(
-            """SELECT *
-               FROM jira_sync_runs
-               WHERE started_at::date = ?::date
-               ORDER BY started_at DESC
-               LIMIT 20""",
-            (snap,),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    mismatch_count = int(snapshot.get("mismatch_count") or 0)
-    failed_sync_runs = int(snapshot.get("failed_sync_runs") or 0)
-    ok = mismatch_count == 0 and failed_sync_runs == 0
-    return {
-        "ok": ok,
-        "snapshot_date": snap,
-        "kpi_snapshot": snapshot,
-        "mismatch_count": mismatch_count,
-        "failed_sync_runs": failed_sync_runs,
-        "missing_items": [dict(r) for r in missing],
-        "runs": [dict(r) for r in latest_runs],
-    }
-
 def record_parallel_go_no_go_decision(
     *,
     decision: str,
@@ -8663,10 +7580,6 @@ def record_parallel_go_no_go_decision(
     when = _normalize_iso_utc(decided_at) or db.now_utc_iso()
     now = db.now_utc_iso()
     payload_metrics = metrics or {}
-    if not payload_metrics:
-        latest = list_parallel_kpi_daily()
-        if latest.get("items"):
-            payload_metrics = latest["items"][0]
     conn = db.get_conn()
     try:
         row = conn.execute(
