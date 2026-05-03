@@ -32,8 +32,6 @@
 
     <main>
         <div class="main-inner module-shell">
-
-            <!-- HEADER -->
             <div class="section-header module-tabs-header module-shell-header">
                 <div class="module-shell-title">
                     <h2 class="module-page-title">Gestión de Tareas (GTA)</h2>
@@ -52,7 +50,7 @@
                 </div>
             </div>
 
-            <!-- TABS -->
+            <!-- TAB BAR -->
             <div class="tab-bar">
                 <button class="tab-btn active" data-tab="tablero" onclick="GtaCore.loadTab('tablero', this)">
                     <i class="fas fa-columns"></i> Tablero
@@ -68,9 +66,9 @@
                 </button>
             </div>
 
-            <!-- CONTENIDO DINÁMICO -->
-            <section class="section-block module-shell-content module-shell-content-fill">
-                <div id="tab-content" style="flex:1; overflow:auto; display:flex; flex-direction:column;"></div>
+            <section class="section-block module-shell-content">
+                <!-- CONTENIDO DINÁMICO -->
+                <div id="tab-content"></div>
             </section>
         </div>
     </main>

@@ -122,21 +122,84 @@ Las variables están definidas en `gateway/frontend/shared/ui/css/monstruo.css`.
 
 ---
 
-## 4. PESTAÑAS (TAB BAR)
+## 4. PESTAÑAS (TAB BAR) — ESTÁNDAR CANÓNICO
 
-Las pestañas siguen el estándar **ERP/PMO** — ya están definidas en `monstruo.css` bajo el bloque `PMO + ERP VISUAL STANDARD`.
+**El bloque header + tabs + contenido es UNA UNIDAD.** No separar con líneas en blanco ni comentarios entre los tres elementos hermanos. La cadena exacta de hermanos dentro de `.main-inner.module-shell` debe ser:
 
-```html
-<div class="tab-bar">
-    <button class="tab-btn active" data-tab="nombre" onclick="loadTab('nombre', this)">
-        <i class="fas fa-icon"></i> Etiqueta
-    </button>
-</div>
+```text
+.section-header.module-tabs-header.module-shell-header
+.tab-bar
+.section-block.module-shell-content
 ```
 
-- Tab activo: clase `active`, color `--neon`, sin subrayado (ya está en CSS global)
+### Estructura literal (copiar tal cual)
+
+```html
+<main>
+    <div class="main-inner module-shell">
+        <div class="section-header module-tabs-header module-shell-header">
+            <div class="module-shell-title">
+                <h2 class="module-page-title">Nombre del Módulo</h2>
+                <p class="module-shell-subtitle">Descripción breve</p>
+            </div>
+            <div class="module-shell-actions">
+                <!-- botones de acción global -->
+            </div>
+        </div>
+
+        <!-- TAB BAR -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="nombre" onclick="loadTab('nombre', this)">
+                <i class="fas fa-icon"></i> Etiqueta
+            </button>
+        </div>
+
+        <section class="section-block module-shell-content">
+            <!-- CONTENIDO DINÁMICO -->
+            <div id="tab-content"></div>
+        </section>
+    </div>
+</main>
+```
+
+### Reglas no negociables
+
+1. **NO** poner líneas en blanco ni comentarios entre `</div class="...module-shell-header">` y `<div class="tab-bar">`. El selector que aplica el espaciado correcto es `.module-tabs-header + .tab-bar` (combinador adyacente). Si los separas con un comentario HTML como `<!-- TABS -->` el combinador SIGUE funcionando porque los comentarios HTML no rompen la adyacencia, pero **un nodo elemento intermedio sí la rompe**. Mantener los comentarios solo encima del bloque, nunca como hermano elemento.
+2. **NO** agregar la clase `module-shell-content-fill` a menos que el módulo necesite que el contenido ocupe altura completa con flex column (drawer fullscreen, kanban). Ticketera, GTA, ERP y PMO usan **solo** `module-shell-content`.
+3. **NO** poner `style="flex:1; overflow:auto; display:flex; flex-direction:column"` inline en `#tab-content`. Esos estilos no van — el contenedor se rige por el flujo natural.
+4. **NO** redefinir `.tab-bar` ni `.tab-btn` en el CSS del módulo. Si necesitas variantes específicas, crea una clase scope (`.tks-tab-bar`, `.gta-tab-bar`) y SOLO modifica color de acento o iconografía.
+
+### Medidas exactas (vienen del CSS global, NO redefinir)
+
+| Selector | Propiedad | Valor |
+|---|---|---|
+| `.module-tabs-header` | `min-height` | `56px` |
+| `.module-tabs-header` | `margin-bottom` | `10px` |
+| `.module-tabs-header` | `padding-bottom` | `0` |
+| `.module-tabs-header + .tab-bar` | `margin-top` | `0` |
+| `.module-tabs-header + .tab-bar` | `padding-bottom` | `8px` |
+| `.module-tabs-header + .tab-bar > .tab-btn` | `min-height` | `34px` |
+| `.module-tabs-header + .tab-bar > .tab-btn` | `min-width` | `86px` |
+| `.module-tabs-header + .tab-bar > .tab-btn` | `padding` | `0 10px` |
+| `.module-tabs-header + .tab-bar > .tab-btn` | `font-size` | `0.8rem` |
+| `.tab-bar` (base) | `gap` | `0.8rem` |
+| `.tab-bar` (base) | `border-bottom` | `1px solid rgba(255,255,255,0.1)` |
+| `.tab-bar` (base) | `margin-bottom` | `16px` |
+| `.tab-bar` (base) | `padding` | `0 4px 10px` |
+
+### Iconografía dentro de tab-btn
+
+Usar **siempre** Font Awesome dentro de las pestañas — NO emojis Unicode. Patrón:
+
+```html
+<button class="tab-btn active" data-tab="dashboard">
+    <i class="fas fa-chart-line"></i> Resumen
+</button>
+```
+
+- Tab activo: clase `active`, color `--neon`, fondo translúcido pill
 - Tab inactivo: color `--text-soft`
-- **NO usar** `border-bottom` de 2px ni `::after` underline — ese patrón fue reemplazado
+- **NO usar** `border-bottom: 2px solid` manual ni `::after` underline — el estilo activo lo da el CSS global
 
 ---
 
