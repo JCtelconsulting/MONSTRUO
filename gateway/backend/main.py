@@ -573,6 +573,13 @@ async def fundacion_static(asset_path: str):
     return _serve_static_file(fundacion_ui_dir, asset_path)
 
 
+@app.get("/gta/{asset_path:path}")
+async def gta_static(asset_path: str):
+    if asset_path.startswith("shared/"):
+        return _serve_static_file(ui_dir / "shared" / "ui", asset_path[len("shared/"):])
+    return _serve_static_file(gta_ui_dir, asset_path)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "gateway": "active"}
