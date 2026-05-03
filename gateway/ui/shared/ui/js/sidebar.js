@@ -35,28 +35,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const menuItems = isProdHost ? [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', link: `https://login.telconsulting.cl${envPrefix}/dashboard`, title: 'Dashboard' },
+        { id: 'tks', label: 'TKs', icon: 'fas fa-ticket-alt', link: `https://ticketera.telconsulting.cl${envPrefix}/`, title: 'Ticketera' },
+        { id: 'gta', label: 'GTA', icon: 'fas fa-tasks', link: `https://login.telconsulting.cl${envPrefix}/gta`, title: 'Gestión de Tareas Automatizada' },
+        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: `https://login.telconsulting.cl${envPrefix}/fundacion`, title: 'Fundación' },
         { id: 'pmo', label: 'Proyectos (PMO)', icon: 'fas fa-helmet-safety', link: `https://pmo.telconsulting.cl${envPrefix}/`, title: 'Oficina Técnica' },
         { id: 'erp', label: 'ERP & Finanzas', icon: 'fas fa-file-invoice-dollar', link: `https://erp.telconsulting.cl${envPrefix}/`, title: 'ERP & Finanzas' },
         { id: 'crm', label: 'CRM', icon: 'fas fa-id-card', link: `https://crm.telconsulting.cl${envPrefix}/`, title: 'CRM (Clientes)' },
         { id: 'bodega', label: 'Bodega', icon: 'fas fa-warehouse', link: `https://bodega.telconsulting.cl${envPrefix}/`, title: 'Bodega (WMS)' },
-        { id: 'tks', label: 'TKs', icon: 'fas fa-ticket-alt', link: `https://ticketera.telconsulting.cl${envPrefix}/`, title: 'Ticketera' },
         { id: 'ia', label: 'IA (ULTRON)', icon: 'fas fa-robot', link: `https://ia.telconsulting.cl${envPrefix}/`, title: 'Asistente IA' },
         { id: 'zabbix', label: 'Zabbix', icon: 'fas fa-signal', link: `https://zabbix.telconsulting.cl${envPrefix}/`, title: 'Monitoreo' },
-        { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: `https://config.telconsulting.cl${envPrefix}/`, title: 'Configuración' },
-        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: `https://login.telconsulting.cl${envPrefix}/fundacion`, title: 'Fundación' },
-        { id: 'gta', label: 'GTA', icon: 'fas fa-tasks', link: `https://login.telconsulting.cl${envPrefix}/gta`, title: 'Gestión de Tareas Automatizada' }
+        { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: `https://config.telconsulting.cl${envPrefix}/`, title: 'Configuración' }
     ] : [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', link: localServiceUrl(9001, '/dashboard'), title: 'Dashboard' },
+        { id: 'tks', label: 'TKs', icon: 'fas fa-ticket-alt', link: localServiceUrl(9005), title: 'Ticketera' },
+        { id: 'gta', label: 'GTA', icon: 'fas fa-tasks', link: localServiceUrl(9012, '/'), title: 'Gestión de Tareas Automatizada' },
+        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: localServiceUrl(9001, '/fundacion'), title: 'Fundación' },
         { id: 'pmo', label: 'Proyectos (PMO)', icon: 'fas fa-helmet-safety', link: localServiceUrl(9009, '/'), title: 'Oficina Técnica' },
         { id: 'erp', label: 'ERP & Finanzas', icon: 'fas fa-file-invoice-dollar', link: localServiceUrl(9006), title: 'ERP & Finanzas' },
         { id: 'crm', label: 'CRM', icon: 'fas fa-id-card', link: localServiceUrl(9008), title: 'CRM (Clientes)' },
         { id: 'bodega', label: 'Bodega', icon: 'fas fa-warehouse', link: localServiceUrl(9007), title: 'Bodega (WMS)' },
-        { id: 'tks', label: 'TKs', icon: 'fas fa-ticket-alt', link: localServiceUrl(9005), title: 'Ticketera' },
         { id: 'ia', label: 'IA (ULTRON)', icon: 'fas fa-robot', link: localServiceUrl(9010, '/'), title: 'Asistente IA' },
         { id: 'zabbix', label: 'Zabbix', icon: 'fas fa-signal', link: localServiceUrl(9011, '/'), title: 'Monitoreo' },
-        { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: localServiceUrl(9001, '/configuracion'), title: 'Configuración' },
-        { id: 'fundacion', label: 'Fundación', icon: 'fas fa-hands-helping', link: localServiceUrl(9001, '/fundacion'), title: 'Fundación' },
-        { id: 'gta', label: 'GTA', icon: 'fas fa-tasks', link: localServiceUrl(9012, '/'), title: 'Gestión de Tareas Automatizada' }
+        { id: 'config', label: 'Configuración', icon: 'fas fa-cog', link: localServiceUrl(9001, '/configuracion'), title: 'Configuración' }
     ];
 
     const currentPath = window.location.pathname;
