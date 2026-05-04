@@ -161,6 +161,51 @@ async def seed_procesos(user: dict = Depends(deps.require_permission("admin.sett
     return procesos_service.seed_procesos_from_files(actor=user["username"])
 
 
+@router.get("/areas")
+async def listar_areas_para_ui(user: dict = Depends(deps.require_permission("gta:read"))):
+    """Lista áreas y subáreas activas (sólo lectura, accesible a cualquier usuario
+    con permiso gta:read). El endpoint /api/config/gta/areas requiere admin.settings."""
+    conn = db.get_conn()
+    try:
+        areas = conn.execute(
+            "SELECT code, label, lider_username, lider_nombre, es_externa, activo, orden "
+            "FROM gta.areas WHERE activo = TRUE ORDER BY orden, code"
+        ).fetchall()
+        subs = conn.execute(
+            "SELECT id, area_code, code, label, lider_username, lider_nombre, activo, orden "
+            "FROM gta.subareas WHERE activo = TRUE ORDER BY area_code, orden, code"
+        ).fetchall()
+
+        sub_by_area: dict = {}
+        for s in subs:
+            sub_by_area.setdefault(s["area_code"], []).append({
+                "id": int(s["id"]),
+                "area_code": s["area_code"],
+                "code": s["code"],
+                "label": s["label"],
+                "lider_username": s.get("lider_username") or "",
+                "lider_nombre": s.get("lider_nombre") or "",
+                "activo": True,
+                "orden": int(s.get("orden") or 99),
+            })
+
+        items = []
+        for a in areas:
+            items.append({
+                "code": a["code"],
+                "label": a["label"],
+                "lider_username": a.get("lider_username") or "",
+                "lider_nombre": a.get("lider_nombre") or "",
+                "es_externa": bool(a.get("es_externa")),
+                "activo": True,
+                "orden": int(a.get("orden") or 99),
+                "subareas": sub_by_area.get(a["code"], []),
+            })
+        return {"items": items}
+    finally:
+        conn.close()
+
+
 # ── Solicitudes ────────────────────────────────────────────────────────────
 
 @router.get("/solicitudes")

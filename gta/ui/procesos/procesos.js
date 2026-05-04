@@ -25,7 +25,7 @@ window.Procesos = (() => {
 
     async function _cargarAreas() {
         try {
-            const resp = await window.fetchApi('/api/config/gta/areas');
+            const resp = await window.fetchApi('/api/gta/areas');
             _areas = resp?.items || [];
         } catch (e) { _areas = []; }
     }
@@ -122,7 +122,13 @@ window.Procesos = (() => {
             porArea[a][s].push(p);
         });
 
-        const orderedAreas = _areas.map(a => a.code).filter(c => porArea[c]);
+        // Si _areas no se pudo cargar, fallback a las áreas que aparecen en los procesos
+        const knownCodes = _areas.length ? _areas.map(a => a.code) : Object.keys(porArea).sort();
+        const orderedAreas = knownCodes.filter(c => porArea[c]);
+        // Y meter cualquier área que esté en porArea pero no en knownCodes (paranoia)
+        Object.keys(porArea).forEach(c => {
+            if (!orderedAreas.includes(c)) orderedAreas.push(c);
+        });
 
         const html = orderedAreas.map(code => {
             const subgroups = porArea[code];

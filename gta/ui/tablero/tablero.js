@@ -16,7 +16,7 @@ window.Tablero = (() => {
 
     async function _cargarAreas() {
         try {
-            const resp = await window.fetchApi('/api/config/gta/areas').catch(() => null);
+            const resp = await window.fetchApi('/api/gta/areas').catch(() => null);
             _areas = resp?.items || [];
             _llenarSelectAreas();
         } catch (e) { /* silent */ }
