@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import FileResponse
 from typing import Optional, Dict, Any
 from plataforma.core import db, deps
 from plataforma.core.audit_decorator import audit_action
@@ -7,6 +8,7 @@ from gta.backend.models import (
     SolicitudCreate, SolicitudUpdate,
     QuiebreCreate, QuiebreResolverBody,
 )
+from gta.backend.services import catalogo as catalogo_service
 
 router = APIRouter(prefix="/api/gta", tags=["gta"])
 
@@ -453,3 +455,27 @@ async def get_stats(user: dict = Depends(deps.require_permission("gta:read"))):
         return result
     finally:
         conn.close()
+
+
+# ── Catálogo de procesos en disco (gta/data/procesos) ──────────────────────
+
+@router.get("/catalogo")
+async def get_catalogo(user: dict = Depends(deps.require_permission("gta:read"))):
+    """Devuelve el índice de procesos descargados desde Drive (gta/data/procesos)."""
+    return catalogo_service.scan_catalog()
+
+
+@router.get("/catalogo/download")
+async def download_catalogo_file(
+    path: str,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Descarga un archivo del catálogo. El path es relativo a gta/data/procesos."""
+    safe = catalogo_service.resolve_safe_path(path)
+    if not safe:
+        raise HTTPException(status_code=404, detail="archivo no encontrado o ruta inválida")
+    return FileResponse(
+        path=str(safe),
+        filename=safe.name,
+        media_type="application/octet-stream",
+    )

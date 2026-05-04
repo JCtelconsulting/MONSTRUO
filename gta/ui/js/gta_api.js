@@ -34,5 +34,9 @@ window.GtaApi = (() => {
 
         // Stats
         getStats:        ()                => get('/stats'),
+
+        // Catálogo de documentos descargados desde Drive (gta/data/procesos)
+        getDocumentos:        ()           => get('/catalogo'),
+        urlDocumento:         (path)       => `${base}/catalogo/download?path=${encodeURIComponent(path)}`,
     };
 })();

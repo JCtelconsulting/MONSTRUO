@@ -61,7 +61,13 @@ window.GtaCore = (() => {
             }
 
             // Llamar init de cada tab
-            const inits = { tablero: window.Tablero, catalogo: window.Catalogo, quiebres: window.Quiebres, procesos: window.Procesos };
+            const inits = {
+                tablero: window.Tablero,
+                catalogo: window.Catalogo,
+                documentos: window.Documentos,
+                quiebres: window.Quiebres,
+                procesos: window.Procesos,
+            };
             if (inits[tabName]?.init) inits[tabName].init(_sesion);
         } catch (e) {
             console.error('Error cargando tab', tabName, e);
