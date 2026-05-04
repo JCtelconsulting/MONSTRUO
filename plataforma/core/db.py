@@ -2701,6 +2701,37 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_gta_flujos", _migrate_gta_flujos_section)
 
+        def _migrate_gta_procesos_unificacion_section() -> None:
+            # Columnas adicionales en gta.procesos para unificar con archivos descargados
+            for col_def in (
+                "archivo_path  TEXT",
+                "subarea_code  TEXT",
+                "version       INTEGER NOT NULL DEFAULT 1",
+            ):
+                conn.execute(f"ALTER TABLE gta.procesos ADD COLUMN IF NOT EXISTS {col_def}")
+
+            # Vincular quiebres a procesos (no solo a solicitudes/flujos)
+            conn.execute("ALTER TABLE gta.quiebres ADD COLUMN IF NOT EXISTS proceso_id INTEGER")
+
+            # Comentarios / decisiones / cambios sobre el proceso (audit trail)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.proceso_comentarios (
+                id          SERIAL PRIMARY KEY,
+                proceso_id  INTEGER NOT NULL REFERENCES gta.procesos(id) ON DELETE CASCADE,
+                autor       TEXT NOT NULL,
+                texto       TEXT NOT NULL,
+                tipo        TEXT NOT NULL DEFAULT 'nota',
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # tipo: nota | cambio | decision
+
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_procesos_archivo  ON gta.procesos(archivo_path);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_quiebres_proceso  ON gta.quiebres(proceso_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_pcomentarios_proc ON gta.proceso_comentarios(proceso_id);")
+
+        _run_guarded_pg_section(conn, "migrate_gta_procesos_unif", _migrate_gta_procesos_unificacion_section)
+
         def _migrate_sys_notifications_section() -> None:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS core.sys_notifications (

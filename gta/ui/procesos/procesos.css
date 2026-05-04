@@ -1,2 +1,93 @@
-/* Procesos — estilos adicionales */
-.gta-procesos { padding-bottom: 1rem; }
+/* Procesos — estilos específicos (reusa muchas clases del tablero/documentos) */
+
+.gta-procs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.gta-procs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.gta-procs-intro {
+    margin: 0;
+    color: var(--text-soft);
+    font-size: 0.88rem;
+    max-width: 560px;
+}
+
+.gta-procs-content {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.gta-proc-row {
+    cursor: pointer;
+    padding-right: 14px;
+}
+.gta-proc-row:hover {
+    background: rgba(0, 255, 65, 0.04);
+}
+
+.gta-proc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 0.7rem;
+    color: var(--text-soft);
+}
+.gta-proc-badge.has-file {
+    background: rgba(0, 243, 255, 0.1);
+    color: var(--info);
+}
+.gta-proc-badge.has-def {
+    background: rgba(0, 255, 65, 0.1);
+    color: var(--neon);
+}
+.gta-proc-badge.has-quiebre {
+    background: rgba(255, 51, 51, 0.12);
+    color: var(--danger);
+}
+
+.gta-proc-desc {
+    color: var(--text-soft);
+    font-size: 0.72rem;
+    font-style: italic;
+}
+
+/* Modal: tabs de modo (con archivo / desde cero) */
+.gta-mode-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 14px;
+}
+.gta-mode-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-soft);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+}
+.gta-mode-tab:hover {
+    color: var(--text);
+}
+.gta-mode-tab.active {
+    color: var(--neon);
+    border-bottom-color: var(--neon);
+}
+.gta-mode-tab i {
+    margin-right: 6px;
+}

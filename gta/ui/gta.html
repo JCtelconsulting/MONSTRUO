@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="shared/css/monstruo.css?v=75" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="css/gta.css?v=4" />
+    <link rel="stylesheet" href="css/gta.css?v=5" />
 </head>
 
 <body class="sidebar-collapsed gta-shell" data-current-module="gta">
@@ -35,18 +35,7 @@
             <div class="section-header module-tabs-header module-shell-header">
                 <div class="module-shell-title">
                     <h2 class="module-page-title">Gestión de Tareas Automatizadas (GTA)</h2>
-                    <p class="module-shell-subtitle">Solicitudes, procesos y seguimiento por área</p>
-                </div>
-                <div class="module-shell-actions">
-                    <div id="gta-quiebres-badge" style="display:none;">
-                        <button class="btn-secondary gta-quiebres-btn" onclick="GtaCore.irAQuiebres()">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <span id="gta-quiebres-count">0</span> Quiebres
-                        </button>
-                    </div>
-                    <button class="btn-primary" id="btn-nueva-solicitud" onclick="GtaCore.abrirCatalogo()">
-                        <i class="fas fa-plus"></i> Nueva Solicitud
-                    </button>
+                    <p class="module-shell-subtitle">Operación de procesos y flujos cross-área</p>
                 </div>
             </div>
 
@@ -55,17 +44,8 @@
                 <button class="tab-btn active" data-tab="tablero" onclick="GtaCore.loadTab('tablero', this)">
                     <i class="fas fa-columns"></i> Tablero
                 </button>
-                <button class="tab-btn" data-tab="catalogo" onclick="GtaCore.loadTab('catalogo', this)">
-                    <i class="fas fa-book-open"></i> Catálogo
-                </button>
-                <button class="tab-btn" data-tab="documentos" onclick="GtaCore.loadTab('documentos', this)">
-                    <i class="fas fa-folder-open"></i> Documentos
-                </button>
-                <button class="tab-btn" data-tab="quiebres" id="tab-btn-quiebres" onclick="GtaCore.loadTab('quiebres', this)">
-                    <i class="fas fa-exclamation-triangle"></i> Quiebres
-                </button>
-                <button class="tab-btn gta-tab-admin" data-tab="procesos" onclick="GtaCore.loadTab('procesos', this)">
-                    <i class="fas fa-sitemap"></i> Procesos
+                <button class="tab-btn" data-tab="procesos" onclick="GtaCore.loadTab('procesos', this)">
+                    <i class="fas fa-folder-tree"></i> Procesos
                 </button>
             </div>
 
@@ -76,88 +56,12 @@
         </div>
     </main>
 
-    <!-- ── DRAWER: Detalle de Solicitud ─────────────────────────────── -->
-    <div id="gta-drawer" class="gta-drawer">
-        <div class="gta-drawer-header">
-            <div>
-                <div class="gta-drawer-eyebrow" id="drawer-area-label">Área</div>
-                <h3 id="drawer-titulo">Solicitud</h3>
-            </div>
-            <button class="btn-icon" onclick="GtaCore.cerrarDrawer()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="gta-drawer-body" id="drawer-body">
-            <!-- Inyectado por JS -->
-        </div>
-    </div>
-    <div id="gta-drawer-overlay" class="gta-drawer-overlay" onclick="GtaCore.cerrarDrawer()"></div>
-
-    <!-- ── MODAL: Nueva Solicitud desde Catálogo ────────────────────── -->
-    <div class="modal-backdrop" id="modal-nueva-solicitud">
-        <div class="modal-content" style="max-width:560px;">
-            <div class="modal-header">
-                <h2 id="modal-solicitud-titulo">Nueva Solicitud</h2>
-                <button class="modal-close-btn" onclick="GtaCore.cerrarModalSolicitud()">×</button>
-            </div>
-            <div class="modal-body" id="modal-solicitud-body">
-                <!-- Pasos del proceso inyectados por JS -->
-            </div>
-            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                <button class="btn-secondary" onclick="GtaCore.cerrarModalSolicitud()">Cancelar</button>
-                <button class="btn-primary" id="btn-confirmar-solicitud" onclick="GtaCore.confirmarSolicitud()">
-                    <i class="fas fa-paper-plane"></i> Enviar Solicitud
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── MODAL: Reportar Quiebre ──────────────────────────────────── -->
-    <div class="modal-backdrop" id="modal-quiebre">
-        <div class="modal-content" style="max-width:500px;">
-            <div class="modal-header">
-                <h2>Reportar Quiebre de Proceso</h2>
-                <button class="modal-close-btn" onclick="GtaCore.cerrarModalQuiebre()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="field">
-                    <label>Descripción del problema</label>
-                    <textarea id="quiebre-descripcion" class="input-dark" rows="4"
-                        placeholder="¿Qué pasó? ¿Qué proceso se rompió o no existe?"></textarea>
-                </div>
-                <div class="field" style="margin-top:14px;">
-                    <label>Área involucrada</label>
-                    <select id="quiebre-area" class="input-dark">
-                        <option value="">Selecciona un área...</option>
-                        <option value="comercial">Comercial</option>
-                        <option value="preventa">Preventa</option>
-                        <option value="redes">Redes</option>
-                        <option value="sistemas">Sistemas</option>
-                        <option value="finanzas">Finanzas</option>
-                        <option value="proveedores">Proveedores</option>
-                        <option value="capital_humano">Capital Humano</option>
-                        <option value="bodega">Bodega</option>
-                        <option value="ia">Especialista IA</option>
-                    </select>
-                </div>
-                <div class="field" style="margin-top:14px;">
-                    <label>Solicitud relacionada (opcional)</label>
-                    <input type="text" id="quiebre-solicitud-ref" class="input-dark" placeholder="ID de solicitud si aplica">
-                </div>
-            </div>
-            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                <button class="btn-secondary" onclick="GtaCore.cerrarModalQuiebre()">Cancelar</button>
-                <button class="btn-primary" onclick="GtaCore.enviarQuiebre()">
-                    <i class="fas fa-flag"></i> Reportar Quiebre
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script src="shared/js/utilidades.js?v=210"></script>
     <script src="shared/js/admin.js?v=5"></script>
     <script src="shared/js/sidebar.js?v=89"></script>
-    <script src="js/gta_api.js?v=4"></script>
-    <script src="js/gta_ui.js?v=4"></script>
-    <script src="js/gta_main.js?v=4"></script>
+    <script src="js/gta_api.js?v=5"></script>
+    <script src="js/gta_ui.js?v=5"></script>
+    <script src="js/gta_main.js?v=5"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {

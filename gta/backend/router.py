@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, File, UploadFile
 from fastapi.responses import FileResponse
 from typing import Optional, Dict, Any
 from plataforma.core import db, deps
@@ -12,107 +12,153 @@ from gta.backend.models import (
 )
 from gta.backend.services import catalogo as catalogo_service
 from gta.backend.services import flujos as flujos_service
+from gta.backend.services import procesos as procesos_service
 
 router = APIRouter(prefix="/api/gta", tags=["gta"])
 
 
-# ── Catálogo de procesos ───────────────────────────────────────────────────
+# ── Procesos (biblioteca unificada: definiciones + archivos + historial) ───
 
 @router.get("/procesos")
 async def list_procesos(
-    estado: Optional[str] = None,
+    estado: Optional[str] = "activo",
     area: Optional[str] = None,
+    subarea: Optional[str] = None,
+    busqueda: Optional[str] = None,
     user: dict = Depends(deps.require_permission("gta:read")),
 ):
-    conn = db.get_conn()
-    try:
-        q = """SELECT p.*,
-                      (SELECT COUNT(*) FROM gta.solicitudes s WHERE s.proceso_id = p.id) AS solicitudes_count,
-                      COALESCE(json_array_length(p.pasos_definicion::json), 0) AS pasos_count
-               FROM gta.procesos p WHERE 1=1"""
-        params: list = []
-        if estado:
-            q += " AND p.estado = %s"
-            params.append(estado)
-        if area:
-            q += " AND p.area = %s"
-            params.append(area)
-        q += " ORDER BY p.area, p.nombre"
-        rows = conn.execute(q, params).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        conn.close()
+    return procesos_service.listar_procesos(
+        area_code=area, subarea_code=subarea,
+        estado=estado, busqueda=busqueda,
+    )
 
 
 @router.get("/procesos/{pid}")
 async def get_proceso(pid: int, user: dict = Depends(deps.require_permission("gta:read"))):
-    conn = db.get_conn()
-    try:
-        row = conn.execute("SELECT * FROM gta.procesos WHERE id = %s", [pid]).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Proceso no encontrado")
-        return dict(row)
-    finally:
-        conn.close()
+    proc = procesos_service.get_proceso(pid)
+    if not proc:
+        raise HTTPException(status_code=404, detail="proceso no encontrado")
+    return proc
 
 
 @router.post("/procesos")
-@audit_action("GTA_CREATE_PROCESO", severity="info")
-async def create_proceso(
+async def crear_proceso(
     proceso: ProcesoCreate,
-    request: Request,
     user: dict = Depends(deps.require_permission("gta:write")),
 ):
-    conn = db.get_conn()
+    """Crea un proceso nuevo (con o sin definición ejecutable)."""
     try:
-        cur = conn.execute(
-            """INSERT INTO gta.procesos
-               (nombre, area, descripcion, sla_horas, icono, pasos_definicion, campos_formulario, estado, creado_por)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-            (proceso.nombre, proceso.area, proceso.descripcion, proceso.sla_horas,
-             proceso.icono, proceso.pasos_definicion or '[]', proceso.campos_formulario or '[]',
-             proceso.estado or 'activo', user.get("username")),
+        # pasos_definicion viene como JSON string en ProcesoCreate; lo parseamos
+        import json as _json
+        pasos = []
+        if proceso.pasos_definicion:
+            try:
+                pasos = _json.loads(proceso.pasos_definicion)
+            except Exception:
+                pasos = []
+        return procesos_service.crear_proceso(
+            nombre=proceso.nombre,
+            area=proceso.area,
+            descripcion=proceso.descripcion or "",
+            pasos_definicion=pasos,
+            sla_horas=proceso.sla_horas,
+            icono=proceso.icono or "fa-tasks",
+            creado_por=user["username"],
         )
-        new_id = cur.fetchone()["id"]
-        conn.commit()
-        return {"ok": True, "id": new_id}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/procesos/{pid}")
-@audit_action("GTA_UPDATE_PROCESO", severity="info")
-async def update_proceso(
+async def actualizar_proceso(
     pid: int,
     update: ProcesoUpdate,
-    request: Request,
     user: dict = Depends(deps.require_permission("gta:write")),
 ):
-    conn = db.get_conn()
+    import json as _json
+    pasos = None
+    if update.pasos_definicion is not None:
+        try:
+            pasos = _json.loads(update.pasos_definicion)
+        except Exception:
+            pasos = []
     try:
-        row = conn.execute("SELECT id FROM gta.procesos WHERE id = %s", [pid]).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Proceso no encontrado")
-        fields = {k: v for k, v in update.model_dump().items() if v is not None}
-        if not fields:
-            raise HTTPException(status_code=400, detail="Sin campos para actualizar")
-        set_clause = ", ".join(f"{k} = %s" for k in fields)
-        conn.execute(
-            f"UPDATE gta.procesos SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-            list(fields.values()) + [pid],
+        return procesos_service.actualizar_proceso(
+            pid,
+            actor=user["username"],
+            nombre=update.nombre,
+            area=update.area,
+            descripcion=update.descripcion,
+            pasos_definicion=pasos,
+            sla_horas=update.sla_horas,
+            icono=update.icono,
+            estado=update.estado,
         )
-        conn.commit()
-        return {"ok": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/procesos/{pid}/comentarios")
+async def agregar_comentario_proceso(
+    pid: int,
+    body: dict,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """body: {texto, tipo} — tipo: nota | cambio | decision"""
+    try:
+        return procesos_service.agregar_comentario(
+            proceso_id=pid,
+            autor=user["username"],
+            texto=str(body.get("texto") or "").strip(),
+            tipo=str(body.get("tipo") or "nota"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/procesos/{pid}/quiebres")
+async def reportar_quiebre_proceso(
+    pid: int,
+    body: dict,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """body: {descripcion, area, tipo?}"""
+    try:
+        return procesos_service.reportar_quiebre(
+            proceso_id=pid,
+            descripcion=str(body.get("descripcion") or ""),
+            area=str(body.get("area") or ""),
+            tipo=str(body.get("tipo") or "sin_proceso"),
+            reportado_por=user["username"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/procesos/{pid}/archivo")
+async def subir_archivo_proceso(
+    pid: int,
+    file: "UploadFile" = File(...),
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Sube un archivo al proceso (lo guarda en gta/data/procesos/<area>/<sub>/)."""
+    try:
+        contenido = await file.read()
+        return procesos_service.guardar_archivo_subido(
+            proceso_id=pid,
+            filename=file.filename or "archivo",
+            contenido=contenido,
+            actor=user["username"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/procesos/seed-from-files")
+async def seed_procesos(user: dict = Depends(deps.require_permission("admin.settings"))):
+    """Endpoint admin: crea registros gta.procesos a partir de los archivos en
+    gta/data/procesos/. Idempotente: omite los ya registrados."""
+    return procesos_service.seed_procesos_from_files(actor=user["username"])
 
 
 # ── Solicitudes ────────────────────────────────────────────────────────────

@@ -1,139 +1,138 @@
-<div class="gta-procesos">
-
-    <div class="gta-procesos-header">
+<div class="gta-procs">
+    <div class="gta-procs-header">
         <div>
-            <p style="color:var(--text-soft); font-size:0.9rem;">
-                Define y administra los tipos de solicitud. Cada proceso tiene pasos, área responsable y SLA opcional.
-            </p>
+            <p class="gta-procs-intro">Biblioteca de procesos. Cada proceso puede tener un documento explicativo,
+                una definición ejecutable de pasos, y registra todos sus quiebres y flujos pasados.</p>
         </div>
-        <button class="btn-primary" id="btn-nuevo-proceso" onclick="Procesos.abrirFormulario(null)">
-            <i class="fas fa-plus"></i> Nuevo Proceso
-        </button>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <span class="gta-docs-counter" id="procs-counter">—</span>
+            <input type="text" id="procs-search" class="input-dark" placeholder="🔍 Buscar proceso..." oninput="Procesos.filtrar(this.value)" style="min-width:220px;">
+            <button class="btn-primary gta-procs-admin-only" onclick="Procesos.abrirNuevo()">
+                <i class="fas fa-plus"></i> Nuevo proceso
+            </button>
+        </div>
     </div>
 
-    <!-- Filtros -->
-    <div class="gta-tablero-filters" style="margin-bottom:16px;">
-        <input type="text" id="procesos-search" class="input-dark" placeholder="Buscar proceso..."
-            oninput="Procesos.filtrar(this.value)" style="min-width:220px;">
-        <select id="procesos-filtro-area" class="input-dark" onchange="Procesos.filtrar()" style="min-width:160px;">
-            <option value="">Todas las áreas</option>
-            <option value="comercial">Comercial</option>
-            <option value="preventa">Preventa</option>
-            <option value="redes">Redes</option>
-            <option value="sistemas">Sistemas</option>
-            <option value="finanzas">Finanzas</option>
-            <option value="proveedores">Proveedores</option>
-            <option value="capital_humano">Capital Humano</option>
-            <option value="bodega">Bodega</option>
-            <option value="ia">Especialista IA</option>
-        </select>
-        <select id="procesos-filtro-estado" class="input-dark" onchange="Procesos.filtrar()" style="min-width:130px;">
-            <option value="activo">Activos</option>
-            <option value="">Todos</option>
-            <option value="inactivo">Inactivos</option>
-        </select>
+    <div class="gta-area-pills" id="procs-area-pills">
+        <button class="gta-area-pill active" data-area="" onclick="Procesos.filtrarArea(this)">Todas</button>
     </div>
 
-    <!-- Tabla de procesos -->
-    <div class="table-scroll">
-        <table class="monstruo-table" id="procesos-tabla">
-            <thead>
-                <tr>
-                    <th>Proceso</th>
-                    <th>Área</th>
-                    <th>Pasos</th>
-                    <th>SLA</th>
-                    <th>Solicitudes</th>
-                    <th>Estado</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody id="procesos-tbody">
-                <tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-soft);">
-                    <i class="fas fa-spinner fa-spin"></i> Cargando procesos...
-                </td></tr>
-            </tbody>
-        </table>
+    <div class="gta-procs-content" id="procs-content">
+        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando procesos...</div>
     </div>
+</div>
 
-    <!-- Modal: Crear/Editar Proceso -->
-    <div class="modal-backdrop" id="modal-proceso">
-        <div class="modal-content" style="max-width:640px; max-height:90vh; overflow-y:auto;">
-            <div class="modal-header">
-                <h2 id="modal-proceso-titulo">Nuevo Proceso</h2>
-                <button class="modal-close-btn" onclick="Procesos.cerrarFormulario()">×</button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="proceso-id">
-                <div class="form-grid-4">
-                    <div class="field">
-                        <label>Nombre del proceso</label>
-                        <input type="text" id="proceso-nombre" class="input-dark" placeholder="Ej: Solicitud de equipo">
-                    </div>
-                    <div class="field">
-                        <label>Área responsable</label>
-                        <select id="proceso-area" class="input-dark">
-                            <option value="">Selecciona...</option>
-                            <option value="comercial">Comercial</option>
-                            <option value="preventa">Preventa</option>
-                            <option value="redes">Redes</option>
-                            <option value="sistemas">Sistemas</option>
-                            <option value="finanzas">Finanzas</option>
-                            <option value="proveedores">Proveedores</option>
-                            <option value="capital_humano">Capital Humano</option>
-                            <option value="bodega">Bodega</option>
-                            <option value="ia">Especialista IA</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="field" style="margin-bottom:14px;">
-                    <label>Descripción</label>
-                    <textarea id="proceso-descripcion" class="input-dark" rows="2"
-                        placeholder="¿Para qué sirve este proceso?"></textarea>
-                </div>
-                <div class="form-grid-4" style="margin-bottom:14px;">
-                    <div class="field">
-                        <label>SLA (horas, opcional)</label>
-                        <input type="number" id="proceso-sla" class="input-dark" placeholder="Ej: 48" min="1">
-                    </div>
-                    <div class="field">
-                        <label>Icono (Font Awesome)</label>
-                        <input type="text" id="proceso-icono" class="input-dark" placeholder="Ej: fa-laptop">
-                    </div>
-                </div>
+<!-- Drawer detalle de proceso -->
+<div id="proc-drawer" class="gta-flujo-drawer">
+    <div class="gta-flujo-drawer-header">
+        <div>
+            <div class="gta-flujo-drawer-eyebrow" id="proc-drawer-eyebrow">Proceso</div>
+            <h3 id="proc-drawer-titulo">Cargando...</h3>
+        </div>
+        <button class="btn-icon" onclick="Procesos.cerrarDrawer()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="gta-flujo-drawer-body" id="proc-drawer-body">
+        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i></div>
+    </div>
+</div>
+<div id="proc-drawer-overlay" class="gta-flujo-drawer-overlay" onclick="Procesos.cerrarDrawer()"></div>
 
-                <!-- Pasos del proceso -->
-                <div class="field">
-                    <label style="display:flex; justify-content:space-between; align-items:center;">
-                        Pasos del proceso
-                        <button type="button" class="btn-sm" onclick="Procesos.agregarPaso()">
-                            <i class="fas fa-plus"></i> Agregar paso
-                        </button>
-                    </label>
-                    <div id="proceso-pasos-lista" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
-                        <!-- Pasos inyectados por JS -->
-                    </div>
-                </div>
-
-                <!-- Campos adicionales del formulario de solicitud -->
-                <div class="field" style="margin-top:14px;">
-                    <label style="display:flex; justify-content:space-between; align-items:center;">
-                        Campos del formulario de solicitud
-                        <button type="button" class="btn-sm" onclick="Procesos.agregarCampo()">
-                            <i class="fas fa-plus"></i> Agregar campo
-                        </button>
-                    </label>
-                    <div id="proceso-campos-lista" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
-                        <!-- Campos inyectados por JS -->
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                <button class="btn-secondary" onclick="Procesos.cerrarFormulario()">Cancelar</button>
-                <button class="btn-primary" onclick="Procesos.guardar()">
-                    <i class="fas fa-save"></i> Guardar Proceso
+<!-- Modal: Nuevo proceso -->
+<div class="modal-backdrop" id="modal-nuevo-proc">
+    <div class="modal-content" style="max-width:680px;">
+        <div class="modal-header">
+            <h2>Nuevo proceso</h2>
+            <button class="modal-close-btn" onclick="Procesos.cerrarNuevo()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="gta-mode-tabs">
+                <button class="gta-mode-tab active" data-mode="vacio" onclick="Procesos.cambiarModo('vacio', this)">
+                    <i class="fas fa-pen"></i> Definir desde cero
+                </button>
+                <button class="gta-mode-tab" data-mode="archivo" onclick="Procesos.cambiarModo('archivo', this)">
+                    <i class="fas fa-file-upload"></i> Subir archivo
                 </button>
             </div>
+
+            <div class="field" style="margin-top:14px;">
+                <label>Nombre del proceso *</label>
+                <input type="text" id="np-nombre" class="input-dark" placeholder="Ej: Cierre de venta">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <div class="field" style="flex:1;">
+                    <label>Área *</label>
+                    <select id="np-area" class="input-dark" onchange="Procesos._actualizarSubareas()"></select>
+                </div>
+                <div class="field" style="flex:1;">
+                    <label>Subárea (opcional)</label>
+                    <select id="np-subarea" class="input-dark"></select>
+                </div>
+            </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Descripción breve</label>
+                <textarea id="np-desc" class="input-dark" rows="2" placeholder="Para qué sirve este proceso, cuándo se usa..."></textarea>
+            </div>
+
+            <!-- Modo: archivo -->
+            <div id="np-mode-archivo" style="display:none; margin-top:14px;">
+                <div class="field">
+                    <label>Archivo (.docx, .pdf, .pptx, .xlsx, .txt)</label>
+                    <input type="file" id="np-file" class="input-dark" accept=".docx,.doc,.pdf,.pptx,.ppt,.xlsx,.xls,.txt,.md">
+                </div>
+                <p class="gta-section-help">El archivo se guardará en <code>gta/data/procesos/</code> bajo el área y subárea seleccionadas.</p>
+            </div>
+
+            <!-- Modo: vacío con pasos editables -->
+            <div id="np-mode-vacio" style="margin-top:14px;">
+                <h4 class="gta-section-subtitle">Pasos del proceso (opcional)</h4>
+                <p class="gta-section-help">Define los pasos ahora o agrégalos después editando el proceso.</p>
+                <div id="np-pasos" class="gta-flujo-tareas-edit"></div>
+                <button class="btn-secondary" onclick="Procesos._agregarPaso()" style="margin-top:8px;">
+                    <i class="fas fa-plus"></i> Agregar paso
+                </button>
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button class="btn-secondary" onclick="Procesos.cerrarNuevo()">Cancelar</button>
+            <button class="btn-primary" onclick="Procesos.guardarNuevo()">
+                <i class="fas fa-save"></i> Crear proceso
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Reportar quiebre asociado a proceso -->
+<div class="modal-backdrop" id="modal-quiebre-proc">
+    <div class="modal-content" style="max-width:520px;">
+        <div class="modal-header">
+            <h2>Reportar quiebre</h2>
+            <button class="modal-close-btn" onclick="Procesos.cerrarQuiebre()">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="quiebre-proc-id">
+            <p class="gta-section-help" id="quiebre-proc-info"></p>
+            <div class="field" style="margin-top:10px;">
+                <label>Descripción del problema *</label>
+                <textarea id="quiebre-proc-desc" class="input-dark" rows="3" placeholder="¿Qué pasó? ¿Qué no funciona del proceso?"></textarea>
+            </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Área involucrada *</label>
+                <select id="quiebre-proc-area" class="input-dark"></select>
+            </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Tipo</label>
+                <select id="quiebre-proc-tipo" class="input-dark">
+                    <option value="sin_proceso">Falta proceso definido</option>
+                    <option value="paso_bloqueado">Paso bloqueado</option>
+                    <option value="sla_vencido">SLA vencido</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button class="btn-secondary" onclick="Procesos.cerrarQuiebre()">Cancelar</button>
+            <button class="btn-primary" onclick="Procesos.guardarQuiebre()">
+                <i class="fas fa-flag"></i> Reportar
+            </button>
         </div>
     </div>
 </div>

@@ -20,16 +20,16 @@ window.GtaApi = (() => {
         addComentario:   (id, texto)       => post(`/solicitudes/${id}/comentarios`, { texto }),
         getComentarios:  (id)              => get(`/solicitudes/${id}/comentarios`),
 
-        // Catálogo de procesos
-        getProcesos:     (params = '')     => get(`/procesos${params}`),
-        getProceso:      (id)              => get(`/procesos/${id}`),
-        crearProceso:    (data)            => post('/procesos', data),
-        updateProceso:   (id, data)        => put(`/procesos/${id}`, data),
-        deleteProceso:   (id)              => del(`/procesos/${id}`),
+        // Procesos (biblioteca unificada)
+        getProcesos:           (params = '')   => get(`/procesos${params}`),
+        getProceso:            (id)            => get(`/procesos/${id}`),
+        crearProceso:          (data)          => post('/procesos', data),
+        actualizarProceso:     (id, data)      => put(`/procesos/${id}`, data),
+        agregarComentarioProc: (id, data)      => post(`/procesos/${id}/comentarios`, data),
+        reportarQuiebreProc:   (id, data)      => post(`/procesos/${id}/quiebres`, data),
+        seedProcesos:          ()              => post('/procesos/seed-from-files', {}),
 
-        // Quiebres
-        getQuiebres:     (params = '')     => get(`/quiebres${params}`),
-        crearQuiebre:    (data)            => post('/quiebres', data),
+        // Quiebres legacy
         resolverQuiebre: (id, nota)        => post(`/quiebres/${id}/resolver`, { nota }),
 
         // Stats
