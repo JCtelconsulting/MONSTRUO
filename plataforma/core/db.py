@@ -2563,6 +2563,25 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_gta_areas", _migrate_gta_areas_section)
 
+        def _migrate_gta_procesos_fix_section() -> None:
+            # Asegura columnas faltantes en gta.procesos cuando la tabla
+            # se creó parcial en una migración anterior (CREATE IF NOT EXISTS
+            # no agrega columnas nuevas a una tabla preexistente).
+            for col_def in (
+                "descripcion       TEXT",
+                "sla_horas         INTEGER",
+                "icono             TEXT",
+                "pasos_definicion  TEXT DEFAULT '[]'",
+                "campos_formulario TEXT DEFAULT '[]'",
+                "creado_por        TEXT",
+                "updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            ):
+                conn.execute(
+                    f"ALTER TABLE gta.procesos ADD COLUMN IF NOT EXISTS {col_def}"
+                )
+
+        _run_guarded_pg_section(conn, "migrate_gta_procesos_fix", _migrate_gta_procesos_fix_section)
+
         def _migrate_sys_notifications_section() -> None:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS core.sys_notifications (
