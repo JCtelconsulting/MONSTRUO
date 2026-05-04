@@ -243,7 +243,7 @@ async def list_users(
     try:
         rows = conn.execute(
             "SELECT username, role, secondary_roles, is_active "
-            "FROM auth.users WHERE COALESCE(is_active, 1) IN (1, TRUE) ORDER BY username"
+            "FROM auth.users WHERE COALESCE(is_active, 1) <> 0 ORDER BY username"
         ).fetchall()
         items = [
             {
