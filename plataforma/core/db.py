@@ -2582,6 +2582,125 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_gta_procesos_fix", _migrate_gta_procesos_fix_section)
 
+        def _migrate_gta_flujos_section() -> None:
+            # Settings globales del GTA (jefe que recibe escalamientos, umbrales SLA, etc.)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.settings (
+                key        TEXT PRIMARY KEY,
+                value      TEXT NOT NULL DEFAULT '',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Seed básico
+            for k, v in (
+                ("jefe_username", "diego@telconsulting.cl"),
+                ("sla_warn_pct", "70"),
+                ("sla_critical_pct", "85"),
+                ("sla_check_interval_min", "10"),
+            ):
+                conn.execute(
+                    "INSERT INTO gta.settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING",
+                    (k, v),
+                )
+
+            # Instancia de flujo (un cierre de negocio puntual, una solicitud activa)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.flujos (
+                id                 SERIAL PRIMARY KEY,
+                proceso_id         INTEGER REFERENCES gta.procesos(id) ON DELETE SET NULL,
+                titulo             TEXT NOT NULL,
+                descripcion        TEXT,
+                iniciado_por       TEXT NOT NULL,
+                estado             TEXT NOT NULL DEFAULT 'borrador',
+                datos_formulario   TEXT NOT NULL DEFAULT '{}',
+                sla_horas_total    INTEGER,
+                iniciado_at        TIMESTAMP,
+                completado_at      TIMESTAMP,
+                created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # estados válidos: borrador, activo, completado, cancelado, vencido
+
+            # Tareas dentro del flujo (una por área que participa)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.flujo_tareas (
+                id                       SERIAL PRIMARY KEY,
+                flujo_id                 INTEGER NOT NULL REFERENCES gta.flujos(id) ON DELETE CASCADE,
+                orden                    INTEGER NOT NULL DEFAULT 1,
+                area_code                TEXT NOT NULL,
+                subarea_code             TEXT,
+                asignado_a               TEXT,
+                titulo                   TEXT NOT NULL,
+                descripcion              TEXT,
+                campos_requeridos        TEXT NOT NULL DEFAULT '[]',
+                campos_completados       TEXT NOT NULL DEFAULT '{}',
+                depende_de               TEXT NOT NULL DEFAULT '[]',
+                sla_horas                INTEGER NOT NULL DEFAULT 24,
+                estado                   TEXT NOT NULL DEFAULT 'pendiente',
+                inicio_at                TIMESTAMP,
+                ejecutor_completo_at     TIMESTAMP,
+                ejecutor_completo_por    TEXT,
+                validado_at              TIMESTAMP,
+                validado_por             TEXT,
+                sla_paused_minutes       INTEGER NOT NULL DEFAULT 0,
+                sla_pause_started_at     TIMESTAMP,
+                last_sla_warn_pct        INTEGER NOT NULL DEFAULT 0,
+                created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # estados válidos: pendiente, lista, en_progreso, por_validar, completada,
+            # ayuda_pedida, vencida, cancelada
+
+            # Pedidos de ayuda entre áreas
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.flujo_ayudas (
+                id                 SERIAL PRIMARY KEY,
+                tarea_id           INTEGER NOT NULL REFERENCES gta.flujo_tareas(id) ON DELETE CASCADE,
+                pedido_por         TEXT NOT NULL,
+                pedido_a_area      TEXT NOT NULL,
+                pedido_a_user      TEXT,
+                mensaje            TEXT NOT NULL,
+                bloquea_sla        BOOLEAN NOT NULL DEFAULT FALSE,
+                estado             TEXT NOT NULL DEFAULT 'abierto',
+                respondido_por     TEXT,
+                respuesta          TEXT,
+                respondido_at      TIMESTAMP,
+                created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Timeline auditable de eventos del flujo
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.flujo_eventos (
+                id           SERIAL PRIMARY KEY,
+                flujo_id     INTEGER NOT NULL REFERENCES gta.flujos(id) ON DELETE CASCADE,
+                tarea_id     INTEGER REFERENCES gta.flujo_tareas(id) ON DELETE SET NULL,
+                tipo         TEXT NOT NULL,
+                actor        TEXT,
+                mensaje      TEXT,
+                metadata     TEXT NOT NULL DEFAULT '{}',
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Índices
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_flujos_estado       ON gta.flujos(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_flujos_iniciado_por ON gta.flujos(iniciado_por);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_flujos_proceso      ON gta.flujos(proceso_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_ftareas_flujo       ON gta.flujo_tareas(flujo_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_ftareas_estado      ON gta.flujo_tareas(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_ftareas_area        ON gta.flujo_tareas(area_code);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_ftareas_asignado    ON gta.flujo_tareas(asignado_a);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_fayudas_tarea       ON gta.flujo_ayudas(tarea_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_fayudas_estado      ON gta.flujo_ayudas(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_feventos_flujo      ON gta.flujo_eventos(flujo_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_feventos_tarea      ON gta.flujo_eventos(tarea_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_feventos_tipo       ON gta.flujo_eventos(tipo);")
+
+        _run_guarded_pg_section(conn, "migrate_gta_flujos", _migrate_gta_flujos_section)
+
         def _migrate_sys_notifications_section() -> None:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS core.sys_notifications (

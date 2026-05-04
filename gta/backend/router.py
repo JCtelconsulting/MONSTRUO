@@ -7,8 +7,11 @@ from gta.backend.models import (
     ProcesoCreate, ProcesoUpdate,
     SolicitudCreate, SolicitudUpdate,
     QuiebreCreate, QuiebreResolverBody,
+    FlujoCrear, TareaCompletarBody, TareaValidarBody,
+    AyudaCrear, AyudaResponder,
 )
 from gta.backend.services import catalogo as catalogo_service
+from gta.backend.services import flujos as flujos_service
 
 router = APIRouter(prefix="/api/gta", tags=["gta"])
 
@@ -479,3 +482,149 @@ async def download_catalogo_file(
         filename=safe.name,
         media_type="application/octet-stream",
     )
+
+
+# ── Flujos cross-área ──────────────────────────────────────────────────────
+
+def _es_admin(user: dict) -> bool:
+    """admin = role admin O permiso global '*' O username del admin del sistema."""
+    role = str(user.get("role") or "").lower()
+    if role == "admin":
+        return True
+    username = str(user.get("username") or "")
+    if username == "sistemas@telconsulting.cl":
+        return True
+    return False
+
+
+@router.post("/flujos")
+async def crear_flujo(body: FlujoCrear, user: dict = Depends(deps.require_permission("gta:write"))):
+    """Inicia un flujo nuevo: desde un proceso del catálogo o un flujo libre."""
+    try:
+        return flujos_service.crear_flujo(
+            iniciado_por=user["username"],
+            titulo=body.titulo,
+            descripcion=body.descripcion or "",
+            proceso_id=body.proceso_id,
+            datos_formulario=body.datos_formulario,
+            pasos_libres=body.pasos_libres,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/flujos")
+async def listar_flujos(
+    estado: Optional[str] = None,
+    area: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    return flujos_service.listar_flujos(
+        actor=user["username"],
+        es_admin=_es_admin(user),
+        rol_usuario=str(user.get("role") or ""),
+        estado=estado,
+        area_code=area,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/flujos/{flujo_id}")
+async def ver_flujo(flujo_id: int, user: dict = Depends(deps.require_permission("gta:read"))):
+    flujo = flujos_service.get_flujo(flujo_id)
+    if not flujo:
+        raise HTTPException(status_code=404, detail="flujo no encontrado")
+    return flujo
+
+
+@router.get("/flujos/{flujo_id}/eventos")
+async def listar_eventos(
+    flujo_id: int,
+    limit: int = 100,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    return flujos_service.get_eventos(flujo_id, limit=limit)
+
+
+@router.post("/flujo-tareas/{tarea_id}/completar")
+async def completar_tarea(
+    tarea_id: int,
+    body: TareaCompletarBody,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """El ejecutor (líder del área asignada) marca su tarea como hecha.
+    Pasa a estado 'por_validar' hasta que el iniciador del flujo confirme.
+    """
+    try:
+        return flujos_service.marcar_ejecutor_completo(
+            tarea_id=tarea_id,
+            actor=user["username"],
+            campos_completados=body.campos_completados,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/flujo-tareas/{tarea_id}/validar")
+async def validar_tarea(
+    tarea_id: int,
+    body: TareaValidarBody,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """El iniciador del flujo (o el jefe) valida o rechaza una tarea en 'por_validar'."""
+    try:
+        return flujos_service.validar_tarea(
+            tarea_id=tarea_id,
+            actor=user["username"],
+            aceptada=body.aceptada,
+            comentario=body.comentario or "",
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/flujo-tareas/{tarea_id}/ayuda")
+async def pedir_ayuda(
+    tarea_id: int,
+    body: AyudaCrear,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Pedir ayuda a otra área. Si bloquea_sla=True, pausa el SLA hasta la respuesta."""
+    try:
+        return flujos_service.pedir_ayuda(
+            tarea_id=tarea_id,
+            pedido_por=user["username"],
+            pedido_a_area=body.pedido_a_area,
+            pedido_a_user=body.pedido_a_user or "",
+            mensaje=body.mensaje,
+            bloquea_sla=body.bloquea_sla,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/flujo-ayudas/{ayuda_id}/responder")
+async def responder_ayuda(
+    ayuda_id: int,
+    body: AyudaResponder,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        return flujos_service.responder_ayuda(
+            ayuda_id=ayuda_id,
+            respondido_por=user["username"],
+            respuesta=body.respuesta,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/metricas")
+async def get_metricas(user: dict = Depends(deps.require_permission("gta:read"))):
+    """Métricas globales: tiempos por persona, por área, totales."""
+    return flujos_service.metricas_globales()

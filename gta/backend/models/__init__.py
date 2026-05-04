@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 
 # ── Procesos (catálogo) ────────────────────────────────────────────────────
@@ -52,3 +52,32 @@ class QuiebreCreate(BaseModel):
 
 class QuiebreResolverBody(BaseModel):
     nota: Optional[str] = None
+
+
+# ── Flujos cross-área ──────────────────────────────────────────────────────
+class FlujoCrear(BaseModel):
+    titulo: str
+    descripcion: Optional[str] = ""
+    proceso_id: Optional[int] = None
+    datos_formulario: Optional[Dict[str, Any]] = None
+    pasos_libres: Optional[List[Dict[str, Any]]] = None  # solo si proceso_id es None
+
+
+class TareaCompletarBody(BaseModel):
+    campos_completados: Optional[Dict[str, Any]] = None
+
+
+class TareaValidarBody(BaseModel):
+    aceptada: bool = True
+    comentario: Optional[str] = ""
+
+
+class AyudaCrear(BaseModel):
+    pedido_a_area: str
+    pedido_a_user: Optional[str] = ""
+    mensaje: str
+    bloquea_sla: bool = False
+
+
+class AyudaResponder(BaseModel):
+    respuesta: str

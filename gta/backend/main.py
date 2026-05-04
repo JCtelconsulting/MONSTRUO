@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -13,7 +14,8 @@ from plataforma.core.env_loader import load_runtime_env
 load_runtime_env(Path(__file__).resolve())
 
 from gta.backend import router as gta_router
-from plataforma.core import db, deps
+from gta.backend.jobs import sla_check as gta_sla_job
+from plataforma.core import db, deps, jobs_engine
 from plataforma.core.web import build_login_redirect_url
 
 repo_root = Path(__file__).resolve().parents[2]
@@ -22,6 +24,17 @@ repo_root = Path(__file__).resolve().parents[2]
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+
+    # Registrar y arrancar jobs del GTA
+    jobs_engine.register_job(gta_sla_job.JOB_TYPE, gta_sla_job.gta_sla_check)
+    await jobs_engine.enqueue_unique_job(
+        gta_sla_job.JOB_TYPE,
+        payload={"recurring": True},
+        max_retries=1,
+    )
+    # Worker loop para procesar los jobs encolados
+    asyncio.create_task(jobs_engine.worker_loop())
+
     yield
 
 
