@@ -25,14 +25,15 @@ def main() -> int:
 
     required_docs = [
         "README.md",
-        "AGENTS.md",
+        "CLAUDE.md",
         "plataforma/docs/README.md",
-        "plataforma/docs/PLAN_MAESTRO_MONSTRUO.md",
+        "plataforma/docs/AGENTS.md",
         "plataforma/docs/PROYECTO_CONTEXTO.md",
-        "plataforma/docs/PROXY_INVERSO.md",
-        "plataforma/docs/ARQUITECTURA.md",
-        "plataforma/docs/CHANGELOG.md",
-        "plataforma/docs/CONTRATO_APPS.md",
+        "plataforma/docs/plan/GUIA_MAESTRA.md",
+        "plataforma/docs/arquitectura/PROXY_INVERSO.md",
+        "plataforma/docs/arquitectura/ARQUITECTURA.md",
+        "plataforma/docs/arquitectura/CONTRATO_APPS.md",
+        "plataforma/docs/changelog/CHANGELOG.md",
     ]
     for rel in required_docs:
         expect_exists(rel, errors)
@@ -50,6 +51,12 @@ def main() -> int:
         "ARQUITECTURA.md",
         "CHANGELOG.md",
         "PLAN_DE_SANEAMIENTO.md",
+        "AGENTS.md",
+        "plataforma/docs/PLAN_MAESTRO_MONSTRUO.md",
+        "plataforma/docs/DESIGN.md",
+        "plataforma/docs/PROMPT_CHAT_UNIVERSAL.md",
+        "plataforma/docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md",
+        "plataforma/docs/playbooks/paralelo_jira_monstruo.md",
     ]
     for rel in old_root_docs:
         expect_missing(rel, errors)
@@ -80,16 +87,16 @@ def main() -> int:
     readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
     for ref in (
         "plataforma/docs/README.md",
-        "plataforma/docs/PLAN_MAESTRO_MONSTRUO.md",
+        "plataforma/docs/AGENTS.md",
         "plataforma/docs/PROYECTO_CONTEXTO.md",
-        "plataforma/docs/PROXY_INVERSO.md",
-        "plataforma/docs/ARQUITECTURA.md",
-        "plataforma/docs/CHANGELOG.md",
+        "plataforma/docs/plan/GUIA_MAESTRA.md",
+        "plataforma/docs/arquitectura/ARQUITECTURA.md",
+        "plataforma/docs/changelog/CHANGELOG.md",
     ):
         if ref not in readme_text:
             errors.append(f"README.md no referencia {ref}")
 
-    # Guardas contrato canónico DEV/PROD (AGENTS.md §4) en docker-compose.yaml.
+    # Guardas contrato canónico DEV/PROD (plataforma/docs/AGENTS.md §4) en docker-compose.yaml.
     compose_path = ROOT / "docker-compose.yaml"
     if not compose_path.exists():
         errors.append("Falta docker-compose.yaml en raíz")

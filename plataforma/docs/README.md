@@ -1,26 +1,63 @@
 # Documentación
 
-## Canónicos
+Documentación viva del proyecto. Organizada por **función** para que sea fácil encontrar lo que se busca.
 
-- [AGENTS](AGENTS.md) — reglas operativas para agentes
-- [Proyecto Contexto](PROYECTO_CONTEXTO.md)
-- [Plan Maestro](PLAN_MAESTRO_MONSTRUO.md)
-- [Proxy Inverso](PROXY_INVERSO.md)
-- [Arquitectura](ARQUITECTURA.md)
-- [Contrato de Apps](CONTRATO_APPS.md)
-- [Estándares](ESTANDARES.md)
-- [Changelog](CHANGELOG.md)
+## Reglas operativas
+
+- [AGENTS.md](AGENTS.md) — reglas obligatorias para todo agente que toque este repo
+- [PROYECTO_CONTEXTO.md](PROYECTO_CONTEXTO.md) — estado actual, prioridad vigente y bitácora de hitos
+
+## Plan y estrategia
+
+- [plan/GUIA_MAESTRA.md](plan/GUIA_MAESTRA.md) — guía oficial de construcción (visión, módulos, contratos)
+
+## Arquitectura
+
+- [arquitectura/ARQUITECTURA.md](arquitectura/ARQUITECTURA.md)
+- [arquitectura/CONTRATO_APPS.md](arquitectura/CONTRATO_APPS.md) — contrato que toda app debe cumplir
+- [arquitectura/FLUJO_REQUEST.md](arquitectura/FLUJO_REQUEST.md)
+- [arquitectura/PROXY_INVERSO.md](arquitectura/PROXY_INVERSO.md)
+
+## Estándares
+
+- [estandares/ESTANDARES.md](estandares/ESTANDARES.md) — convenciones de código, UI y operación
+- [estandares/DESIGN_SYSTEM.md](estandares/DESIGN_SYSTEM.md) — sistema de diseño (paleta, tipografía, componentes)
 
 ## Operación y despliegue
 
-- `deploy/`
-- `playbooks/`
-- `apis/`
+- [operacion/deploy/](operacion/deploy/) — scripts y plantillas de deploy
+- [operacion/playbooks/](operacion/playbooks/) — playbooks de validación y troubleshooting
+- [operacion/windows/](operacion/windows/) — accesos directos para clientes Windows
 
-## Históricos
+## Recursos técnicos
 
-- [antiguo/](antiguo/)
-- `archive/`
+- [recursos/apis/](recursos/apis/) — especificaciones OpenAPI de integraciones
+- [recursos/sql/](recursos/sql/) — scripts SQL de referencia
+
+## IA y modelo
+
+- [ia/](ia/) — políticas, prompts y configuración del módulo IA
+
+## Demo y comercial
+
+- [demo/](demo/) — guion, escenarios y KPIs para demos comerciales
+
+## Histórico
+
+- [changelog/CHANGELOG.md](changelog/CHANGELOG.md) — bitácora completa de cambios
+- [archive/](archive/) — documentos archivados (no operativos)
+
+## Documentación específica por app
+
+Cada app mantiene su propia documentación operativa en `app/docs/`:
+
+- [ticketera/docs/](../../ticketera/docs/) — en mantención post-PROD
+- [gta/docs/](../../gta/docs/) — **prioridad actual**
+- [crm/docs/](../../crm/docs/)
+- [erp/docs/](../../erp/docs/)
+- [bodega/docs/](../../bodega/docs/)
+- [fundacion/docs/](../../fundacion/docs/)
+- [gateway/docs/](../../gateway/docs/)
 
 ## Regla
 

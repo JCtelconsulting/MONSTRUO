@@ -84,8 +84,6 @@ def repo_checks() -> List[str]:
         PROJECT_ROOT / "plataforma/tests/e2e_ticketera.py",
         PROJECT_ROOT / "plataforma/tests/e2e_api_full.py",
         PROJECT_ROOT / "plataforma/tests/.README.md",
-        PROJECT_ROOT / "plataforma/docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md",
-        PROJECT_ROOT / "plataforma/docs/playbooks/paralelo_jira_monstruo.md",
     ]
     for path in required_files:
         if not path.exists():
@@ -152,12 +150,12 @@ def repo_checks() -> List[str]:
         if required not in config_text:
             errors.append(f"config.py sin variable requerida de ticketera: {required}")
 
-    dev_env_values = parse_env_like(PROJECT_ROOT / "plataforma/docs/deploy/plantillas_env/env.server.dev.example")
-    prod_env_values = parse_env_like(PROJECT_ROOT / "plataforma/docs/deploy/plantillas_env/env.server.example")
+    dev_env_values = parse_env_like(PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.dev.example")
+    prod_env_values = parse_env_like(PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.example")
 
     for env_file in (
-        PROJECT_ROOT / "plataforma/docs/deploy/plantillas_env/env.server.dev.example",
-        PROJECT_ROOT / "plataforma/docs/deploy/plantillas_env/env.server.example",
+        PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.dev.example",
+        PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.example",
     ):
         env_text = read_text(env_file)
         for required in (

@@ -1,16 +1,19 @@
-PLAN MAESTRO MONSTRUO
+GUÍA MAESTRA MONSTRUO
 
 Proyecto: MONSTRUO (Telconsulting)
-Versión: v1.1
-Fecha: 2026-02-14
+Versión: v1.2
+Fecha original: 2026-02-14 — última revisión estructural: 2026-05-04
 Autoría: Juan + IA (plan operativo y arquitectura)
-Propósito del documento: ser la única guía oficial de construcción. Si el agente propone algo que no calza con esto, se rechaza.
+Propósito del documento: guía oficial de construcción. Si una propuesta no calza con esto, se rechaza.
+
+> Nota 2026-05-04: Jira fue retirada de operación. Las menciones a Jira en este documento son contexto histórico (bitácora, programa cerrado en sección 0.8, integración retirada en 12.4). Prioridad actual: GTA. Ticketera en mantención post-PROD. Ver `PROYECTO_CONTEXTO.md` para estado actual.
 
 Documentación operativa y técnica complementaria:
-- [Proxy Inverso](/srv/monstruo_dev/plataforma/docs/PROXY_INVERSO.md)
-- [Arquitectura](/srv/monstruo_dev/plataforma/docs/ARQUITECTURA.md)
-- [Changelog](/srv/monstruo_dev/plataforma/docs/CHANGELOG.md)
-- [Documentos antiguos](/srv/monstruo_dev/plataforma/docs/antiguo/)
+
+- [Proxy Inverso](../arquitectura/PROXY_INVERSO.md)
+- [Arquitectura](../arquitectura/ARQUITECTURA.md)
+- [Changelog](../changelog/CHANGELOG.md)
+- [Archivo histórico](../archive/)
 
 0) Cómo se usa este plan (modo “contrato” para humanos y para IA)
 
@@ -183,16 +186,14 @@ Efecto en el trabajo diario:
 - Se fuerza foco en EPIC 11 (Ticketera) hasta cumplir Go/No-Go profesional.
 - Se evita cruce DEV/PROD por norma explicita para ramas, env files, jobs y credenciales.
 
-0.8 Programa Maestro Reemplazo Jira + ISO/IEC 27001 (12 meses) [ACTIVO]
+0.8 Programa Maestro Reemplazo Jira + ISO/IEC 27001 [CERRADO — 2026-05]
 
-Documento canonico del programa:
-- `docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md`
+Jira fue retirada de la operación. La ticketera interna está en producción y reemplazó a Jira por completo. Esta sección queda como referencia histórica del programa que motivó la construcción de la ticketera.
 
-Mandatos operativos:
+Mandatos operativos vigentes (post cierre):
 - Alcance SGSI objetivo: todo MONSTRUO (app, integraciones, datos, operacion, soporte, cambios, continuidad y terceros criticos).
-- Estrategia de reemplazo Jira: operacion en paralelo Jira+MONSTRUO entre 4 y 8 semanas, con Go/No-Go formal.
-- Criterio de cierre del programa: Jira fuera de operacion diaria + Stage 1 y Stage 2 ISO/IEC 27001 aprobados sin NC mayores abiertas.
 - Definicion de done por control: implementado + evidenciado + operado (no solo documentado).
+- El doc canónico del programa (`PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md`) fue eliminado en la reorganización de docs (2026-05-04).
 
 
 ---
@@ -833,10 +834,10 @@ Búsqueda rápida (debounce, index, etc.)
 
 ---
 
-12) Ticketera (interna) + Jira (externa)
+12) Ticketera (interna)
 12.1 Objetivo
 
-Unificar gestión de casos internos y sincronizar con Jira cuando corresponda.
+Unificar gestión de casos internos. Reemplaza por completo a Jira (Jira fuera de operación desde 2026-05).
 
 12.2 Tipos de ticket
 
@@ -860,19 +861,9 @@ Kanban por equipo
 
 Auto-escalamiento
 
-12.4 Integración Jira (mínimo viable)
+12.4 Integración Jira [RETIRADA — 2026-05]
 
-Tabla mapping:
-
-ticket_id ↔ jira_issue_key
-
-Sync:
-
-crear en Jira cuando el ticket sea “externo”
-
-actualizar estados y comentarios
-
-adjuntar evidencias (si política lo permite)
+La integración Jira fue retirada al cerrar el programa de reemplazo. Tablas, endpoints y job diario `JIRA_DELTA_SYNC_DAILY` quedaron como deuda residual para limpieza en backend (config.py, plantillas env, validaciones CI).
 
 12.5 Triggers que DEBEN existir
 

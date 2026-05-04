@@ -3,8 +3,9 @@
 ## Estado operativo actual
 
 - entorno de trabajo: `dev`
-- prioridad absoluta: `EPIC 11 / Ticketera`
-- objetivo vigente: ordenar la base técnica sin mezclar `DEV` y `PROD`
+- prioridad actual: **GTA** (Gestión y Tableros por Área)
+- ticketera: en producción y mantención post-PROD (EPIC 11 cerrado)
+- objetivo vigente: avanzar GTA sin romper DEV/PROD ni regresar a la ticketera salvo bug crítico
 
 ## Estructura canónica vigente
 
@@ -77,6 +78,7 @@ Migración PROD pendiente (ventana controlada con backup `pg_dump` previo): move
 
 ## Hitos recientes
 
+- 2026-05-04: Reorganización documental completa de `plataforma/docs/`. `AGENTS.md` movido desde la raíz a `plataforma/docs/AGENTS.md` (canónico para todos los agentes); `CLAUDE.md` raíz queda como puntero corto. Docs reagrupados por función en `arquitectura/`, `estandares/`, `operacion/`, `recursos/`, `plan/`, `changelog/`. `PLAN_MAESTRO_MONSTRUO.md` renombrado a `plan/GUIA_MAESTRA.md` y `DESIGN.md` a `estandares/DESIGN_SYSTEM.md`. Eliminados docs obsoletos: `PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md`, `playbooks/paralelo_jira_monstruo.md`, `PROMPT_CHAT_UNIVERSAL.md` y los scripts `generate_universal_prompt.py` y `snapshot_for_training.py` que lo generaban/usaban. Prioridad operativa actualizada: GTA en lugar de EPIC 11 (ticketera ya en producción). Queda como deuda residual la limpieza Jira en backend (vars `JIRA_*` en `config.py` y plantillas env, endpoints `/api/tks/migration/jira/*`, validaciones CI relacionadas) — Commit B pendiente.
 - 2026-04-29: `docker-compose.yaml` queda como contrato canónico único DEV/PROD parametrizado por `STACK_NAME`/`ENV_FILE`/`POSTGRES_DB`/`GATEWAY_PORT`/`TICKETERA_PORT`. Postgres no publica `5432`, persiste como bind `./plataforma/data/postgres` (preservando datos DEV existentes), gateway publica `9001`, ticketera publica `9005`, mounts críticos de adjuntos en `./plataforma/data_runtime/{tickets,compliance}`. Se extiende `plataforma/tests/ci_repo_guard.py` con guardas anti-regresión (prohíbe publicar `5432`, exige puertos `9001`/`9005`, bind Postgres canónico, mounts `data_runtime` y parametrización `ENV_FILE`/`STACK_NAME`). `python3 plataforma/tests/ci_repo_guard.py` → `PASS`. `docker compose --env-file plataforma/ops/env/.env.server.dev config` → válido sin warnings. Estado: contrato listo en DEV; migración PROD queda condicionada a ventana con backup + ajuste nginx + health URL.
 
 - 2026-04-28: Saneamiento canónico ejecutado en PROD (`192.168.60.5 / TERRENEITOR`) vía SSH sin sudo (árbol `/srv/monstruo` propiedad de `juan:juan`). Se creó `/srv/monstruo/plataforma/ops/env/` y se copió `.env.server` desde la fuente legacy `/srv/monstruo/ops/env/.env.server` (más reciente, 1580B). Evidencia: `src_sha=dst_sha=c707b960467bfc8f2f0e40c12462e3c48ff0999b8cef768a92bd202d3d6aa676` (PASS hashes coinciden), destino con `size=1580 perms=600 owner=juan:juan`, contenedores `monstruo-gateway`, `monstruo-ticketera` y `monstruo-postgres` siguen `Up 2 weeks` sin reinicio. Ruta canónica AGENTS.md §4 ahora disponible para que `deploy.yml` y `deploy.sh` la encuentren al promover. Estado operativo: **GO condicional** para `dev -> main`, pendiente autorización explícita del usuario (AGENTS.md §4 + §9).

@@ -8,24 +8,25 @@ Repositorio de desarrollo de Monstruo para Telconsulting.
 - plataforma compartida en `plataforma/`
 - documentación operativa y técnica en `plataforma/docs/`
 
+## Prioridad actual
+
+**GTA** (Gestión y Tableros por Área). Ticketera ya en producción y mantención post-PROD.
+
 ## Documentación principal
 
 - [Índice de docs](plataforma/docs/README.md)
-- [Plan Maestro](plataforma/docs/PLAN_MAESTRO_MONSTRUO.md)
+- [Reglas operativas (AGENTS)](plataforma/docs/AGENTS.md)
 - [Proyecto Contexto](plataforma/docs/PROYECTO_CONTEXTO.md)
-- [Proxy Inverso](plataforma/docs/PROXY_INVERSO.md)
-- [Arquitectura](plataforma/docs/ARQUITECTURA.md)
-- [Changelog](plataforma/docs/CHANGELOG.md)
-- [Documentos antiguos](plataforma/docs/antiguo/)
+- [Guía Maestra](plataforma/docs/plan/GUIA_MAESTRA.md)
+- [Arquitectura](plataforma/docs/arquitectura/ARQUITECTURA.md)
+- [Proxy Inverso](plataforma/docs/arquitectura/PROXY_INVERSO.md)
+- [Design System](plataforma/docs/estandares/DESIGN_SYSTEM.md)
+- [Changelog](plataforma/docs/changelog/CHANGELOG.md)
 
 ## Estructura corta
 
 - `plataforma/`: base compartida, operación, docs y datos
-- `ticketera/`, `crm/`, `erp/`, `bodega/`, `fundacion/`: apps y módulos
+- `gta/`: app prioridad actual
+- `ticketera/`, `crm/`, `erp/`, `bodega/`, `fundacion/`, `gateway/`: apps en operación o mantención
 - `CLAUDE.md`: puntero para Claude Code → reglas en `plataforma/docs/AGENTS.md`
 - `plataforma/docs/AGENTS.md`: reglas operativas canónicas para todos los agentes
-
-## Nota
-
-El contenido largo que antes vivía en este `README` fue movido a:
-- [plataforma/docs/PLAN_MAESTRO_MONSTRUO.md](plataforma/docs/PLAN_MAESTRO_MONSTRUO.md)

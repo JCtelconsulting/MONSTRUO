@@ -27,19 +27,6 @@ Este documento consolida todas las normas, estándares y políticas del proyecto
 - **Input:** Prompt Universal + Instrucciones del usuario
 - **Output:** Software funcionando, Logs de ejecución, Archivos actualizados
 
-### Flujo de Trabajo: Context Switching (Rotación de Contexto)
-
-Los contextos de LLM se degradan con el tiempo. Para mitigar esto, usamos **Relevo de Contexto**.
-
-**¿Cuándo Rotar?**
-1. **Latencia Alta:** Cuando el chat tarda mucho en responder
-2. **Confusión:** Cuando el agente alucina rutas o archivos viejos
-3. **Cambio de Fase:** Al terminar un módulo grande
-
-**¿Cómo Rotar?**
-1. En el Chat Viejo: Actualizar `docs/PROYECTO_CONTEXTO.md` y ejecutar `python3 ops/herramientas/deploy/generate_universal_prompt.py`
-2. En el Chat Nuevo: Pegar contenido de `docs/PROMPT_CHAT_UNIVERSAL.md`
-
 ### Reglas de Seguridad & Operación
 - **Sudo sin Interrupciones:** Configurar `SUDO_PASS` en `.env` local
 - **Verdad Única:** Si no está en `docs/PROYECTO_CONTEXTO.md`, no existe
@@ -129,9 +116,12 @@ Los contextos de LLM se degradan con el tiempo. Para mitigar esto, usamos **Rele
 ## 3. POLÍTICAS DE PROYECTO
 
 ### Estructura de Proyecto Estándar
+
 Cualquier nuevo proyecto debe tener al menos:
-- `/srv/[proyecto]/docs/PROYECTO_CONTEXTO.md` (Bitácora)
-- `/srv/[proyecto]/ops/herramientas/deploy/generate_universal_prompt.py` (Script Relevo)
+
+- `plataforma/docs/PROYECTO_CONTEXTO.md` (bitácora y estado actual)
+- `plataforma/docs/AGENTS.md` (reglas operativas para agentes)
+- `CLAUDE.md` en la raíz (puntero para Claude Code)
 
 ### Actualización de Estándares
 Cuando se necesite agregar nuevo término o política:

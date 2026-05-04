@@ -14,7 +14,7 @@ Evitar desorden, cruces DEV/PROD y pérdida de foco en la meta de negocio (EPIC 
 
 Cuando haya conflicto, obedecer en este orden:
 
-1. `plataforma/docs/PLAN_MAESTRO_MONSTRUO.md`
+1. `plataforma/docs/plan/GUIA_MAESTRA.md`
 2. `plataforma/docs/PROYECTO_CONTEXTO.md`
 3. `plataforma/docs/AGENTS.md` (este archivo)
 4. Instrucción puntual del usuario (si no contradice 1-3)
@@ -28,9 +28,9 @@ Cuando haya conflicto, obedecer en este orden:
 
 ## 3) Prioridad de negocio vigente
 
-- **EPIC 11 (Ticketera) es prioridad máxima absoluta.**
-- Objetivo: reemplazar la mesa externa contratada por una mesa interna profesional.
-- No abrir desarrollo neto de EPIC 12+ mientras EPIC 11 no cumpla Go/No-Go definido en Plan Maestro.
+- **GTA (Gestión y Tableros por Área) es la prioridad actual.**
+- Ticketera (EPIC 11) ya está en producción y entra en mantención post-PROD; no se abre trabajo en ticketera salvo bug crítico.
+- No mezclar trabajo de GTA con trabajo de otras apps en el mismo commit/PR.
 
 ## 4) Separación DEV/PROD (No Negociable)
 
@@ -55,13 +55,16 @@ Reglas:
 - Una tarea a la vez.
 - No meter extras fuera de scope antes de cerrar la tarea solicitada.
 
-## 6) Calidad mínima para Ticketera (EPIC 11)
+## 6) Calidad mínima por app
 
-- Cero errores 500 en flujos críticos: crear, asignar, responder, listar, detalle.
-- Correo: hilo correcto (`In-Reply-To`/`References`) y anti-duplicado efectivo.
-- Adjuntos y historial de correos operativos de punta a punta.
-- Tests E2E de ticketera en verde en CI.
+- Cero errores 500 en flujos críticos.
+- Tests automáticos en verde en CI antes de mergear a `dev`.
 - UX fluida sin congelamientos ni dobles envíos.
+- Cualquier cambio de schema acompañado de migración en `app/migrations/`.
+
+Apps en mantención (no se abre trabajo nuevo salvo bug crítico):
+
+- ticketera (EPIC 11 cerrado, en producción).
 
 ## 7) Seguridad y Secretos
 
@@ -71,8 +74,9 @@ Reglas:
 
 ## 8) Registro Documental Obligatorio
 
-- Cambios de reglas/proceso: actualizar `plataforma/docs/PLAN_MAESTRO_MONSTRUO.md`.
+- Cambios de reglas/proceso: actualizar `plataforma/docs/plan/GUIA_MAESTRA.md`.
 - Hitos ejecutados: registrar en `plataforma/docs/PROYECTO_CONTEXTO.md`.
+- Cambios de UI/estilos: respetar `plataforma/docs/estandares/DESIGN_SYSTEM.md`.
 
 ## 9) Git y Entrega
 
