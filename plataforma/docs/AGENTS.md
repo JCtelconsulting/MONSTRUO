@@ -1,7 +1,10 @@
 # AGENTS - MONSTRUO DEV
 
 Estas instrucciones aplican a cualquier agente ejecutado en este repositorio. Este es el único archivo de reglas operativas.
-responderas corto y preciso en lenguaje natural.
+
+Ubicación canónica: `plataforma/docs/AGENTS.md`. Claude Code entra vía `CLAUDE.md` en la raíz, que apunta a este archivo. Otros agentes (Codex, etc.) deben leerlo directo desde aquí.
+
+Responder corto y preciso en lenguaje natural.
 
 ## 0) Objetivo
 
@@ -13,12 +16,13 @@ Cuando haya conflicto, obedecer en este orden:
 
 1. `plataforma/docs/PLAN_MAESTRO_MONSTRUO.md`
 2. `plataforma/docs/PROYECTO_CONTEXTO.md`
-3. `AGENTS.md` (este archivo)
+3. `plataforma/docs/AGENTS.md` (este archivo)
 4. Instrucción puntual del usuario (si no contradice 1-3)
 
 ## 2) Carga obligatoria
 
-- Todo agente debe cargar este archivo al iniciar.
+- Todo agente debe cargar `plataforma/docs/AGENTS.md` al iniciar.
+- Claude Code lo carga indirectamente vía `CLAUDE.md` en la raíz (puntero).
 - Si no puede leerlo, debe detenerse y reportar bloqueo antes de ejecutar cambios.
 - Frase de control recomendada al iniciar: `Reglas cargadas: AGENTS.md`.
 

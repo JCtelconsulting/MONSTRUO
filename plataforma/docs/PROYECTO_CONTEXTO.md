@@ -10,9 +10,9 @@
 
 - raíz del repo:
   - `README.md`
-  - `AGENTS.md`
+  - `CLAUDE.md` (puntero a `plataforma/docs/AGENTS.md`)
 - documentación viva:
-  - `plataforma/docs/`
+  - `plataforma/docs/` (incluye `AGENTS.md` canónico)
 - operación y despliegue:
   - `plataforma/ops/`
 - proxy versionado:

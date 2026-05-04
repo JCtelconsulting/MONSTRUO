@@ -1,4 +1,4 @@
-# Contrato canónico DEV/PROD (AGENTS.md §4):
+# Contrato canónico DEV/PROD (plataforma/docs/AGENTS.md §4):
 # - DEV: STACK_NAME=monstruo-dev, POSTGRES_DB=monstruo_dev, ENV_FILE=plataforma/ops/env/.env.server.dev
 # - PROD: STACK_NAME=monstruo, POSTGRES_DB=monstruo, ENV_FILE=plataforma/ops/env/.env.server
 # Reglas no negociables:

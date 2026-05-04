@@ -22,7 +22,8 @@ Repositorio de desarrollo de Monstruo para Telconsulting.
 
 - `plataforma/`: base compartida, operación, docs y datos
 - `ticketera/`, `crm/`, `erp/`, `bodega/`, `fundacion/`: apps y módulos
-- `AGENTS.md`: reglas operativas para agentes
+- `CLAUDE.md`: puntero para Claude Code → reglas en `plataforma/docs/AGENTS.md`
+- `plataforma/docs/AGENTS.md`: reglas operativas canónicas para todos los agentes
 
 ## Nota
 
