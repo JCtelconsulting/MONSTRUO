@@ -1,6 +1,6 @@
 # Ticketera V3 (Módulo de Mesa de Ayuda)
 
-Este microservicio es el núcleo de la gestión de casos internos de MONSTRUO y está diseñado para reemplazar el uso de mesas externas (como Jira) mediante una operación interna de estándar profesional.
+Este microservicio es el núcleo de la gestión de casos internos de MONSTRUO. Reemplaza el uso de mesas externas mediante una operación interna de estándar profesional.
 
 ## Objetivo
 Unificar la gestión de casos internos (operación, incidentes, proyectos, preventa, integraciones) y automatizar el flujo de trabajo, las notificaciones y los acuerdos de nivel de servicio (SLAs).
@@ -40,7 +40,6 @@ Los objetivos operativos actuales (ajustables vía `.env` o base de datos) son:
     *   +5 min: WhatsApp / Telegram.
     *   +20 min: Llamada telefónica (3CX).
 5.  **Papelera Blanda:** Los tickets basura generados por correos spam pueden enviarse a la papelera sin alterar los KPIs, pudiendo ser restaurados en caso de error.
-6.  **Sincronización con Jira (Fase de Transición):** Soporta importación y sincronización delta con Jira durante ventanas de transición.
 
 ## Seguridad y Compliance (ISO 27001)
 El módulo genera evidencia con huellas criptográficas (hash chain) para acciones críticas: creación, borrado, respuesta a clientes y aplicación de "Legal Holds" sobre datos.

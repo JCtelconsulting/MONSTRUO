@@ -55,8 +55,6 @@ def main() -> int:
         "plataforma/docs/PLAN_MAESTRO_MONSTRUO.md",
         "plataforma/docs/DESIGN.md",
         "plataforma/docs/PROMPT_CHAT_UNIVERSAL.md",
-        "plataforma/docs/PROGRAMA_REEMPLAZO_JIRA_ISO27001_12M.md",
-        "plataforma/docs/playbooks/paralelo_jira_monstruo.md",
     ]
     for rel in old_root_docs:
         expect_missing(rel, errors)

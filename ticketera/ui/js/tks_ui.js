@@ -1639,8 +1639,6 @@ const TksUI = (() => {
             ticket_channels_dispatch: 'Despacho de notificaciones de canales',
             ticket_email_incoming_poll: 'Lectura de correo entrante',
             ticket_email_reconcile: 'Conciliación de correo de tickets',
-            jira_delta_sync_daily: 'Sincronización diaria Jira (delta)',
-            jira_bootstrap_open: 'Carga inicial Jira (tickets abiertos)',
             compliance_export_run: 'Ejecución de exportación de cumplimiento',
             compliance_purge_run: 'Depuración de datos de cumplimiento',
             auto_reply_dispatch: 'Despacho de autorrespuestas',

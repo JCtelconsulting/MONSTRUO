@@ -281,7 +281,7 @@ def _maybe_mark_first_response(conn, ticket_id: int, by_user: str, now_iso: Opti
     if not by_user:
         return
     actor = str(by_user).strip().lower()
-    if actor.startswith("system") or actor.startswith("email:") or actor in {"email_bot", "jira"}:
+    if actor.startswith("system") or actor.startswith("email:") or actor == "email_bot":
         return
     now_iso = now_iso or db.now_utc_iso()
     row = conn.execute(

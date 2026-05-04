@@ -139,19 +139,9 @@ def repo_checks() -> List[str]:
         "WHATSAPP_ADAPTER_MODE",
         "THREECX_ADAPTER_MODE",
         "CHANNELS_MAX_ATTEMPTS",
-        "JIRA_BASE_URL",
-        "JIRA_USER",
-        "JIRA_API_TOKEN",
-        "JIRA_PROJECT_KEYS",
-        "JIRA_SYNC_ENABLED",
-        "JIRA_SYNC_DAILY_HOUR",
-        "JIRA_SYNC_TZ",
     ):
         if required not in config_text:
             errors.append(f"config.py sin variable requerida de ticketera: {required}")
-
-    dev_env_values = parse_env_like(PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.dev.example")
-    prod_env_values = parse_env_like(PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.example")
 
     for env_file in (
         PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.dev.example",
@@ -178,27 +168,9 @@ def repo_checks() -> List[str]:
             "CHANNELS_MAX_ATTEMPTS",
             "CHANNELS_RETRY_BASE_SECONDS",
             "CHANNELS_RETRY_MAX_SECONDS",
-            "JIRA_BASE_URL",
-            "JIRA_USER",
-            "JIRA_API_TOKEN",
-            "JIRA_PROJECT_KEYS",
-            "JIRA_SYNC_ENABLED",
-            "JIRA_SYNC_DAILY_HOUR",
-            "JIRA_SYNC_TZ",
         ):
             if required not in env_text:
                 errors.append(f"{env_file} sin variable requerida: {required}")
-
-    dev_url = (dev_env_values.get("JIRA_BASE_URL") or "").strip()
-    prod_url = (prod_env_values.get("JIRA_BASE_URL") or "").strip()
-    if dev_url and prod_url and dev_url == prod_url:
-        errors.append("Cruce DEV/PROD: JIRA_BASE_URL es igual en env.server.dev.example y env.server.example")
-
-    dev_token = (dev_env_values.get("JIRA_API_TOKEN") or "").strip()
-    prod_token = (prod_env_values.get("JIRA_API_TOKEN") or "").strip()
-    safe_placeholders = {"", "replace_me"}
-    if dev_token not in safe_placeholders and prod_token not in safe_placeholders and dev_token == prod_token:
-        errors.append("Cruce DEV/PROD: JIRA_API_TOKEN no debe ser igual entre plantillas DEV y PROD")
 
     banned_checks: List[Tuple[str, re.Pattern[str], List[Path]]] = [
         (
@@ -360,75 +332,6 @@ def api_checks(args: argparse.Namespace) -> List[str]:
     except Exception as exc:
         errors.append(f"Error ejecutando /api/jobs/recover-stale: {exc}")
 
-    jira_sample_issue = {
-        "key": f"HARD-{int(time.time())}",
-        "summary": "Hardening Jira bootstrap/delta",
-        "description": "Validación hardening paralelo Jira",
-        "status": "open",
-        "priority": "medium",
-        "issue_type": "incidencia",
-        "comments": [{"author": "jira", "body": "check"}],
-    }
-
-    try:
-        bootstrap = session.post(
-            f"{base_url}/api/tks/migration/jira/bootstrap-open",
-            json={"dry_run": True, "issues": [jira_sample_issue], "limit": 50},
-            timeout=max(args.timeout, 30),
-        )
-        if bootstrap.status_code != 200:
-            errors.append(f"/api/tks/migration/jira/bootstrap-open -> {bootstrap.status_code} {bootstrap.text}")
-    except Exception as exc:
-        errors.append(f"Error ejecutando bootstrap-open: {exc}")
-
-    try:
-        delta = session.post(
-            f"{base_url}/api/tks/migration/jira/delta-sync/run",
-            json={"dry_run": True, "issues": [jira_sample_issue], "limit": 50},
-            timeout=max(args.timeout, 30),
-        )
-        if delta.status_code != 200:
-            errors.append(f"/api/tks/migration/jira/delta-sync/run -> {delta.status_code} {delta.text}")
-    except Exception as exc:
-        errors.append(f"Error ejecutando delta-sync/run: {exc}")
-
-    try:
-        jira_runs = session.get(f"{base_url}/api/tks/migration/jira/runs?limit=5", timeout=args.timeout)
-        if jira_runs.status_code != 200:
-            errors.append(f"/api/tks/migration/jira/runs -> {jira_runs.status_code} {jira_runs.text}")
-    except Exception as exc:
-        errors.append(f"Error consultando /api/tks/migration/jira/runs: {exc}")
-
-    try:
-        recon = session.get(f"{base_url}/api/tks/migration/jira/reconciliation/daily", timeout=max(args.timeout, 30))
-        if recon.status_code != 200:
-            errors.append(f"/api/tks/migration/jira/reconciliation/daily -> {recon.status_code} {recon.text}")
-    except Exception as exc:
-        errors.append(f"Error consultando reconciliación Jira diaria: {exc}")
-
-    try:
-        kpi_daily = session.get(f"{base_url}/api/tks/parallel/kpi/daily?from=2026-01-01&to=2030-01-01", timeout=max(args.timeout, 30))
-        if kpi_daily.status_code != 200:
-            errors.append(f"/api/tks/parallel/kpi/daily -> {kpi_daily.status_code} {kpi_daily.text}")
-    except Exception as exc:
-        errors.append(f"Error consultando KPI diario paralelo: {exc}")
-
-    try:
-        go_no_go = session.post(
-            f"{base_url}/api/tks/parallel/go-no-go",
-            json={
-                "decision": "no_go",
-                "signers": [args.user],
-                "rationale": "Hardening check",
-                "evidence_refs": ["hardening:auto"],
-            },
-            timeout=max(args.timeout, 30),
-        )
-        if go_no_go.status_code != 200:
-            errors.append(f"/api/tks/parallel/go-no-go -> {go_no_go.status_code} {go_no_go.text}")
-    except Exception as exc:
-        errors.append(f"Error registrando go-no-go: {exc}")
-
     protected_cases = [
         ("GET", f"{base_url}/api/tks/tickets/1/workflow", None),
         ("POST", f"{base_url}/api/tks/tickets/1/transitions", {"to_subestado": "en_analisis", "motivo": "hardening"}),
@@ -443,12 +346,6 @@ def api_checks(args: argparse.Namespace) -> List[str]:
         ("GET", f"{base_url}/api/tks/channels/notifications?limit=5", None),
         ("POST", f"{base_url}/api/tks/channels/notifications/1/retry", None),
         ("POST", f"{base_url}/api/jobs/recover-stale?stale_minutes=20", None),
-        ("POST", f"{base_url}/api/tks/migration/jira/bootstrap-open", {"dry_run": True, "issues": []}),
-        ("POST", f"{base_url}/api/tks/migration/jira/delta-sync/run", {"dry_run": True, "issues": []}),
-        ("GET", f"{base_url}/api/tks/migration/jira/runs", None),
-        ("GET", f"{base_url}/api/tks/migration/jira/reconciliation/daily", None),
-        ("GET", f"{base_url}/api/tks/parallel/kpi/daily", None),
-        ("POST", f"{base_url}/api/tks/parallel/go-no-go", {"decision": "no_go", "signers": ["x"], "rationale": "x"}),
     ]
     for method, url, body in protected_cases:
         try:

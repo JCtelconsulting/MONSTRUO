@@ -167,15 +167,6 @@ class AutomationRuleIn(BaseModel):
     action_json: dict = Field(default_factory=dict)
 
 
-class ParallelGoNoGoIn(BaseModel):
-    decision: str = Field(pattern="^(go|no_go)$")
-    signers: List[str] = Field(default_factory=list, min_length=1)
-    rationale: str
-    evidence_refs: List[str] = Field(default_factory=list)
-    metrics: dict = Field(default_factory=dict)
-    decided_at: Optional[str] = None
-
-
 class EvidenceEventCreate(BaseModel):
     control_id: str
     artifact_ref: str
@@ -1154,41 +1145,6 @@ async def list_automation_rules(
 ):
     return {"items": tickets_service.list_automation_rules(only_active=only_active)}
 
-
-
-@router.get("/parallel/kpi/daily", response_model=dict)
-async def list_parallel_kpi_daily(
-    from_date: Optional[str] = Query(None, alias="from"),
-    to_date: Optional[str] = Query(None, alias="to"),
-    sess: dict = Depends(deps.require_permission("tickets:compliance"))
-):
-    try:
-        return tickets_service.list_parallel_kpi_daily(
-            date_from=from_date,
-            date_to=to_date,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/parallel/go-no-go", response_model=dict)
-async def register_parallel_go_no_go(
-    body: ParallelGoNoGoIn,
-    sess: dict = Depends(deps.require_permission("tickets:compliance"))
-):
-    try:
-        item = tickets_service.record_parallel_go_no_go_decision(
-            decision=body.decision,
-            decided_by=sess["username"],
-            signers=body.signers,
-            rationale=body.rationale,
-            evidence_refs=body.evidence_refs or [],
-            metrics=body.metrics or {},
-            decided_at=body.decided_at,
-        )
-        return {"item": item}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/evidence/events", response_model=dict)
