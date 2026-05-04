@@ -38,5 +38,16 @@ window.GtaApi = (() => {
         // Catálogo de documentos descargados desde Drive (gta/data/procesos)
         getDocumentos:        ()           => get('/catalogo'),
         urlDocumento:         (path)       => `${base}/catalogo/download?path=${encodeURIComponent(path)}`,
+
+        // Flujos cross-área
+        listarFlujos:         (params = '')   => get(`/flujos${params}`),
+        getFlujo:             (id)            => get(`/flujos/${id}`),
+        getEventosFlujo:      (id)            => get(`/flujos/${id}/eventos`),
+        crearFlujo:           (data)          => post('/flujos', data),
+        completarTarea:       (id, data)      => post(`/flujo-tareas/${id}/completar`, data || {}),
+        validarTarea:         (id, data)      => post(`/flujo-tareas/${id}/validar`, data),
+        pedirAyuda:           (id, data)      => post(`/flujo-tareas/${id}/ayuda`, data),
+        responderAyuda:       (id, data)      => post(`/flujo-ayudas/${id}/responder`, data),
+        getMetricas:          ()              => get('/metricas'),
     };
 })();

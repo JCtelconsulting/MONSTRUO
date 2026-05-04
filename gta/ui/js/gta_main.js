@@ -47,14 +47,14 @@ window.GtaCore = (() => {
             if (!_loadedResources.has(`css-${tabName}`)) {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `${tabName}/${tabName}.css?v=3`;
+                link.href = `${tabName}/${tabName}.css?v=4`;
                 document.head.appendChild(link);
                 _loadedResources.add(`css-${tabName}`);
             }
 
             if (!_loadedResources.has(`js-${tabName}`)) {
                 const script = document.createElement('script');
-                script.src = `${tabName}/${tabName}.js?v=3`;
+                script.src = `${tabName}/${tabName}.js?v=4`;
                 document.body.appendChild(script);
                 _loadedResources.add(`js-${tabName}`);
                 await new Promise(r => { script.onload = r; script.onerror = r; });

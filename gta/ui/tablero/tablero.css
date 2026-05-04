@@ -1,2 +1,430 @@
-/* Tablero — estilos adicionales (la mayoría están en gta.css) */
-.gta-tablero { display: flex; flex-direction: column; gap: 0; }
+/* Tablero — Kanban de flujos cross-área */
+
+.gta-tablero {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* KPIs */
+.gta-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+.gta-kpi-card {
+    background: rgba(18, 26, 36, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+}
+.gta-kpi-card.kpi-warning { border-color: rgba(255, 204, 0, 0.3); }
+.gta-kpi-card.kpi-danger  { border-color: rgba(255, 51, 51, 0.35); }
+.gta-kpi-card.kpi-ok      { border-color: rgba(0, 255, 65, 0.3); }
+.gta-kpi-val {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.gta-kpi-card.kpi-warning .gta-kpi-val { color: var(--warning); }
+.gta-kpi-card.kpi-danger  .gta-kpi-val { color: var(--danger); }
+.gta-kpi-card.kpi-ok      .gta-kpi-val { color: var(--neon); }
+.gta-kpi-lbl {
+    font-size: 0.74rem;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+/* Filtros */
+.gta-tablero-filters {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Kanban de flujos por estado */
+.gta-flujos-kanban {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    align-items: flex-start;
+}
+.gta-flujo-col {
+    background: rgba(18, 26, 36, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 180px;
+}
+.gta-flujo-col-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px 8px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.85rem;
+    color: var(--text-soft);
+}
+.gta-flujo-col-header i { color: var(--neon); }
+.gta-flujo-col-title {
+    flex: 1;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    font-size: 0.78rem;
+}
+.gta-flujo-col-count {
+    background: rgba(0, 255, 65, 0.12);
+    color: var(--neon);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+.gta-flujo-col-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gta-flujo-card {
+    background: rgba(7, 11, 17, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.gta-flujo-card:hover {
+    border-color: rgba(0, 255, 65, 0.3);
+    transform: translateY(-1px);
+}
+.gta-flujo-card-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    line-height: 1.3;
+}
+.gta-flujo-card-meta {
+    display: flex;
+    gap: 10px;
+    font-size: 0.72rem;
+    color: var(--text-soft);
+    flex-wrap: wrap;
+}
+.gta-flujo-card-meta i { margin-right: 3px; opacity: 0.7; }
+.gta-flujo-card-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+.gta-flujo-progress-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.gta-flujo-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--info), var(--neon));
+    border-radius: 999px;
+}
+.gta-flujo-progress-label {
+    font-size: 0.7rem;
+    color: var(--text-soft);
+    white-space: nowrap;
+}
+
+/* Drawer de detalle del flujo */
+.gta-flujo-drawer {
+    position: fixed;
+    top: 0;
+    right: -700px;
+    width: min(700px, 95vw);
+    height: 100vh;
+    background: var(--panel);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 1000;
+    transition: right 0.25s ease;
+    overflow-y: auto;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.5);
+}
+.gta-flujo-drawer.open { right: 0; }
+.gta-flujo-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+}
+.gta-flujo-drawer-overlay.open { opacity: 1; pointer-events: auto; }
+.gta-flujo-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    z-index: 2;
+}
+.gta-flujo-drawer-eyebrow {
+    font-size: 0.7rem;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 4px;
+}
+.gta-flujo-drawer-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--text);
+}
+.gta-flujo-drawer-body {
+    padding: 16px 20px 40px;
+}
+.gta-flujo-summary {
+    background: rgba(7, 11, 17, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.gta-section-subtitle {
+    font-size: 0.85rem;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 8px 0;
+}
+.gta-section-help {
+    color: var(--text-soft);
+    font-size: 0.8rem;
+    margin: 0 0 10px 0;
+}
+
+/* Pipeline de tareas — bloques verticales con semáforo */
+.gta-pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.gta-pipe-tarea {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: rgba(7, 11, 17, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 4px solid var(--text-soft);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.gta-pipe-tarea.sla-gray   { border-left-color: #666; }
+.gta-pipe-tarea.sla-cyan   { border-left-color: var(--info); }
+.gta-pipe-tarea.sla-yellow { border-left-color: var(--warning); }
+.gta-pipe-tarea.sla-orange { border-left-color: #ff8800; }
+.gta-pipe-tarea.sla-red    { border-left-color: var(--danger); background: rgba(255, 51, 51, 0.05); }
+.gta-pipe-tarea.sla-green  { border-left-color: var(--neon); background: rgba(0, 255, 65, 0.04); }
+.gta-pipe-tarea.sla-blue   { border-left-color: #4488ff; background: rgba(68, 136, 255, 0.05); }
+.gta-pipe-tarea.sla-purple { border-left-color: #aa55ff; background: rgba(170, 85, 255, 0.05); }
+.gta-pipe-tarea.sla-rojo_completado { border-left-color: var(--neon); background: rgba(255, 51, 51, 0.06); }
+
+.gta-pipe-num {
+    width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-soft);
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.gta-pipe-body {
+    flex: 1;
+    padding: 10px 14px;
+}
+.gta-pipe-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+.gta-pipe-header h5 {
+    margin: 0;
+    font-size: 0.92rem;
+    color: var(--text);
+    font-weight: 600;
+}
+.gta-tarea-estado {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-soft);
+    white-space: nowrap;
+}
+.estado-pendiente   { background: rgba(255, 255, 255, 0.05); color: #999; }
+.estado-lista       { background: rgba(0, 243, 255, 0.12); color: var(--info); }
+.estado-en_progreso { background: rgba(0, 243, 255, 0.18); color: var(--info); }
+.estado-por_validar { background: rgba(68, 136, 255, 0.15); color: #4488ff; }
+.estado-completada  { background: rgba(0, 255, 65, 0.15); color: var(--neon); }
+.estado-ayuda_pedida{ background: rgba(170, 85, 255, 0.15); color: #aa55ff; }
+.estado-vencida     { background: rgba(255, 51, 51, 0.15); color: var(--danger); }
+
+.gta-pipe-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 0.74rem;
+    color: var(--text-soft);
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.gta-pipe-meta i { margin-right: 3px; opacity: 0.7; }
+
+.gta-pipe-sla {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.gta-pipe-sla-bar {
+    flex: 1;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.gta-pipe-sla-fill {
+    height: 100%;
+    background: var(--info);
+    border-radius: 999px;
+    transition: width 0.3s;
+}
+.sla-yellow .gta-pipe-sla-fill { background: var(--warning); }
+.sla-orange .gta-pipe-sla-fill { background: #ff8800; }
+.sla-red    .gta-pipe-sla-fill { background: var(--danger); }
+.sla-green  .gta-pipe-sla-fill { background: var(--neon); }
+.sla-blue   .gta-pipe-sla-fill { background: #4488ff; }
+.sla-purple .gta-pipe-sla-fill { background: #aa55ff; }
+.gta-pipe-sla-label {
+    font-size: 0.7rem;
+    color: var(--text-soft);
+    white-space: nowrap;
+    min-width: 130px;
+    text-align: right;
+}
+
+.gta-pipe-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+/* Timeline */
+.gta-flujo-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.gta-evento-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(7, 11, 17, 0.4);
+}
+.gta-evento-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: rgba(0, 255, 65, 0.1);
+    color: var(--neon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    flex-shrink: 0;
+}
+.gta-evento-msg {
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.3;
+}
+.gta-evento-meta {
+    font-size: 0.7rem;
+    color: var(--text-soft);
+    margin-top: 2px;
+}
+
+/* Editor de tareas libres */
+.gta-flujo-tareas-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.gta-tarea-edit-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(7, 11, 17, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+.gta-tarea-edit-num {
+    background: rgba(0, 255, 65, 0.1);
+    color: var(--neon);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    min-width: 36px;
+    text-align: center;
+}
+.gta-tarea-edit-fields {
+    flex: 1;
+    min-width: 0;
+}
+
+.gta-checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 0.88rem;
+}
+.gta-checkbox-label input[type="checkbox"] {
+    margin-top: 3px;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .gta-kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .gta-flujo-drawer { width: 100vw; }
+    .gta-pipe-meta { font-size: 0.7rem; }
+}

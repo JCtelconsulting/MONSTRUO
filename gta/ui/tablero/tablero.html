@@ -1,22 +1,21 @@
 <div class="gta-tablero">
-
     <!-- KPIs -->
     <div class="gta-kpi-row" id="tablero-kpis">
         <div class="gta-kpi-card">
-            <div class="gta-kpi-val" id="kpi-total">—</div>
-            <div class="gta-kpi-lbl">Total activas</div>
+            <div class="gta-kpi-val" id="kpi-activos">—</div>
+            <div class="gta-kpi-lbl">Flujos activos</div>
         </div>
         <div class="gta-kpi-card kpi-warning">
-            <div class="gta-kpi-val" id="kpi-en-progreso">—</div>
-            <div class="gta-kpi-lbl">En progreso</div>
+            <div class="gta-kpi-val" id="kpi-por-validar">—</div>
+            <div class="gta-kpi-lbl">Por validar</div>
         </div>
         <div class="gta-kpi-card kpi-danger">
-            <div class="gta-kpi-val" id="kpi-vencidas">—</div>
-            <div class="gta-kpi-lbl">Vencidas / urgentes</div>
+            <div class="gta-kpi-val" id="kpi-vencidos">—</div>
+            <div class="gta-kpi-lbl">Tareas vencidas</div>
         </div>
         <div class="gta-kpi-card kpi-ok">
-            <div class="gta-kpi-val" id="kpi-completadas">—</div>
-            <div class="gta-kpi-lbl">Completadas hoy</div>
+            <div class="gta-kpi-val" id="kpi-completados">—</div>
+            <div class="gta-kpi-lbl">Completados</div>
         </div>
     </div>
 
@@ -24,32 +23,107 @@
     <div class="gta-tablero-filters">
         <select id="filtro-area" class="input-dark" onchange="Tablero.filtrar()" style="min-width:160px;">
             <option value="">Todas las áreas</option>
-            <option value="comercial">Comercial</option>
-            <option value="preventa">Preventa</option>
-            <option value="redes">Redes</option>
-            <option value="sistemas">Sistemas</option>
-            <option value="finanzas">Finanzas</option>
-            <option value="proveedores">Proveedores</option>
-            <option value="capital_humano">Capital Humano</option>
-            <option value="bodega">Bodega</option>
-            <option value="ia">Especialista IA</option>
         </select>
-        <select id="filtro-prioridad" class="input-dark" onchange="Tablero.filtrar()" style="min-width:140px;">
-            <option value="">Toda prioridad</option>
-            <option value="alta">Alta</option>
-            <option value="media">Media</option>
-            <option value="baja">Baja</option>
+        <select id="filtro-estado" class="input-dark" onchange="Tablero.filtrar()" style="min-width:160px;">
+            <option value="">Todos los estados</option>
+            <option value="activo">Activos</option>
+            <option value="completado">Completados</option>
+            <option value="vencido">Vencidos</option>
         </select>
-        <button class="btn-secondary" onclick="Tablero.cargar()" style="padding:8px 14px;">
+        <input type="text" id="filtro-busqueda" class="input-dark" placeholder="🔍 Buscar..." oninput="Tablero.filtrar()" style="min-width:200px;">
+        <button class="btn-secondary" onclick="Tablero.cargar()" title="Refrescar">
             <i class="fas fa-sync-alt"></i>
         </button>
-        <button class="btn-secondary gta-quiebre-trigger" onclick="GtaCore.abrirModalQuiebre()" style="margin-left:auto;">
-            <i class="fas fa-flag"></i> Reportar quiebre
+        <button class="btn-primary" onclick="Tablero.abrirNuevoFlujo()" style="margin-left:auto;">
+            <i class="fas fa-plus"></i> Nuevo flujo
         </button>
     </div>
 
-    <!-- Kanban por área -->
-    <div class="gta-kanban" id="tablero-kanban">
-        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando solicitudes...</div>
+    <!-- Kanban por estado del flujo -->
+    <div class="gta-flujos-kanban" id="tablero-kanban">
+        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando flujos...</div>
+    </div>
+</div>
+
+<!-- Drawer de detalle de flujo -->
+<div id="flujo-drawer" class="gta-flujo-drawer">
+    <div class="gta-flujo-drawer-header">
+        <div>
+            <div class="gta-flujo-drawer-eyebrow" id="flujo-drawer-codigo">Flujo</div>
+            <h3 id="flujo-drawer-titulo">Cargando...</h3>
+        </div>
+        <button class="btn-icon" onclick="Tablero.cerrarDrawer()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="gta-flujo-drawer-body" id="flujo-drawer-body">
+        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i></div>
+    </div>
+</div>
+<div id="flujo-drawer-overlay" class="gta-flujo-drawer-overlay" onclick="Tablero.cerrarDrawer()"></div>
+
+<!-- Modal: Nuevo flujo libre -->
+<div class="modal-backdrop" id="modal-nuevo-flujo">
+    <div class="modal-content" style="max-width:760px;">
+        <div class="modal-header">
+            <h2>Nuevo flujo</h2>
+            <button class="modal-close-btn" onclick="Tablero.cerrarNuevoFlujo()">×</button>
+        </div>
+        <div class="modal-body" id="modal-nuevo-flujo-body">
+            <div class="field">
+                <label>Título del flujo *</label>
+                <input type="text" id="nuevo-flujo-titulo" class="input-dark" placeholder="Ej: Cierre de venta cliente XYZ">
+            </div>
+            <div class="field" style="margin-top:12px;">
+                <label>Descripción</label>
+                <textarea id="nuevo-flujo-descripcion" class="input-dark" rows="2" placeholder="Contexto general del flujo..."></textarea>
+            </div>
+
+            <h4 class="gta-section-subtitle" style="margin-top:20px;">Tareas del flujo</h4>
+            <p class="gta-section-help">Agrega cada tarea con su área, SLA y dependencias. Las tareas sin dependencias arrancan en paralelo.</p>
+
+            <div id="nuevo-flujo-tareas" class="gta-flujo-tareas-edit"></div>
+            <button class="btn-secondary" onclick="Tablero.agregarTareaLibre()" style="margin-top:10px;">
+                <i class="fas fa-plus"></i> Agregar tarea
+            </button>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button class="btn-secondary" onclick="Tablero.cerrarNuevoFlujo()">Cancelar</button>
+            <button class="btn-primary" onclick="Tablero.crearFlujoLibre()">
+                <i class="fas fa-paper-plane"></i> Iniciar flujo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Pedir ayuda -->
+<div class="modal-backdrop" id="modal-pedir-ayuda">
+    <div class="modal-content" style="max-width:560px;">
+        <div class="modal-header">
+            <h2>Pedir ayuda</h2>
+            <button class="modal-close-btn" onclick="Tablero.cerrarModalAyuda()">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="ayuda-tarea-id">
+            <div class="field">
+                <label>Área a la que pides ayuda *</label>
+                <select id="ayuda-area" class="input-dark"></select>
+            </div>
+            <div class="field" style="margin-top:12px;">
+                <label>Mensaje *</label>
+                <textarea id="ayuda-mensaje" class="input-dark" rows="3" placeholder="¿Qué necesitas?"></textarea>
+            </div>
+            <div class="field" style="margin-top:12px;">
+                <label class="gta-checkbox-label">
+                    <input type="checkbox" id="ayuda-bloquea-sla">
+                    <span>Pausar SLA (la tarea es dependencia oficial del proceso)</span>
+                </label>
+                <p class="gta-section-help" style="margin-top:6px;">Marca esto solo si la otra área es responsable directa del paso. Si es solo orientación o consulta, déjalo desmarcado.</p>
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button class="btn-secondary" onclick="Tablero.cerrarModalAyuda()">Cancelar</button>
+            <button class="btn-primary" onclick="Tablero.enviarAyuda()">
+                <i class="fas fa-hands-helping"></i> Enviar
+            </button>
+        </div>
     </div>
 </div>
