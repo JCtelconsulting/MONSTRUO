@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-from gateway.backend.routers import admin_users, config_router, ops
+from gateway.backend.routers import admin_users, config_router, gta_areas, ops
 from plataforma.core import auth_service, db, deps, security
 from plataforma.core.config import settings as app_settings
 from plataforma.core.middleware import AuthIdentityMiddleware
@@ -260,6 +260,7 @@ class ChangePasswordIn(BaseModel):
 
 app.include_router(admin_users.router)
 app.include_router(config_router.router)
+app.include_router(gta_areas.router)
 app.include_router(ops.router)
 
 SERVICES_MAP = {

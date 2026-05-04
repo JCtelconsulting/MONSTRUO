@@ -2473,6 +2473,96 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_gta_v2", _migrate_gta_v2_section)
 
+        def _migrate_gta_areas_section() -> None:
+            # Áreas (12 áreas operativas + contabilidad externa)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.areas (
+                id           SERIAL PRIMARY KEY,
+                code         TEXT NOT NULL UNIQUE,
+                label        TEXT NOT NULL,
+                lider_username TEXT DEFAULT '',
+                lider_nombre   TEXT DEFAULT '',
+                es_externa     BOOLEAN NOT NULL DEFAULT FALSE,
+                activo         BOOLEAN NOT NULL DEFAULT TRUE,
+                orden          INTEGER NOT NULL DEFAULT 99,
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Subáreas: una subárea apunta a un área padre. Mismo líder por defecto.
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.subareas (
+                id              SERIAL PRIMARY KEY,
+                area_code       TEXT NOT NULL REFERENCES gta.areas(code) ON UPDATE CASCADE ON DELETE CASCADE,
+                code            TEXT NOT NULL,
+                label           TEXT NOT NULL,
+                lider_username  TEXT DEFAULT '',
+                lider_nombre    TEXT DEFAULT '',
+                activo          BOOLEAN NOT NULL DEFAULT TRUE,
+                orden           INTEGER NOT NULL DEFAULT 99,
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(area_code, code)
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_areas_activo    ON gta.areas(activo);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_subareas_area   ON gta.subareas(area_code);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_subareas_activo ON gta.subareas(activo);")
+
+            # Seed de las 12 áreas si la tabla está vacía
+            existing = conn.execute("SELECT COUNT(*) AS c FROM gta.areas").fetchone()
+            if int((existing or {}).get("c") or 0) == 0:
+                seed_areas = [
+                    ("comercial",         "Comercial",         "brayan.fuentes",   "Brayan Fuentes",   False, 10),
+                    ("preventa",          "Preventa",          "",                 "Elso",             False, 20),
+                    ("redes",             "Redes",             "fabian.correa",    "Fabián Correa",    False, 30),
+                    ("sistemas",          "Sistemas",          "lukas.moyano",     "Lukas Moyano",     False, 40),
+                    ("proveedores",       "Proveedores",       "",                 "Jonhson",          False, 50),
+                    ("finanzas",          "Finanzas",          "",                 "Tania",            False, 60),
+                    ("bodega",            "Bodega",            "",                 "",                 False, 70),
+                    ("capital_humano",    "Capital Humano",    "",                 "Cristian Peña",    False, 80),
+                    ("pmo",               "PMO",               "francisco.cea",    "Francisco Cea",    False, 90),
+                    ("prevencion_riesgos","Prevención de Riesgos", "",             "(externa)",        True,  100),
+                    ("contabilidad",      "Contabilidad",      "",                 "(externa)",        True,  110),
+                    ("ia",                "IA",                "",                 "",                 False, 120),
+                ]
+                for code, label, lider_user, lider_nombre, externa, orden in seed_areas:
+                    conn.execute(
+                        """INSERT INTO gta.areas
+                           (code, label, lider_username, lider_nombre, es_externa, activo, orden)
+                           VALUES (%s, %s, %s, %s, %s, TRUE, %s)
+                           ON CONFLICT (code) DO NOTHING""",
+                        (code, label, lider_user, lider_nombre, externa, orden),
+                    )
+
+                seed_subareas = [
+                    ("comercial",      "ventas",              "Ventas",                  10),
+                    ("comercial",      "postventa",           "Postventa",               20),
+                    ("redes",          "infraestructura",     "Infraestructura",         10),
+                    ("redes",          "acceso",              "Redes de Acceso",         20),
+                    ("redes",          "mesa_ayuda",          "Mesa de Ayuda",           30),
+                    ("redes",          "soporte",             "Soporte",                 40),
+                    ("redes",          "ciberseguridad",      "Ciberseguridad",          50),
+                    ("proveedores",    "compras",             "Compras",                 10),
+                    ("finanzas",       "facturacion",         "Facturación",             10),
+                    ("finanzas",       "cobranzas",           "Cobranzas",               20),
+                    ("capital_humano", "contratacion",        "Contratación",            10),
+                    ("capital_humano", "desvinculacion",      "Desvinculación",          20),
+                    ("pmo",            "proyectos",           "Gestión de Proyectos",    10),
+                    ("pmo",            "instalaciones",       "Instalaciones",           20),
+                    ("pmo",            "gestion_documental",  "Gestión Documental",      30),
+                ]
+                for area_code, code, label, orden in seed_subareas:
+                    conn.execute(
+                        """INSERT INTO gta.subareas
+                           (area_code, code, label, activo, orden)
+                           VALUES (%s, %s, %s, TRUE, %s)
+                           ON CONFLICT (area_code, code) DO NOTHING""",
+                        (area_code, code, label, orden),
+                    )
+
+        _run_guarded_pg_section(conn, "migrate_gta_areas", _migrate_gta_areas_section)
+
         def _migrate_sys_notifications_section() -> None:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS core.sys_notifications (
