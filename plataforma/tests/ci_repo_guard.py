@@ -26,8 +26,8 @@ def main() -> int:
     required_docs = [
         "README.md",
         "CLAUDE.md",
+        "AGENTS.md",
         "plataforma/docs/README.md",
-        "plataforma/docs/AGENTS.md",
         "plataforma/docs/PROYECTO_CONTEXTO.md",
         "plataforma/docs/GUIA_MAESTRA.md",
         "plataforma/docs/arquitectura/PROXY_INVERSO.md",
@@ -51,7 +51,7 @@ def main() -> int:
         "ARQUITECTURA.md",
         "CHANGELOG.md",
         "PLAN_DE_SANEAMIENTO.md",
-        "AGENTS.md",
+        "plataforma/docs/AGENTS.md",  # ahora vive en raíz, no debe duplicarse en docs
         "plataforma/docs/PLAN_MAESTRO_MONSTRUO.md",
         "plataforma/docs/DESIGN.md",
         "plataforma/docs/PROMPT_CHAT_UNIVERSAL.md",
@@ -92,7 +92,7 @@ def main() -> int:
     readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
     for ref in (
         "plataforma/docs/README.md",
-        "plataforma/docs/AGENTS.md",
+        "AGENTS.md",
         "plataforma/docs/PROYECTO_CONTEXTO.md",
         "plataforma/docs/GUIA_MAESTRA.md",
         "plataforma/docs/arquitectura/ARQUITECTURA.md",
@@ -101,7 +101,7 @@ def main() -> int:
         if ref not in readme_text:
             errors.append(f"README.md no referencia {ref}")
 
-    # Guardas contrato canónico DEV/PROD (plataforma/docs/AGENTS.md §4) en docker-compose.yaml.
+    # Guardas contrato canónico DEV/PROD (AGENTS.md §4) en docker-compose.yaml.
     compose_path = ROOT / "docker-compose.yaml"
     if not compose_path.exists():
         errors.append("Falta docker-compose.yaml en raíz")

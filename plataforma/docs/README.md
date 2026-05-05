@@ -4,7 +4,7 @@ Documentación viva del proyecto. Organizada por **función** para que sea fáci
 
 ## Documentos principales
 
-- [AGENTS.md](AGENTS.md) — reglas obligatorias para todo agente que toque este repo
+- [AGENTS.md](../../AGENTS.md) — reglas obligatorias para todo agente (raíz del repo, convención multi-agente)
 - [PROYECTO_CONTEXTO.md](PROYECTO_CONTEXTO.md) — estado actual, prioridad vigente, decisiones
 - [GUIA_MAESTRA.md](GUIA_MAESTRA.md) — guía oficial de construcción (visión, módulos, contratos)
 
@@ -58,7 +58,9 @@ La documentación viva del proyecto debe quedar en `plataforma/docs/`.
 
 La raíz del repo queda reservada para:
 
-- `README.md`
-- `CLAUDE.md` (puntero a `plataforma/docs/AGENTS.md`)
+- `README.md` — landing del repo
+- `AGENTS.md` — reglas operativas para agentes (convención multi-agente)
+- `CLAUDE.md` — puntero específico para Claude Code (carga `AGENTS.md`)
+- `.claude/` — configuración específica de Claude Code (subagentes, hooks)
 
-`AGENTS.md` vive en `plataforma/docs/` junto al resto de la documentación canónica. No se deben volver a dejar documentos operativos largos en la raíz.
+No se deben dejar otros documentos operativos largos en la raíz.

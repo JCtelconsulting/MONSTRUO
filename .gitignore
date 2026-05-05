@@ -78,5 +78,6 @@ pmo/data/
 zabbix/data/
 gateway/data/
 
-# Claude Code (per-user config)
-.claude/
+# Claude Code: ignorar solo config per-usuario; permitir agents/, settings.json, README.md
+.claude/settings.local.json
+.claude/.cache/

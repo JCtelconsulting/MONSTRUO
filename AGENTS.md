@@ -2,7 +2,7 @@
 
 Estas instrucciones aplican a cualquier agente ejecutado en este repositorio. Este es el único archivo de reglas operativas.
 
-Ubicación canónica: `plataforma/docs/AGENTS.md`. Claude Code entra vía `CLAUDE.md` en la raíz, que apunta a este archivo. Otros agentes (Codex, etc.) deben leerlo directo desde aquí.
+Ubicación canónica: `AGENTS.md` en la raíz del repo. Claude Code lo carga vía `CLAUDE.md` (puntero corto). Otros agentes (Codex, Cursor, Aider, Gemini) lo leen directo siguiendo la convención multi-agente.
 
 Responder corto y preciso en lenguaje natural.
 
@@ -16,12 +16,12 @@ Cuando haya conflicto, obedecer en este orden:
 
 1. `plataforma/docs/GUIA_MAESTRA.md`
 2. `plataforma/docs/PROYECTO_CONTEXTO.md`
-3. `plataforma/docs/AGENTS.md` (este archivo)
+3. `AGENTS.md` (este archivo, raíz del repo)
 4. Instrucción puntual del usuario (si no contradice 1-3)
 
 ## 2) Carga obligatoria
 
-- Todo agente debe cargar `plataforma/docs/AGENTS.md` al iniciar.
+- Todo agente debe cargar `AGENTS.md` (raíz) al iniciar.
 - Claude Code lo carga indirectamente vía `CLAUDE.md` en la raíz (puntero).
 - Si no puede leerlo, debe detenerse y reportar bloqueo antes de ejecutar cambios.
 - Frase de control recomendada al iniciar: `Reglas cargadas: AGENTS.md`.

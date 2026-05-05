@@ -8,7 +8,7 @@
 Documentos relacionados:
 
 - [PROYECTO_CONTEXTO.md](PROYECTO_CONTEXTO.md) — estado actual y prioridad vigente
-- [AGENTS.md](AGENTS.md) — reglas operativas para agentes
+- [AGENTS.md](../../AGENTS.md) — reglas operativas para agentes (raíz del repo)
 - [arquitectura/ARQUITECTURA.md](arquitectura/ARQUITECTURA.md) — flujo de red, componentes Docker, modelo de comunicación
 - [arquitectura/PROXY_INVERSO.md](arquitectura/PROXY_INVERSO.md) — detalle del proxy
 - [arquitectura/CONTRATO_APPS.md](arquitectura/CONTRATO_APPS.md) — contrato que toda app debe cumplir

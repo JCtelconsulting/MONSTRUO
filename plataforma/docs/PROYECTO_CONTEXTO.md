@@ -11,9 +11,11 @@
 
 - raíz del repo:
   - `README.md`
-  - `CLAUDE.md` (puntero a `plataforma/docs/AGENTS.md`)
+  - `AGENTS.md` (reglas operativas multi-agente — Codex, Cursor, Aider, Gemini)
+  - `CLAUDE.md` (puntero específico para Claude Code → `AGENTS.md`)
+  - `.claude/` (configuración específica de Claude Code: subagentes, hooks)
 - documentación viva:
-  - `plataforma/docs/` (incluye `AGENTS.md` canónico)
+  - `plataforma/docs/`
 - operación y despliegue:
   - `plataforma/ops/`
 - proxy versionado:

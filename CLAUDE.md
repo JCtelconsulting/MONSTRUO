@@ -1,6 +1,6 @@
 # CLAUDE.md - MONSTRUO DEV
 
-Reglas operativas canónicas: **[plataforma/docs/AGENTS.md](plataforma/docs/AGENTS.md)**.
+Reglas operativas canónicas: **[AGENTS.md](AGENTS.md)** (raíz del repo, válido para cualquier agente).
 
 Léelo primero. Lo de abajo es solo el resumen mínimo para arrancar.
 
@@ -41,5 +41,5 @@ Hacerlo **antes** del commit es mejor: detecta errores de sintaxis o imports rot
 
 1. `plataforma/docs/GUIA_MAESTRA.md`
 2. `plataforma/docs/PROYECTO_CONTEXTO.md`
-3. `plataforma/docs/AGENTS.md`
+3. `AGENTS.md` (raíz)
 4. Instrucción puntual del usuario

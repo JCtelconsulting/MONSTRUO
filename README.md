@@ -15,7 +15,7 @@ Repositorio de desarrollo de Monstruo para Telconsulting.
 ## Documentación principal
 
 - [Índice de docs](plataforma/docs/README.md)
-- [Reglas operativas (AGENTS)](plataforma/docs/AGENTS.md)
+- [Reglas operativas (AGENTS)](AGENTS.md)
 - [Proyecto Contexto](plataforma/docs/PROYECTO_CONTEXTO.md)
 - [Guía Maestra](plataforma/docs/GUIA_MAESTRA.md)
 - [Arquitectura](plataforma/docs/arquitectura/ARQUITECTURA.md)
@@ -28,5 +28,6 @@ Repositorio de desarrollo de Monstruo para Telconsulting.
 - `plataforma/`: base compartida, operación, docs y datos
 - `gta/`: app prioridad actual
 - `ticketera/`, `crm/`, `erp/`, `bodega/`, `fundacion/`, `gateway/`: apps en operación o mantención
-- `CLAUDE.md`: puntero para Claude Code → reglas en `plataforma/docs/AGENTS.md`
-- `plataforma/docs/AGENTS.md`: reglas operativas canónicas para todos los agentes
+- `AGENTS.md`: reglas operativas canónicas — convención multi-agente (Codex, Cursor, Aider, Gemini, etc.)
+- `CLAUDE.md`: puntero específico para Claude Code → carga `AGENTS.md`
+- `.claude/`: configuración específica de Claude Code (subagentes, hooks)

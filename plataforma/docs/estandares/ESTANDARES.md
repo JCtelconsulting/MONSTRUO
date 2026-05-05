@@ -120,8 +120,9 @@ Este documento consolida todas las normas, estándares y políticas del proyecto
 Cualquier nuevo proyecto debe tener al menos:
 
 - `plataforma/docs/PROYECTO_CONTEXTO.md` (bitácora y estado actual)
-- `plataforma/docs/AGENTS.md` (reglas operativas para agentes)
-- `CLAUDE.md` en la raíz (puntero para Claude Code)
+- `AGENTS.md` en la raíz (reglas operativas multi-agente — convención Codex/Cursor/Aider/Gemini)
+- `CLAUDE.md` en la raíz (puntero específico para Claude Code)
+- `.claude/` en la raíz (configuración específica de Claude Code: subagentes, hooks)
 
 ### Actualización de Estándares
 Cuando se necesite agregar nuevo término o política:
