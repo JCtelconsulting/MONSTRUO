@@ -396,6 +396,89 @@ window.initModal = initModal;
 window.showToast = showToast;
 
 
+// --- REPORTE DE ERRORES FRONTEND → DASHBOARD ---
+// Captura errores no manejados de JS (window.error y unhandledrejection)
+// y los manda al endpoint POST /api/ops/client-errors. Quedan en
+// core.audit_logs con action='frontend_error' y aparecen en el dashboard de Ops.
+//
+// Diseño:
+//   - Fire-and-forget: nunca bloquea al usuario (try/catch + keepalive).
+//   - Deduplicación local: el mismo error en menos de 60s no se repite.
+//   - Throttle: máximo 20 reportes por sesión para evitar inundar la DB.
+//   - Reportes manuales desde apps: window.reportError(msg, {severity, source, extra}).
+
+(function setupClientErrorReporter() {
+  const REPORT_URL = `${getApiBase()}/ops/client-errors`;
+  const DEDUP_WINDOW_MS = 60_000;
+  const MAX_REPORTS_PER_SESSION = 20;
+
+  const _seen = new Map();
+  let _reportCount = 0;
+
+  function _hashError(message, source) {
+    return `${message || ''}::${source || ''}`.slice(0, 200);
+  }
+
+  function _appLabel() {
+    return (document.body && document.body.dataset && document.body.dataset.currentModule) || 'unknown';
+  }
+
+  async function reportError(message, options) {
+    options = options || {};
+    if (_reportCount >= MAX_REPORTS_PER_SESSION) return;
+
+    const key = _hashError(message, options.source);
+    const now = Date.now();
+    const lastSeen = _seen.get(key);
+    if (lastSeen && now - lastSeen < DEDUP_WINDOW_MS) return;
+    _seen.set(key, now);
+    _reportCount++;
+
+    const payload = {
+      message: String(message || '').slice(0, 2000),
+      severity: options.severity || 'error',
+      source: String(options.source || '').slice(0, 500),
+      stack: String(options.stack || '').slice(0, 8000),
+      user_agent: navigator.userAgent || '',
+      url: window.location.href,
+      app: _appLabel(),
+    };
+    if (options.extra && typeof options.extra === 'object') {
+      payload.extra = options.extra;
+    }
+
+    try {
+      await fetch(REPORT_URL, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      });
+    } catch (e) {
+      // Silenciar: si no podemos reportar, no podemos hacer mucho más
+      // (NUNCA llamar a reportError dentro de este catch — loop infinito).
+    }
+  }
+
+  window.addEventListener('error', function (event) {
+    const msg = event.message || (event.error && event.error.message) || 'Unknown error';
+    const source = (event.filename || '') + ':' + (event.lineno || 0) + ':' + (event.colno || 0);
+    const stack = (event.error && event.error.stack) || '';
+    reportError(msg, { severity: 'error', source: source, stack: stack });
+  });
+
+  window.addEventListener('unhandledrejection', function (event) {
+    const reason = event.reason;
+    const msg = (reason && (reason.message || reason.toString())) || 'Unhandled promise rejection';
+    const stack = (reason && reason.stack) || '';
+    reportError(msg, { severity: 'error', source: 'unhandledrejection', stack: stack });
+  });
+
+  window.reportError = reportError;
+})();
+
+
 // --- ENV SWITCH (LEGACY REMOVED) ---
 // La lógica de "Modo: ?" y "Cambiar entorno" (boton verde) se eliminó
 // para favorecer el botón estándar del sidebar en el footer.

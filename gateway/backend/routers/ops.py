@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 
 from plataforma.core import db, deps, security
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ops", tags=["ops"])
 LEGACY_OPS_FALLBACK_URL = os.getenv("LEGACY_OPS_FALLBACK_URL", "").strip()
@@ -249,5 +254,123 @@ def get_dashboard_stats(
         if _should_use_legacy_fallback(stats):
             return _fetch_legacy_dashboard(sess) or stats
         return stats
+    finally:
+        conn.close()
+
+
+# ============================================================================
+# Reporte de errores frontend → dashboard
+# ============================================================================
+
+class ClientErrorReport(BaseModel):
+    """Payload que envía el JS del frontend cuando captura un error."""
+    message: str = Field(..., max_length=2000)
+    severity: str = Field("error", pattern=r"^(error|warning|info)$")
+    source: Optional[str] = Field("", max_length=500)        # archivo:linea
+    stack: Optional[str] = Field("", max_length=8000)        # stack trace
+    user_agent: Optional[str] = Field("", max_length=500)
+    url: Optional[str] = Field("", max_length=1000)          # URL donde ocurrió
+    app: Optional[str] = Field("", max_length=50)            # gateway, ticketera, gta...
+    extra: Optional[Dict[str, Any]] = None
+
+
+@router.post("/client-errors")
+async def report_client_error(
+    body: ClientErrorReport,
+    request: Request,
+):
+    """Recibe errores capturados en el frontend y los persiste en core.audit_logs.
+
+    Endpoint público: los errores tempranos pueden ocurrir antes del login,
+    y los datos guardados no son sensibles (mensaje + stack + URL pública).
+    El payload está limitado por max_length de cada campo en ClientErrorReport
+    para mitigar abuso.
+
+    El dashboard de Ops los muestra agrupados por hora en system_events.
+    Para listarlos: GET /api/ops/client-errors/recent (requiere admin.settings).
+    """
+    # actor: si hay cookie de sesión válida, lo extraemos; si no, "anonymous"
+    actor = "anonymous"
+    try:
+        auth_cookie = request.cookies.get("access_token") or ""
+        if auth_cookie:
+            payload = security.verify_token(auth_cookie)
+            if payload and payload.get("sub"):
+                actor = str(payload["sub"])
+    except Exception:
+        pass
+    ip = request.client.host if request.client else ""
+    now = datetime.now(timezone.utc).isoformat()
+
+    metadata = {
+        "source": body.source or "",
+        "stack": (body.stack or "")[:8000],
+        "user_agent": body.user_agent or request.headers.get("user-agent", "")[:500],
+        "url": body.url or "",
+        "app": body.app or "",
+    }
+    if body.extra:
+        metadata["extra"] = body.extra
+
+    conn = db.get_conn()
+    try:
+        conn.execute(
+            """INSERT INTO core.audit_logs
+               (timestamp, actor, action, target, ip_address, metadata_json, severity)
+               VALUES (?, ?, 'frontend_error', ?, ?, ?, ?)""",
+            (
+                now,
+                actor or "anonymous",
+                (body.message or "")[:200],
+                ip,
+                json.dumps(metadata, ensure_ascii=False),
+                body.severity,
+            ),
+        )
+        conn.commit()
+        logger.warning(
+            "[frontend_error] %s severity=%s actor=%s app=%s url=%s",
+            body.message[:120], body.severity, actor, body.app, body.url,
+        )
+    except Exception as e:
+        logger.error(f"No se pudo persistir frontend_error: {e}")
+        # No fallamos el endpoint para no perder más errores en cascada
+    finally:
+        conn.close()
+
+    return {"ok": True, "ts": now}
+
+
+@router.get("/client-errors/recent")
+async def list_recent_client_errors(
+    limit: int = 50,
+    _sess: Dict[str, Any] = Depends(deps.require_permission("admin.settings")),
+):
+    """Lista errores frontend recientes para el dashboard de Ops.
+
+    Solo admin.settings — incluye stacks y URLs internas.
+    El parámetro _sess solo está para activar el guard de permiso vía Depends.
+    """
+    limit = max(1, min(int(limit), 200))
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT id, timestamp, actor, target AS message, ip_address,
+                      metadata_json, severity
+               FROM core.audit_logs
+               WHERE action = 'frontend_error'
+               ORDER BY id DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        items: List[Dict[str, Any]] = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["metadata"] = json.loads(d.pop("metadata_json", "{}") or "{}")
+            except Exception:
+                d["metadata"] = {}
+            items.append(d)
+        return {"items": items, "total": len(items)}
     finally:
         conn.close()

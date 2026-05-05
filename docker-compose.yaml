@@ -50,6 +50,7 @@ services:
       - "${GATEWAY_PORT:-9001}:9001"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9001
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     volumes:
@@ -74,6 +75,7 @@ services:
       - "${TICKETERA_PORT:-9005}:9005"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9005
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     volumes:
@@ -98,6 +100,7 @@ services:
       - "${FUNDACION_PORT:-9006}:9006"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9006
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
@@ -119,6 +122,7 @@ services:
       - "${BODEGA_PORT:-9007}:9007"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9007
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
@@ -140,6 +144,7 @@ services:
       - "${CRM_PORT:-9008}:9008"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9008
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
@@ -161,6 +166,7 @@ services:
       - "${ERP_PORT:-9009}:9009"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9009
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
@@ -182,6 +188,7 @@ services:
       - "${PMO_PORT:-9010}:9010"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9010
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
@@ -203,6 +210,7 @@ services:
       - "${IA_PORT:-9011}:9011"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9011
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
@@ -224,6 +232,7 @@ services:
       - "${GTA_PORT:-9012}:9012"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9012
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
@@ -245,6 +254,7 @@ services:
       - "${ZABBIX_PORT:-9013}:9013"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9013
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:

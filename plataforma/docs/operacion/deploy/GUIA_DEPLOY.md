@@ -92,18 +92,23 @@ Estas variables se leen al hacer `docker compose build` y se pasan como `ARG` al
 
 ### Levantar el stack
 
+> **Cache-busting de assets**: el SHA del commit actual se inyecta como `ASSET_VERSION` en el container (visto por backend y frontend). Cuando deployas, todos los `?v=...` de los HTMLs se actualizan automáticamente — los navegadores descargan la nueva versión sin esfuerzo manual.
+
 ```bash
 # PROD
 cd /srv/monstruo
-APP_UID=$(id -u) APP_GID=$(id -g) \
+APP_UID=$(id -u) APP_GID=$(id -g) ASSET_VERSION=$(git rev-parse --short HEAD) \
   ENV_FILE=plataforma/ops/env/.env.server STACK_NAME=monstruo \
   docker compose --env-file plataforma/ops/env/.env.server up -d --build
 
 # DEV
 cd /srv/monstruo_dev
-APP_UID=$(id -u) APP_GID=$(id -g) docker compose up -d --build
+APP_UID=$(id -u) APP_GID=$(id -g) ASSET_VERSION=$(git rev-parse --short HEAD) \
+  docker compose up -d --build
 # (usa defaults: STACK_NAME=monstruo-dev, ENV_FILE=plataforma/ops/env/.env.server.dev)
 ```
+
+Si no se exporta `ASSET_VERSION`, el container usa el `mtime` del archivo `version.py` como fallback. Funciona pero es menos predecible. Recomendado: siempre pasar el SHA.
 
 ### Smoke test
 

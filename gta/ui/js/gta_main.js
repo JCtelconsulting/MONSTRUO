@@ -40,17 +40,20 @@ window.GtaCore = (() => {
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             container.innerHTML = await resp.text();
 
+            // Cache-busting compartido: inyectado por gateway al servir el HTML padre.
+            // Ver plataforma/core/version.py.
+            const v = window.ASSET_VERSION || 'dev';
             if (!_loadedResources.has(`css-${tabName}`)) {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = `${tabName}/${tabName}.css?v=6`;
+                link.href = `${tabName}/${tabName}.css?v=${v}`;
                 document.head.appendChild(link);
                 _loadedResources.add(`css-${tabName}`);
             }
 
             if (!_loadedResources.has(`js-${tabName}`)) {
                 const script = document.createElement('script');
-                script.src = `${tabName}/${tabName}.js?v=6`;
+                script.src = `${tabName}/${tabName}.js?v=${v}`;
                 document.body.appendChild(script);
                 _loadedResources.add(`js-${tabName}`);
                 await new Promise(r => { script.onload = r; script.onerror = r; });
