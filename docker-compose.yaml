@@ -40,6 +40,9 @@ services:
     build:
       context: .
       dockerfile: ./gateway/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-gateway
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -61,6 +64,9 @@ services:
     build:
       context: .
       dockerfile: ./ticketera/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-ticketera
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -82,6 +88,9 @@ services:
     build:
       context: .
       dockerfile: ./fundacion/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-fundacion
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -100,6 +109,9 @@ services:
     build:
       context: .
       dockerfile: ./bodega/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-bodega
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -118,6 +130,9 @@ services:
     build:
       context: .
       dockerfile: ./crm/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-crm
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -136,6 +151,9 @@ services:
     build:
       context: .
       dockerfile: ./erp/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-erp
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -154,6 +172,9 @@ services:
     build:
       context: .
       dockerfile: ./pmo/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-pmo
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -172,6 +193,9 @@ services:
     build:
       context: .
       dockerfile: ./ia/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-ia
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -190,6 +214,9 @@ services:
     build:
       context: .
       dockerfile: ./gta/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-gta
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -208,6 +235,9 @@ services:
     build:
       context: .
       dockerfile: ./zabbix/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-zabbix
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}

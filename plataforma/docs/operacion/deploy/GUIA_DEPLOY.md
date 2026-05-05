@@ -67,17 +67,34 @@ Claves obligatorias para PROD:
 - `COOKIE_DOMAIN=.telconsulting.cl`
 - `COOKIE_SECURE=1`
 
+### Permisos: alinear UID/GID con el host
+
+Los containers corren como `appuser` (no root). Por defecto `UID=1000`, `GID=1000`. Si en la VM el usuario que es dueño de los bind mounts (`./ticketera/data/...`, `./plataforma/data/...`) tiene un UID distinto, hay que parametrizar para evitar errores de permisos al escribir:
+
+```bash
+# Verificar UID del dueño de los archivos
+id $(stat -c '%U' /srv/monstruo_dev/ticketera/data 2>/dev/null || echo $USER)
+
+# Si UID != 1000, exportar antes de levantar:
+export APP_UID=$(id -u)
+export APP_GID=$(id -g)
+```
+
+Estas variables se leen al hacer `docker compose build` y se pasan como `ARG` al Dockerfile. Si no están seteadas, default es `1000`.
+
 ### Levantar el stack
 
 ```bash
 # PROD
 cd /srv/monstruo
-ENV_FILE=plataforma/ops/env/.env.server STACK_NAME=monstruo \
+APP_UID=$(id -u) APP_GID=$(id -g) \
+  ENV_FILE=plataforma/ops/env/.env.server STACK_NAME=monstruo \
   docker compose --env-file plataforma/ops/env/.env.server up -d --build
 
 # DEV
 cd /srv/monstruo_dev
-docker compose up -d --build           # usa defaults: STACK_NAME=monstruo-dev, ENV_FILE=plataforma/ops/env/.env.server.dev
+APP_UID=$(id -u) APP_GID=$(id -g) docker compose up -d --build
+# (usa defaults: STACK_NAME=monstruo-dev, ENV_FILE=plataforma/ops/env/.env.server.dev)
 ```
 
 ### Smoke test

@@ -19,8 +19,12 @@ COPY . /app/
 
 # El CMD se define en el docker-compose por cada servicio
 
-# Crear usuario no-root
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+# Crear usuario no-root (UID/GID parametrizable para coincidir con bind mounts del host)
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd -g ${APP_GID} appuser \
+    && useradd -m -u ${APP_UID} -g ${APP_GID} appuser \
+    && chown -R appuser:appuser /app
 USER appuser
 
 # Healthcheck
