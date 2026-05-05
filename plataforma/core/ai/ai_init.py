@@ -3,7 +3,7 @@
 Inicialización de tablas para Asistente Operaciones IA.
 Crea ai_event_queue y ai_recommendations.
 """
-from core import db
+from plataforma.core import db
 
 def init_ai_tables():
     """Crear tablas para sistema de asistente IA"""

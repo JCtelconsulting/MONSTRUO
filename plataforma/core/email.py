@@ -5,8 +5,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.utils import make_msgid
 from typing import Optional
-from core import db
-from core.config import settings
+from plataforma.core import db
+from plataforma.core.config import settings
 import logging
 from datetime import datetime
 

@@ -63,7 +63,7 @@ cp plataforma/docs/operacion/deploy/plantillas_env/env.server.dev.example plataf
 
 Claves obligatorias para PROD:
 
-- `SECRET_KEY` (largo y aleatorio, no compartir con DEV)
+- `SECRET_KEY` — largo y aleatorio, **no compartir con DEV**. Si queda vacío en PROD, el gateway aborta el arranque (`RuntimeError: SECRET_KEY inseguro en PROD`). Generar con `python3 -c "import secrets; print(secrets.token_urlsafe(64))"`.
 - `COOKIE_DOMAIN=.telconsulting.cl`
 - `COOKIE_SECURE=1`
 

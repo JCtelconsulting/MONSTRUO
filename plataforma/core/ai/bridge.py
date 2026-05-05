@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from core import db
+from plataforma.core import db
 
 def main() -> int:
     conn = db.get_conn()

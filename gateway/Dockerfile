@@ -17,4 +17,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app/
 
 # El CMD se define en el docker-compose por cada servicio
+
+# Crear usuario no-root
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -fsS http://localhost:9001/health || exit 1
+
 CMD ["uvicorn", "gateway.backend.main:app", "--host", "0.0.0.0", "--port", "9001"]

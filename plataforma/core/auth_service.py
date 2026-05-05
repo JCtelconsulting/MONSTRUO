@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any, List
-from core import db, security
-from core.config import settings
+from plataforma.core import db, security
+from plataforma.core.config import settings
 import unicodedata
 import json
 import re

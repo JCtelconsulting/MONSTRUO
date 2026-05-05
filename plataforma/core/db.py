@@ -39,7 +39,7 @@ except Exception:
 
 _pool: "object | None" = None  # ConnectionPool instance when available
 
-from core.env_loader import load_runtime_env
+from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 
@@ -2707,7 +2707,7 @@ def init_db() -> None:
 
         # Automated Migrations Engine
         try:
-            from core import migrations
+            from plataforma.core import migrations
             migrations.run_migrations()
         except Exception as e:
             logger.error("[DB] ERROR running automated migrations: %s", e)
