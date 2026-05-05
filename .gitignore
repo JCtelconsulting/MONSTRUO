@@ -15,8 +15,6 @@ venv.bak/
 .env.*
 !.env.example
 !plataforma/ops/env/.env.example
-code/.env
-plataforma/ops/guardian/config/entorno_guardian.env
 
 # IDEs
 .idea/
@@ -36,7 +34,6 @@ yarn-debug.log*
 yarn-error.log*
 plataforma/data/
 ticketera/data/
-plataforma/ops/guardian/*.sqlite*
 
 # Backups
 backups/
@@ -81,5 +78,5 @@ pmo/data/
 zabbix/data/
 gateway/data/
 
-# Guardian runtime reports
-plataforma/ops/guardian/reportes/*.json
+# Claude Code (per-user config)
+.claude/
