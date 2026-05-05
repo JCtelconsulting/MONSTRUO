@@ -1,0 +1,17 @@
+# Dependencias de desarrollo / testing
+# NO se instalan en los containers de producción.
+#
+# Instalación local (en una venv del host):
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r gateway/requirements.txt   # deps runtime de cualquier app
+#   pip install -r requirements-dev.txt       # deps de testing
+#
+# Ejecutar tests:
+#   pytest                          # todos
+#   pytest -m "not integration"     # solo unitarios (sin DB)
+#   pytest -m integration           # solo integración (requiere DB dev)
+
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1
