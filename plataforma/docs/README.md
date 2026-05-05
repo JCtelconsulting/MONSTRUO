@@ -52,7 +52,7 @@ Documentación viva del proyecto. Organizada por **función** para que sea fáci
 Cada app mantiene su propia documentación operativa en `app/docs/`:
 
 - [ticketera/docs/](../../ticketera/docs/) — en mantención post-PROD
-- [gta/docs/](../../gta/docs/) — **prioridad actual**
+- [gta/docs/](../../gta/docs/) — **prioridad actual** ([Arquitectura](../../gta/docs/ARQUITECTURA.md) · [API](../../gta/docs/API.md))
 - [crm/docs/](../../crm/docs/)
 - [erp/docs/](../../erp/docs/)
 - [bodega/docs/](../../bodega/docs/)
