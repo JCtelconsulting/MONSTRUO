@@ -1,11 +1,14 @@
-# Dependencias de desarrollo / testing
+# Dependencias de testing (pytest + extras).
 # NO se instalan en los containers de producción.
 #
 # Instalación local (en una venv del host):
 #   python3 -m venv .venv
 #   source .venv/bin/activate
-#   pip install -r gateway/requirements.txt   # deps runtime de cualquier app
-#   pip install -r requirements-dev.txt       # deps de testing
+#   pip install -r gateway/requirements.txt          # deps runtime de cualquier app
+#   pip install -r plataforma/tests/requirements.txt # deps de testing
+#
+# Configuración de pytest (testpaths, markers, asyncio_mode) vive en
+# pyproject.toml en la raíz del repo.
 #
 # Ejecutar tests:
 #   pytest                          # todos
