@@ -51,12 +51,6 @@ class TestQueryTickets:
         assert row["titulo"] == "Test integración"
         assert row["subestado"] == "recibido"
 
-    @pytest.mark.xfail(
-        reason="Bug conocido: _crud.py usa _now_dt y otras funciones privadas no "
-               "importadas por `from ._helpers import *`. Ver memory: "
-               "project_bug_ticketera_helpers.md",
-        strict=False,
-    )
     def test_listar_tickets_devuelve_estructura(self, db_conn):
         from ticketera.backend.services import service as tickets_service
         _insert_ticket_minimo(db_conn, titulo="Para listar")
