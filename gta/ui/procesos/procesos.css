@@ -1,9 +1,195 @@
-/* Procesos — estilos específicos (reusa muchas clases del tablero/documentos) */
+/* Procesos — estilos específicos del módulo */
 
 .gta-procs {
     display: flex;
     flex-direction: column;
     gap: 14px;
+}
+
+/* ── Listado agrupado por área / subárea ─────────────────────────────── */
+.gta-doc-area {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px 16px;
+    background: rgba(18, 26, 36, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.gta-doc-area-title {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--neon);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.gta-doc-area-title i { opacity: 0.8; }
+
+.gta-doc-subgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-doc-subgroup-title {
+    margin: 6px 0 2px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.gta-doc-subgroup-title i { opacity: 0.6; }
+
+.gta-doc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-doc-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(12, 18, 26, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gta-doc-row:hover {
+    border-color: rgba(0, 255, 65, 0.25);
+}
+
+.gta-doc-icon {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: rgba(0, 255, 65, 0.08);
+    border: 1px solid rgba(0, 255, 65, 0.18);
+    color: var(--neon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+}
+
+.gta-doc-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gta-doc-name {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gta-doc-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.74rem;
+    color: var(--text-soft);
+}
+.gta-doc-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+.gta-doc-meta i { opacity: 0.7; }
+
+/* Estado vacío y conteo de pills */
+.gta-empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--text-soft);
+    font-size: 0.88rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+
+.gta-pill-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 6px;
+    margin-left: 6px;
+    background: rgba(0, 255, 65, 0.12);
+    color: var(--neon);
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.gta-docs-counter {
+    color: var(--text-soft);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* Help / hints reutilizados en el drawer */
+.gta-section-help {
+    color: var(--text-soft);
+    font-size: 0.82rem;
+    margin: 6px 0;
+}
+.gta-section-help code {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 0.78rem;
+}
+
+/* Filas de pasos en edición (modal nuevo / editar) */
+.gta-flujo-tareas-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gta-tarea-edit-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    background: rgba(12, 18, 26, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+.gta-tarea-edit-num {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 255, 65, 0.1);
+    border-radius: 8px;
+    font-weight: 800;
+    color: var(--neon);
+    font-size: 0.78rem;
+}
+
+.gta-tarea-edit-fields {
+    flex: 1;
+    min-width: 0;
 }
 
 .gta-procs-header {
