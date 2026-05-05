@@ -10,10 +10,10 @@ Propósito del documento: guía oficial de construcción. Si una propuesta no ca
 
 Documentación operativa y técnica complementaria:
 
-- [Proxy Inverso](../arquitectura/PROXY_INVERSO.md)
-- [Arquitectura](../arquitectura/ARQUITECTURA.md)
-- [Changelog](../changelog/CHANGELOG.md)
-- [Archivo histórico](../archive/)
+- [Proxy Inverso](arquitectura/PROXY_INVERSO.md)
+- [Arquitectura](arquitectura/ARQUITECTURA.md)
+- [Changelog](changelog/)
+- [Archivo histórico](archive/)
 
 0) Cómo se usa este plan (modo “contrato” para humanos y para IA)
 
@@ -2253,7 +2253,7 @@ Nota: esta sección es histórica. El proxy actual ya no usa este modelo como re
 ## Estado actual del Proxy Inverso — 2026-04-13
 
 Referencia operativa:
-- local: [plataforma/docs/PROXY_INVERSO.md](/srv/monstruo_dev/plataforma/docs/PROXY_INVERSO.md)
+- local: [arquitectura/PROXY_INVERSO.md](arquitectura/PROXY_INVERSO.md)
 - VM proxy: `/etc/nginx/README_PROXY_ORDEN.md` en `192.168.60.6`
 
 Resumen corto:

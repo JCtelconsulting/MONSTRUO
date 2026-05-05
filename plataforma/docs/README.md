@@ -2,14 +2,11 @@
 
 Documentación viva del proyecto. Organizada por **función** para que sea fácil encontrar lo que se busca.
 
-## Reglas operativas
+## Documentos principales
 
 - [AGENTS.md](AGENTS.md) — reglas obligatorias para todo agente que toque este repo
-- [PROYECTO_CONTEXTO.md](PROYECTO_CONTEXTO.md) — estado actual, prioridad vigente y bitácora de hitos
-
-## Plan y estrategia
-
-- [plan/GUIA_MAESTRA.md](plan/GUIA_MAESTRA.md) — guía oficial de construcción (visión, módulos, contratos)
+- [PROYECTO_CONTEXTO.md](PROYECTO_CONTEXTO.md) — estado actual, prioridad vigente, decisiones
+- [GUIA_MAESTRA.md](GUIA_MAESTRA.md) — guía oficial de construcción (visión, módulos, contratos)
 
 ## Arquitectura
 
@@ -34,17 +31,13 @@ Documentación viva del proyecto. Organizada por **función** para que sea fáci
 - [recursos/apis/](recursos/apis/) — especificaciones OpenAPI de integraciones
 - [recursos/sql/](recursos/sql/) — scripts SQL de referencia
 
-## IA y modelo
-
-- [ia/](ia/) — políticas, prompts y configuración del módulo IA
-
 ## Demo y comercial
 
 - [demo/](demo/) — guion, escenarios y KPIs para demos comerciales
 
 ## Histórico
 
-- [changelog/CHANGELOG.md](changelog/CHANGELOG.md) — bitácora completa de cambios
+- [changelog/](changelog/) — bitácora del proyecto, partida por mes-año
 - [archive/](archive/) — documentos archivados (no operativos)
 
 ## Documentación específica por app

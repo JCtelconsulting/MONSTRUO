@@ -17,11 +17,11 @@ Repositorio de desarrollo de Monstruo para Telconsulting.
 - [Índice de docs](plataforma/docs/README.md)
 - [Reglas operativas (AGENTS)](plataforma/docs/AGENTS.md)
 - [Proyecto Contexto](plataforma/docs/PROYECTO_CONTEXTO.md)
-- [Guía Maestra](plataforma/docs/plan/GUIA_MAESTRA.md)
+- [Guía Maestra](plataforma/docs/GUIA_MAESTRA.md)
 - [Arquitectura](plataforma/docs/arquitectura/ARQUITECTURA.md)
 - [Proxy Inverso](plataforma/docs/arquitectura/PROXY_INVERSO.md)
 - [Design System](plataforma/docs/estandares/DESIGN_SYSTEM.md)
-- [Changelog](plataforma/docs/changelog/CHANGELOG.md)
+- [Changelog](plataforma/docs/changelog/)
 
 ## Estructura corta
 

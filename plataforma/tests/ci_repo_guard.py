@@ -29,11 +29,11 @@ def main() -> int:
         "plataforma/docs/README.md",
         "plataforma/docs/AGENTS.md",
         "plataforma/docs/PROYECTO_CONTEXTO.md",
-        "plataforma/docs/plan/GUIA_MAESTRA.md",
+        "plataforma/docs/GUIA_MAESTRA.md",
         "plataforma/docs/arquitectura/PROXY_INVERSO.md",
         "plataforma/docs/arquitectura/ARQUITECTURA.md",
         "plataforma/docs/arquitectura/CONTRATO_APPS.md",
-        "plataforma/docs/changelog/CHANGELOG.md",
+        "plataforma/docs/changelog/README.md",
     ]
     for rel in required_docs:
         expect_exists(rel, errors)
@@ -87,9 +87,9 @@ def main() -> int:
         "plataforma/docs/README.md",
         "plataforma/docs/AGENTS.md",
         "plataforma/docs/PROYECTO_CONTEXTO.md",
-        "plataforma/docs/plan/GUIA_MAESTRA.md",
+        "plataforma/docs/GUIA_MAESTRA.md",
         "plataforma/docs/arquitectura/ARQUITECTURA.md",
-        "plataforma/docs/changelog/CHANGELOG.md",
+        "plataforma/docs/changelog/",
     ):
         if ref not in readme_text:
             errors.append(f"README.md no referencia {ref}")

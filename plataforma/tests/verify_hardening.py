@@ -80,7 +80,6 @@ def repo_checks() -> List[str]:
         PROJECT_ROOT / "plataforma/ops/control/control_monstruo.sh",
         PROJECT_ROOT / "plataforma/ops/control/limpiar_ram.sh",
         PROJECT_ROOT / "plataforma/ops/guardian/scripts/install_hooks.sh",
-        PROJECT_ROOT / "plataforma/docs/estructura_repo.json",
         PROJECT_ROOT / "plataforma/tests/e2e_ticketera.py",
         PROJECT_ROOT / "plataforma/tests/e2e_api_full.py",
         PROJECT_ROOT / "plataforma/tests/.README.md",

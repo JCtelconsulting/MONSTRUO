@@ -23,7 +23,7 @@ psql -c "SELECT version();" 2>/dev/null || echo "DB no disponible aún"
 
 ## Orden de autoridad (resumen)
 
-1. `plataforma/docs/plan/GUIA_MAESTRA.md`
+1. `plataforma/docs/GUIA_MAESTRA.md`
 2. `plataforma/docs/PROYECTO_CONTEXTO.md`
 3. `plataforma/docs/AGENTS.md`
 4. Instrucción puntual del usuario

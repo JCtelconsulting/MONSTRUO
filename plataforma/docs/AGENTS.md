@@ -14,7 +14,7 @@ Evitar desorden, cruces DEV/PROD y pérdida de foco en la meta de negocio (EPIC 
 
 Cuando haya conflicto, obedecer en este orden:
 
-1. `plataforma/docs/plan/GUIA_MAESTRA.md`
+1. `plataforma/docs/GUIA_MAESTRA.md`
 2. `plataforma/docs/PROYECTO_CONTEXTO.md`
 3. `plataforma/docs/AGENTS.md` (este archivo)
 4. Instrucción puntual del usuario (si no contradice 1-3)
@@ -74,7 +74,7 @@ Apps en mantención (no se abre trabajo nuevo salvo bug crítico):
 
 ## 8) Registro Documental Obligatorio
 
-- Cambios de reglas/proceso: actualizar `plataforma/docs/plan/GUIA_MAESTRA.md`.
+- Cambios de reglas/proceso: actualizar `plataforma/docs/GUIA_MAESTRA.md`.
 - Hitos ejecutados: registrar en `plataforma/docs/PROYECTO_CONTEXTO.md`.
 - Cambios de UI/estilos: respetar `plataforma/docs/estandares/DESIGN_SYSTEM.md`.
 

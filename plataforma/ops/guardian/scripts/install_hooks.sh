@@ -33,7 +33,7 @@ if git diff --cached | python3 "$GUARDIAN_SCRIPT" --check-patch -; then
     exit 0
 else
     echo "[guardian] BLOQUEADO: Tu commit viola las reglas de estructura (EPIC 01)."
-    echo "   Consulta docs/estructura_repo.json o contacta al Arquitecto."
+    echo "   Revisa la regla violada o contacta al Arquitecto."
     exit 1
 fi
 EOF
