@@ -22,11 +22,11 @@ Validado por `plataforma/tests/ci_repo_guard.py`. Reglas no negociables:
 | `project` (compose) | `monstruo_dev` | `monstruo` |
 | `STACK_NAME` (containers) | `monstruo-dev` | `monstruo` |
 | `ENV_FILE` | `plataforma/ops/env/.env.server.dev` | `plataforma/ops/env/.env.server` |
-| Gateway publica | `${GATEWAY_PORT:-9001}` | `9001` (migración pendiente desde `9000`) |
-| Ticketera publica | `${TICKETERA_PORT:-9005}` | `9005` (migración pendiente) |
+| Gateway publica | `${GATEWAY_PORT:-9001}` | `9001` |
+| Ticketera publica | `${TICKETERA_PORT:-9005}` | `9005` |
 | Postgres | NUNCA publica `5432` al host | NUNCA publica `5432` al host |
 
-> **Nota PROD pendiente** (ver `PROYECTO_CONTEXTO.md`): la migración de PROD a puertos `9001/9005` y bind canónico de Postgres requiere ventana controlada con backup `pg_dump` previo + ajuste de `plataforma/ops/nginx/monstruo.conf` + actualizar `HEALTH_URL` en `.github/workflows/deploy.yml`.
+> **Estado PROD** (verificado 2026-05-05): el proxy ya enruta a `9001/9005/9006`. Confirmar caso por caso que las apps en `192.168.60.5` escuchen en esos puertos y que `HEALTH_URL` en `.github/workflows/deploy.yml` apunte a `9001` para PROD.
 
 Reglas duras:
 

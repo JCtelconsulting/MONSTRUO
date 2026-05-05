@@ -74,15 +74,15 @@ Variables canónicas por entorno:
 - DEV: `STACK_NAME=monstruo-dev`, `POSTGRES_DB=monstruo_dev`, `ENV_FILE=plataforma/ops/env/.env.server.dev`
 - PROD: `STACK_NAME=monstruo`, `POSTGRES_DB=monstruo`, `ENV_FILE=plataforma/ops/env/.env.server`
 
-Migración PROD pendiente (ventana controlada con backup `pg_dump` previo): mover datos Postgres al bind `/srv/monstruo/plataforma/data/postgres`, exponer gateway en `9001` y ticketera en `9005`, ajustar `plataforma/ops/nginx/monstruo.conf` para `9001`/`9005`, actualizar `HEALTH_URL` en `.github/workflows/deploy.yml` a `9001`.
+Estado PROD (verificado 2026-05-05 vía SSH a la VM proxy): el proxy `192.168.60.6` ya enruta a `192.168.60.5:9001` (gateway/login/config), `:9005` (ticketera api) y `:9006` (fundación api). La migración desde el modelo viejo `:9000` ya está consumada del lado proxy. Pendiente solo confirmar caso por caso que las apps en `192.168.60.5` escuchen efectivamente en esos puertos y que los binds de Postgres sigan canónicos.
 
 ## Últimos cambios
 
 Ver bitácora completa en [changelog/](changelog/).
 
+- **2026-05-05** — Auditoría docs vs realidad. Sincronización byte a byte de `plataforma/ops/nginx/` con la VM proxy (`monstruo.conf`/`terreneitor.conf` actualizados, `ultron.conf` agregado al repo). Borrado `plataforma/ops/guardian/` entero (sin uso real), borrados scripts Windows legacy y `pmo_v1.sql.txt`. `ARQUITECTURA.md` y `PROXY_INVERSO.md` reescritos con la realidad confirmada (PROD ya en `9001/9005/9006`, refactor `core/` ya hecho). `deploy/README.md` → `GUIA_DEPLOY.md`.
 - **2026-05-04** — Cierre completo de la deuda Jira en backend (Commit B post-reorg docs).
 - **2026-05-04** — Reorganización documental completa de `plataforma/docs/` por función + cambio de prioridad a GTA.
-- **2026-04-29** — `docker-compose.yaml` queda como contrato canónico único DEV/PROD parametrizado.
 
 ## Pendientes relevantes
 

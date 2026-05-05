@@ -49,12 +49,12 @@ Configuración activa en `/etc/nginx/sites-enabled/`:
 | `login.telconsulting.cl` | PROD `/` → login. DEV `/dev/` → base + auth/google + sesion + tks + fundacion |
 | `config.telconsulting.cl` | PROD `/` → config. DEV `/dev/` → base + tks |
 | `ia.telconsulting.cl` | DEV `/dev/` → ia-app, `/dev/oficina/` → ia-oficina |
-| `pmo.telconsulting.cl` | server_name declarado (verificar si tiene proxy_pass real o stub) |
-| `erp.telconsulting.cl` | idem |
-| `crm.telconsulting.cl` | idem |
-| `bodega.telconsulting.cl` | idem |
-| `zabbix.telconsulting.cl` | idem |
-| `monitoreo.telconsulting.cl` | idem |
+| `pmo.telconsulting.cl` | reservado para apps futuras (declarado en proxy, app aún no productiva) |
+| `erp.telconsulting.cl` | reservado para apps futuras |
+| `crm.telconsulting.cl` | reservado para apps futuras |
+| `bodega.telconsulting.cl` | reservado para apps futuras |
+| `zabbix.telconsulting.cl` | reservado para apps futuras |
+| `monitoreo.telconsulting.cl` | reservado para apps futuras |
 
 ### Terreneitor (`terreneitor.conf`)
 
@@ -83,7 +83,7 @@ En `/etc/nginx/sites-available/_disabled/` la VM conserva snapshots de migracion
 - `monstruo_migracion_20260413_201613/`
 - `terreneitor_migracion_20260413_203143/`
 
-Hay también un `ultron.conf.bak` suelto en `sites-available/` que sería bueno mover a `_disabled/` o eliminar.
+El directorio `sites-available/` está limpio: solo contiene los `.conf` activos y el subdirectorio `_disabled/`.
 
 ## Servicios de la VM
 
@@ -120,5 +120,4 @@ ssh root@192.168.60.6 "nginx -t && systemctl reload nginx"
 
 ## Pendientes conocidos
 
-- Mover `ultron.conf.bak` (suelto en `sites-available/` de la VM) a `_disabled/` o eliminarlo.
-- Confirmar si los dominios `pmo`, `erp`, `crm`, `bodega`, `zabbix`, `monitoreo` declarados en `monstruo.conf` tienen `proxy_pass` real o son stubs esperando backend.
+- Cuando las apps futuras (`pmo`, `erp`, `crm`, `bodega`, `zabbix`, `monitoreo`) entren en operación, completar sus bloques `proxy_pass` en `monstruo.conf` y actualizar este doc.
