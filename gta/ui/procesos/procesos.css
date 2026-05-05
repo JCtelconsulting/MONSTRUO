@@ -6,6 +6,11 @@
     gap: 14px;
 }
 
+/* Modal de detalle/edición de proceso — más ancho que el default 600px */
+.gta-proc-modal {
+    max-width: 880px !important;
+}
+
 /* ── Listado agrupado por área / subárea ─────────────────────────────── */
 .gta-doc-area {
     display: flex;

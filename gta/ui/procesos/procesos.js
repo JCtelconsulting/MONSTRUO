@@ -160,37 +160,69 @@ window.Procesos = (() => {
         `;
     }
 
-    // ── Drawer detalle ────────────────────────────────────────────────
+    // ── Modal detalle (vista + edición) ───────────────────────────────
+    let _modoEdit = false;
+    let _pasosEdit = [];
+
     async function abrir(procId) {
-        const drawer = document.getElementById('proc-drawer');
-        const overlay = document.getElementById('proc-drawer-overlay');
-        const body = document.getElementById('proc-drawer-body');
-        document.getElementById('proc-drawer-titulo').textContent = 'Cargando...';
-        document.getElementById('proc-drawer-eyebrow').textContent = `Proceso #${procId}`;
+        _modoEdit = false;
+        const modal = document.getElementById('modal-proceso');
+        const body = document.getElementById('proc-modal-body');
+        const footer = document.getElementById('proc-modal-footer');
+        document.getElementById('proc-modal-titulo').textContent = 'Cargando...';
+        document.getElementById('proc-modal-eyebrow').textContent = `Proceso #${procId}`;
         body.innerHTML = `<div class="gta-loading"><i class="fas fa-spinner fa-spin"></i></div>`;
-        drawer.classList.add('open');
-        overlay.classList.add('open');
+        footer.innerHTML = '';
+        modal.classList.add('is-open');
 
         try {
             const proc = await GtaApi.getProceso(procId);
             _procActivo = proc;
-            _renderDrawer(proc);
+            _renderModal(proc);
         } catch (e) {
             body.innerHTML = `<div class="gta-empty">Error al cargar el proceso.</div>`;
         }
     }
 
-    function cerrarDrawer() {
-        document.getElementById('proc-drawer')?.classList.remove('open');
-        document.getElementById('proc-drawer-overlay')?.classList.remove('open');
+    function cerrarModal() {
+        document.getElementById('modal-proceso')?.classList.remove('is-open');
         _procActivo = null;
+        _modoEdit = false;
+        _pasosEdit = [];
     }
 
-    function _renderDrawer(p) {
-        document.getElementById('proc-drawer-titulo').textContent = p.nombre || 'Proceso';
-        const breadcrumb = `${_areaLabel(p.area)}${p.subarea_code ? ' / ' + _subareaLabel(p.area, p.subarea_code) : ''} · v${p.version || 1}`;
-        document.getElementById('proc-drawer-eyebrow').textContent = breadcrumb;
+    function entrarModoEdicion() {
+        if (!_procActivo) return;
+        _modoEdit = true;
+        _pasosEdit = (_procActivo.pasos_definicion || []).map((p, i) => ({
+            orden: p.orden || (i + 1),
+            titulo: p.titulo || p.nombre || '',
+            area_code: p.area_code || p.area || '',
+            sla_horas: p.sla_horas || 24,
+            depende_de: p.depende_de || [],
+        }));
+        _renderModal(_procActivo);
+    }
 
+    function salirModoEdicion() {
+        _modoEdit = false;
+        _pasosEdit = [];
+        _renderModal(_procActivo);
+    }
+
+    function _renderModal(p) {
+        document.getElementById('proc-modal-titulo').textContent = p.nombre || 'Proceso';
+        const breadcrumb = `${_areaLabel(p.area)}${p.subarea_code ? ' / ' + _subareaLabel(p.area, p.subarea_code) : ''} · v${p.version || 1}`;
+        document.getElementById('proc-modal-eyebrow').textContent = breadcrumb;
+
+        if (_modoEdit) {
+            _renderModalEdit(p);
+        } else {
+            _renderModalView(p);
+        }
+    }
+
+    function _renderModalView(p) {
         const pasos = p.pasos_definicion || [];
         const flujos = p.flujos || [];
         const quiebres = p.quiebres || [];
@@ -265,7 +297,7 @@ window.Procesos = (() => {
             ? `<button class="btn-primary" onclick="Procesos.iniciarFlujo(${p.id})"><i class="fas fa-rocket"></i> Iniciar flujo</button>`
             : '';
 
-        const body = document.getElementById('proc-drawer-body');
+        const body = document.getElementById('proc-modal-body');
         body.innerHTML = `
             <div class="gta-flujo-summary">
                 <div><strong>${_esc(p.descripcion || 'Sin descripción')}</strong></div>
@@ -305,6 +337,150 @@ window.Procesos = (() => {
                 </button>
             </div>
         `;
+
+        const footer = document.getElementById('proc-modal-footer');
+        footer.innerHTML = `
+            <button class="btn-secondary" onclick="Procesos.cerrarModal()">Cerrar</button>
+            <button class="btn-primary" onclick="Procesos.entrarModoEdicion()">
+                <i class="fas fa-pen"></i> Editar
+            </button>
+        `;
+    }
+
+    function _renderModalEdit(p) {
+        const activas = _areas.filter(a => a.activo);
+        const subareasDelArea = (() => {
+            const a = _areas.find(x => x.code === (p._editArea ?? p.area));
+            return (a?.subareas || []).filter(s => s.activo);
+        })();
+
+        const body = document.getElementById('proc-modal-body');
+        body.innerHTML = `
+            <div class="field">
+                <label>Nombre del proceso *</label>
+                <input type="text" id="ed-nombre" class="input-dark" value="${_esc(p.nombre || '')}">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <div class="field" style="flex:1;">
+                    <label>Área *</label>
+                    <select id="ed-area" class="input-dark" onchange="Procesos._refreshSubareas()">
+                        ${activas.map(a => `<option value="${a.code}" ${p.area === a.code ? 'selected' : ''}>${_esc(a.label)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="field" style="flex:1;">
+                    <label>Subárea (opcional)</label>
+                    <select id="ed-subarea" class="input-dark">
+                        <option value="">— Sin subárea —</option>
+                        ${subareasDelArea.map(s => `<option value="${s.code}" ${p.subarea_code === s.code ? 'selected' : ''}>${_esc(s.label)}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Descripción breve</label>
+                <textarea id="ed-desc" class="input-dark" rows="2">${_esc(p.descripcion || '')}</textarea>
+            </div>
+
+            <h4 class="gta-section-subtitle" style="margin-top:18px;">Pasos del proceso</h4>
+            <p class="gta-section-help">Cada paso necesita título y área. Las dependencias usan el número de orden (ej: <code>1,2</code>).</p>
+            <div id="ed-pasos" class="gta-flujo-tareas-edit"></div>
+            <button class="btn-secondary" onclick="Procesos._agregarPasoEdit()" style="margin-top:8px;">
+                <i class="fas fa-plus"></i> Agregar paso
+            </button>
+        `;
+        _renderPasosEdit();
+
+        const footer = document.getElementById('proc-modal-footer');
+        footer.innerHTML = `
+            <button class="btn-secondary" onclick="Procesos.salirModoEdicion()">Cancelar</button>
+            <button class="btn-primary" onclick="Procesos.guardarEdicion()">
+                <i class="fas fa-save"></i> Guardar cambios
+            </button>
+        `;
+    }
+
+    function _refreshSubareas() {
+        const areaCode = document.getElementById('ed-area')?.value || '';
+        const a = _areas.find(x => x.code === areaCode);
+        const subs = (a?.subareas || []).filter(s => s.activo);
+        const subSel = document.getElementById('ed-subarea');
+        if (!subSel) return;
+        subSel.innerHTML = '<option value="">— Sin subárea —</option>' +
+            subs.map(s => `<option value="${s.code}">${_esc(s.label)}</option>`).join('');
+    }
+
+    function _renderPasosEdit() {
+        const cont = document.getElementById('ed-pasos');
+        if (!cont) return;
+        const activas = _areas.filter(a => a.activo);
+        cont.innerHTML = _pasosEdit.map((t, idx) => `
+            <div class="gta-tarea-edit-row">
+                <div class="gta-tarea-edit-num">#${t.orden}</div>
+                <div class="gta-tarea-edit-fields">
+                    <input type="text" class="input-dark" placeholder="Título del paso"
+                           value="${_esc(t.titulo)}" oninput="Procesos._setPasoEdit(${idx}, 'titulo', this.value)">
+                    <div style="display:flex; gap:8px; margin-top:6px;">
+                        <select class="input-dark" style="flex:1;" onchange="Procesos._setPasoEdit(${idx}, 'area_code', this.value)">
+                            <option value="">— Área —</option>
+                            ${activas.map(a => `<option value="${a.code}" ${t.area_code === a.code ? 'selected' : ''}>${_esc(a.label)}</option>`).join('')}
+                        </select>
+                        <input type="number" class="input-dark" min="1" max="999" style="width:90px;"
+                               value="${t.sla_horas}" placeholder="SLA h"
+                               oninput="Procesos._setPasoEdit(${idx}, 'sla_horas', parseInt(this.value, 10) || 24)">
+                        <input type="text" class="input-dark" placeholder="Depende de"
+                               value="${(t.depende_de || []).join(',')}" style="width:120px;"
+                               oninput="Procesos._setDepsEdit(${idx}, this.value)">
+                    </div>
+                </div>
+                <button class="btn-sm btn-danger" onclick="Procesos._quitarPasoEdit(${idx})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function _agregarPasoEdit() {
+        _pasosEdit.push({
+            orden: _pasosEdit.length + 1,
+            titulo: '', area_code: '', sla_horas: 24, depende_de: [],
+        });
+        _renderPasosEdit();
+    }
+
+    function _setPasoEdit(idx, k, v) {
+        if (_pasosEdit[idx]) _pasosEdit[idx][k] = v;
+    }
+    function _setDepsEdit(idx, raw) {
+        if (!_pasosEdit[idx]) return;
+        _pasosEdit[idx].depende_de = (raw || '').split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
+    }
+    function _quitarPasoEdit(idx) {
+        _pasosEdit.splice(idx, 1);
+        _pasosEdit.forEach((p, i) => p.orden = i + 1);
+        _renderPasosEdit();
+    }
+
+    async function guardarEdicion() {
+        if (!_procActivo) return;
+        const nombre = document.getElementById('ed-nombre').value.trim();
+        const area = document.getElementById('ed-area').value;
+        const desc = document.getElementById('ed-desc').value.trim();
+        if (!nombre || !area) {
+            alert('Nombre y área son obligatorios');
+            return;
+        }
+        const pasos = _pasosEdit.filter(p => p.titulo && p.area_code);
+        try {
+            await GtaApi.actualizarProceso(_procActivo.id, {
+                nombre, area, descripcion: desc,
+                pasos_definicion: JSON.stringify(pasos),
+            });
+            _modoEdit = false;
+            _pasosEdit = [];
+            await abrir(_procActivo.id);
+            await cargar();
+        } catch (e) {
+            alert('Error: ' + (e.message || e));
+        }
     }
 
     async function agregarNota() {
@@ -367,7 +543,7 @@ window.Procesos = (() => {
                 proceso_id: procId,
                 titulo: titulo.trim(),
             });
-            cerrarDrawer();
+            cerrarModal();
             await window.GtaCore.loadTab('tablero');
             setTimeout(() => {
                 if (window.Tablero?.abrirFlujo) window.Tablero.abrirFlujo(flujo.id);
@@ -383,7 +559,9 @@ window.Procesos = (() => {
 
     return {
         init, cargar, filtrarArea,
-        abrir, cerrarDrawer,
+        abrir, cerrarModal,
+        entrarModoEdicion, salirModoEdicion, guardarEdicion,
+        _refreshSubareas, _agregarPasoEdit, _setPasoEdit, _setDepsEdit, _quitarPasoEdit,
         abrirQuiebre, cerrarQuiebre, guardarQuiebre,
         iniciarFlujo, agregarNota,
     };
