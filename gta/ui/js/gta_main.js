@@ -36,13 +36,13 @@ window.GtaCore = (() => {
         container.innerHTML = `<div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>`;
 
         try {
-            const resp = await fetch(`${tabName}/${tabName}.html`);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            container.innerHTML = await resp.text();
-
             // Cache-busting compartido: inyectado por gateway al servir el HTML padre.
             // Ver plataforma/core/version.py.
             const v = window.ASSET_VERSION || 'dev';
+            const resp = await fetch(`${tabName}/${tabName}.html?v=${v}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            container.innerHTML = await resp.text();
+
             if (!_loadedResources.has(`css-${tabName}`)) {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';

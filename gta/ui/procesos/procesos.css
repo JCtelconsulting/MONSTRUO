@@ -194,17 +194,10 @@
 
 .gta-procs-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    justify-content: flex-end;
+    align-items: center;
     gap: 16px;
     flex-wrap: wrap;
-}
-
-.gta-procs-intro {
-    margin: 0;
-    color: var(--text-soft);
-    font-size: 0.88rem;
-    max-width: 560px;
 }
 
 .gta-procs-content {

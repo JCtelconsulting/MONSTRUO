@@ -2,7 +2,6 @@
 window.Procesos = (() => {
     let _procesos = [];
     let _areas = [];
-    let _busqueda = '';
     let _areaFiltro = '';
     let _procActivo = null;
 
@@ -52,11 +51,6 @@ window.Procesos = (() => {
         }
     }
 
-    function filtrar(texto) {
-        _busqueda = (texto || '').trim();
-        _render();
-    }
-
     function filtrarArea(btn) {
         document.querySelectorAll('#procs-area-pills .gta-area-pill').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -65,15 +59,7 @@ window.Procesos = (() => {
     }
 
     function _filtered() {
-        const q = _busqueda.toLowerCase();
-        return _procesos.filter(p => {
-            if (_areaFiltro && p.area !== _areaFiltro) return false;
-            if (q) {
-                const t = `${p.nombre} ${p.descripcion || ''}`.toLowerCase();
-                if (!t.includes(q)) return false;
-            }
-            return true;
-        });
+        return _procesos.filter(p => !_areaFiltro || p.area === _areaFiltro);
     }
 
     function _subareaLabel(areaCode, subCode) {
@@ -396,7 +382,7 @@ window.Procesos = (() => {
     }
 
     return {
-        init, cargar, filtrar, filtrarArea,
+        init, cargar, filtrarArea,
         abrir, cerrarDrawer,
         abrirQuiebre, cerrarQuiebre, guardarQuiebre,
         iniciarFlujo, agregarNota,
