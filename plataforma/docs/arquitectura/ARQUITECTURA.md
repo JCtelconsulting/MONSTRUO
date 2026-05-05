@@ -1,148 +1,100 @@
-# Arquitectura del Sistema Monstruo (AS-IS)
+# Arquitectura del Sistema Monstruo
 
-Este documento describe la arquitectura actual del sistema, incluyendo el flujo de red, los componentes de software y un diagnóstico de los problemas de acoplamiento existentes.
+> **Última revisión**: 2026-05-05.
+> Documentos relacionados: [PROXY_INVERSO.md](PROXY_INVERSO.md) (detalle del proxy), [CONTRATO_APPS.md](CONTRATO_APPS.md) (contrato que toda app debe cumplir), [FLUJO_REQUEST.md](FLUJO_REQUEST.md) (anatomía de un request).
 
-Referencia operativa del proxy actual:
-- [plataforma/docs/PROXY_INVERSO.md](/srv/monstruo_dev/plataforma/docs/PROXY_INVERSO.md)
+## 1. Flujo de red
 
-## 1. Flujo de Red (Estado actual)
-
-El flujo de una petición HTTP desde un usuario hasta un servicio de la aplicación sigue estos pasos:
-
-```mermaid
-graph TD
-    A[Usuario] --> B{Internet};
-    B --> C[VM Proxy: 192.168.60.6];
-    C --> D[Backend Monstruo PROD: 192.168.60.5:9000];
-    C --> E[Backend Terreneitor PROD: 192.168.60.5:8080];
-    C --> F[Backend Terreneitor DEV: 192.168.60.5:8081];
-    C --> G[Backend Monstruo DEV base: 192.168.60.8:9001];
-    C --> H[Backend Ticketera API DEV: 192.168.60.8:9005];
-    C --> I[Backend IA DEV: 192.168.20.228:18789];
-    C --> J[Backend IA Oficina DEV: 192.168.20.228:8000];
-
-    subgraph "VM Proxy (.60.6)"
-        C(Nginx Proxy Inverso)
-    end
+```
+Usuario
+  │
+  ▼
+Internet
+  │
+  ▼
+VM Proxy (192.168.60.6 - PROXYSSL, Nginx 1.22.1 + TLS Let's Encrypt)
+  │
+  ├──→ VM apps PROD (192.168.60.5)  : 9001 (gateway/login/config), 9005 (ticketera api), 9006 (fundación api)
+  ├──→ VM apps DEV  (192.168.60.8)  : 9001, 9005, 9006
+  ├──→ VM IA        (192.168.20.228): 18789 (ia-app), 8000 (ia-oficina), 5173 (ultron front)
+  └──→ Terreneitor  (192.168.60.5)  : 8080 (PROD), 8081 (DEV)
 ```
 
-**Descripción del Flujo actual:**
+El proxy enruta por dominio:
 
-1. **Usuario:** Inicia una petición a un dominio como `ticketera.telconsulting.cl`.
-2. **VM Proxy (`.60.6`):** Nginx recibe la petición pública y la enruta según familia de aplicación:
-   - `monstruo.conf`
-   - `terreneitor.conf`
-   - `sapa.conf`
-3. **PROD:** Usa `/` sin prefijo visible.
-4. **DEV:** Usa `/dev/` como prefijo público obligatorio.
-5. **Backends reales:** La VM proxy ya no debe asumirse como un simple passthrough a `:80`. Hoy enruta directamente a puertos concretos según servicio.
+- `*.telconsulting.cl` → según familia, ver [PROXY_INVERSO.md](PROXY_INVERSO.md) para tabla completa.
+- PROD usa `/`, DEV usa `/dev/`.
 
-### Backends actuales publicados por el proxy
+## 2. Componentes Docker (por VM)
 
-**Monstruo PROD**
-- `ticketera.telconsulting.cl` -> `192.168.60.5:9000`
-- `login.telconsulting.cl` -> `192.168.60.5:9000`
-- `config.telconsulting.cl` -> `192.168.60.5:9000`
+Stack orquestado por `docker-compose.yaml` en raíz del repo. Contrato canónico DEV/PROD parametrizado por `STACK_NAME`, `ENV_FILE`, `POSTGRES_DB`, `GATEWAY_PORT`, `TICKETERA_PORT`. Validado por `plataforma/tests/ci_repo_guard.py`.
 
-**Monstruo DEV**
-- `base-dev` -> `192.168.60.8:9001`
-- `ticketera-api-dev` -> `192.168.60.8:9005`
-- `ia-dev` -> `192.168.20.228:18789`
-- `ia-oficina-dev` -> `192.168.20.228:8000`
+| Servicio | Puerto interno | Imagen | Función |
+|---|---|---|---|
+| `db` | `5432` (NUNCA al host) | `postgres:16` | Base de datos central, schemas por app (`auth`, `ops`, `tks`, `gta`, `crm`, `erp`, `bodega`, `fundacion`, `pmo`) |
+| `gateway` | `9001` | `monstruo-gateway` | Punto de entrada, auth, RBAC, proxy a apps internas |
+| `ticketera` | `9005` | `monstruo-ticketera` | API y UI de tickets |
+| `gta` | `9012` | `monstruo-gta` | Gestión de Tareas Automatizadas (prioridad actual) |
+| `crm` | `9007` | `monstruo-crm` | CRM clientes |
+| `erp` | `9008` | `monstruo-erp` | Facturación + conciliación bancaria |
+| `bodega` | `9009` | `monstruo-bodega` | Inventario |
+| `fundacion` | `9006` | `monstruo-fundacion` | Módulo Fundación |
+| `pmo` | `9010` | `monstruo-pmo` | Gestión de proyectos |
+| `ia` | `9011` | `monstruo-ia` | Servicios IA |
+| `zabbix` | `9013` | `monstruo-zabbix` | Integración Zabbix |
 
-**Terreneitor**
-- PROD -> `192.168.60.5:8080`
-- DEV -> `192.168.60.5:8081`
+> Verificar puertos exactos en `docker-compose.yaml`. Algunos como `pmo`, `zabbix` pueden no estar productivos aún.
 
-## 2. Componentes Internos (Contenedores Docker)
+## 3. Modelo de aplicaciones
 
-El entorno de desarrollo (`monstruo-dev`) se compone de los siguientes servicios principales, orquestados por `docker-compose.yaml`:
+Cada app es **autocontenida** y sigue el mismo contrato (ver [CONTRATO_APPS.md](CONTRATO_APPS.md)):
 
-*   `monstruo-dev-db` (Imagen: `postgres:16`)
-    *   **Función:** Base de datos central para todas las aplicaciones.
-*   `monstruo-dev-gateway` (Imagen: `monstruo_dev-gateway`)
-    *   **Función:** Punto de entrada único, gestiona la autenticación de usuarios y redirige las peticiones a los servicios internos. Expone el puerto `9001`.
-*   `monstruo-dev-ticketera` (Imagen: `monstruo_dev-ticketera`)
-    *   **Función:** Aplicación principal para la gestión de tickets. Contiene toda la lógica de negocio relacionada.
-*   **(Otros servicios):** El `docker-compose` está incompleto, pero existen otros servicios como `erp`, `crm`, `bodega`, etc., que siguen un patrón similar.
+```
+<app>/
+├── backend/
+│   ├── main.py                # FastAPI app
+│   ├── router.py              # Endpoints /api/<app>/*
+│   ├── services/              # Lógica de negocio (propia, no compartida)
+│   └── jobs/                  # Workers/jobs específicos
+├── ui/                        # HTML + JS + CSS (servido por gateway)
+├── migrations/                # SQL versionado (cuando aplica)
+├── docs/                      # Documentación de la app
+├── tests/
+├── data/                      # Runtime data (no a git)
+├── Dockerfile
+├── README.md
+└── requirements.txt
+```
 
-## 3. Diagnóstico de Acoplamiento y Deuda Técnica
+## 4. Plataforma compartida (`plataforma/core/`)
 
-El principal problema que impide la separación real de las aplicaciones es la **duplicación de la lógica de negocio en una librería compartida.**
+Solo lógica genuinamente transversal. **Lo específico de una app vive en la app**, no acá. Contenido actual:
 
-*   **El Problema:** El directorio `plataforma/core/` contiene archivos de lógica de negocio que son específicos de un único servicio. Por ejemplo:
-    *   `plataforma/core/tickets_service.py`
-    *   `plataforma/core/bodega_service.py`
-    *   `plataforma/core/crm_service.py`
-*   **La Duplicación:** Al mismo tiempo, existen copias (en la mayoría de los casos, idénticas) de estos archivos dentro de sus respectivas aplicaciones. Por ejemplo, `ticketera/service.py`.
-*   **El Riesgo:**
-    1.  **Mantenimiento Doble:** Un cambio en `ticketera/service.py` debe replicarse manualmente en `plataforma/core/tickets_service.py`, lo cual es propenso a errores y olvidos.
-    2.  **Acoplamiento Fuerte:** Aunque no se detectaron importaciones directas *entre* servicios, el hecho de que toda la lógica de negocio esté disponible en una librería compartida (`core`) hace trivial que un desarrollador importe `from core import crm_service` dentro de la `ticketera`, rompiendo el aislamiento de microservicios y creando dependencias ocultas.
-    3.  **Falta de Claridad:** No queda claro cuál es la "fuente de la verdad" para la lógica de un servicio, si el archivo local o el archivo en `core`.
+- `db.py` — conexión, schemas, migraciones DDL
+- `security.py` — hashing, tokens
+- `middleware.py` — middlewares HTTP comunes
+- `auth_service.py` — autenticación
+- `config.py` — settings globales
+- `deps.py` — dependencies de FastAPI (sesiones, permisos)
+- `email.py` + `email_integration.py` — envío y polling de correo
+- `google_chat.py` — notificaciones Google Chat
+- `notifications.py` — sistema de notificaciones in-app
+- `jobs_engine.py` — motor de jobs persistente con retry/DLQ
+- `audit.py` + `audit_decorator.py` — auditoría con decorador
+- `migrations.py` — runner de migraciones
+- `env_loader.py` — carga de `.env.server.dev`/`.env.server`
+- `web.py` — utilidades web compartidas
+- `ai/` — bridge a IA local (OpenAI-compat) + políticas y prompts
 
-**Conclusión:** Para lograr una arquitectura de microservicios limpia y escalable, es imperativo eliminar esta duplicación y asegurar que la lógica de cada servicio resida únicamente dentro de su propio dominio (su directorio de aplicación).
+> **Histórico**: hasta principios de 2026 hubo `tickets_service.py`, `bodega_service.py`, `crm_service.py` duplicados aquí y en cada app, lo que generaba acoplamiento. Esa refactorización ya se completó: la lógica vive solo en cada app.
 
----
+## 5. Comunicación entre apps
 
-# Fase 2: Arquitectura Futura (TO-BE)
+Por API HTTP a través del gateway. **No hay imports cruzados** entre apps (`from ticketera import ...` desde otra app está prohibido). El gateway es el único que conoce todos los servicios y enruta entre ellos.
 
-Esta sección describe la arquitectura ideal propuesta y el plan para alcanzarla.
+Para flujo detallado de un request, ver [FLUJO_REQUEST.md](FLUJO_REQUEST.md).
 
-## 1. Diseño de VM Ideal (Desarrollo y Producción)
+## 6. Pendientes de evolución
 
-El objetivo es tener dos entornos idénticos y aislados en Proxmox, cada uno con una configuración simple y robusta.
-
-*   **Proxy Inverso Único por VM:** Objetivo futuro: que cada entorno tenga su propio proxy local y eliminar dependencia operativa del proxy compartido en `.60.6`.
-*   **Contenedores de Aplicación Aislados:** Las aplicaciones (`gateway`, `ticketera`, `db`, etc.) correrán en contenedores Docker, con su código fuente refactorizado para eliminar dependencias a nivel de ficheros.
-*   **Comunicación Exclusiva por API:** La comunicación entre servicios se realizará únicamente a través de llamadas HTTP, orquestadas por el `gateway`.
-
-## 2. Plan de Refactorización de Código
-
-El núcleo de la separación de servicios se logra con la siguiente refactorización:
-
-1.  **Mover Lógica de Negocio:** Para cada servicio (`ticketera`, `bodega`, etc.), la lógica de negocio será movida desde `plataforma/core/` a la carpeta raíz del servicio. Por ejemplo, el contenido de `plataforma/core/tickets_service.py` se moverá a `ticketera/service.py` (verificando que sean idénticos antes de eliminar el de `core`).
-2.  **Corregir Importaciones:** Dentro del código de cada aplicación, se ajustarán las importaciones para que apunten a su `service.py` local (ej: `import service as tickets_service`) en lugar de a la librería compartida (`from core import ...`).
-3.  **Limpieza de `core`:** Se eliminarán los archivos de servicio duplicados de `plataforma/core/`, dejando únicamente el código verdaderamente transversal (`db.py`, `security.py`, `middleware.py`, etc.).
-
-## 3. Configuración Nginx Simplificada (Plantillas)
-
-Se crearán plantillas de configuración de Nginx para cada entorno, siguiendo los requisitos de ruteo.
-
-*   **VM de Producción (Ruteo por Subdominio):**
-    ```nginx
-    # /etc/nginx/sites-available/produccion.conf
-    server {
-        listen 443 ssl;
-        server_name ticketera.telconsulting.cl;
-
-        # ... config SSL ...
-
-        location / {
-            proxy_pass http://ticketera_container:9005; # Puerto del servicio de ticketera
-            # ... headers de proxy ...
-        }
-    }
-
-    server {
-        listen 443 ssl;
-        server_name erp.telconsulting.cl;
-        # ... otro servicio ...
-    }
-    ```
-
-*   **VM de Desarrollo (Ruteo por Prefijo `/dev/`):
-    ```nginx
-    # /etc/nginx/sites-available/desarrollo.conf
-    server {
-        listen 443 ssl;
-        server_name dev.telconsulting.cl; # Un dominio genérico para desarrollo
-
-        # ... config SSL ...
-
-        location /dev/ {
-            proxy_pass http://gateway_dev_container:9001; # Apunta siempre al gateway de desarrollo
-            proxy_set_header X-Forwarded-Prefix /dev;
-            # ... otros headers de proxy ...
-        }
-    }
-    ```
+- **Proxy local por VM**: hoy ambos entornos dependen del proxy compartido en `192.168.60.6`. Una evolución posible es que cada VM apps tenga su propio Nginx local que termine TLS, eliminando esa dependencia. No hay plan concreto en curso.
+- **Algunos dominios declarados sin backend**: `pmo`, `erp`, `crm`, `bodega`, `zabbix`, `monitoreo` aparecen como `server_name` en `monstruo.conf` pero hay que confirmar caso por caso si el `proxy_pass` apunta a backend real o es stub esperando despliegue.
