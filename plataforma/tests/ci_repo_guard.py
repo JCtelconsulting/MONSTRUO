@@ -70,13 +70,20 @@ def main() -> int:
     for rel in legacy_structure_paths:
         expect_missing(rel, errors)
 
+    # Contrato canónico: cada app tiene README.md + Dockerfile en raíz y
+    # backend/main.py + backend/router.py adentro. Gateway es la excepción
+    # porque tiene routers/ múltiples en vez de router.py único.
     app_contract = {
-        "bodega": ["README.md", "Dockerfile", "main.py", "router.py", "service.py"],
-        "crm": ["README.md", "Dockerfile", "main.py", "router.py", "service.py"],
-        "erp": ["README.md", "Dockerfile", "main.py", "router.py", "service.py"],
-        "fundacion": ["README.md", "Dockerfile", "main.py", "router.py"],
-        "gateway": ["README.md", "Dockerfile", "backend/main.py"],
-        "ticketera": ["README.md", "Dockerfile", "backend/main.py", "backend/router.py", "backend/service.py"],
+        "gateway":   ["README.md", "Dockerfile", "backend/main.py"],
+        "ticketera": ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "gta":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "fundacion": ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "bodega":    ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "crm":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "erp":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "pmo":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "ia":        ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "zabbix":    ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
     }
     for app, files in app_contract.items():
         for rel in files:
