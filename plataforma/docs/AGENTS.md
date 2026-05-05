@@ -47,13 +47,29 @@ Cada tarea debe cerrar este ciclo:
 
 1. **PLAN** breve
 2. **EJECUCIÓN** acotada
-3. **VERIFICACIÓN** con evidencia (PASS/FAIL)
+3. **VERIFICACIÓN** con evidencia (PASS/FAIL) — incluye rebuild de containers afectados (ver §5.1)
 4. **CIERRE** con resumen técnico
 
 Reglas:
 
 - Una tarea a la vez.
 - No meter extras fuera de scope antes de cerrar la tarea solicitada.
+
+### 5.1) Rebuild obligatorio tras cambios de código
+
+**Antes de declarar un cambio listo o pedirle al usuario que lo verifique**, siempre rebuildear los containers afectados. Aplica a cualquier cambio en código: UI (HTML/CSS/JS), backend (Python), Dockerfile, etc.
+
+```bash
+ASSET_VERSION=$(git rev-parse --short HEAD) \
+  APP_UID=$(id -u) APP_GID=$(id -g) \
+  docker compose --env-file plataforma/ops/env/.env.server.dev up -d --build <containers>
+```
+
+Luego validar runtime con `curl` al endpoint relevante (`/health`, GET del recurso modificado) y comparar contra el contenido esperado.
+
+**Por qué importa:** sin rebuild, `window.ASSET_VERSION` queda con el SHA anterior, el navegador sigue sirviendo HTML cacheado mientras el JS es nuevo, y se producen mismatches silenciosos (el JS busca IDs que ya no existen en el HTML cacheado). Síntoma típico: el usuario reporta "no veo los cambios" o "no pasa nada al apretar".
+
+Hacerlo **antes** del commit es preferible: detecta errores de sintaxis o imports rotos antes de pushear, y deja la evidencia PASS/FAIL en VERIFICACIÓN.
 
 ## 6) Calidad mínima por app
 
