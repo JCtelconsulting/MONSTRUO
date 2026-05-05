@@ -82,6 +82,14 @@ export APP_GID=$(id -g)
 
 Estas variables se leen al hacer `docker compose build` y se pasan como `ARG` al Dockerfile. Si no están seteadas, default es `1000`.
 
+> **Migración primer deploy**: si los bind mounts (`ticketera/data/{tickets,compliance}`) fueron creados por containers anteriores que corrían como `root`, su ownership será de root y el nuevo `appuser` no podrá escribir. Arreglarlo sin `sudo` con un container temporal:
+>
+> ```bash
+> docker run --rm -v /srv/monstruo/ticketera/data:/data alpine:3 chown -R $(id -u):$(id -g) /data
+> ```
+>
+> (Reemplazar `/srv/monstruo` por la ruta de tu entorno; en DEV es `/srv/monstruo_dev`.)
+
 ### Levantar el stack
 
 ```bash
