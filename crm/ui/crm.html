@@ -296,20 +296,45 @@
 
                 data.forEach(c => {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><b>${c.name}</b></td>
-                        <td>${c.rut}</td>
-                        <td>${c.email || '-'}</td>
-                        <td>${c.city || '-'}</td>
-                        <td>
-                            <button class="btn-icon" onclick='openPanel(${JSON.stringify(c)})'><i class="fas fa-eye"></i></button>
-                        </td>
-                    `;
+
+                    const tdName = document.createElement('td');
+                    const b = document.createElement('b');
+                    b.textContent = c.name || '';
+                    tdName.appendChild(b);
+                    tr.appendChild(tdName);
+
+                    const tdRut = document.createElement('td');
+                    tdRut.textContent = c.rut || '';
+                    tr.appendChild(tdRut);
+
+                    const tdEmail = document.createElement('td');
+                    tdEmail.textContent = c.email || '-';
+                    tr.appendChild(tdEmail);
+
+                    const tdCity = document.createElement('td');
+                    tdCity.textContent = c.city || '-';
+                    tr.appendChild(tdCity);
+
+                    const tdActions = document.createElement('td');
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-icon';
+                    btn.innerHTML = '<i class="fas fa-eye"></i>';
+                    btn.addEventListener('click', () => openPanel(c));
+                    tdActions.appendChild(btn);
+                    tr.appendChild(tdActions);
+
                     tbody.appendChild(tr);
                 });
 
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red; padding:2rem;">${err.message}</td></tr>`;
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 5;
+                td.style.cssText = 'text-align:center; color:red; padding:2rem;';
+                td.textContent = err.message || 'Error desconocido';
+                tr.appendChild(td);
+                tbody.innerHTML = '';
+                tbody.appendChild(tr);
             }
         }
 

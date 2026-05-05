@@ -192,7 +192,6 @@ def repo_checks() -> List[str]:
         ),
     ]
     ignore_files = {
-        PROJECT_ROOT / "plataforma/ops/env/.env.example",
         PROJECT_ROOT / "plataforma/ops/herramientas/dev/proxy_vm.env.example",
         PROJECT_ROOT / "plataforma/ops/herramientas/dev/proxy_vm_env.sh",
     }
