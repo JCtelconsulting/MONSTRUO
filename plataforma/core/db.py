@@ -2388,7 +2388,7 @@ def init_db() -> None:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_subareas_area   ON gta.subareas(area_code);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_subareas_activo ON gta.subareas(activo);")
 
-            # Seed de las 12 áreas si la tabla está vacía
+            # Seed de las áreas si la tabla está vacía
             existing = conn.execute("SELECT COUNT(*) AS c FROM gta.areas").fetchone()
             if int((existing or {}).get("c") or 0) == 0:
                 seed_areas = [
@@ -2403,7 +2403,6 @@ def init_db() -> None:
                     ("pmo",               "PMO",               "francisco.cea",    "Francisco Cea",    False, 90),
                     ("prevencion_riesgos","Prevención de Riesgos", "",             "(externa)",        True,  100),
                     ("contabilidad",      "Contabilidad",      "",                 "(externa)",        True,  110),
-                    ("ia",                "IA",                "",                 "",                 False, 120),
                 ]
                 for code, label, lider_user, lider_nombre, externa, orden in seed_areas:
                     conn.execute(
@@ -2422,6 +2421,7 @@ def init_db() -> None:
                     ("redes",          "mesa_ayuda",          "Mesa de Ayuda",           30),
                     ("redes",          "soporte",             "Soporte",                 40),
                     ("redes",          "ciberseguridad",      "Ciberseguridad",          50),
+                    ("sistemas",       "ia",                  "IA",                      10),
                     ("proveedores",    "compras",             "Compras",                 10),
                     ("finanzas",       "facturacion",         "Facturación",             10),
                     ("finanzas",       "cobranzas",           "Cobranzas",               20),

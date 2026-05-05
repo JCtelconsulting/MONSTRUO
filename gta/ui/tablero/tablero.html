@@ -34,9 +34,6 @@
         <button class="btn-secondary" onclick="Tablero.cargar()" title="Refrescar">
             <i class="fas fa-sync-alt"></i>
         </button>
-        <button class="btn-primary" onclick="Tablero.abrirNuevoFlujo()" style="margin-left:auto;">
-            <i class="fas fa-plus"></i> Nuevo flujo
-        </button>
     </div>
 
     <!-- Kanban por estado del flujo -->
@@ -59,40 +56,6 @@
     </div>
 </div>
 <div id="flujo-drawer-overlay" class="gta-flujo-drawer-overlay" onclick="Tablero.cerrarDrawer()"></div>
-
-<!-- Modal: Nuevo flujo libre -->
-<div class="modal-backdrop" id="modal-nuevo-flujo">
-    <div class="modal-content" style="max-width:760px;">
-        <div class="modal-header">
-            <h2>Nuevo flujo</h2>
-            <button class="modal-close-btn" onclick="Tablero.cerrarNuevoFlujo()">×</button>
-        </div>
-        <div class="modal-body" id="modal-nuevo-flujo-body">
-            <div class="field">
-                <label>Título del flujo *</label>
-                <input type="text" id="nuevo-flujo-titulo" class="input-dark" placeholder="Ej: Cierre de venta cliente XYZ">
-            </div>
-            <div class="field" style="margin-top:12px;">
-                <label>Descripción</label>
-                <textarea id="nuevo-flujo-descripcion" class="input-dark" rows="2" placeholder="Contexto general del flujo..."></textarea>
-            </div>
-
-            <h4 class="gta-section-subtitle" style="margin-top:20px;">Tareas del flujo</h4>
-            <p class="gta-section-help">Agrega cada tarea con su área, SLA y dependencias. Las tareas sin dependencias arrancan en paralelo.</p>
-
-            <div id="nuevo-flujo-tareas" class="gta-flujo-tareas-edit"></div>
-            <button class="btn-secondary" onclick="Tablero.agregarTareaLibre()" style="margin-top:10px;">
-                <i class="fas fa-plus"></i> Agregar tarea
-            </button>
-        </div>
-        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-            <button class="btn-secondary" onclick="Tablero.cerrarNuevoFlujo()">Cancelar</button>
-            <button class="btn-primary" onclick="Tablero.crearFlujoLibre()">
-                <i class="fas fa-paper-plane"></i> Iniciar flujo
-            </button>
-        </div>
-    </div>
-</div>
 
 <!-- Modal: Pedir ayuda -->
 <div class="modal-backdrop" id="modal-pedir-ayuda">

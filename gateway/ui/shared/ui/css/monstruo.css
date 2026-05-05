@@ -2720,6 +2720,18 @@ body:not(.login-shell) textarea.input-dark {
   color: #eef5ff !important;
   border-radius: 10px !important;
   min-height: 38px !important;
+  padding: 8px 12px !important;
+  font-size: 0.88rem !important;
+}
+
+body:not(.login-shell) textarea.input-dark {
+  padding: 10px 12px !important;
+  line-height: 1.4 !important;
+}
+
+/* Espacio extra a la derecha del select para no chocar con el caret nativo */
+body:not(.login-shell) select.input-dark {
+  padding-right: 30px !important;
 }
 
 body:not(.login-shell) .input-dark::placeholder,

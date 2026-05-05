@@ -5,7 +5,6 @@ window.Tablero = (() => {
     let _sesion = null;
     let _areas = [];
     let _flujoActivo = null;  // detalle abierto
-    let _tareasLibres = [];
 
     // ── Init ────────────────────────────────────────────────────────────
     function init(sesion) {
@@ -330,99 +329,6 @@ window.Tablero = (() => {
         }
     }
 
-    // ── Nuevo flujo libre ──────────────────────────────────────────────
-    function abrirNuevoFlujo() {
-        _tareasLibres = [];
-        document.getElementById('nuevo-flujo-titulo').value = '';
-        document.getElementById('nuevo-flujo-descripcion').value = '';
-        agregarTareaLibre();
-        document.getElementById('modal-nuevo-flujo').classList.add('is-open');
-    }
-
-    function cerrarNuevoFlujo() {
-        document.getElementById('modal-nuevo-flujo')?.classList.remove('is-open');
-    }
-
-    function agregarTareaLibre() {
-        _tareasLibres.push({
-            orden: _tareasLibres.length + 1,
-            titulo: '',
-            area_code: '',
-            sla_horas: 24,
-            depende_de: [],
-        });
-        _renderTareasLibres();
-    }
-
-    function _renderTareasLibres() {
-        const cont = document.getElementById('nuevo-flujo-tareas');
-        if (!cont) return;
-        const areas = _areas.filter(a => a.activo && !a.es_externa);
-        cont.innerHTML = _tareasLibres.map((t, idx) => `
-            <div class="gta-tarea-edit-row" data-idx="${idx}">
-                <div class="gta-tarea-edit-num">#${t.orden}</div>
-                <div class="gta-tarea-edit-fields">
-                    <input type="text" class="input-dark" placeholder="Título de la tarea"
-                           value="${_esc(t.titulo)}" oninput="Tablero._setTareaCampo(${idx}, 'titulo', this.value)">
-                    <div style="display:flex; gap:8px; margin-top:6px;">
-                        <select class="input-dark" style="flex:1;" onchange="Tablero._setTareaCampo(${idx}, 'area_code', this.value)">
-                            <option value="">— Área —</option>
-                            ${areas.map(a => `<option value="${a.code}" ${t.area_code === a.code ? 'selected' : ''}>${_esc(a.label)}</option>`).join('')}
-                        </select>
-                        <input type="number" class="input-dark" min="1" max="999" style="width:90px;"
-                               value="${t.sla_horas}" placeholder="SLA h"
-                               oninput="Tablero._setTareaCampo(${idx}, 'sla_horas', parseInt(this.value, 10) || 24)">
-                        <input type="text" class="input-dark" placeholder="Depende de (ej: 1,2)"
-                               value="${(t.depende_de || []).join(',')}" style="width:140px;"
-                               oninput="Tablero._setDependeDe(${idx}, this.value)">
-                    </div>
-                </div>
-                <button class="btn-sm btn-danger" onclick="Tablero._quitarTarea(${idx})" title="Eliminar">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        `).join('');
-    }
-
-    function _setTareaCampo(idx, campo, valor) {
-        if (_tareasLibres[idx]) _tareasLibres[idx][campo] = valor;
-    }
-
-    function _setDependeDe(idx, raw) {
-        if (!_tareasLibres[idx]) return;
-        const deps = (raw || '').split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
-        _tareasLibres[idx].depende_de = deps;
-    }
-
-    function _quitarTarea(idx) {
-        _tareasLibres.splice(idx, 1);
-        _tareasLibres.forEach((t, i) => t.orden = i + 1);
-        _renderTareasLibres();
-    }
-
-    async function crearFlujoLibre() {
-        const titulo = document.getElementById('nuevo-flujo-titulo').value.trim();
-        const descripcion = document.getElementById('nuevo-flujo-descripcion').value.trim();
-        if (!titulo) { alert('El título es requerido'); return; }
-        if (!_tareasLibres.length) { alert('Agrega al menos una tarea'); return; }
-        const invalidas = _tareasLibres.filter(t => !t.titulo.trim() || !t.area_code);
-        if (invalidas.length) {
-            alert('Cada tarea necesita título y área');
-            return;
-        }
-        try {
-            const flujo = await GtaApi.crearFlujo({
-                titulo, descripcion,
-                pasos_libres: _tareasLibres,
-            });
-            cerrarNuevoFlujo();
-            await cargar();
-            await abrirFlujo(flujo.id);
-        } catch (e) {
-            alert('Error al crear flujo: ' + (e.message || e));
-        }
-    }
-
     // ── Helpers ─────────────────────────────────────────────────────────
     function _areaLabel(code) {
         const a = _areas.find(x => x.code === code);
@@ -467,7 +373,5 @@ window.Tablero = (() => {
         abrirFlujo, cerrarDrawer,
         completarTarea, validarTarea,
         abrirAyuda, cerrarModalAyuda, enviarAyuda,
-        abrirNuevoFlujo, cerrarNuevoFlujo, agregarTareaLibre, crearFlujoLibre,
-        _setTareaCampo, _setDependeDe, _quitarTarea,
     };
 })();
