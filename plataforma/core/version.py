@@ -49,3 +49,16 @@ def _compute_asset_version() -> str:
 
 
 ASSET_VERSION: str = _compute_asset_version()
+
+
+def inject_asset_version(html: str) -> str:
+    """Sustituye `?v=ASSET_VERSION` por el SHA actual e inyecta `window.ASSET_VERSION`.
+
+    Pensado para usarse al servir el HTML de cada app (gateway + apps proxy).
+    Es idempotente: si el HTML ya no contiene `?v=ASSET_VERSION` no rompe nada.
+    """
+    html = html.replace("?v=ASSET_VERSION", f"?v={ASSET_VERSION}")
+    version_script = f'<script>window.ASSET_VERSION = "{ASSET_VERSION}";</script>'
+    if "</head>" in html:
+        html = html.replace("</head>", f"    {version_script}\n</head>", 1)
+    return html

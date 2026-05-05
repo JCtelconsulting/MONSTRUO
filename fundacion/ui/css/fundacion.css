@@ -1,0 +1,746 @@
+/* ============================================================
+   Fundación — estilos específicos del módulo
+   Patrones genéricos (.hidden, slide-over) viven en
+   gateway/ui/shared/ui/css/monstruo.css.
+   ============================================================ */
+
+.fund-intro p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: .92rem;
+}
+
+.fund-sedes-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.fund-sede-item {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+}
+
+.fund-sede-card {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(8, 12, 18, 0.75);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+
+.fund-sede-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(79, 172, 254, .6);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, .28);
+}
+
+.fund-sede-card.is-open {
+  border-color: rgba(79, 172, 254, .68);
+  box-shadow: 0 0 0 1px rgba(79, 172, 254, .22), 0 14px 28px rgba(0, 0, 0, .28);
+}
+
+.fund-sede-card h3 {
+  margin: 0;
+  font-size: 1.28rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  line-height: 1.2;
+}
+
+.fund-sede-card p {
+  margin: .42rem 0 0;
+  color: var(--text-soft);
+  font-size: .76rem;
+  line-height: 1.35;
+}
+
+.fund-sede-meta {
+  margin-top: .2rem;
+  font-size: .74rem;
+  color: var(--text-soft);
+}
+
+.fund-sede-footer {
+  margin-top: .5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.fund-sede-footer .fund-sede-meta {
+  margin-top: 0;
+}
+
+.fund-sede-chevron {
+  color: var(--text-soft);
+  font-size: .76rem;
+  transition: transform .2s ease, color .2s ease;
+  flex: 0 0 auto;
+}
+
+.fund-sede-card.is-open .fund-sede-chevron {
+  transform: rotate(180deg);
+  color: #d9ecff;
+}
+
+.fund-sede-accordion {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0 .72rem;
+  max-height: 0;
+  overflow: hidden;
+  background: rgba(10, 16, 24, .72);
+  transition: max-height .24s ease, padding .24s ease, border-color .24s ease;
+}
+
+.fund-sede-accordion.open {
+  max-height: 220px;
+  padding: .72rem;
+  border-color: rgba(79, 172, 254, .28);
+}
+
+.fund-sede-accordion-title {
+  margin: 0 0 .52rem;
+  font-size: .78rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.fund-sede-cursos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
+
+.fund-curso-chip {
+  border: 1px solid rgba(79, 172, 254, .42);
+  background: rgba(79, 172, 254, .14);
+  color: #e7f3ff;
+  border-radius: 999px;
+  padding: .34rem .65rem;
+  font-size: .77rem;
+  cursor: pointer;
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+
+.fund-curso-chip:hover {
+  background: rgba(79, 172, 254, .24);
+  border-color: rgba(79, 172, 254, .62);
+  transform: translateY(-1px);
+}
+
+.fund-curso-empty {
+  color: var(--text-soft);
+  font-size: .78rem;
+}
+
+.fund-workspace {
+  margin-top: 1.25rem;
+}
+
+.fund-workspace-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: .8rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.fund-back-btn {
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .03);
+  color: var(--text);
+  border-radius: 10px;
+  padding: .45rem .75rem;
+  cursor: pointer;
+  font-size: .85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.fund-back-btn:hover {
+  border-color: rgba(79, 172, 254, .55);
+}
+
+.fund-workspace-head h3 {
+  margin: 0 0 .2rem;
+  font-size: 1.08rem;
+}
+
+.fund-workspace-head p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: .85rem;
+}
+
+.fund-head-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .35rem;
+  min-width: 220px;
+}
+
+.fund-head-field {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  width: 100%;
+  max-width: 260px;
+}
+
+.fund-head-field label {
+  font-size: .74rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.fund-head-field select {
+  border: 1px solid rgba(255, 255, 255, .13);
+  background: rgba(255, 255, 255, .03);
+  border-radius: 9px;
+  color: var(--text);
+  font-size: .83rem;
+  padding: .43rem .5rem;
+}
+
+.fund-scope-hint {
+  margin: 0;
+  font-size: .74rem;
+  color: var(--text-soft);
+  text-align: right;
+}
+
+.fund-tabs {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  margin-bottom: 1rem;
+  padding-bottom: .75rem;
+}
+
+.fund-tab {
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .03);
+  color: var(--text-soft);
+  border-radius: 10px;
+  padding: .45rem .75rem;
+  cursor: pointer;
+  font-size: .85rem;
+}
+
+.fund-tab.active {
+  border-color: rgba(79, 172, 254, .65);
+  color: var(--text);
+  background: rgba(79, 172, 254, .14);
+}
+
+.fund-tab-panel {
+  display: none;
+}
+
+.fund-tab-panel.active {
+  display: block;
+}
+
+.fund-calendar-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-bottom: .5rem;
+}
+
+.fund-calendar-nav,
+.fund-calendar-view-switch {
+  display: inline-flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+
+.fund-calendar-nav button,
+.fund-calendar-view-switch button {
+  border: 1px solid rgba(255, 255, 255, .13);
+  background: rgba(255, 255, 255, .03);
+  color: var(--text-soft);
+  border-radius: 9px;
+  padding: .35rem .6rem;
+  cursor: pointer;
+  font-size: .79rem;
+}
+
+.fund-calendar-view-switch button.active {
+  border-color: rgba(79, 172, 254, .65);
+  color: var(--text);
+  background: rgba(79, 172, 254, .14);
+}
+
+.fund-calendar-range {
+  margin: 0 0 .9rem;
+  font-size: .95rem;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+.fund-calendar-container {
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  background: rgba(8, 12, 18, .68);
+  padding: .75rem;
+}
+
+.fund-month-head,
+.fund-calendar-grid--month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: .5rem;
+}
+
+.fund-month-head span {
+  text-align: center;
+  font-size: .74rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.fund-day-cell {
+  min-height: 110px;
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 10px;
+  padding: .45rem;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  background: rgba(255, 255, 255, .02);
+}
+
+.fund-day-cell.out-month {
+  opacity: .45;
+}
+
+.fund-day-cell.today {
+  border-color: rgba(79, 172, 254, .68);
+  box-shadow: 0 0 0 1px rgba(79, 172, 254, .2);
+}
+
+.fund-day-number {
+  font-size: .78rem;
+  color: var(--text-soft);
+}
+
+.fund-day-task {
+  font-size: .72rem;
+  border-radius: 7px;
+  padding: .18rem .35rem;
+  background: rgba(79, 172, 254, .17);
+  color: #d9ecff;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fund-day-task--more {
+  background: rgba(255, 255, 255, .07);
+  color: var(--text-soft);
+}
+
+.fund-calendar-grid--week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: .55rem;
+}
+
+.fund-week-day {
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 10px;
+  padding: .55rem;
+  min-height: 175px;
+  background: rgba(255, 255, 255, .02);
+}
+
+.fund-week-day.today {
+  border-color: rgba(79, 172, 254, .66);
+}
+
+.fund-week-day h5 {
+  margin: 0 0 .45rem;
+  font-size: .76rem;
+  color: var(--text-soft);
+}
+
+.fund-task-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+
+.fund-task-item {
+  border-radius: 8px;
+  padding: .38rem .42rem;
+  background: rgba(79, 172, 254, .15);
+  font-size: .73rem;
+  color: #e8f4ff;
+}
+
+.fund-task-item small {
+  display: block;
+  color: var(--text-soft);
+  margin-top: .15rem;
+  font-size: .68rem;
+}
+
+.fund-day-view {
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 10px;
+  padding: .75rem;
+  background: rgba(255, 255, 255, .02);
+}
+
+.fund-day-view h5 {
+  margin: 0 0 .65rem;
+  font-size: .83rem;
+  color: var(--text-soft);
+}
+
+.fund-next-tasks {
+  margin-top: .9rem;
+}
+
+.fund-next-tasks h4 {
+  margin: 0 0 .5rem;
+  font-size: .88rem;
+}
+
+.fund-next-tasks ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--text-soft);
+  font-size: .82rem;
+  line-height: 1.45;
+}
+
+.fund-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: .7rem;
+  margin-bottom: .85rem;
+}
+
+.fund-kpi-card {
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 11px;
+  padding: .68rem;
+  background: rgba(255, 255, 255, .03);
+}
+
+.fund-kpi-card span {
+  display: block;
+  font-size: .76rem;
+  color: var(--text-soft);
+  margin-bottom: .25rem;
+}
+
+.fund-kpi-card strong {
+  font-size: 1.08rem;
+}
+
+.fund-inv-toolbar {
+  margin-bottom: .7rem;
+}
+
+.fund-inv-toolbar input {
+  width: 100%;
+  max-width: 360px;
+  border: 1px solid rgba(255, 255, 255, .13);
+  background: rgba(255, 255, 255, .03);
+  border-radius: 9px;
+  color: var(--text);
+  font-size: .83rem;
+  padding: .45rem .55rem;
+}
+
+.fund-stock-badge {
+  display: inline-block;
+  border-radius: 999px;
+  font-size: .72rem;
+  padding: .12rem .45rem;
+  border: 1px solid transparent;
+}
+
+.fund-stock-badge.ok {
+  background: rgba(20, 186, 117, .15);
+  color: #9ef0ca;
+  border-color: rgba(20, 186, 117, .34);
+}
+
+.fund-stock-badge.bajo {
+  background: rgba(251, 191, 36, .15);
+  color: #ffe6a3;
+  border-color: rgba(251, 191, 36, .36);
+}
+
+.fund-stock-badge.critico {
+  background: rgba(255, 84, 113, .16);
+  color: #ffc4d1;
+  border-color: rgba(255, 84, 113, .36);
+}
+
+.fund-report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: .8rem;
+}
+
+.fund-report-card {
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 11px;
+  padding: .72rem;
+  background: rgba(255, 255, 255, .02);
+}
+
+.fund-report-card h4 {
+  margin: 0 0 .45rem;
+  font-size: .86rem;
+}
+
+.fund-report-card ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--text-soft);
+  font-size: .8rem;
+  line-height: 1.45;
+}
+
+.fund-status {
+  margin-top: 1rem;
+  font-size: .83rem;
+  color: var(--text-soft);
+}
+
+.fund-users-admin {
+  margin-top: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  background: rgba(8, 12, 18, .68);
+  padding: .9rem;
+}
+
+.fund-users-admin-head {
+  margin-bottom: .5rem;
+}
+
+.fund-users-admin-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.fund-users-admin-head p {
+  margin: .25rem 0 0;
+  font-size: .8rem;
+  color: var(--text-soft);
+}
+
+.fund-users-admin-toolbar {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-bottom: .65rem;
+}
+
+.fund-users-admin-toolbar button,
+.fund-user-modal-actions button,
+.fund-user-modal-close {
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .04);
+  color: var(--text);
+  border-radius: 9px;
+  padding: .4rem .65rem;
+  font-size: .79rem;
+  cursor: pointer;
+}
+
+.fund-users-admin-toolbar button:hover,
+.fund-user-modal-actions button:hover,
+.fund-user-modal-close:hover {
+  border-color: rgba(79, 172, 254, .55);
+}
+
+.fund-users-admin-status {
+  margin: 0 0 .6rem;
+  color: var(--text-soft);
+  font-size: .78rem;
+}
+
+.fund-user-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.fund-user-role-pill {
+  border: 1px solid rgba(79, 172, 254, .35);
+  background: rgba(79, 172, 254, .14);
+  color: #dceeff;
+  border-radius: 999px;
+  padding: .15rem .45rem;
+  font-size: .72rem;
+}
+
+.fund-user-action {
+  border: 1px solid rgba(255, 255, 255, .15);
+  background: rgba(255, 255, 255, .04);
+  color: var(--text);
+  border-radius: 8px;
+  padding: .28rem .5rem;
+  font-size: .74rem;
+  cursor: pointer;
+  margin-left: .25rem;
+}
+
+.fund-user-action.delete {
+  border-color: rgba(255, 84, 113, .45);
+  color: #ffc1cd;
+  background: rgba(255, 84, 113, .08);
+}
+
+.fund-user-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .58);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 1rem;
+}
+
+.fund-user-modal-card {
+  width: min(720px, 100%);
+  max-height: 86vh;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  background: #0c141f;
+  padding: .9rem;
+}
+
+.fund-user-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  margin-bottom: .7rem;
+}
+
+.fund-user-modal-head h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.fund-user-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .65rem;
+  margin-bottom: .7rem;
+}
+
+.fund-user-field {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.fund-user-field.full {
+  grid-column: 1 / -1;
+}
+
+.fund-user-field label {
+  font-size: .73rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+.fund-user-field input {
+  border: 1px solid rgba(255, 255, 255, .13);
+  background: rgba(255, 255, 255, .03);
+  border-radius: 9px;
+  color: var(--text);
+  font-size: .82rem;
+  padding: .4rem .5rem;
+}
+
+.fund-user-roles-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .45rem;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 10px;
+  padding: .5rem;
+  background: rgba(255, 255, 255, .02);
+}
+
+.fund-user-role-option {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: .78rem;
+  color: var(--text-soft);
+}
+
+.fund-user-modal-actions {
+  margin-top: .8rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: .45rem;
+}
+
+@media (max-width: 960px) {
+
+  .fund-sedes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fund-month-head,
+  .fund-calendar-grid--month,
+  .fund-calendar-grid--week {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+
+  .fund-sedes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fund-month-head,
+  .fund-calendar-grid--month,
+  .fund-calendar-grid--week,
+  .fund-kpis {
+    grid-template-columns: 1fr;
+  }
+}

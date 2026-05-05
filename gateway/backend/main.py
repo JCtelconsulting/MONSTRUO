@@ -24,7 +24,7 @@ from gateway.backend.routers import admin_users, config_router, gta_areas, ops
 from plataforma.core import auth_service, db, deps, security
 from plataforma.core.config import settings as app_settings
 from plataforma.core.middleware import AuthIdentityMiddleware
-from plataforma.core.version import ASSET_VERSION
+from plataforma.core.version import inject_asset_version
 from plataforma.core.web import build_login_redirect_url
 
 ROOT_PATH = os.getenv("ROOT_PATH", "").strip()
@@ -103,13 +103,7 @@ def _serve_module_html(request: Request, module_path: str, fallback_path: str = 
             html = html.replace("<head>", f"<head>\n    {base_tag}", 1)
         else:
             html = base_tag + html
-        # Cache-busting moderno: reemplazar `?v=ASSET_VERSION` por el SHA actual.
-        # Y exponer la versión a JS para assets cargados dinámicamente.
-        html = html.replace("?v=ASSET_VERSION", f"?v={ASSET_VERSION}")
-        version_script = f'<script>window.ASSET_VERSION = "{ASSET_VERSION}";</script>'
-        if "</head>" in html:
-            html = html.replace("</head>", f"    {version_script}\n</head>", 1)
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=inject_asset_version(html))
 
     fallback_relative_path = fallback_path.lstrip("/")
     for root in search_roots:
@@ -133,13 +127,7 @@ def _serve_module_html(request: Request, module_path: str, fallback_path: str = 
             html = html.replace("<head>", f"<head>\n    {base_tag}", 1)
         else:
             html = base_tag + html
-        # Cache-busting moderno: reemplazar `?v=ASSET_VERSION` por el SHA actual.
-        # Y exponer la versión a JS para assets cargados dinámicamente.
-        html = html.replace("?v=ASSET_VERSION", f"?v={ASSET_VERSION}")
-        version_script = f'<script>window.ASSET_VERSION = "{ASSET_VERSION}";</script>'
-        if "</head>" in html:
-            html = html.replace("</head>", f"    {version_script}\n</head>", 1)
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=inject_asset_version(html))
 
     raise HTTPException(status_code=404, detail="module_not_found")
 
@@ -556,7 +544,7 @@ async def fundacion_root_slash():
     index_path = fundacion_ui_dir / "fundacion.html"
     if not index_path.exists():
         raise HTTPException(status_code=404, detail="fundacion_ui_not_found")
-    return HTMLResponse(index_path.read_text(encoding="utf-8"))
+    return HTMLResponse(inject_asset_version(index_path.read_text(encoding="utf-8")))
 
 
 @app.get("/fundacion/fundacion.html")
@@ -574,7 +562,7 @@ async def gta_root_slash():
     index_path = gta_ui_dir / "gta.html"
     if not index_path.exists():
         raise HTTPException(status_code=404, detail="gta_ui_not_found")
-    return HTMLResponse(index_path.read_text(encoding="utf-8"))
+    return HTMLResponse(inject_asset_version(index_path.read_text(encoding="utf-8")))
 
 
 @app.get("/gta/gta.html")

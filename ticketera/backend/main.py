@@ -46,7 +46,8 @@ def _resolve_shared_ui_dir() -> Optional[Path]:
 def _html_response(file_path: Path, request: Request) -> HTMLResponse:
     if not file_path.exists():
         raise HTTPException(status_code=404, detail=f"UI not found: {file_path.name}")
-    return HTMLResponse(content=file_path.read_text(encoding="utf-8"))
+    from plataforma.core.version import inject_asset_version
+    return HTMLResponse(content=inject_asset_version(file_path.read_text(encoding="utf-8")))
 
 
 def _is_weak_secret(secret_key: str) -> bool:

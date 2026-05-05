@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response as FastAP
 from fastapi.staticfiles import StaticFiles
 
 from plataforma.core.env_loader import load_runtime_env
+from plataforma.core.version import inject_asset_version
 
 load_runtime_env(Path(__file__).resolve())
 
@@ -76,7 +77,7 @@ async def get_index(
     index_path = ui_dir / "fundacion.html"
     if not index_path.exists():
         raise HTTPException(status_code=404, detail="Fundación UI not found")
-    return HTMLResponse(index_path.read_text(encoding="utf-8"))
+    return HTMLResponse(inject_asset_version(index_path.read_text(encoding="utf-8")))
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
