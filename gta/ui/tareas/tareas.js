@@ -320,23 +320,35 @@ window.Tareas = (() => {
 
     async function guardarColab() {
         const tareaId = parseInt(document.getElementById('colab-tarea-id').value, 10);
-        const username = (document.getElementById('colab-username').value || '').trim();
+        const inputRaw = (document.getElementById('colab-username').value || '').trim();
         const rol = document.getElementById('colab-rol').value;
         const motivo = (document.getElementById('colab-motivo').value || '').trim();
-        if (!username) return alert('El usuario es obligatorio.');
+        if (!inputRaw) return alert('El usuario es obligatorio.');
 
-        // Resolver username → id vía un endpoint de búsqueda. Como no tenemos uno
-        // dedicado todavía, dejamos al backend devolver el error si no existe.
-        // Lo más limpio sería un /api/users/by-username, pero por ahora pedimos
-        // al usuario que ingrese el id si lo conoce. Atajo: si el input es numérico,
-        // lo usamos como id; si tiene @, intentamos resolverlo desde el backend.
-
-        let usuario_id;
-        if (/^\d+$/.test(username)) {
-            usuario_id = parseInt(username, 10);
+        // Resolver el input a usuario_id. Aceptamos:
+        //   - ID numérico directo (ej: "24")
+        //   - Username completo (ej: "fleon@wolf-industries.tech")
+        //   - Prefijo del username (ej: "fleon" → matchea fleon@…)
+        let usuario_id = null;
+        if (/^\d+$/.test(inputRaw)) {
+            usuario_id = parseInt(inputRaw, 10);
         } else {
-            // Por ahora exigimos que el admin/usuario sepa el id numérico
-            return alert('Ingresá el ID numérico del usuario (no el correo).\nEsto se mejorará en una próxima iteración.');
+            try {
+                const r = await window.fetchApi('/api/config/gta/users');
+                const items = r?.items || [];
+                const exact = items.find(u => u.username === inputRaw);
+                if (exact) {
+                    usuario_id = exact.id;
+                } else {
+                    // Prefijo único antes del @: si hay un solo match, lo aceptamos
+                    const matches = items.filter(u => String(u.username || '').split('@')[0] === inputRaw);
+                    if (matches.length === 1) usuario_id = matches[0].id;
+                    else if (matches.length > 1) return alert('Hay más de un usuario con ese prefijo. Ingresá el correo completo.');
+                }
+            } catch (e) {
+                return alert('No se pudo resolver el usuario: ' + _esc(_humanizeErr(e)));
+            }
+            if (!usuario_id) return alert(`No se encontró un usuario para "${inputRaw}".`);
         }
 
         try {

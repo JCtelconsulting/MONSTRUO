@@ -2709,14 +2709,24 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_sys_role_permissions", _migrate_sys_role_permissions_section)
 
+        # Commitear TODO el trabajo inline antes de invocar el runner de
+        # migraciones automatizadas. El runner abre una conexión propia del
+        # pool; si dejamos la transacción de init_db abierta sobre auth.users,
+        # cualquier migración que pida lock sobre esa tabla (ej. FK a
+        # auth.users(id)) queda bloqueada esperando a init_db, que a su vez
+        # espera al runner → deadlock circular sin detección de Postgres
+        # (la primera conexión queda 'idle in transaction', no 'waiting').
+        # Síntoma: primer arranque sale OK porque las migraciones fallan
+        # rápido antes de pedir el lock; segundo arranque cuelga el lifespan
+        # y el container nunca queda healthy.
+        conn.commit()
+
         # Automated Migrations Engine
         try:
             from plataforma.core import migrations
             migrations.run_migrations()
         except Exception as e:
             logger.error("[DB] ERROR running automated migrations: %s", e)
-
-        conn.commit()
     finally:
         conn.close()
 

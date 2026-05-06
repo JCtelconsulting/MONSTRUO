@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from plataforma.core import db, deps
+from plataforma.core.audit_decorator import audit_action
 
 router = APIRouter(prefix="/api/config/gta", tags=["config", "gta"])
 
@@ -296,8 +297,10 @@ async def list_membresias(
 
 
 @router.post("/membresias", summary="Asignar usuario a subárea (miembro o líder)")
+@audit_action("GTA_MEMBRESIA_ASIGNAR", severity="warning")
 async def create_membresia(
     body: MembresiaIn,
+    request: Request,
     sess: dict = Depends(deps.require_permission("admin.settings")),
 ):
     if body.rol not in ("miembro", "lider"):
@@ -360,8 +363,10 @@ async def create_membresia(
 
 
 @router.delete("/membresias/{membresia_id}", summary="Cerrar membresía vigente")
+@audit_action("GTA_MEMBRESIA_CERRAR", severity="warning")
 async def close_membresia(
     membresia_id: int,
+    request: Request,
     sess: dict = Depends(deps.require_permission("admin.settings")),
 ):
     conn = db.get_conn()

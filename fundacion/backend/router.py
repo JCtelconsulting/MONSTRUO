@@ -270,9 +270,19 @@ async def update_tarea(tid: int, update: Dict[str, Any], user: dict = Depends(de
 @audit_action("DELETE_FUNDACION_TASK", severity="warning")
 async def delete_tarea(tid: int, user: dict = Depends(deps.require_permission("fundacion:write"))):
     """
-    Elimina una tarea. Solo admin/jefatura/líder educativo.
+    Elimina una tarea. Solo admin/jefatura/líder educativo (no gestoras).
     """
     scope = auth_service.get_user_fundacion_scope(user.get("username", ""))
+
+    # Mismo gate de privilegio que update_tarea: la eliminación NO está
+    # permitida a gestoras_educativas aunque tengan scope a la sede.
+    roles = user.get("roles", [])
+    primary_role = (user.get("role") or "").lower()
+    privileged = {"admin", "directora_social", "jefa_pedagogica",
+                  "coordinadora_territorial", "lider_educativo", "gerencia"}
+    is_privileged = primary_role in privileged or any(r in privileged for r in roles)
+    if not is_privileged:
+        raise HTTPException(status_code=403, detail="Solo admin/jefatura/líder educativo pueden eliminar tareas")
 
     conn = db.get_conn()
     try:
