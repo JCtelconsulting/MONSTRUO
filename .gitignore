@@ -81,3 +81,4 @@ gateway/data/
 # Claude Code: ignorar solo config per-usuario; permitir agents/, settings.json, README.md
 .claude/settings.local.json
 .claude/.cache/
+.claude/hooks/*.log
