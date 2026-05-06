@@ -2,269 +2,93 @@
 <html lang="es">
 
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Fundación | Monstruo</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
-    rel="stylesheet">
-  <link rel="stylesheet" href="../shared/css/monstruo.css?v=ASSET_VERSION" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="css/fundacion.css?v=ASSET_VERSION" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fundación | Monstruo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../shared/css/monstruo.css?v=ASSET_VERSION" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="css/fundacion.css?v=ASSET_VERSION" />
 </head>
 
-<body class="sidebar-collapsed" data-current-module="fundacion">
-  <header id="app-header">
-    <div class="header-top">
-      <h1>MONSTRUO</h1>
-      <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
-        <i class="fas fa-bars"></i>
-      </button>
-    </div>
-
-    <nav id="dynamic-sidebar" class="side-nav"></nav>
-    <div class="header-actions">
-      <span id="who" class="pill shell-who-pill">Usuario</span>
-      <div class="footer-buttons-container">
-        <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
-          <i class="fas fa-key"></i> <span>Cuenta</span>
-        </button>
-        <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
-          <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <main>
-    <div class="main-inner module-shell">
-      <div class="section-header module-tabs-header module-shell-header">
-        <div class="module-shell-title">
-          <h2 class="module-page-title">Fundación</h2>
-          <p class="module-shell-subtitle">Espacio base para comenzar el desarrollo del módulo Fundación en DEV</p>
-        </div>
-      </div>
-
-      <section class="section-block module-shell-content">
-        <div class="fund-intro">
-          <p>Selecciona una sede para desplegar sus cursos en acordeón. Al elegir un curso ingresarás a su panel de
-            <strong>planificación</strong>, <strong>inventario</strong> y <strong>reportes</strong>.
-          </p>
-        </div>
-
-        <section id="fund-sede-selector">
-          <div id="fund-sedes-grid" class="fund-sedes-grid"></div>
-        </section>
-
-        <section id="fund-users-admin" class="fund-users-admin">
-          <div class="fund-users-admin-head">
-            <h3>Usuarios Fundación</h3>
-            <p>Administra usuarios y roles operativos de Fundación directamente desde este módulo.</p>
-          </div>
-
-          <div class="fund-users-admin-toolbar">
-            <button id="fund-users-refresh" type="button"><i class="fas fa-rotate"></i> Actualizar</button>
-            <button id="fund-user-new" type="button"><i class="fas fa-user-plus"></i> Nuevo usuario</button>
-          </div>
-
-          <p id="fund-users-admin-status" class="fund-users-admin-status">Cargando usuarios de Fundación...</p>
-
-          <div class="table-responsive">
-            <table class="monstruo-table">
-              <thead>
-                <tr>
-                  <th>Usuario</th>
-                  <th>Roles</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="fund-users-body">
-                <tr>
-                  <td colspan="4">Cargando...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section id="fund-sede-workspace" class="fund-workspace hidden">
-          <div class="fund-workspace-head">
-            <button id="fund-back-to-sedes" class="fund-back-btn" type="button">
-              <i class="fas fa-arrow-left"></i> Cambiar sede
+<body class="sidebar-collapsed fundacion-shell" data-current-module="fundacion">
+    <header id="app-header">
+        <div class="header-top">
+            <h1>MONSTRUO</h1>
+            <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
+                <i class="fas fa-bars"></i>
             </button>
-
-            <div>
-              <h3 id="fund-sede-title">Sede</h3>
-              <p id="fund-sede-subtitle"></p>
-            </div>
-
-            <div class="fund-head-controls">
-              <div class="fund-head-field">
-                <label for="fund-curso-select">Curso</label>
-                <select id="fund-curso-select">
-                  <option value="all">Todos los cursos</option>
-                </select>
-              </div>
-              <p id="fund-scope-hint" class="fund-scope-hint"></p>
-            </div>
-          </div>
-
-          <div id="fund-tabs" class="fund-tabs" role="tablist">
-            <button class="fund-tab active" data-tab-target="planificacion" type="button">
-              <i class="fas fa-calendar-alt"></i> Planificación
-            </button>
-            <button class="fund-tab" data-tab-target="inventario" type="button">
-              <i class="fas fa-boxes-stacked"></i> Inventario
-            </button>
-            <button class="fund-tab" data-tab-target="reportes" type="button">
-              <i class="fas fa-chart-line"></i> Reportes
-            </button>
-          </div>
-
-          <section id="fund-tab-planificacion" class="fund-tab-panel active">
-            <div class="fund-calendar-toolbar">
-              <div class="fund-calendar-nav">
-                <button id="fund-cal-prev" type="button"><i class="fas fa-chevron-left"></i></button>
-                <button id="fund-cal-today" type="button">Hoy</button>
-                <button id="fund-cal-next" type="button"><i class="fas fa-chevron-right"></i></button>
-              </div>
-
-              <div id="fund-calendar-view-switch" class="fund-calendar-view-switch">
-                <button class="active" data-calendar-view="dia" type="button">Día</button>
-                <button data-calendar-view="semana" type="button">Semana</button>
-                <button data-calendar-view="mes" type="button">Mes</button>
-              </div>
-            </div>
-
-            <h4 id="fund-cal-range" class="fund-calendar-range"></h4>
-            <div id="fund-calendar-container" class="fund-calendar-container"></div>
-
-            <div class="fund-next-tasks">
-              <h4>Próximas tareas</h4>
-              <ul id="fund-next-tasks-list"></ul>
-            </div>
-          </section>
-
-          <section id="fund-tab-inventario" class="fund-tab-panel">
-            <div class="fund-kpis">
-              <article class="fund-kpi-card">
-                <span>Ítems registrados</span>
-                <strong id="fund-kpi-items">0</strong>
-              </article>
-              <article class="fund-kpi-card">
-                <span>Stock crítico</span>
-                <strong id="fund-kpi-critical">0</strong>
-              </article>
-              <article class="fund-kpi-card">
-                <span>Unidades totales</span>
-                <strong id="fund-kpi-units">0</strong>
-              </article>
-            </div>
-
-            <div class="fund-inv-toolbar">
-              <input id="fund-inventory-search" type="text"
-                placeholder="Buscar ítem por nombre o categoría (ej: notebook, insumos, mobiliario)">
-            </div>
-
-            <div class="table-responsive">
-              <table class="monstruo-table">
-                <thead>
-                  <tr>
-                    <th>Ítem</th>
-                    <th>Categoría</th>
-                    <th>Stock</th>
-                    <th>Estado</th>
-                    <th>Responsable</th>
-                  </tr>
-                </thead>
-                <tbody id="fund-inventory-body"></tbody>
-              </table>
-            </div>
-          </section>
-
-          <section id="fund-tab-reportes" class="fund-tab-panel">
-            <div class="fund-kpis">
-              <article class="fund-kpi-card">
-                <span>Tareas activas</span>
-                <strong id="fund-report-active">0</strong>
-              </article>
-              <article class="fund-kpi-card">
-                <span>Tareas completadas</span>
-                <strong id="fund-report-completed">0</strong>
-              </article>
-              <article class="fund-kpi-card">
-                <span>Cumplimiento estimado</span>
-                <strong id="fund-report-rate">0%</strong>
-              </article>
-            </div>
-
-            <div class="fund-report-grid">
-              <article class="fund-report-card">
-                <h4>Resumen de planificación</h4>
-                <ul id="fund-report-task-summary"></ul>
-              </article>
-
-              <article class="fund-report-card">
-                <h4>Riesgos de inventario</h4>
-                <ul id="fund-report-critical-list"></ul>
-              </article>
-
-              <article class="fund-report-card">
-                <h4>Agenda próxima (7 días)</h4>
-                <ul id="fund-report-agenda-list"></ul>
-              </article>
-            </div>
-          </section>
-        </section>
-
-        <p id="fund-status" class="fund-status">Verificando conectividad del módulo...</p>
-      </section>
-    </div>
-  </main>
-
-  <div id="fund-user-modal" class="fund-user-modal hidden" aria-hidden="true">
-    <div class="fund-user-modal-card">
-      <div class="fund-user-modal-head">
-        <h4 id="fund-user-modal-title">Nuevo usuario Fundación</h4>
-        <button id="fund-user-modal-close" class="fund-user-modal-close" type="button">Cerrar</button>
-      </div>
-
-      <form id="fund-user-form">
-        <div class="fund-user-form-grid">
-          <div class="fund-user-field">
-            <label for="fund-user-username">Usuario</label>
-            <input id="fund-user-username" type="text" required>
-          </div>
-          <div class="fund-user-field">
-            <label for="fund-user-password">Contraseña</label>
-            <input id="fund-user-password" type="password">
-          </div>
-          <div class="fund-user-field full">
-            <label>
-              <input id="fund-user-active" type="checkbox" checked>
-              Usuario activo
-            </label>
-          </div>
-          <div class="fund-user-field full">
-            <label>Roles de Fundación</label>
-            <div id="fund-user-role-options" class="fund-user-roles-grid"></div>
-          </div>
         </div>
-
-        <div class="fund-user-modal-actions">
-          <button id="fund-user-cancel" type="button">Cancelar</button>
-          <button id="fund-user-save" type="submit">Guardar</button>
+        <nav id="dynamic-sidebar" class="side-nav"></nav>
+        <div class="header-actions">
+            <span id="who" class="pill shell-who-pill">Usuario</span>
+            <div class="footer-buttons-container">
+                <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i> <span>Cuenta</span>
+                </button>
+                <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
+            </div>
         </div>
-      </form>
-    </div>
-  </div>
+    </header>
 
-  <script src="../shared/js/utilidades.js?v=ASSET_VERSION"></script>
-  <script src="../shared/js/admin.js?v=ASSET_VERSION"></script>
-  <script src="js/fundacion.js?v=ASSET_VERSION"></script>
-  <script src="../shared/js/sidebar.js?v=ASSET_VERSION"></script>
+    <main>
+        <div class="main-inner module-shell">
+            <div class="section-header module-tabs-header module-shell-header">
+                <div class="module-shell-title">
+                    <h2 class="module-page-title">Fundación</h2>
+                    <p class="module-shell-subtitle">Operación territorial — sedes, planificación, bodegas y reportería</p>
+                </div>
+                <div class="module-shell-actions">
+                    <div id="fund-sede-context" class="fund-sede-context" aria-live="polite">
+                        <label for="fund-sede-select">Sede</label>
+                        <select id="fund-sede-select" class="input-dark">
+                            <option value="">— Cargando —</option>
+                        </select>
+                        <span id="fund-sede-lock" class="fund-sede-lock" hidden title="No podés cambiar de sede">
+                            <i class="fas fa-lock"></i>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="planificacion" onclick="FundCore.loadTab('planificacion', this)">
+                    <i class="fas fa-calendar-alt"></i> Planificación
+                </button>
+                <button class="tab-btn" data-tab="bodegas" onclick="FundCore.loadTab('bodegas', this)">
+                    <i class="fas fa-boxes-stacked"></i> Bodegas
+                </button>
+                <button class="tab-btn" data-tab="reporteria" onclick="FundCore.loadTab('reporteria', this)">
+                    <i class="fas fa-chart-line"></i> Reportería
+                </button>
+                <button class="tab-btn fund-tab-admin" data-tab="configuracion" hidden onclick="FundCore.loadTab('configuracion', this)">
+                    <i class="fas fa-cog"></i> Configuración
+                </button>
+            </div>
+
+            <section class="section-block module-shell-content">
+                <div id="tab-content"></div>
+            </section>
+        </div>
+    </main>
+
+    <script src="../shared/js/utilidades.js?v=ASSET_VERSION"></script>
+    <script src="../shared/js/admin.js?v=ASSET_VERSION"></script>
+    <script src="../shared/js/sidebar.js?v=ASSET_VERSION"></script>
+    <script src="js/fundacion_api.js?v=ASSET_VERSION"></script>
+    <script src="js/fundacion_main.js?v=ASSET_VERSION"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.initLogout) window.initLogout();
+            FundCore.init();
+        });
+    </script>
 </body>
 
 </html>

@@ -55,6 +55,7 @@ class UserCreate(BaseModel):
     secondary_roles: List[str] = Field(default_factory=list)
     allowed_modules: List[str] = Field(default_factory=list)
     fundacion_scope: Dict[str, Any] = Field(default_factory=dict)
+    organizacion: Optional[str] = None  # 'monstruo' | 'fundacion'
 
 
 class UserUpdate(BaseModel):
@@ -64,17 +65,91 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
     allowed_modules: Optional[List[str]] = None
     fundacion_scope: Optional[Dict[str, Any]] = None
+    organizacion: Optional[str] = None
+
+
+_VALID_ORGS = {"monstruo", "fundacion"}
+
+
+def _scope_from_session(sess: dict) -> str:
+    """Devuelve la organización a la que el actor está limitado.
+
+    - admin de Monstruo (sistemas/admin global) ve todo: 'monstruo' (sin filtro extra
+      en list, pero al crear/editar puede tocar a quien quiera dentro de Monstruo).
+    - admin de Fundación solo ve y edita usuarios de Fundación.
+
+    Implementación simple: el actor mismo tiene un valor en auth.users.organizacion;
+    los actores de Fundación quedan limitados a su organización.
+    """
+    username = sess.get("username") if isinstance(sess, dict) else None
+    if not username:
+        return "monstruo"
+    conn = db.get_conn()
+    try:
+        row = conn.execute(
+            "SELECT organizacion FROM auth.users WHERE username = %s",
+            (username,),
+        ).fetchone()
+        org = (row.get("organizacion") if row else "monstruo") or "monstruo"
+        return org if org in _VALID_ORGS else "monstruo"
+    finally:
+        conn.close()
+
+
+def _scope_filter_clause(actor_org: str, alias: str = "") -> tuple[str, tuple]:
+    """Cláusula WHERE para limitar la query al scope del actor.
+
+    - actor 'fundacion' → SOLO usuarios de fundacion
+    - actor 'monstruo'  → ve todos (no filtra) — el admin global gestiona ambos lados
+                          pero la UI de configuración global por convención muestra
+                          solo monstruo (filtrado en el frontend o via parámetro).
+    """
+    prefix = f"{alias}." if alias else ""
+    if actor_org == "fundacion":
+        return f"{prefix}organizacion = %s", ("fundacion",)
+    return "1=1", ()
 
 
 @router.get("", response_model=dict)
 async def list_users(
+    organizacion: Optional[str] = None,
     sess: dict = Depends(deps.require_permission("admin.settings")),
 ):
+    """Lista usuarios.
+
+    - Admin de Fundación (organizacion='fundacion' en su propia fila): SOLO ve
+      usuarios de Fundación, ignorando el query param.
+    - Admin global (organizacion='monstruo'): por default ve solo Monstruo. Puede
+      pedir explícitamente ?organizacion=fundacion o ?organizacion=all.
+    """
+    actor_org = _scope_from_session(sess)
+    where_clauses = ["1=1"]
+    params: list = []
+
+    if actor_org == "fundacion":
+        where_clauses.append("organizacion = %s")
+        params.append("fundacion")
+    else:
+        # Admin de Monstruo: respetar filtro explícito o default 'monstruo'.
+        wanted = (organizacion or "monstruo").strip().lower()
+        if wanted in _VALID_ORGS:
+            where_clauses.append("organizacion = %s")
+            params.append(wanted)
+        elif wanted == "all":
+            pass  # sin filtro
+        else:
+            where_clauses.append("organizacion = %s")
+            params.append("monstruo")
+
+    sql = (
+        "SELECT id, username, role, secondary_roles, is_active, allowed_modules, "
+        "fundacion_scope, organizacion, created_at "
+        f"FROM users WHERE {' AND '.join(where_clauses)} ORDER BY username ASC"
+    )
+
     conn = db.get_conn()
     try:
-        cursor = conn.execute(
-            "SELECT username, role, secondary_roles, is_active, allowed_modules, fundacion_scope, created_at FROM users ORDER BY username ASC"
-        )
+        cursor = conn.execute(sql, tuple(params))
         users = []
         for row in cursor.fetchall():
             item = dict(row)
@@ -92,7 +167,7 @@ async def list_users(
 
             item["fundacion_scope"] = auth_service.normalize_fundacion_scope(item.get("fundacion_scope"))
             users.append(item)
-        return {"items": users}
+        return {"items": users, "actor_organizacion": actor_org}
     finally:
         conn.close()
 
@@ -108,6 +183,18 @@ async def create_user_endpoint(
     normalized_secondary_roles = _normalize_secondary_roles_input(body.secondary_roles, normalized_role)
     normalized_fundacion_scope = auth_service.normalize_fundacion_scope(body.fundacion_scope)
 
+    # Resolver organización del usuario nuevo según el scope del actor
+    actor_org = _scope_from_session(sess)
+    requested = (body.organizacion or "").strip().lower() or None
+    if actor_org == "fundacion":
+        # Admin de Fundación SOLO puede crear usuarios de Fundación
+        if requested and requested != "fundacion":
+            raise HTTPException(status_code=403, detail="Solo podés crear usuarios de Fundación")
+        target_org = "fundacion"
+    else:
+        # Admin de Monstruo elige (default 'monstruo')
+        target_org = requested if requested in _VALID_ORGS else "monstruo"
+
     conn = db.get_conn()
     try:
         exists = conn.execute("SELECT 1 FROM users WHERE username = ?", (body.username,)).fetchone()
@@ -115,8 +202,9 @@ async def create_user_endpoint(
             raise HTTPException(status_code=409, detail="Usuario ya existe")
 
         conn.execute(
-            """INSERT INTO users (username, password_hash, role, secondary_roles, is_active, allowed_modules, fundacion_scope, created_at)
-               VALUES (?, ?, ?, ?, 1, ?, ?, ?)""",
+            """INSERT INTO users (username, password_hash, role, secondary_roles, is_active,
+                                  allowed_modules, fundacion_scope, organizacion, created_at)
+               VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)""",
             (
                 body.username,
                 security.get_password_hash(body.password),
@@ -124,11 +212,12 @@ async def create_user_endpoint(
                 json.dumps(normalized_secondary_roles),
                 json.dumps(body.allowed_modules or []),
                 json.dumps(normalized_fundacion_scope),
+                target_org,
                 db.now_utc_iso(),
             ),
         )
         conn.commit()
-        return {"ok": True, "username": body.username}
+        return {"ok": True, "username": body.username, "organizacion": target_org}
     except HTTPException:
         conn.rollback()
         raise
@@ -145,11 +234,19 @@ async def update_user(
     body: UserUpdate,
     sess: dict = Depends(deps.require_permission("admin.settings")),
 ):
+    actor_org = _scope_from_session(sess)
     conn = db.get_conn()
     try:
-        existing = conn.execute("SELECT role, secondary_roles FROM users WHERE username = ?", (username,)).fetchone()
+        existing = conn.execute(
+            "SELECT role, secondary_roles, organizacion FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        target_org = (existing.get("organizacion") or "monstruo")
+        if actor_org == "fundacion" and target_org != "fundacion":
+            raise HTTPException(status_code=403, detail="Solo podés editar usuarios de Fundación")
 
         base_role = _normalize_role_input(existing.get("role"))
         target_role = _normalize_role_input(body.role) if body.role else base_role
@@ -192,6 +289,15 @@ async def update_user(
             updates.append("password_hash = ?")
             params.append(security.get_password_hash(body.password))
 
+        if body.organizacion is not None:
+            new_org = body.organizacion.strip().lower()
+            if new_org not in _VALID_ORGS:
+                raise HTTPException(status_code=400, detail="organización inválida")
+            if actor_org == "fundacion" and new_org != "fundacion":
+                raise HTTPException(status_code=403, detail="No podés mover usuarios fuera de Fundación")
+            updates.append("organizacion = ?")
+            params.append(new_org)
+
         if not updates:
             return {"ok": True, "msg": "No changes"}
 
@@ -218,11 +324,19 @@ async def delete_user(
     if username == sess["username"]:
         raise HTTPException(status_code=400, detail="No puedes eliminar tu propio usuario")
 
+    actor_org = _scope_from_session(sess)
     conn = db.get_conn()
     try:
-        exists = conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
-        if not exists:
+        existing = conn.execute(
+            "SELECT organizacion FROM users WHERE username = ?", (username,),
+        ).fetchone()
+        if not existing:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        target_org = (existing.get("organizacion") or "monstruo")
+        if actor_org == "fundacion" and target_org != "fundacion":
+            raise HTTPException(status_code=403, detail="Solo podés eliminar usuarios de Fundación")
+
         conn.execute("DELETE FROM users WHERE username = ?", (username,))
         conn.commit()
         return {"ok": True}

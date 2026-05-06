@@ -1,0 +1,4 @@
+/* Tab Planificación — solo overrides locales. Reutiliza monstruo.css global. */
+.fund-pane[data-pane="planificacion"] .kpi-row {
+    margin-top: 0.6rem;
+}

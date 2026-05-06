@@ -1,0 +1,41 @@
+<div class="fund-pane" data-pane="planificacion">
+    <div class="fund-pane-head">
+        <h3 id="plan-sede-title">Planificación</h3>
+        <p id="plan-sede-subtitle" class="fund-pane-sub">—</p>
+    </div>
+
+    <div class="kpi-row" id="plan-kpis">
+        <div class="kpi-card">
+            <div class="kpi-val" id="plan-kpi-tareas">—</div>
+            <div class="kpi-lbl">Tareas activas</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-val" id="plan-kpi-vencen">—</div>
+            <div class="kpi-lbl">Vencen esta semana</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-val" id="plan-kpi-completadas">—</div>
+            <div class="kpi-lbl">Completadas (30d)</div>
+        </div>
+    </div>
+
+    <div class="section-header" style="margin-top:1.2rem;">
+        <h3>Próximas tareas</h3>
+    </div>
+    <div class="table-scroll">
+        <table class="monstruo-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Título</th>
+                    <th>Curso</th>
+                    <th>Asignada a</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody id="plan-tareas-body">
+                <tr><td colspan="5" class="fund-empty-row">Cargando tareas…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>

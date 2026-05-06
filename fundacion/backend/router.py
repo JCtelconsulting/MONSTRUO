@@ -4,8 +4,24 @@ from pydantic import BaseModel
 from datetime import datetime
 from plataforma.core import auth_service, db, deps
 from plataforma.core.audit_decorator import audit_action
+from fundacion.backend.services import sedes as sedes_service
+from fundacion.backend.services import membresias as memb_service
 
 router = APIRouter(prefix="/api/fundacion", tags=["fundacion"])
+
+
+def _user_id(user: dict) -> int:
+    uid = sedes_service.usuario_id_de_username(user.get("username", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="usuario no resoluble")
+    return uid
+
+
+def _is_admin(user: dict) -> bool:
+    role = (user.get("role") or "").lower()
+    roles = [r.lower() for r in (user.get("roles") or [])]
+    admin_roles = {"admin", "directora_social", "jefa_pedagogica", "coordinadora_territorial"}
+    return role in admin_roles or any(r in admin_roles for r in roles)
 
 
 def _normalize_sede_value(raw_value: Any) -> str:
@@ -43,6 +59,25 @@ def _is_task_in_scope(scope: Dict[str, Any], task_row: Dict[str, Any]) -> bool:
     curso_value = _normalize_curso_value(task_row.get("curso"))
     return _is_target_in_scope(scope, sede_value, curso_value)
 
+
+def _ensure_sede_access(user: dict, sede_id: Optional[int] = None, sede_code: Optional[str] = None):
+    """Doble candado: backend rechaza si el usuario no tiene acceso a la sede.
+
+    Admins/jefatura pasan siempre (super_scope vía función SQL). Otros roles
+    solo pasan si tienen membresía vigente en la sede solicitada.
+    """
+    uid = _user_id(user)
+    target_id = sede_id
+    if target_id is None and sede_code:
+        sede = sedes_service.get_sede_por_code(sede_code)
+        target_id = sede["id"] if sede else None
+    if target_id is None:
+        # Sin sede target → libre (ej: listar sedes accesibles).
+        return uid
+    if not sedes_service.tiene_acceso_sede(uid, int(target_id)):
+        raise HTTPException(status_code=403, detail="no tenés acceso a esta sede")
+    return uid
+
 class TareaFundacion(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
@@ -71,6 +106,9 @@ async def list_tareas(
     Sin parámetros devuelve todas las tareas (carga inicial rápida para cache del cliente).
     """
     scope = auth_service.get_user_fundacion_scope(user.get("username", ""))
+    uid = _user_id(user)
+    sedes_codes = sedes_service.sede_codes_accesibles(uid)
+    is_admin = sedes_service.es_super_scope(uid) or _is_admin(user)
 
     conn = db.get_conn()
     try:
@@ -90,9 +128,15 @@ async def list_tareas(
             rows = conn.execute("SELECT * FROM fundacion_tareas ORDER BY fecha_inicio ASC").fetchall()
 
         items = [dict(r) for r in rows]
-        if scope.get("is_global"):
-            return items
 
+        # Capa 1: filtrar por sedes accesibles según membresías nuevas.
+        if not is_admin:
+            allowed = set(sedes_codes)
+            items = [i for i in items if (i.get("sede") or "") in allowed or not i.get("sede")]
+
+        # Capa 2 (fallback compat): scope viejo basado en fundacion_scope JSON.
+        if scope.get("is_global") or is_admin:
+            return items
         return [item for item in items if _is_task_in_scope(scope, item)]
     finally:
         conn.close()
@@ -243,3 +287,158 @@ async def delete_tarea(tid: int, user: dict = Depends(deps.require_permission("f
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+
+# ── Sedes ──────────────────────────────────────────────────────────────
+
+class SedeIn(BaseModel):
+    code: str
+    nombre: str
+    region: Optional[str] = None
+    descripcion: Optional[str] = None
+    icono: Optional[str] = None
+    color: Optional[str] = None
+    orden: Optional[int] = 99
+
+
+class SedeUpdate(BaseModel):
+    nombre: Optional[str] = None
+    region: Optional[str] = None
+    descripcion: Optional[str] = None
+    icono: Optional[str] = None
+    color: Optional[str] = None
+    activo: Optional[bool] = None
+    orden: Optional[int] = None
+
+
+@router.get("/sedes")
+async def list_sedes_accesibles(
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """Lista de sedes que el usuario puede ver. Doble candado: el filtro
+    se hace en SQL via fundacion.sedes_accesibles(usuario_id)."""
+    uid = _user_id(user)
+    items = sedes_service.sedes_accesibles(uid)
+    is_admin = sedes_service.es_super_scope(uid) or _is_admin(user)
+    return {"items": items, "es_admin": is_admin}
+
+
+@router.get("/sedes/all")
+async def list_todas_sedes(
+    incluir_inactivas: bool = False,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """Vista admin: todas las sedes existentes (para configuración)."""
+    if not _is_admin(user):
+        raise HTTPException(status_code=403, detail="solo admin")
+    return {"items": sedes_service.listar_todas_sedes(incluir_inactivas=incluir_inactivas)}
+
+
+@router.post("/sedes")
+@audit_action("CREATE_FUNDACION_SEDE", severity="info")
+async def crear_sede(
+    body: SedeIn,
+    request: Request,
+    user: dict = Depends(deps.require_permission("fundacion:write")),
+):
+    if not _is_admin(user):
+        raise HTTPException(status_code=403, detail="solo admin")
+    try:
+        return sedes_service.crear_sede(
+            code=body.code, nombre=body.nombre, region=body.region,
+            descripcion=body.descripcion, icono=body.icono, color=body.color,
+            orden=body.orden or 99,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/sedes/{sede_id}")
+@audit_action("UPDATE_FUNDACION_SEDE", severity="info")
+async def actualizar_sede(
+    sede_id: int,
+    body: SedeUpdate,
+    request: Request,
+    user: dict = Depends(deps.require_permission("fundacion:write")),
+):
+    if not _is_admin(user):
+        raise HTTPException(status_code=403, detail="solo admin")
+    try:
+        return sedes_service.actualizar_sede(
+            sede_id,
+            nombre=body.nombre, region=body.region, descripcion=body.descripcion,
+            icono=body.icono, color=body.color, activo=body.activo, orden=body.orden,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Membresías persona ↔ sede ─────────────────────────────────────────
+
+class MembresiaIn(BaseModel):
+    usuario_id: int
+    sede_id: int
+    rol: str  # 'lider_educativo' | 'gestora_educativa' | 'ejecutiva'
+    motivo: Optional[str] = None
+
+
+@router.get("/membresias")
+async def list_membresias(
+    sede_id: Optional[int] = None,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """Lista membresías. Sin sede_id devuelve todas las vigentes (admin) o
+    solo las del usuario (no-admin)."""
+    uid = _user_id(user)
+    if sede_id is not None:
+        # Doble candado: si no es admin, debe tener acceso a la sede para verlas.
+        _ensure_sede_access(user, sede_id=sede_id)
+        return {"items": memb_service.listar_membresias_sede(sede_id)}
+    if _is_admin(user) or sedes_service.es_super_scope(uid):
+        return {"items": memb_service.listar_todas_membresias_vigentes()}
+    return {"items": memb_service.listar_membresias_usuario(uid)}
+
+
+@router.get("/membresias/mias")
+async def list_mis_membresias(
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    uid = _user_id(user)
+    return {"items": memb_service.listar_membresias_usuario(uid)}
+
+
+@router.post("/membresias")
+@audit_action("ASSIGN_FUNDACION_SEDE_MEMBERSHIP", severity="info")
+async def crear_membresia(
+    body: MembresiaIn,
+    request: Request,
+    user: dict = Depends(deps.require_permission("fundacion:write")),
+):
+    if not _is_admin(user):
+        raise HTTPException(status_code=403, detail="solo admin puede asignar")
+    actor_id = _user_id(user)
+    try:
+        return memb_service.asignar_membresia(
+            usuario_id=body.usuario_id, sede_id=body.sede_id, rol=body.rol,
+            asignado_por=actor_id, motivo=body.motivo,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/membresias/{membresia_id}")
+@audit_action("CLOSE_FUNDACION_SEDE_MEMBERSHIP", severity="warning")
+async def cerrar_membresia(
+    membresia_id: int,
+    request: Request,
+    motivo: Optional[str] = None,
+    user: dict = Depends(deps.require_permission("fundacion:write")),
+):
+    if not _is_admin(user):
+        raise HTTPException(status_code=403, detail="solo admin puede cerrar")
+    ok = memb_service.cerrar_membresia(membresia_id, motivo=motivo)
+    if not ok:
+        raise HTTPException(status_code=404, detail="membresía no encontrada o ya cerrada")
+    return {"ok": True}
