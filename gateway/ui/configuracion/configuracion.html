@@ -1249,13 +1249,88 @@
             <!-- PESTAÑA: GTA — Áreas, Subáreas y Líderes                 -->
             <!-- ========================================================= -->
             <div id="pane-gta" class="view-section">
-                <div class="panel cfg-panel" id="panelGtaAreas">
-                    <h3 class="cfg-panel-title"><i class="fas fa-sitemap"></i> Áreas y Líderes del GTA</h3>
-                    <p class="cfg-panel-subtitle">Administra las áreas operativas, sus subáreas y los líderes responsables.
-                        Los líderes se eligen entre los usuarios activos del sistema.</p>
+                <!-- Sub-tabs internas del pane GTA -->
+                <div class="cfg-subtabs" role="tablist">
+                    <button class="cfg-subtab active" data-gta-sub="areas" type="button">
+                        <i class="fas fa-sitemap"></i> Áreas y Subáreas
+                    </button>
+                    <button class="cfg-subtab" data-gta-sub="membresias" type="button">
+                        <i class="fas fa-users"></i> Líderes y Miembros
+                    </button>
+                </div>
 
-                    <div id="gtaAreasContainer" class="cfg-role-guide-list" style="margin-top: 16px;">
-                        <div class="cfg-role-guide-empty">Cargando áreas...</div>
+                <!-- Sub-pane: Áreas y Subáreas (TABLA) -->
+                <div class="cfg-gta-subpane" data-gta-pane="areas">
+                    <div class="panel cfg-panel">
+                        <div class="cfg-panel-row" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                            <div>
+                                <h3 class="cfg-panel-title"><i class="fas fa-sitemap"></i> Áreas y Subáreas</h3>
+                                <p class="cfg-panel-subtitle">Estructura organizacional del GTA. Cada subárea puede tener tareas y miembros.</p>
+                            </div>
+                            <div class="cfg-toolbar">
+                                <input type="search" id="gtaTblFilter" class="cfg-input input-dark" placeholder="Buscar área o subárea…" style="min-width:240px;">
+                                <label class="cfg-checkbox-label" style="white-space:nowrap;">
+                                    <input type="checkbox" id="gtaTblShowInactive"> Mostrar inactivas
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="cfg-table-wrap">
+                            <table class="cfg-table" id="gtaAreasTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:22%;">Área</th>
+                                        <th style="width:22%;">Subárea</th>
+                                        <th style="width:24%;">Líder vigente</th>
+                                        <th style="width:10%; text-align:center;">Miembros</th>
+                                        <th style="width:10%; text-align:center;">Estado</th>
+                                        <th style="width:12%; text-align:right;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gtaAreasTableBody">
+                                    <tr><td colspan="6" class="cfg-table-empty">Cargando…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-pane: Membresías (Líderes y Miembros) -->
+                <div class="cfg-gta-subpane" data-gta-pane="membresias" hidden>
+                    <div class="panel cfg-panel">
+                        <div class="cfg-panel-row" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                            <div>
+                                <h3 class="cfg-panel-title"><i class="fas fa-users"></i> Líderes y Miembros por Subárea</h3>
+                                <p class="cfg-panel-subtitle">Asignación versionada: una persona puede pertenecer a varias subáreas, una sola es principal. Cada subárea tiene como mucho un líder vigente.</p>
+                            </div>
+                            <div class="cfg-toolbar">
+                                <button class="btn-primary" type="button" onclick="GtaMembresiasUI.openModal()">
+                                    <i class="fas fa-plus"></i> Asignar membresía
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="cfg-toolbar" style="margin:12px 0;">
+                            <input type="search" id="gtaMembFilter" class="cfg-input input-dark" placeholder="Buscar por subárea, persona…" style="min-width:280px;">
+                        </div>
+
+                        <div class="cfg-table-wrap">
+                            <table class="cfg-table" id="gtaMembTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:22%;">Área / Subárea</th>
+                                        <th style="width:28%;">Usuario</th>
+                                        <th style="width:14%;">Rol</th>
+                                        <th style="width:14%;">Principal</th>
+                                        <th style="width:14%;">Desde</th>
+                                        <th style="width:8%; text-align:right;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gtaMembTableBody">
+                                    <tr><td colspan="6" class="cfg-table-empty">Cargando…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div> <!-- END pane-gta -->
@@ -1356,6 +1431,52 @@
         </div>
     </div>
 
+    <!-- Modal: Asignar membresía -->
+    <div id="modalGtaMembresia" class="cfg-modal-overlay" aria-hidden="true">
+        <div class="cfg-modal-card">
+            <div class="cfg-modal-header">
+                <h3>Asignar membresía</h3>
+                <button type="button" class="cfg-modal-close" onclick="GtaMembresiasUI.closeModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <form id="formGtaMembresia" onsubmit="GtaMembresiasUI.save(event)">
+                <div class="cfg-form-row">
+                    <label class="cfg-label">Subárea</label>
+                    <select id="gtaMembSubarea" class="cfg-input input-dark" required></select>
+                </div>
+                <div class="cfg-form-row">
+                    <label class="cfg-label">Usuario</label>
+                    <select id="gtaMembUsuario" class="cfg-input input-dark" required></select>
+                </div>
+                <div class="cfg-form-row">
+                    <label class="cfg-label">Rol</label>
+                    <select id="gtaMembRol" class="cfg-input input-dark">
+                        <option value="miembro">Miembro</option>
+                        <option value="lider">Líder (responsable de la subárea)</option>
+                    </select>
+                    <small style="color:var(--text-muted); display:block; margin-top:4px;">
+                        Si ya hay un líder vigente en la subárea, se cierra automáticamente al asignar uno nuevo.
+                    </small>
+                </div>
+                <div class="cfg-form-row">
+                    <label class="cfg-checkbox-label">
+                        <input type="checkbox" id="gtaMembPrincipal"> Esta es la subárea principal del usuario
+                    </label>
+                    <small style="color:var(--text-muted); display:block; margin-top:4px;">
+                        Si marcas esto, se cierra la membresía principal vigente del usuario en otra subárea.
+                    </small>
+                </div>
+                <div class="cfg-form-row">
+                    <label class="cfg-label">Motivo (opcional)</label>
+                    <input type="text" id="gtaMembMotivo" class="cfg-input input-dark" placeholder="Ej: ingreso al equipo, rotación interna…">
+                </div>
+                <div class="cfg-modal-footer">
+                    <button type="button" class="btn-secondary" onclick="GtaMembresiasUI.closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Asignar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="modalUser" class="cfg-modal-overlay" aria-hidden="true">
         <div class="cfg-modal-card">
             <div class="cfg-modal-header">
@@ -1422,6 +1543,7 @@
     <script src="../shared/js/admin.js?v=ASSET_VERSION"></script>
     <script src="js/users_ui.js?v=ASSET_VERSION"></script>
     <script src="js/gta_areas_ui.js?v=ASSET_VERSION"></script>
+    <script src="js/gta_membresias_ui.js?v=ASSET_VERSION"></script>
     <script>
         // ===================================================================
         // CFG TICKETERA

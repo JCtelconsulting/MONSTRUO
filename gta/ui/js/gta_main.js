@@ -62,6 +62,7 @@ window.GtaCore = (() => {
             const inits = {
                 tablero: window.Tablero,
                 procesos: window.Procesos,
+                tareas:   window.Tareas,
             };
             if (inits[tabName]?.init) inits[tabName].init(_sesion);
         } catch (e) {

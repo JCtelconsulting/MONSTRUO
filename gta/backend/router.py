@@ -9,10 +9,15 @@ from gta.backend.models import (
     QuiebreCreate, QuiebreResolverBody,
     FlujoCrear, TareaCompletarBody, TareaValidarBody,
     AyudaCrear, AyudaResponder,
+    TareaCreate, TareaCerrarBody, TareaReasignarBody, TareaLiberarBody,
+    ColaboradorAgregar, ColaboradorQuitar,
+    MembresiaAsignar, MembresiaCerrar,
 )
 from gta.backend.services import catalogo as catalogo_service
 from gta.backend.services import flujos as flujos_service
 from gta.backend.services import procesos as procesos_service
+from gta.backend.services import tareas as tareas_service
+from gta.backend.services import membresias as membresias_service
 
 router = APIRouter(prefix="/api/gta", tags=["gta"])
 
@@ -719,3 +724,269 @@ async def responder_ayuda(
 async def get_metricas(user: dict = Depends(deps.require_permission("gta:read"))):
     """Métricas globales: tiempos por persona, por área, totales."""
     return flujos_service.metricas_globales()
+
+
+# ── Tareas (modelo área-céntrico) ─────────────────────────────────────
+
+@router.get("/tareas/bandeja")
+async def listar_bandeja(
+    subarea_id: Optional[int] = None,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Tareas sin responsable vigente. Si se pasa subarea_id, filtra a esa
+    subárea; si no, devuelve la unión de las subáreas del usuario."""
+    uid = tareas_service.usuario_id_de_username(user["username"])
+    if subarea_id is not None:
+        return {"items": tareas_service.listar_bandeja_subarea(subarea_id)}
+    return {"items": tareas_service.listar_bandeja_de_usuario(uid)}
+
+
+@router.get("/tareas/mias")
+async def listar_mis_tareas(
+    incluir_cerradas: bool = False,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    uid = tareas_service.usuario_id_de_username(user["username"])
+    return {"items": tareas_service.listar_mis_tareas(uid, incluir_cerradas=incluir_cerradas)}
+
+
+@router.get("/tareas/colaboro")
+async def listar_donde_colaboro(
+    incluir_cerradas: bool = False,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    uid = tareas_service.usuario_id_de_username(user["username"])
+    return {"items": tareas_service.listar_donde_colaboro(uid, incluir_cerradas=incluir_cerradas)}
+
+
+@router.get("/tareas/subarea/{subarea_id}")
+async def listar_tareas_subarea(
+    subarea_id: int,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Todas las tareas de una subárea (cualquier estado)."""
+    return {"items": tareas_service.listar_todas_subarea(subarea_id)}
+
+
+@router.get("/tareas/{tarea_id}")
+async def get_tarea(
+    tarea_id: int,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    t = tareas_service.get_tarea(tarea_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="tarea no encontrada")
+    return t
+
+
+@router.post("/tareas")
+@audit_action("GTA_CREATE_TAREA", severity="info")
+async def crear_tarea(
+    body: TareaCreate,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return tareas_service.crear_tarea(
+            subarea_id=body.subarea_id,
+            titulo=body.titulo,
+            descripcion=body.descripcion,
+            creado_por=uid,
+            proceso_id=body.proceso_id,
+            flujo_tarea_id=body.flujo_tarea_id,
+            tipo=body.tipo,
+            prioridad=body.prioridad or "media",
+            sla_horas=body.sla_horas,
+            tags=body.tags,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/tomar")
+@audit_action("GTA_TOMAR_TAREA", severity="info")
+async def tomar_tarea(
+    tarea_id: int,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return tareas_service.tomar_tarea(tarea_id, usuario_id=uid)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/liberar")
+@audit_action("GTA_LIBERAR_TAREA", severity="info")
+async def liberar_tarea(
+    tarea_id: int,
+    body: TareaLiberarBody,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return tareas_service.liberar_tarea(tarea_id, usuario_id=uid, motivo=body.motivo)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/reasignar")
+@audit_action("GTA_REASIGNAR_TAREA", severity="info")
+async def reasignar_tarea(
+    tarea_id: int,
+    body: TareaReasignarBody,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Reasigna el responsable. Permitido para líderes vigentes de la
+    subárea o admins."""
+    try:
+        actor_id = tareas_service.usuario_id_de_username(user["username"])
+        # Admin bypass
+        if not _es_admin(user):
+            tarea = tareas_service.get_tarea(tarea_id)
+            if not tarea:
+                raise HTTPException(status_code=404, detail="tarea no encontrada")
+            sub_id = tarea["subarea_id"]
+            from plataforma.core import db as _db
+            conn = _db.get_conn()
+            try:
+                row = conn.execute(
+                    """SELECT 1 FROM gta.area_membresias
+                       WHERE usuario_id = %s AND subarea_id = %s
+                         AND rol = 'lider' AND hasta IS NULL""",
+                    (actor_id, sub_id),
+                ).fetchone()
+            finally:
+                conn.close()
+            if not row:
+                raise HTTPException(
+                    status_code=403,
+                    detail="solo el líder vigente de la subárea o un admin puede reasignar",
+                )
+        return tareas_service.reasignar_responsable(
+            tarea_id,
+            nuevo_usuario_id=body.nuevo_usuario_id,
+            asignado_por=actor_id,
+            motivo=body.motivo,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/colaboradores")
+@audit_action("GTA_TAREA_ADD_COLAB", severity="info")
+async def agregar_colaborador(
+    tarea_id: int,
+    body: ColaboradorAgregar,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        actor_id = tareas_service.usuario_id_de_username(user["username"])
+        return tareas_service.agregar_colaborador(
+            tarea_id,
+            usuario_id=body.usuario_id,
+            rol=body.rol,
+            asignado_por=actor_id,
+            motivo=body.motivo,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/tareas/{tarea_id}/colaboradores")
+@audit_action("GTA_TAREA_DEL_COLAB", severity="info")
+async def quitar_colaborador(
+    tarea_id: int,
+    body: ColaboradorQuitar,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        return tareas_service.quitar_colaborador(
+            tarea_id, usuario_id=body.usuario_id, rol=body.rol,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/cerrar")
+@audit_action("GTA_CERRAR_TAREA", severity="info")
+async def cerrar_tarea(
+    tarea_id: int,
+    body: TareaCerrarBody,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return tareas_service.cerrar_tarea(tarea_id, cerrado_por=uid, reporte=body.reporte)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Membresías área ↔ persona ─────────────────────────────────────────
+
+@router.get("/membresias/subarea/{subarea_id}")
+async def listar_membresias_subarea(
+    subarea_id: int,
+    incluir_historico: bool = False,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    return {"items": membresias_service.listar_membresias_subarea(
+        subarea_id, incluir_historico=incluir_historico,
+    )}
+
+
+@router.get("/membresias/mias")
+async def listar_mis_membresias(
+    incluir_historico: bool = False,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    uid = tareas_service.usuario_id_de_username(user["username"])
+    return {"items": membresias_service.listar_membresias_usuario(
+        uid, incluir_historico=incluir_historico,
+    )}
+
+
+@router.post("/membresias")
+@audit_action("GTA_MEMBRESIA_ASIGNAR", severity="warning")
+async def asignar_membresia(
+    body: MembresiaAsignar,
+    request: Request,
+    user: dict = Depends(deps.require_permission("admin.settings")),
+):
+    """Solo admins pueden asignar membresías por ahora."""
+    try:
+        actor_id = tareas_service.usuario_id_de_username(user["username"])
+        return membresias_service.asignar_membresia(
+            usuario_id=body.usuario_id,
+            subarea_id=body.subarea_id,
+            rol=body.rol,
+            es_principal=body.es_principal,
+            asignado_por=actor_id,
+            motivo=body.motivo,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/membresias/{membresia_id}")
+@audit_action("GTA_MEMBRESIA_CERRAR", severity="warning")
+async def cerrar_membresia(
+    membresia_id: int,
+    body: MembresiaCerrar,
+    request: Request,
+    user: dict = Depends(deps.require_permission("admin.settings")),
+):
+    actor_id = tareas_service.usuario_id_de_username(user["username"])
+    ok = membresias_service.cerrar_membresia(
+        membresia_id, cerrado_por=actor_id, motivo=body.motivo,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="membresía no encontrada o ya cerrada")
+    return {"ok": True}

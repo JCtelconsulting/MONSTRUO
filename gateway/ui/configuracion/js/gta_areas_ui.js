@@ -1,106 +1,165 @@
-// gta_areas_ui.js — Pestaña GTA en Configuración
-// Gestión de áreas, subáreas y líderes del GTA
+// gta_areas_ui.js — Pestaña GTA en Configuración (vista tabla)
+// Gestión de áreas, subáreas y líderes del GTA.
 
 (function () {
     'use strict';
 
-    let _areas = [];
+    let _areas = [];               // [{code, label, ..., subareas:[...]}]
     let _users = [];
+    let _membresias = [];          // membresías vigentes (para conteo y líder vigente)
     let _editingAreaCode = null;
     let _editingSubareaId = null;
+    let _filterText = '';
+    let _showInactive = false;
+    let _firstLoadDone = false;
 
     // ── Carga inicial ────────────────────────────────────────────────────
     async function load() {
-        const container = document.getElementById('gtaAreasContainer');
-        if (!container) return;
-        container.innerHTML = '<div class="cfg-role-guide-empty">Cargando áreas...</div>';
+        const tbody = document.getElementById('gtaAreasTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="6" class="cfg-table-empty">Cargando…</td></tr>';
 
         try {
-            const [areasResp, usersResp] = await Promise.all([
+            const [areasResp, usersResp, membResp] = await Promise.all([
                 window.fetchApi('/api/config/gta/areas'),
                 window.fetchApi('/api/config/gta/users'),
+                window.fetchApi('/api/config/gta/membresias'),
             ]);
             _areas = areasResp.items || [];
             _users = usersResp.items || [];
+            _membresias = membResp.items || [];
+            _firstLoadDone = true;
             render();
+            // Refrescar también la sub-pestaña de membresías si está montada
+            if (window.GtaMembresiasUI) window.GtaMembresiasUI.onAreasLoaded(_areas, _users, _membresias);
         } catch (e) {
-            container.innerHTML = `<div class="cfg-role-guide-empty">Error al cargar: ${e.message || e}</div>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="cfg-table-empty">Error al cargar: ${_esc(e.message || e)}</td></tr>`;
         }
-    }
-
-    function _liderText(area) {
-        if (area.lider_username) {
-            const u = _users.find(x => x.username === area.lider_username);
-            return u ? `${area.lider_nombre || area.lider_username} (${area.lider_username})` : area.lider_username;
-        }
-        return area.lider_nombre || '— Sin asignar —';
     }
 
     function _esc(s) {
         return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    function render() {
-        const container = document.getElementById('gtaAreasContainer');
-        if (!container) return;
+    function _liderVigenteHtml(subareaId, areaLiderUsername, areaLiderNombre) {
+        const m = _membresias.find(x => x.subarea_id === subareaId && x.rol === 'lider');
+        if (m) return `<span class="cfg-tag cfg-tag-lider"><i class="fas fa-user-tie"></i> ${_esc(m.username)}</span>`;
+        if (areaLiderUsername) return `<span class="cfg-tag" title="Heredado del área (legacy)">${_esc(areaLiderUsername)} <small>(legacy)</small></span>`;
+        if (areaLiderNombre) return `<span class="cfg-tag">${_esc(areaLiderNombre)} <small>(legacy)</small></span>`;
+        return '<span class="cfg-tag cfg-tag-empty">— Sin líder —</span>';
+    }
 
-        if (_areas.length === 0) {
-            container.innerHTML = '<div class="cfg-role-guide-empty">No hay áreas configuradas.</div>';
+    function _miembrosCount(subareaId) {
+        return _membresias.filter(x => x.subarea_id === subareaId).length;
+    }
+
+    function _matchFilter(area, sub) {
+        if (!_filterText) return true;
+        const q = _filterText.toLowerCase();
+        const fields = [
+            area.code, area.label,
+            sub ? sub.code : '', sub ? sub.label : '',
+        ].map(s => String(s || '').toLowerCase());
+        return fields.some(f => f.includes(q));
+    }
+
+    function render() {
+        const tbody = document.getElementById('gtaAreasTableBody');
+        if (!tbody) return;
+
+        if (!_areas.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="cfg-table-empty">No hay áreas configuradas.</td></tr>';
             return;
         }
 
-        const html = _areas.map(area => {
-            const liderHtml = _liderText(area);
-            const externaTag = area.es_externa ? '<span class="tarea-tag" style="background:#444; color:#bbb;">EXTERNA</span>' : '';
-            const inactivaTag = !area.activo ? '<span class="tarea-tag prioridad-baja">INACTIVA</span>' : '';
+        const rows = [];
+        _areas.forEach(area => {
+            if (!_showInactive && !area.activo) return;
+            const subs = (area.subareas || []).filter(s => _showInactive || s.activo);
 
-            const subareasHtml = (area.subareas || []).map(sub => `
-                <div class="cfg-subarea-row">
-                    <div class="cfg-subarea-info">
-                        <span class="cfg-subarea-label">${_esc(sub.label)}</span>
-                        <span class="cfg-subarea-code">${_esc(sub.code)}</span>
-                        ${sub.lider_nombre ? `<span class="cfg-subarea-lider">Líder: ${_esc(sub.lider_nombre)}</span>` : ''}
-                        ${!sub.activo ? '<span class="tarea-tag prioridad-baja">INACTIVA</span>' : ''}
-                    </div>
-                    <div class="cfg-subarea-actions">
-                        <button class="btn-sm" onclick="GtaAreasUI.openSubareaModal('${_esc(area.code)}', ${sub.id})" title="Editar">
-                            <i class="fas fa-pen"></i>
-                        </button>
-                        <button class="btn-sm btn-danger" onclick="GtaAreasUI.deleteSubarea(${sub.id}, '${_esc(sub.label)}')" title="Eliminar">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+            if (subs.length === 0) {
+                if (!_matchFilter(area, null)) return;
+                rows.push(`
+                    <tr class="cfg-row-area">
+                        <td>
+                            <strong>${_esc(area.label)}</strong>
+                            ${_areaTags(area)}
+                            <div class="cfg-cell-sub">${_esc(area.code)}</div>
+                        </td>
+                        <td colspan="3" class="cfg-cell-empty"><em>Sin subáreas</em></td>
+                        <td style="text-align:center;">${_estadoBadge(area.activo)}</td>
+                        <td style="text-align:right;">
+                            ${_areaActionsHtml(area)}
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
 
-            return `
-            <div class="cfg-area-card" data-area="${_esc(area.code)}">
-                <div class="cfg-area-header">
-                    <div class="cfg-area-title">
-                        <h4>${_esc(area.label)} ${externaTag} ${inactivaTag}</h4>
-                        <div class="cfg-area-meta">
-                            <span class="cfg-area-code">${_esc(area.code)}</span>
-                            <span class="cfg-area-lider"><i class="fas fa-user-tie"></i> ${_esc(liderHtml)}</span>
-                        </div>
-                    </div>
-                    <div class="cfg-area-actions">
-                        <button class="btn-sm" onclick="GtaAreasUI.openAreaModal('${_esc(area.code)}')" title="Editar área">
-                            <i class="fas fa-pen"></i> Editar
-                        </button>
-                        <button class="btn-sm btn-primary" onclick="GtaAreasUI.openSubareaModal('${_esc(area.code)}', null)" title="Agregar subárea">
-                            <i class="fas fa-plus"></i> Subárea
-                        </button>
-                    </div>
-                </div>
-                ${subareasHtml ? `<div class="cfg-subareas-list">${subareasHtml}</div>` : '<div class="cfg-subareas-empty">Sin subáreas</div>'}
-            </div>
-            `;
-        }).join('');
+            subs.forEach((sub, idx) => {
+                if (!_matchFilter(area, sub)) return;
+                const isFirst = (idx === 0);
+                rows.push(`
+                    <tr class="cfg-row-subarea ${isFirst ? 'cfg-row-area-first' : ''}">
+                        <td>
+                            ${isFirst ? `
+                                <strong>${_esc(area.label)}</strong>
+                                ${_areaTags(area)}
+                                <div class="cfg-cell-sub">${_esc(area.code)}</div>
+                            ` : '<span class="cfg-cell-cont">↳</span>'}
+                        </td>
+                        <td>
+                            <span>${_esc(sub.label)}</span>
+                            <div class="cfg-cell-sub">${_esc(sub.code)}</div>
+                        </td>
+                        <td>${_liderVigenteHtml(sub.id, sub.lider_username, sub.lider_nombre)}</td>
+                        <td style="text-align:center;"><span class="cfg-tag cfg-tag-num">${_miembrosCount(sub.id)}</span></td>
+                        <td style="text-align:center;">${_estadoBadge(sub.activo)}</td>
+                        <td style="text-align:right;">
+                            <div class="cfg-row-actions">
+                                ${isFirst ? _areaActionsHtml(area) : ''}
+                                <button class="btn-sm" type="button" onclick="GtaAreasUI.openSubareaModal('${_esc(area.code)}', ${sub.id})" title="Editar subárea">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <button class="btn-sm btn-danger" type="button" onclick="GtaAreasUI.deleteSubarea(${sub.id}, '${_esc(sub.label)}')" title="Eliminar subárea">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `);
+            });
+        });
 
-        container.innerHTML = html;
+        tbody.innerHTML = rows.length
+            ? rows.join('')
+            : '<tr><td colspan="6" class="cfg-table-empty">Sin resultados con ese filtro.</td></tr>';
     }
 
-    // ── Modal: Editar Área ───────────────────────────────────────────────
+    function _areaTags(area) {
+        const parts = [];
+        if (area.es_externa) parts.push('<span class="cfg-tag cfg-tag-warn">EXTERNA</span>');
+        return parts.join(' ');
+    }
+
+    function _estadoBadge(activo) {
+        return activo
+            ? '<span class="cfg-tag cfg-tag-ok">Activa</span>'
+            : '<span class="cfg-tag cfg-tag-muted">Inactiva</span>';
+    }
+
+    function _areaActionsHtml(area) {
+        return `
+            <button class="btn-sm" type="button" onclick="GtaAreasUI.openAreaModal('${_esc(area.code)}')" title="Editar área">
+                <i class="fas fa-pen"></i>
+            </button>
+            <button class="btn-sm btn-primary" type="button" onclick="GtaAreasUI.openSubareaModal('${_esc(area.code)}', null)" title="Nueva subárea en esta área">
+                <i class="fas fa-plus"></i>
+            </button>
+        `;
+    }
+
+    // ── Modales (idénticos a antes en lógica) ────────────────────────────
     function openAreaModal(code) {
         const area = _areas.find(a => a.code === code);
         if (!area) return;
@@ -114,7 +173,6 @@
         document.getElementById('gtaAreaActivo').checked = !!area.activo;
         document.getElementById('gtaAreaOrden').value = area.orden ?? 99;
 
-        // Llenar select de líderes con usuarios del sistema
         const sel = document.getElementById('gtaAreaLider');
         sel.innerHTML = '<option value="">— Sin asignar —</option>' +
             _users.map(u => `<option value="${_esc(u.username)}" ${u.username === area.lider_username ? 'selected' : ''}>${_esc(u.username)} (${_esc(u.role || '-')})</option>`).join('');
@@ -155,7 +213,6 @@
         }
     }
 
-    // ── Modal: Subárea (crear o editar) ──────────────────────────────────
     function openSubareaModal(parentCode, subId) {
         _editingSubareaId = subId;
         const parent = _areas.find(a => a.code === parentCode);
@@ -249,13 +306,39 @@
         }
     }
 
-    // ── Auto-load cuando se activa la pestaña GTA ────────────────────────
+    // ── Sub-tabs internas (Áreas / Membresías) ───────────────────────────
+    function _initSubtabs() {
+        const tabs = document.querySelectorAll('#pane-gta .cfg-subtab');
+        tabs.forEach(t => {
+            t.addEventListener('click', () => {
+                const target = t.getAttribute('data-gta-sub');
+                tabs.forEach(x => x.classList.toggle('active', x === t));
+                document.querySelectorAll('#pane-gta .cfg-gta-subpane').forEach(p => {
+                    p.hidden = (p.getAttribute('data-gta-pane') !== target);
+                });
+                if (target === 'membresias' && window.GtaMembresiasUI) {
+                    window.GtaMembresiasUI.onShow();
+                }
+            });
+        });
+    }
+
+    // ── Filtros tabla ────────────────────────────────────────────────────
+    function _initFilters() {
+        const f = document.getElementById('gtaTblFilter');
+        if (f) f.addEventListener('input', () => { _filterText = f.value.trim(); render(); });
+        const i = document.getElementById('gtaTblShowInactive');
+        if (i) i.addEventListener('change', () => { _showInactive = i.checked; render(); });
+    }
+
+    // Auto-load cuando se activa el pane GTA
     document.addEventListener('DOMContentLoaded', () => {
         const gtaTab = document.querySelector('.tab-btn[data-target="pane-gta"]');
         if (!gtaTab) return;
+        _initSubtabs();
+        _initFilters();
         gtaTab.addEventListener('click', () => {
-            // Carga lazy: primera vez que se abre la pestaña
-            if (_areas.length === 0) load();
+            if (!_firstLoadDone) load();
         });
     });
 
@@ -264,5 +347,10 @@
         openAreaModal, closeAreaModal, saveArea,
         openSubareaModal, closeSubareaModal, saveSubarea,
         deleteSubarea,
+        // Acceso a datos para el módulo de membresías
+        _getAreas: () => _areas,
+        _getUsers: () => _users,
+        _getMembresias: () => _membresias,
+        refresh: load,
     };
 })();

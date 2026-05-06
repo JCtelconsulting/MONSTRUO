@@ -49,5 +49,25 @@ window.GtaApi = (() => {
         pedirAyuda:           (id, data)      => post(`/flujo-tareas/${id}/ayuda`, data),
         responderAyuda:       (id, data)      => post(`/flujo-ayudas/${id}/responder`, data),
         getMetricas:          ()              => get('/metricas'),
+
+        // Tareas (modelo área-céntrico)
+        getBandeja:           (subId)          => get(`/tareas/bandeja${subId ? `?subarea_id=${subId}` : ''}`),
+        getMisTareas:         (incluirCerradas=false) => get(`/tareas/mias?incluir_cerradas=${incluirCerradas}`),
+        getDondeColaboro:     (incluirCerradas=false) => get(`/tareas/colaboro?incluir_cerradas=${incluirCerradas}`),
+        getTareasSubarea:     (subId)          => get(`/tareas/subarea/${subId}`),
+        getTareaArea:         (id)             => get(`/tareas/${id}`),
+        crearTareaArea:       (data)           => post('/tareas', data),
+        tomarTareaArea:       (id)             => post(`/tareas/${id}/tomar`, {}),
+        liberarTareaArea:     (id, motivo)     => post(`/tareas/${id}/liberar`, { motivo: motivo || null }),
+        reasignarTareaArea:   (id, data)       => post(`/tareas/${id}/reasignar`, data),
+        agregarColaborador:   (id, data)       => post(`/tareas/${id}/colaboradores`, data),
+        quitarColaborador:    (id, data)       => window.fetchApi(`${base}/tareas/${id}/colaboradores`, { method: 'DELETE', headers: h, body: JSON.stringify(data) }),
+        cerrarTareaArea:      (id, reporte)    => post(`/tareas/${id}/cerrar`, { reporte: reporte || null }),
+
+        // Membresías
+        getMembresiasSubarea: (subId, hist=false) => get(`/membresias/subarea/${subId}?incluir_historico=${hist}`),
+        getMisMembresias:     (hist=false)        => get(`/membresias/mias?incluir_historico=${hist}`),
+        asignarMembresia:     (data)              => post('/membresias', data),
+        cerrarMembresia:      (id, motivo)        => window.fetchApi(`${base}/membresias/${id}`, { method: 'DELETE', headers: h, body: JSON.stringify({ motivo: motivo || null }) }),
     };
 })();

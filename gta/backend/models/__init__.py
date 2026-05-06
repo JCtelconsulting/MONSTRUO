@@ -81,3 +81,53 @@ class AyudaCrear(BaseModel):
 
 class AyudaResponder(BaseModel):
     respuesta: str
+
+
+# ── Tareas (modelo área-céntrico) ──────────────────────────────────────
+class TareaCreate(BaseModel):
+    subarea_id: int
+    titulo: str
+    descripcion: Optional[str] = None
+    proceso_id: Optional[int] = None
+    flujo_tarea_id: Optional[int] = None
+    tipo: Optional[str] = None
+    prioridad: Optional[str] = "media"           # baja | media | alta | urgente
+    sla_horas: Optional[int] = None
+    tags: Optional[List[str]] = None
+
+
+class TareaCerrarBody(BaseModel):
+    reporte: Optional[str] = None
+
+
+class TareaReasignarBody(BaseModel):
+    nuevo_usuario_id: int
+    motivo: Optional[str] = None
+
+
+class TareaLiberarBody(BaseModel):
+    motivo: Optional[str] = None
+
+
+class ColaboradorAgregar(BaseModel):
+    usuario_id: int
+    rol: str                                      # co_responsable | ayuda
+    motivo: Optional[str] = None
+
+
+class ColaboradorQuitar(BaseModel):
+    usuario_id: int
+    rol: str
+
+
+# ── Membresías área ↔ persona ──────────────────────────────────────────
+class MembresiaAsignar(BaseModel):
+    usuario_id: int
+    subarea_id: int
+    rol: str = "miembro"                          # miembro | lider
+    es_principal: bool = False
+    motivo: Optional[str] = None
+
+
+class MembresiaCerrar(BaseModel):
+    motivo: Optional[str] = None
