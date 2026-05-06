@@ -106,6 +106,23 @@ class PgConn:
         cur.execute(sql, params or ())
         return cur
 
+    def execute_script(self, sql: str):
+        """Ejecuta SQL literal sin parsear placeholders.
+
+        Para archivos de migración con LIKE '%"x"%' o cualquier otro `%`
+        que no sea un placeholder real. psycopg3 al recibir un argumento
+        `params` (incluso `()`) parsea la query y aborta con `only '%s',
+        '%b', '%t' are allowed as placeholders, got '%"'`. Llamando a
+        `_conn.execute(sql)` SIN segundo argumento, psycopg3 trata el
+        SQL como literal y no toca los `%`.
+        """
+        sql = _convert_sql_for_postgres(sql)
+        if self._use_psycopg3:
+            return self._conn.execute(sql)
+        cur = self._conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(sql)
+        return cur
+
     def commit(self):
         self._conn.commit()
 
@@ -295,7 +312,7 @@ def _run_guarded_pg_section(conn, section_name: str, fn) -> None:
             conn.execute(f"RELEASE SAVEPOINT {sp_name}")
         except Exception:
             pass
-        logger.warning("[DB-MIGRATION] WARN {section_name}: {e}")
+        logger.warning("[DB-MIGRATION] WARN %s: %s", section_name, e)
 
 
 def init_db() -> None:
@@ -595,7 +612,7 @@ def init_db() -> None:
                 (now_jobs,),
             )
         except Exception as _e:
-            logger.warning("[DB-MIGRATION] WARN prune duplicados sys_jobs: {_e}")
+            logger.warning("[DB-MIGRATION] WARN prune duplicados sys_jobs: %s", _e)
         # Dedupe fuerte para recurrentes de alta frecuencia.
         try:
             conn.execute(
@@ -611,7 +628,7 @@ def init_db() -> None:
                      AND status IN ('PENDING', 'RETRY')"""
             )
         except Exception as _e:
-            logger.warning("[DB-MIGRATION] WARN índices únicos recurrentes sys_jobs: {_e}")
+            logger.warning("[DB-MIGRATION] WARN índices únicos recurrentes sys_jobs: %s", _e)
 
         # Ticketera (EPIC 11)
         conn.execute("""
@@ -686,7 +703,7 @@ def init_db() -> None:
         try:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_attach_sha256 ON tks.ticket_attachments(sha256);")
         except Exception as _e:
-            logger.warning("[DB-MIGRATION] WARN índice idx_attach_sha256: {_e}")
+            logger.warning("[DB-MIGRATION] WARN índice idx_attach_sha256: %s", _e)
 
         # --- Ticketera V3: Columnas extras en tickets (migración individual) ---
         _v3_columns = [
@@ -733,7 +750,7 @@ def init_db() -> None:
                         logger.error("%s", err_msg)
                         raise RuntimeError(err_msg) from _e
                     else:
-                        logger.warning("[DB-MIGRATION] WARN columna '{col_name}' ya existe o no se pudo crear: {_e}")
+                        logger.warning("[DB-MIGRATION] WARN columna '%s' ya existe o no se pudo crear: %s", col_name, _e)
 
         _run_guarded_pg_section(conn, "migrate_tickets_v3", _migrate_tickets_v3_section)
 
@@ -764,7 +781,7 @@ def init_db() -> None:
             try:
                 conn.execute(idx_sql)
             except Exception as _e:
-                logger.warning("[DB-MIGRATION] WARN índice: {_e}")
+                logger.warning("[DB-MIGRATION] WARN índice: %s", _e)
 
         # --- Backfill de columnas Workflow/SLA para registros existentes ---
         try:
@@ -819,7 +836,7 @@ def init_db() -> None:
                    WHERE frt_due_at IS NULL"""
             )
         except Exception as _e:
-            logger.warning("[DB-MIGRATION] WARN backfill workflow/sla: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill workflow/sla: %s", _e)
 
         # --- Backfill papelera ---
         try:
@@ -830,7 +847,7 @@ def init_db() -> None:
                 "UPDATE tickets SET trash_reason = '' WHERE trash_reason IS NULL"
             )
         except Exception as _e:
-            logger.warning("[DB-MIGRATION] WARN backfill papelera: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill papelera: %s", _e)
 
         # --- Backfill retención por clase de seguridad ---
         try:
@@ -857,7 +874,7 @@ def init_db() -> None:
                       AND retention_until IS NULL"""
             )
         except Exception as _e:
-            logger.warning("[DB-MIGRATION] WARN backfill retention: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill retention: %s", _e)
 
         # --- Ticketera V3: Especialidades de Usuarios ---
         conn.execute("""
@@ -956,7 +973,7 @@ def init_db() -> None:
                     WHERE provider IS NULL OR attempt_count IS NULL"""
             )
         except Exception as _e:
-            logger.warning("[DB-MIGRATION] WARN backfill ticket_notifications: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill ticket_notifications: %s", _e)
 
         # --- PMO (Proyectos y Bitacora) ---
         conn.execute("""

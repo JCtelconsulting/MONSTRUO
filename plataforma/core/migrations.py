@@ -51,7 +51,11 @@ def run_migrations() -> None:
             sql_content = file_path.read_text(encoding="utf-8")
 
             try:
-                conn.execute(sql_content)
+                # Usar execute_script (no execute) para que psycopg3 trate
+                # el SQL como literal y no parsee `%` como placeholder. Si no,
+                # patrones como LIKE '%"x"%' rompen con
+                # "only '%s', '%b', '%t' are allowed as placeholders, got '%\"'".
+                conn.execute_script(sql_content)
                 now = datetime.now(timezone.utc).isoformat()
                 if row:
                     conn.execute(

@@ -329,6 +329,9 @@ window.Tareas = (() => {
         //   - ID numérico directo (ej: "24")
         //   - Username completo (ej: "fleon@wolf-industries.tech")
         //   - Prefijo del username (ej: "fleon" → matchea fleon@…)
+        // Comparación case-insensitive porque los correos no son sensibles
+        // a mayúsculas, y BD los guarda lowercase.
+        const inputLower = inputRaw.toLowerCase();
         let usuario_id = null;
         if (/^\d+$/.test(inputRaw)) {
             usuario_id = parseInt(inputRaw, 10);
@@ -336,12 +339,12 @@ window.Tareas = (() => {
             try {
                 const r = await window.fetchApi('/api/config/gta/users');
                 const items = r?.items || [];
-                const exact = items.find(u => u.username === inputRaw);
+                const exact = items.find(u => String(u.username || '').toLowerCase() === inputLower);
                 if (exact) {
                     usuario_id = exact.id;
                 } else {
                     // Prefijo único antes del @: si hay un solo match, lo aceptamos
-                    const matches = items.filter(u => String(u.username || '').split('@')[0] === inputRaw);
+                    const matches = items.filter(u => String(u.username || '').split('@')[0].toLowerCase() === inputLower);
                     if (matches.length === 1) usuario_id = matches[0].id;
                     else if (matches.length > 1) return alert('Hay más de un usuario con ese prefijo. Ingresá el correo completo.');
                 }
@@ -349,6 +352,10 @@ window.Tareas = (() => {
                 return alert('No se pudo resolver el usuario: ' + _esc(_humanizeErr(e)));
             }
             if (!usuario_id) return alert(`No se encontró un usuario para "${inputRaw}".`);
+        }
+
+        if (!Number.isInteger(usuario_id) || usuario_id <= 0) {
+            return alert('ID de usuario inválido.');
         }
 
         try {

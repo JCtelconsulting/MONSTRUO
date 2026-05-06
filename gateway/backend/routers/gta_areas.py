@@ -238,8 +238,15 @@ async def delete_subarea(
 
 @router.get("/users", summary="Lista de usuarios disponibles para asignar como líder")
 async def list_users(
-    sess: dict = Depends(deps.require_permission("admin.settings")),
+    sess: dict = Depends(deps.require_permission("gta:read")),
 ):
+    """Listado de usuarios activos para asignación de líderes/colaboradores.
+
+    Requiere `gta:read` (no `admin.settings`) porque también lo consume el
+    modal "Agregar colaborador" en gta/ui/tareas, que se invoca con permisos
+    de operación normal. La respuesta no expone secretos: id, username/email
+    (que son lo mismo), role y secondary_roles.
+    """
     conn = db.get_conn()
     try:
         rows = conn.execute(
