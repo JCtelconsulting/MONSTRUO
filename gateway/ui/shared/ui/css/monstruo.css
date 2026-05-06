@@ -3026,3 +3026,46 @@ body:not(.login-shell) .tks-modal {
     color: #0b1220;
     border-color: var(--accent, #8ab4f8);
 }
+
+/* Configuración — agrupación de roles por organización */
+.cfg-role-group {
+    margin-top: 1.2rem;
+}
+.cfg-role-group:first-child { margin-top: 0; }
+
+.cfg-role-group-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-soft, #a5adb4);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.cfg-role-group-title i {
+    color: var(--neon, #00ff41);
+}
+
+.cfg-role-group-items {
+    display: grid;
+    gap: 0.6rem;
+}
+
+/* Indicador "no podés borrarte a vos mismo" en la columna de acciones */
+.cfg-self-lock {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: var(--warning, #ffcc00);
+    opacity: 0.6;
+    font-size: 0.85rem;
+}

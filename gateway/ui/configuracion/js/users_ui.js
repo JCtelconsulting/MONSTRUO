@@ -10,22 +10,35 @@ const UsersUI = (() => {
     let _allPermissions = [];      // [{id, label}] from API
     let _editingRole = null;       // role being edited in modal
     let _editingRolePerms = [];    // current draft permissions
+    let _currentUsername = '';     // username del usuario logueado, resuelto en load()
 
-    const PROTECTED_USER = 'juan.lopez@telconsulting.cl';
-
-    const ROLE_OPTIONS = [
-        { id: 'admin', label: 'Admin' },
-        { id: 'encargado_mesa', label: 'Encargado Mesa Ayuda' },
-        { id: 'redes', label: 'Redes' },
-        { id: 'sistemas', label: 'Sistemas' },
+    const MONSTRUO_ROLES = [
+        { id: 'admin',            label: 'Admin (super)' },
+        { id: 'encargado_mesa',   label: 'Encargado Mesa Ayuda' },
+        { id: 'redes',            label: 'Redes' },
+        { id: 'sistemas',         label: 'Sistemas' },
         { id: 'implementaciones', label: 'Implementaciones' },
-        { id: 'gerencia', label: 'Gerencia' },
-        { id: 'ops', label: 'Operaciones' },
-        { id: 'finance', label: 'Finanzas' },
-        { id: 'warehouse', label: 'Bodega' },
-        { id: 'monitora', label: 'Monitora Fundación' },
-        { id: 'ejecutiva', label: 'Ejecutiva Fundación' }
+        { id: 'gerencia',         label: 'Gerencia' },
+        { id: 'ops',              label: 'Operaciones' },
+        { id: 'finance',          label: 'Finanzas' },
+        { id: 'warehouse',        label: 'Bodega' },
     ];
+
+    const FUNDACION_ROLES = [
+        { id: 'directora_social',          label: 'Directora Social' },
+        { id: 'jefa_pedagogica',           label: 'Jefa Pedagógica' },
+        { id: 'coordinadora_territorial',  label: 'Coordinadora Territorial' },
+        { id: 'lider_educativo',           label: 'Líder Educativo' },
+        { id: 'gestora_educativa',         label: 'Gestora Educativa' },
+    ];
+
+    const MONSTRUO_ROLE_IDS = new Set(MONSTRUO_ROLES.map(r => r.id));
+    const FUNDACION_ROLE_IDS = new Set(FUNDACION_ROLES.map(r => r.id));
+
+    // Compat: el resto del archivo aún referencia ROLE_OPTIONS para llenar
+    // selects de rol primario. Combinamos ambos grupos en un único listado
+    // ordenado (Monstruo primero, Fundación después).
+    const ROLE_OPTIONS = [...MONSTRUO_ROLES, ...FUNDACION_ROLES];
 
     const ROLE_SCOPE_FALLBACK = {
         admin: {
@@ -114,8 +127,8 @@ const UsersUI = (() => {
                 'Reportes: lectura'
             ]
         },
-        monitora: {
-            description: 'Planificación global y gestión de todas las tareas de la Fundación.',
+        directora_social: {
+            description: 'Dirección estratégica de la Fundación (super-scope a sedes).',
             permissions: [
                 'Dashboard: lectura',
                 'Fundacion: lectura',
@@ -123,11 +136,39 @@ const UsersUI = (() => {
                 'Auditoria: lectura'
             ]
         },
-        ejecutiva: {
-            description: 'Acceso a la planificación propia y reporte de actividades.',
+        jefa_pedagogica: {
+            description: 'Lidera la línea pedagógica de la Fundación (super-scope a sedes).',
             permissions: [
                 'Dashboard: lectura',
-                'Fundacion: lectura'
+                'Fundacion: lectura',
+                'Fundacion: escritura',
+                'Auditoria: lectura'
+            ]
+        },
+        coordinadora_territorial: {
+            description: 'Coordina territorialmente las sedes (super-scope a sedes).',
+            permissions: [
+                'Dashboard: lectura',
+                'Fundacion: lectura',
+                'Fundacion: escritura',
+                'Auditoria: lectura'
+            ]
+        },
+        lider_educativo: {
+            description: 'Responsable de una o más sedes; el alcance lo define la membresía.',
+            permissions: [
+                'Dashboard: lectura',
+                'Fundacion: lectura',
+                'Fundacion: escritura'
+            ]
+        },
+        gestora_educativa: {
+            description: 'Operación educativa dentro de su sede asignada.',
+            permissions: [
+                'Dashboard: lectura',
+                'Fundacion: lectura',
+                'Fundacion: escritura',
+                'Auditoria: lectura'
             ]
         }
     };
@@ -454,7 +495,17 @@ const UsersUI = (() => {
             return;
         }
 
-        body.innerHTML = _roleScopeItems.map((item) => {
+        const monstruo = [];
+        const fundacion = [];
+        const otros = [];
+        _roleScopeItems.forEach(item => {
+            const id = String(item.role || '').toLowerCase();
+            if (FUNDACION_ROLE_IDS.has(id))      fundacion.push(item);
+            else if (MONSTRUO_ROLE_IDS.has(id))  monstruo.push(item);
+            else                                  otros.push(item);
+        });
+
+        const renderItem = (item) => {
             const perms = Array.isArray(item.permissions) ? item.permissions : [];
             const encodedRole = encodeDataset(item.role);
             return `
@@ -469,7 +520,23 @@ const UsersUI = (() => {
                     <div class="cfg-role-guide-perms">${renderScopePills(perms)}</div>
                 </article>
             `;
-        }).join('');
+        };
+
+        const renderGroup = (titulo, icon, items) => {
+            if (!items.length) return '';
+            return `
+                <div class="cfg-role-group">
+                    <h5 class="cfg-role-group-title"><i class="fas ${icon}"></i> ${escapeHtml(titulo)}</h5>
+                    <div class="cfg-role-group-items">${items.map(renderItem).join('')}</div>
+                </div>
+            `;
+        };
+
+        body.innerHTML = [
+            renderGroup('Monstruo', 'fa-server', monstruo),
+            renderGroup('Fundación', 'fa-school', fundacion),
+            renderGroup('Otros', 'fa-circle-question', otros),
+        ].filter(Boolean).join('');
 
         body.querySelectorAll('.cfg-role-guide-row[data-role]').forEach((row) => {
             row.addEventListener('click', () => {
@@ -656,9 +723,9 @@ const UsersUI = (() => {
                                 <button class="btn-icon-sm" data-action="edit" data-username="${encodedUsername}" title="Editar usuario">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                ${username !== PROTECTED_USER
+                                ${username !== _currentUsername
                         ? `<button class="btn-icon-sm btn-icon-danger" data-action="delete" data-username="${encodedUsername}" title="Eliminar usuario"><i class="fas fa-trash"></i></button>`
-                        : ''}
+                        : '<span class="cfg-self-lock" title="No podés eliminarte a vos mismo"><i class="fas fa-lock"></i></span>'}
                             </div>
                         </td>
                     </tr>
@@ -673,11 +740,15 @@ const UsersUI = (() => {
         bindTableActions();
 
         try {
-            const [usersData, scopesDataRaw] = await Promise.all([
+            const [usersData, scopesDataRaw, sesionData] = await Promise.all([
                 window.fetchApi('/api/admin/users'),
-                window.fetchApi('/api/config/role-scopes').catch(() => null)
+                window.fetchApi('/api/config/role-scopes').catch(() => null),
+                window.fetchApi('/api/sesion').catch(() => null),
             ]);
 
+            // /api/sesion devuelve {user, role, roles, ...}. Tomamos `user`
+            // (legacy) o `username` (algunos consumidores), lo que esté.
+            _currentUsername = String(sesionData?.user || sesionData?.username || '');
             _users = Array.isArray(usersData?.items) ? usersData.items : [];
             const scopesItems = Array.isArray(scopesDataRaw?.items) && scopesDataRaw.items.length
                 ? scopesDataRaw.items
