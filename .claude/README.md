@@ -8,15 +8,21 @@ herede automáticamente.
 
 ```text
 .claude/
-├── settings.json       — config compartida del proyecto (hooks, permisos)
-├── settings.local.json — config tuya local (NO se commitea, .gitignore)
-├── hooks/              — scripts ejecutados por hooks
+├── settings.json          — config compartida (hooks, permisos)
+├── settings.local.json    — config tuya local (NO se commitea, .gitignore)
+├── hooks/                 — scripts ejecutados por hooks
 │   ├── rebuild-on-edit.sh
-│   └── rebuild.log     — log de ejecuciones (NO se commitea, .gitignore)
-└── (futuro)
-    ├── agents/         — subagentes especializados
-    └── commands/       — slash commands del proyecto
+│   └── rebuild.log        — log de ejecuciones (NO se commitea, .gitignore)
+├── agents/                — subagentes especializados
+│   └── code-reviewer.md
+├── commands/              — slash commands del proyecto
+│   └── deploy-dev.md
+└── mcp/                   — wrappers para MCP servers
+    └── postgres-wrapper.sh
 ```
+
+El `.mcp.json` que registra los MCP servers vive en la raíz del repo (no acá),
+porque esa es la convención que Claude Code busca.
 
 ## Hooks activos
 
@@ -37,6 +43,44 @@ regla en `AGENTS.md` §5.1; este hook la automatiza.
 - Archivos en `.claude/`, `plataforma/docs/`, raíz del repo (`AGENTS.md`,
   `README.md`, `docker-compose.yaml`, etc.).
 - Extensiones que no son runtime: `.md`, `.json`, `.yaml`, `.sql`, etc.
+
+## Subagentes
+
+### `code-reviewer`
+
+Revisor read-only para usar antes de commits importantes o cuando se pida una
+segunda opinión. Conoce las reglas duras del repo (DEV/PROD, cache-busting,
+audit-logs append-only, etc.) y reporta hallazgos clasificados como
+🔴 BLOQUEANTE / 🟡 IMPORTANTE / 🟢 SUGERENCIA. No edita ni reescribe código.
+
+Invocación típica: el agente principal lo llama vía la tool `Agent` con
+`subagent_type: "code-reviewer"` cuando termina un cambio significativo.
+
+## Slash commands
+
+### `/deploy-dev <containers>`
+
+Atajo para el ciclo `ASSET_VERSION=$(sha) docker compose up -d --build` +
+smoke test de `/health`. Sin args, rebuildea el stack completo.
+
+```text
+/deploy-dev gateway gta
+```
+
+## MCP servers
+
+### `monstruo-postgres`
+
+MCP server oficial de Postgres (`@modelcontextprotocol/server-postgres`)
+conectado a la DB DEV. Expone `tools` para hacer queries SQL y `resources`
+para listar tablas/schemas, sin tener que pasar por `docker exec ... psql`
+cada vez.
+
+El wrapper `mcp/postgres-wrapper.sh` resuelve la IP del container
+`monstruo-dev-db` en runtime (la IP cambia al recrear el container) y lee
+las credenciales desde el env file del repo.
+
+Configurado en `.mcp.json` (raíz del repo, scope proyecto).
 
 ## Convenciones
 
