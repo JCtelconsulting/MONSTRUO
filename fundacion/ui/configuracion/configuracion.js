@@ -103,8 +103,6 @@ window.FundConfiguracion = (() => {
             coordinadora_territorial: 'Coordinadora Territorial',
             lider_educativo: 'Líder Educativo',
             gestora_educativa: 'Gestora Educativa',
-            ejecutiva: 'Ejecutiva',
-            fundacion: 'Fundación',
         })[r] || r || '—';
     }
 

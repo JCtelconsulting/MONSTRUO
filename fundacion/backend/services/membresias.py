@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from plataforma.core import db
 
 
-_VALID_ROLES = {"lider_educativo", "gestora_educativa", "ejecutiva"}
+_VALID_ROLES = {"lider_educativo", "gestora_educativa"}
 
 
 def listar_membresias_sede(sede_id: int, *, incluir_historico: bool = False) -> List[Dict[str, Any]]:

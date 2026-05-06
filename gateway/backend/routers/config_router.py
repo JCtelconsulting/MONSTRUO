@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 
 ROLE_LABELS = {
+    # Monstruo
     "admin": "Admin",
     "encargado_mesa": "Encargado Mesa Ayuda",
     "ops": "Operaciones",
@@ -21,16 +22,12 @@ ROLE_LABELS = {
     "finance": "Finanzas",
     "warehouse": "Bodega",
     "gerencia": "Gerencia",
-    "monitora": "Monitora Fundacion",
-    "ejecutiva": "Ejecutiva Fundacion",
-    "fundacion": "Fundacion",
-    "encargado_la_pintana": "Encargado La Pintana",
-    "encargado_maipu": "Encargado Maipu",
-    "encargado_llay_llay": "Encargado Llay-Llay",
-    "encargado_huechuraba": "Encargado Huechuraba",
-    "encargado_renca": "Encargado Renca",
-    "encargado_lo_espejo": "Encargado Lo Espejo",
-    "encargado_cerro_navia": "Encargado Cerro Navia",
+    # Fundación (organigrama 2026)
+    "directora_social": "Directora Social",
+    "jefa_pedagogica": "Jefa Pedagógica",
+    "coordinadora_territorial": "Coordinadora Territorial",
+    "lider_educativo": "Líder Educativo",
+    "gestora_educativa": "Gestora Educativa",
 }
 
 ROLE_DESCRIPTIONS = {
@@ -43,16 +40,11 @@ ROLE_DESCRIPTIONS = {
     "finance": "Gestion financiera y cobranza con foco contable.",
     "warehouse": "Gestion operativa de inventario y movimientos de bodega.",
     "gerencia": "Vision ejecutiva y lectura de indicadores/estado operacional.",
-    "monitora": "Planificacion global y gestion de todas las tareas de la Fundacion.",
-    "ejecutiva": "Acceso a planificacion propia y reporte de actividades.",
-    "fundacion": "Gestion integral del modulo Fundacion.",
-    "encargado_la_pintana": "Responsable operativo de la sede La Pintana.",
-    "encargado_maipu": "Responsable operativo de la sede Maipu.",
-    "encargado_llay_llay": "Responsable operativo de la sede Llay-Llay.",
-    "encargado_huechuraba": "Responsable operativo de la sede Huechuraba.",
-    "encargado_renca": "Responsable operativo de la sede Renca.",
-    "encargado_lo_espejo": "Responsable operativo de la sede Lo Espejo.",
-    "encargado_cerro_navia": "Responsable operativo de la sede Cerro Navia.",
+    "directora_social": "Direccion estrategica de la Fundacion (super-scope a sedes).",
+    "jefa_pedagogica": "Lidera la linea pedagogica de la Fundacion (super-scope a sedes).",
+    "coordinadora_territorial": "Coordina territorialmente las sedes (super-scope a sedes).",
+    "lider_educativo": "Responsable de una o mas sedes; el alcance lo define la membresia.",
+    "gestora_educativa": "Operacion educativa dentro de su sede asignada.",
 }
 
 PERMISSION_LABELS = {

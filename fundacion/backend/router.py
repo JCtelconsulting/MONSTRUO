@@ -204,11 +204,16 @@ async def update_tarea(tid: int, update: Dict[str, Any], user: dict = Depends(de
         if not _is_target_in_scope(scope, target_sede, target_curso):
             raise HTTPException(status_code=403, detail="No puede mover esta tarea fuera de su alcance Fundación")
         
+        # Roles que pueden editar tareas ajenas: admin global + jefatura de Fundación
+        # + líder educativo (responsable de sede). Las gestoras editan solo lo propio.
         roles = user.get("roles", [])
-        is_monitora = any(r in ["admin", "monitora", "gerencia", "ejecutiva"] for r in roles)
+        primary_role = (user.get("role") or "").lower()
+        privileged = {"admin", "directora_social", "jefa_pedagogica",
+                      "coordinadora_territorial", "lider_educativo", "gerencia"}
+        is_privileged = primary_role in privileged or any(r in privileged for r in roles)
         is_owner = row["asignado_a"] == user["username"]
-        
-        if not is_monitora and not is_owner:
+
+        if not is_privileged and not is_owner:
             raise HTTPException(status_code=403, detail="No tiene permisos sobre esta tarea")
             
         fields = []
@@ -225,7 +230,7 @@ async def update_tarea(tid: int, update: Dict[str, Any], user: dict = Depends(de
             "categoria", "categoria_madre", "subcategoria", "curso"
         ]
         
-        if not is_monitora:
+        if not is_privileged:
             allowed_fields = ["estado", "reporte", "imprevistos"]
             
         for k, v in update.items():
@@ -265,7 +270,7 @@ async def update_tarea(tid: int, update: Dict[str, Any], user: dict = Depends(de
 @audit_action("DELETE_FUNDACION_TASK", severity="warning")
 async def delete_tarea(tid: int, user: dict = Depends(deps.require_permission("fundacion:write"))):
     """
-    Elimina una tarea. Solo monitoras/admin.
+    Elimina una tarea. Solo admin/jefatura/líder educativo.
     """
     scope = auth_service.get_user_fundacion_scope(user.get("username", ""))
 
@@ -378,7 +383,7 @@ async def actualizar_sede(
 class MembresiaIn(BaseModel):
     usuario_id: int
     sede_id: int
-    rol: str  # 'lider_educativo' | 'gestora_educativa' | 'ejecutiva'
+    rol: str  # 'lider_educativo' | 'gestora_educativa'
     motivo: Optional[str] = None
 
 

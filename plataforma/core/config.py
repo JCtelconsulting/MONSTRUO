@@ -161,10 +161,6 @@ class Settings(BaseSettings):
             "fundacion:write",
             "audit:read",
         ],
-        "ejecutiva": [
-            "dashboard:read",
-            "fundacion:read",
-        ],
         # Roles de jefatura del organigrama. Operacionalmente equivalentes a
         # admin para Fundación; los conservamos como roles separados para
         # reflejar el organigrama y permitir afinar permisos en el futuro.
@@ -181,14 +177,6 @@ class Settings(BaseSettings):
             "audit:read",
         ],
         "coordinadora_territorial": [
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-            "audit:read",
-        ],
-        # Rol genérico — alias para usuarios que solo tienen módulo Fundación
-        # sin distinción jerárquica.
-        "fundacion": [
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",

@@ -2677,6 +2677,7 @@ def init_db() -> None:
                         "gta:write": "GTA: gestión",
                     }
                     _ROLE_DESCS = {
+                        # Monstruo
                         "admin": "Control total de plataforma, seguridad y configuración global.",
                         "encargado_mesa": "Gestiona flujo de ticketera, asignación, seguimiento y cumplimiento.",
                         "ops": "Operación técnica transversal para atención y despacho de tickets.",
@@ -2686,9 +2687,12 @@ def init_db() -> None:
                         "finance": "Gestión financiera y cobranza con foco contable.",
                         "warehouse": "Gestión operativa de inventario y movimientos de bodega.",
                         "gerencia": "Visión ejecutiva y lectura de indicadores/estado operacional.",
-                        "monitora": "Planificación global y gestión de todas las tareas de la Fundación.",
-                        "ejecutiva": "Acceso a planificación propia y reporte de actividades.",
-                        "fundacion": "Gestión integral del módulo Fundación.",
+                        # Fundación (organigrama 2026)
+                        "directora_social": "Dirección estratégica de la Fundación (super-scope a sedes).",
+                        "jefa_pedagogica": "Lidera la línea pedagógica de la Fundación (super-scope a sedes).",
+                        "coordinadora_territorial": "Coordina territorialmente las sedes (super-scope a sedes).",
+                        "lider_educativo": "Responsable de una o más sedes; el alcance lo define la membresía.",
+                        "gestora_educativa": "Operación educativa dentro de su sede asignada.",
                     }
                     for role, perms in _s.ROLE_PERMISSIONS.items():
                         desc = _ROLE_DESCS.get(role, "Rol operativo de plataforma.")
