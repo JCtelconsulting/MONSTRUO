@@ -1057,11 +1057,13 @@ async def reportar_quiebre_desde_tarea(
 async def listar_quiebres_para_mi_area(
     user: dict = Depends(deps.require_permission("gta:read")),
 ):
-    """Quiebres abiertos dirigidos a las áreas vigentes del usuario."""
+    """Quiebres abiertos dirigidos a las áreas vigentes del usuario.
+    Admin ve todos los quiebres abiertos sin filtro de área."""
     uid = tareas_service.usuario_id_de_username(user["username"])
     codes = membresias_service.area_codes_de_usuario(uid)
-    items = quiebres_service.listar_pendientes_para_areas(codes)
-    return {"items": items, "areas": codes}
+    es_admin = _es_admin(user)
+    items = quiebres_service.listar_pendientes_para_areas(codes, todos=es_admin)
+    return {"items": items, "areas": codes, "es_admin": es_admin}
 
 
 @router.post("/quiebres/{qid}/resolver-tarea")

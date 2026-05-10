@@ -182,33 +182,47 @@ def listar_de_tarea(tarea_id: int) -> List[Dict[str, Any]]:
         conn.close()
 
 
-def listar_pendientes_para_areas(area_codes: List[str]) -> List[Dict[str, Any]]:
-    """Quiebres abiertos dirigidos a alguna de las áreas del usuario, vinculados
-    a una tarea (los del modelo viejo atados solo a solicitud_id quedan fuera).
+def listar_pendientes_para_areas(
+    area_codes: List[str],
+    *,
+    todos: bool = False,
+) -> List[Dict[str, Any]]:
+    """Quiebres abiertos vinculados a una tarea.
+
+    - Si todos=True: devuelve todos los abiertos (útil para admin).
+    - Si todos=False: filtra por las áreas del usuario.
+
+    Los quiebres del modelo viejo atados solo a solicitud_id quedan fuera.
     """
-    if not area_codes:
+    if not todos and not area_codes:
         return []
     conn = db.get_conn()
     try:
-        placeholders = ",".join(["%s"] * len(area_codes))
-        rows = conn.execute(
-            f"""SELECT q.id, q.descripcion, q.area, q.tipo, q.estado,
-                       q.reportado_por, q.created_at,
-                       q.tarea_id, q.tarea_estado_previo, q.proceso_id,
-                       a.label AS area_label,
-                       t.titulo AS tarea_titulo, t.paso_orden, t.flujo_id,
-                       t.flujo_titulo,
-                       p.nombre AS proceso_nombre
-                FROM gta.quiebres q
-                LEFT JOIN gta.areas a ON a.code = q.area
-                LEFT JOIN gta.tareas t ON t.id = q.tarea_id
-                LEFT JOIN gta.procesos p ON p.id = q.proceso_id
-                WHERE q.estado = 'abierto'
-                  AND q.area IN ({placeholders})
-                  AND q.tarea_id IS NOT NULL
-                ORDER BY q.created_at ASC""",
-            tuple(area_codes),
-        ).fetchall()
+        base_sql = """
+            SELECT q.id, q.descripcion, q.area, q.tipo, q.estado,
+                   q.reportado_por, q.created_at,
+                   q.tarea_id, q.tarea_estado_previo, q.proceso_id,
+                   a.label AS area_label,
+                   t.titulo AS tarea_titulo, t.paso_orden, t.flujo_id,
+                   t.flujo_titulo,
+                   p.nombre AS proceso_nombre
+            FROM gta.quiebres q
+            LEFT JOIN gta.areas a ON a.code = q.area
+            LEFT JOIN gta.tareas t ON t.id = q.tarea_id
+            LEFT JOIN gta.procesos p ON p.id = q.proceso_id
+            WHERE q.estado = 'abierto'
+              AND q.tarea_id IS NOT NULL
+        """
+        if todos:
+            rows = conn.execute(
+                base_sql + " ORDER BY q.created_at ASC"
+            ).fetchall()
+        else:
+            placeholders = ",".join(["%s"] * len(area_codes))
+            rows = conn.execute(
+                base_sql + f" AND q.area IN ({placeholders}) ORDER BY q.created_at ASC",
+                tuple(area_codes),
+            ).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()
