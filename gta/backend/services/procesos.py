@@ -291,6 +291,7 @@ def actualizar_proceso(
     subarea_code: Optional[str] = None,
     descripcion: Optional[str] = None,
     pasos_definicion: Optional[List[Dict[str, Any]]] = None,
+    campos_formulario: Optional[List[Dict[str, Any]]] = None,
     sla_horas: Optional[int] = None,
     icono: Optional[str] = None,
     archivo_path: Optional[str] = None,
@@ -324,6 +325,11 @@ def actualizar_proceso(
             sla_total = sum(int(p.get("sla_horas") or 0) for p in pasos_definicion)
             fields.append("sla_horas = %s")
             params.append(sla_total)
+
+    if campos_formulario is not None:
+        fields.append("campos_formulario = %s")
+        params.append(json.dumps(campos_formulario, ensure_ascii=False))
+        cambios.append("campos del formulario")
 
     if not fields:
         return get_proceso(proceso_id)

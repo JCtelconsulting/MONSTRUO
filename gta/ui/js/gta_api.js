@@ -38,6 +38,8 @@ window.GtaApi = (() => {
         // Catálogo de documentos descargados desde Drive (gta/data/procesos)
         getDocumentos:        ()           => get('/catalogo'),
         urlDocumento:         (path)       => `${base}/catalogo/download?path=${encodeURIComponent(path)}`,
+        getPreviewMeta:       (path)       => get(`/catalogo/preview-meta?path=${encodeURIComponent(path)}`),
+        getPreviewText:       (path)       => get(`/catalogo/preview-text?path=${encodeURIComponent(path)}`),
 
         // Flujos cross-área
         listarFlujos:         (params = '')   => get(`/flujos${params}`),
@@ -62,7 +64,40 @@ window.GtaApi = (() => {
         reasignarTareaArea:   (id, data)       => post(`/tareas/${id}/reasignar`, data),
         agregarColaborador:   (id, data)       => post(`/tareas/${id}/colaboradores`, data),
         quitarColaborador:    (id, data)       => window.fetchApi(`${base}/tareas/${id}/colaboradores`, { method: 'DELETE', headers: h, body: JSON.stringify(data) }),
-        cerrarTareaArea:      (id, reporte)    => post(`/tareas/${id}/cerrar`, { reporte: reporte || null }),
+        cerrarTareaArea:      (id, reporte, datos_formulario) => post(`/tareas/${id}/cerrar`, {
+            reporte: reporte || null,
+            datos_formulario: datos_formulario || null,
+        }),
+        guardarBorradorTarea: (id, datos_formulario) => post(`/tareas/${id}/borrador`, {
+            datos_formulario: datos_formulario || {},
+        }),
+        devolverTareaArea:    (id, motivo, paso_destino) => post(`/tareas/${id}/devolver`, {
+            motivo: motivo || '',
+            paso_destino: (paso_destino == null ? null : Number(paso_destino)),
+        }),
+
+        // Comentarios libres del flujo (visibles desde cualquier tarea)
+        listarComentariosTarea: (id)               => get(`/tareas/${id}/comentarios`),
+        crearComentarioTarea:   (id, texto)        => post(`/tareas/${id}/comentarios`, { texto: texto || '' }),
+        borrarComentarioTarea:  (tareaId, comId)   => window.fetchApi(`${base}/tareas/${tareaId}/comentarios/${comId}`, { method: 'DELETE' }),
+
+        // Quiebres dirigidos desde una tarea hacia otra área del flujo
+        areasDisponiblesQuiebre: (id)             => get(`/tareas/${id}/quiebres/areas-disponibles`),
+        listarQuiebresTarea:     (id)             => get(`/tareas/${id}/quiebres`),
+        reportarQuiebreTarea:    (id, area_destino, descripcion, tipo) =>
+            post(`/tareas/${id}/quiebres`, { area_destino, descripcion, tipo: tipo || null }),
+        listarMisQuiebres:       ()               => get('/quiebres/mios'),
+        resolverQuiebreTarea:    (qid, nota)      => post(`/quiebres/${qid}/resolver-tarea`, { nota: nota || null }),
+
+        // Adjuntos del flujo (compartidos entre todas las tareas del mismo flujo)
+        listarAdjuntosTarea:  (id)             => get(`/tareas/${id}/adjuntos`),
+        subirAdjuntoTarea:    (id, file)       => {
+            const fd = new FormData();
+            fd.append('file', file);
+            return window.fetchApi(`${base}/tareas/${id}/adjuntos`, { method: 'POST', body: fd });
+        },
+        borrarAdjuntoTarea:   (tareaId, adjId) => window.fetchApi(`${base}/tareas/${tareaId}/adjuntos/${adjId}`, { method: 'DELETE' }),
+        urlDescargarAdjunto:  (adjId)          => `${base}/adjuntos/${adjId}/download`,
 
         // Membresías
         getMembresiasSubarea: (subId, hist=false) => get(`/membresias/subarea/${subId}?incluir_historico=${hist}`),

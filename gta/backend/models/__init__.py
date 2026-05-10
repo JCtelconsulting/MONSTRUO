@@ -17,6 +17,7 @@ class ProcesoCreate(BaseModel):
 class ProcesoUpdate(BaseModel):
     nombre: Optional[str] = None
     area: Optional[str] = None
+    subarea_code: Optional[str] = None
     descripcion: Optional[str] = None
     sla_horas: Optional[int] = None
     icono: Optional[str] = None
@@ -98,6 +99,19 @@ class TareaCreate(BaseModel):
 
 class TareaCerrarBody(BaseModel):
     reporte: Optional[str] = None
+    datos_formulario: Optional[Dict[str, Any]] = None  # solo para tareas-paso-1 de flujo
+
+
+class TareaDevolverBody(BaseModel):
+    motivo: str                        # qué no cumple, qué debe corregir el paso destino
+    paso_destino: Optional[int] = None # si el paso permite varios destinos, el responsable elige
+
+
+class QuiebreReporteBody(BaseModel):
+    """Reportar un quiebre desde una tarea hacia otra área del flujo."""
+    area_destino: str
+    descripcion: str
+    tipo: Optional[str] = None
 
 
 class TareaReasignarBody(BaseModel):

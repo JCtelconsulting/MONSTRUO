@@ -7,9 +7,9 @@ from gta.backend.models import (
     ProcesoCreate, ProcesoUpdate,
     SolicitudCreate, SolicitudUpdate,
     QuiebreCreate, QuiebreResolverBody,
-    FlujoCrear, TareaCompletarBody, TareaValidarBody,
-    AyudaCrear, AyudaResponder,
-    TareaCreate, TareaCerrarBody, TareaReasignarBody, TareaLiberarBody,
+    FlujoCrear,
+    TareaCreate, TareaCerrarBody, TareaDevolverBody, TareaReasignarBody, TareaLiberarBody,
+    QuiebreReporteBody,
     ColaboradorAgregar, ColaboradorQuitar,
     MembresiaAsignar, MembresiaCerrar,
 )
@@ -18,6 +18,10 @@ from gta.backend.services import flujos as flujos_service
 from gta.backend.services import procesos as procesos_service
 from gta.backend.services import tareas as tareas_service
 from gta.backend.services import membresias as membresias_service
+from gta.backend.services import preview as preview_service
+from gta.backend.services import adjuntos as adjuntos_service
+from gta.backend.services import quiebres as quiebres_service
+from gta.backend.services import comentarios as comentarios_service
 
 router = APIRouter(prefix="/api/gta", tags=["gta"])
 
@@ -87,14 +91,22 @@ async def actualizar_proceso(
             pasos = _json.loads(update.pasos_definicion)
         except Exception:
             pasos = []
+    campos = None
+    if update.campos_formulario is not None:
+        try:
+            campos = _json.loads(update.campos_formulario)
+        except Exception:
+            campos = []
     try:
         return procesos_service.actualizar_proceso(
             pid,
             actor=user["username"],
             nombre=update.nombre,
             area=update.area,
+            subarea_code=update.subarea_code,
             descripcion=update.descripcion,
             pasos_definicion=pasos,
+            campos_formulario=campos,
             sla_horas=update.sla_horas,
             icono=update.icono,
             estado=update.estado,
@@ -580,6 +592,48 @@ async def download_catalogo_file(
     )
 
 
+@router.get("/catalogo/preview-meta")
+async def get_preview_meta(
+    path: str,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Indica al frontend cómo previsualizar este documento.
+
+    Respuesta: {mode: 'iframe'|'image'|'text'|'download', mime?: ...}
+      - iframe → PDF: usar <iframe src=download_url>
+      - image  → imagen: <img>
+      - text   → llamar /catalogo/preview-text para extraer texto plano
+      - download → no se puede previsualizar, solo descargar
+    """
+    safe = catalogo_service.resolve_safe_path(path)
+    if not safe:
+        raise HTTPException(status_code=404, detail="archivo no encontrado o ruta inválida")
+    return preview_service.detectar_render_mode(path)
+
+
+@router.get("/catalogo/preview-text")
+async def get_preview_text(
+    path: str,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Extrae texto plano de Word/Excel/PowerPoint/TXT/MD para preview en modal.
+
+    Respuesta: {text, truncated, total_chars, kind}.
+    Si la extensión no soporta extracción, devuelve 422.
+    """
+    safe = catalogo_service.resolve_safe_path(path)
+    if not safe:
+        raise HTTPException(status_code=404, detail="archivo no encontrado o ruta inválida")
+    try:
+        return preview_service.extraer_texto(path)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error extrayendo texto: {e}")
+
+
 # ── Flujos cross-área ──────────────────────────────────────────────────────
 
 def _es_admin(user: dict) -> bool:
@@ -595,7 +649,56 @@ def _es_admin(user: dict) -> bool:
 
 @router.post("/flujos")
 async def crear_flujo(body: FlujoCrear, user: dict = Depends(deps.require_permission("gta:write"))):
-    """Inicia un flujo nuevo: desde un proceso del catálogo o un flujo libre."""
+    """Inicia un flujo nuevo: desde un proceso del catálogo o un flujo libre.
+
+    Permisos:
+    - Admin global puede iniciar cualquier flujo.
+    - Si viene proceso_id: el actor debe ser miembro vigente del área dueña
+      del proceso (cualquier subárea de esa área alcanza). Esto refleja
+      que "el proceso es del área, así que cualquiera del área lo arranca".
+    - pasos_libres (sin proceso_id) sigue libre — admin se valida por el role.
+    """
+    if body.proceso_id and not _es_admin(user):
+        from plataforma.core import db as _db
+        actor_username = user.get("username", "")
+        conn = _db.get_conn()
+        try:
+            row = conn.execute(
+                "SELECT area FROM gta.procesos WHERE id = %s",
+                (body.proceso_id,),
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="proceso no encontrado")
+            area_proceso = row["area"]
+
+            actor_row = conn.execute(
+                "SELECT id FROM auth.users WHERE username = %s",
+                (actor_username,),
+            ).fetchone()
+            if not actor_row:
+                raise HTTPException(status_code=403, detail="usuario no resoluble")
+            actor_id = int(actor_row["id"])
+
+            # ¿Tiene membresía vigente en alguna subárea de esa área?
+            membresia = conn.execute(
+                """SELECT 1
+                   FROM gta.area_membresias m
+                   JOIN gta.subareas s ON s.id = m.subarea_id
+                   WHERE m.usuario_id = %s
+                     AND s.area_code = %s
+                     AND m.hasta IS NULL
+                   LIMIT 1""",
+                (actor_id, area_proceso),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        if not membresia:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Solo miembros del área '{area_proceso}' pueden iniciar este proceso.",
+            )
+
     try:
         return flujos_service.crear_flujo(
             iniciado_por=user["username"],
@@ -613,111 +716,21 @@ async def crear_flujo(body: FlujoCrear, user: dict = Depends(deps.require_permis
 async def listar_flujos(
     estado: Optional[str] = None,
     area: Optional[str] = None,
-    limit: int = 100,
-    offset: int = 0,
     user: dict = Depends(deps.require_permission("gta:read")),
 ):
-    return flujos_service.listar_flujos(
-        actor=user["username"],
-        es_admin=_es_admin(user),
-        rol_usuario=str(user.get("role") or ""),
-        estado=estado,
-        area_code=area,
-        limit=limit,
-        offset=offset,
-    )
+    """Lista de flujos para el tablero. Después del refactor del modelo
+    único, los flujos viven dentro de gta.tareas.flujo_id; este endpoint
+    los agrupa con sus métricas de avance."""
+    return flujos_service.listar_flujos(estado=estado, area_code=area)
 
 
 @router.get("/flujos/{flujo_id}")
-async def ver_flujo(flujo_id: int, user: dict = Depends(deps.require_permission("gta:read"))):
+async def ver_flujo(flujo_id: str, user: dict = Depends(deps.require_permission("gta:read"))):
+    """Detalle de un flujo: tareas con su estado, dependencias, datos cargados."""
     flujo = flujos_service.get_flujo(flujo_id)
     if not flujo:
         raise HTTPException(status_code=404, detail="flujo no encontrado")
     return flujo
-
-
-@router.get("/flujos/{flujo_id}/eventos")
-async def listar_eventos(
-    flujo_id: int,
-    limit: int = 100,
-    user: dict = Depends(deps.require_permission("gta:read")),
-):
-    return flujos_service.get_eventos(flujo_id, limit=limit)
-
-
-@router.post("/flujo-tareas/{tarea_id}/completar")
-async def completar_tarea(
-    tarea_id: int,
-    body: TareaCompletarBody,
-    user: dict = Depends(deps.require_permission("gta:write")),
-):
-    """El ejecutor (líder del área asignada) marca su tarea como hecha.
-    Pasa a estado 'por_validar' hasta que el iniciador del flujo confirme.
-    """
-    try:
-        return flujos_service.marcar_ejecutor_completo(
-            tarea_id=tarea_id,
-            actor=user["username"],
-            campos_completados=body.campos_completados,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/flujo-tareas/{tarea_id}/validar")
-async def validar_tarea(
-    tarea_id: int,
-    body: TareaValidarBody,
-    user: dict = Depends(deps.require_permission("gta:write")),
-):
-    """El iniciador del flujo (o el jefe) valida o rechaza una tarea en 'por_validar'."""
-    try:
-        return flujos_service.validar_tarea(
-            tarea_id=tarea_id,
-            actor=user["username"],
-            aceptada=body.aceptada,
-            comentario=body.comentario or "",
-        )
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/flujo-tareas/{tarea_id}/ayuda")
-async def pedir_ayuda(
-    tarea_id: int,
-    body: AyudaCrear,
-    user: dict = Depends(deps.require_permission("gta:write")),
-):
-    """Pedir ayuda a otra área. Si bloquea_sla=True, pausa el SLA hasta la respuesta."""
-    try:
-        return flujos_service.pedir_ayuda(
-            tarea_id=tarea_id,
-            pedido_por=user["username"],
-            pedido_a_area=body.pedido_a_area,
-            pedido_a_user=body.pedido_a_user or "",
-            mensaje=body.mensaje,
-            bloquea_sla=body.bloquea_sla,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/flujo-ayudas/{ayuda_id}/responder")
-async def responder_ayuda(
-    ayuda_id: int,
-    body: AyudaResponder,
-    user: dict = Depends(deps.require_permission("gta:write")),
-):
-    try:
-        return flujos_service.responder_ayuda(
-            ayuda_id=ayuda_id,
-            respondido_por=user["username"],
-            respuesta=body.respuesta,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/metricas")
@@ -733,11 +746,18 @@ async def listar_bandeja(
     subarea_id: Optional[int] = None,
     user: dict = Depends(deps.require_permission("gta:read")),
 ):
-    """Tareas sin responsable vigente. Si se pasa subarea_id, filtra a esa
-    subárea; si no, devuelve la unión de las subáreas del usuario."""
-    uid = tareas_service.usuario_id_de_username(user["username"])
+    """Tareas sin responsable vigente.
+
+    - Con `subarea_id`: filtra a esa subárea (cualquiera con gta:read puede consultar).
+    - Sin `subarea_id`:
+      - Admin global → ve TODAS las tareas sin responsable de todo el sistema.
+      - Usuario común → ve solo la unión de sus subáreas con membresía vigente.
+    """
     if subarea_id is not None:
         return {"items": tareas_service.listar_bandeja_subarea(subarea_id)}
+    if _es_admin(user):
+        return {"items": tareas_service.listar_bandeja_global()}
+    uid = tareas_service.usuario_id_de_username(user["username"])
     return {"items": tareas_service.listar_bandeja_de_usuario(uid)}
 
 
@@ -746,6 +766,8 @@ async def listar_mis_tareas(
     incluir_cerradas: bool = False,
     user: dict = Depends(deps.require_permission("gta:read")),
 ):
+    """Tareas donde el actor es responsable vigente. (No es vista global —
+    incluso admin solo ve las suyas reales)."""
     uid = tareas_service.usuario_id_de_username(user["username"])
     return {"items": tareas_service.listar_mis_tareas(uid, incluir_cerradas=incluir_cerradas)}
 
@@ -755,6 +777,7 @@ async def listar_donde_colaboro(
     incluir_cerradas: bool = False,
     user: dict = Depends(deps.require_permission("gta:read")),
 ):
+    """Tareas donde el actor es co-responsable o ayuda vigente."""
     uid = tareas_service.usuario_id_de_username(user["username"])
     return {"items": tareas_service.listar_donde_colaboro(uid, incluir_cerradas=incluir_cerradas)}
 
@@ -813,7 +836,11 @@ async def tomar_tarea(
 ):
     try:
         uid = tareas_service.usuario_id_de_username(user["username"])
-        return tareas_service.tomar_tarea(tarea_id, usuario_id=uid)
+        return tareas_service.tomar_tarea(
+            tarea_id,
+            usuario_id=uid,
+            bypass_membresia=_es_admin(user),
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -924,9 +951,277 @@ async def cerrar_tarea(
 ):
     try:
         uid = tareas_service.usuario_id_de_username(user["username"])
-        return tareas_service.cerrar_tarea(tarea_id, cerrado_por=uid, reporte=body.reporte)
+        return tareas_service.cerrar_tarea(
+            tarea_id,
+            cerrado_por=uid,
+            reporte=body.reporte,
+            datos_formulario=body.datos_formulario,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/devolver")
+@audit_action("GTA_DEVOLVER_TAREA", severity="info")
+async def devolver_tarea(
+    tarea_id: int,
+    body: TareaDevolverBody,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Rechaza una tarea de validación y reabre el paso destino para corregir."""
+    try:
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return tareas_service.devolver_tarea(
+            tarea_id,
+            devuelto_por=uid,
+            motivo=body.motivo,
+            paso_destino=body.paso_destino,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/borrador")
+@audit_action("GTA_GUARDAR_BORRADOR", severity="info")
+async def guardar_borrador(
+    tarea_id: int,
+    body: dict,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Guarda datos parciales del formulario sin cerrar la tarea.
+
+    Útil para cargar lo que ya se tiene mientras se busca el resto.
+    No valida obligatorios. Solo el responsable vigente (o admin) puede.
+    """
+    try:
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return tareas_service.guardar_borrador_formulario(
+            tarea_id,
+            usuario_id=uid,
+            datos_formulario=body.get("datos_formulario") or {},
+            bypass_responsable=_es_admin(user),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Quiebres dirigidos desde una tarea hacia otra área del flujo ──────
+
+@router.get("/tareas/{tarea_id}/quiebres/areas-disponibles")
+async def areas_disponibles_quiebre(
+    tarea_id: int,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Áreas del flujo a las que se puede reportar un quiebre desde esta tarea
+    (excluye la propia área de la tarea)."""
+    try:
+        return {"items": quiebres_service.areas_disponibles_para_quiebre(tarea_id)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/tareas/{tarea_id}/quiebres")
+async def listar_quiebres_de_tarea(
+    tarea_id: int,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Quiebres del flujo al que pertenece la tarea (visibles desde cualquier paso)."""
+    return {"items": quiebres_service.listar_de_tarea(tarea_id)}
+
+
+@router.post("/tareas/{tarea_id}/quiebres")
+@audit_action("GTA_REPORTAR_QUIEBRE_TAREA", severity="warning")
+async def reportar_quiebre_desde_tarea(
+    tarea_id: int,
+    body: QuiebreReporteBody,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Reporta un quiebre desde la tarea hacia un área del flujo. La tarea
+    queda 'esperando_quiebre' hasta que esa área lo resuelva."""
+    try:
+        return quiebres_service.reportar_desde_tarea(
+            tarea_id=tarea_id,
+            area_destino=body.area_destino,
+            descripcion=body.descripcion,
+            tipo=body.tipo,
+            reportado_por=user["username"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/quiebres/mios")
+async def listar_quiebres_para_mi_area(
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Quiebres abiertos dirigidos a las áreas vigentes del usuario."""
+    uid = tareas_service.usuario_id_de_username(user["username"])
+    codes = membresias_service.area_codes_de_usuario(uid)
+    items = quiebres_service.listar_pendientes_para_areas(codes)
+    return {"items": items, "areas": codes}
+
+
+@router.post("/quiebres/{qid}/resolver-tarea")
+@audit_action("GTA_RESOLVER_QUIEBRE_TAREA", severity="info")
+async def resolver_quiebre_de_tarea(
+    qid: int,
+    body: QuiebreResolverBody,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Resuelve un quiebre vinculado a una tarea: marca como resuelto y
+    restaura el estado previo de la tarea (sale de 'esperando_quiebre')."""
+    try:
+        return quiebres_service.resolver(
+            qid,
+            nota=body.nota,
+            resuelto_por=user["username"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Comentarios libres del flujo (visibles desde cualquier tarea) ────
+
+@router.get("/tareas/{tarea_id}/comentarios")
+async def listar_comentarios_de_tarea(
+    tarea_id: int,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Comentarios del flujo al que pertenece la tarea (compartidos)."""
+    try:
+        return {"items": comentarios_service.listar_de_tarea(tarea_id)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/comentarios")
+@audit_action("GTA_AGREGAR_COMENTARIO_TAREA", severity="info")
+async def crear_comentario_de_tarea(
+    tarea_id: int,
+    body: dict,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Agrega un comentario libre a la tarea (visible al flujo entero)."""
+    try:
+        return comentarios_service.crear(
+            tarea_id=tarea_id,
+            autor=user["username"],
+            texto=(body.get("texto") or ""),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/tareas/{tarea_id}/comentarios/{comentario_id}")
+@audit_action("GTA_BORRAR_COMENTARIO_TAREA", severity="info")
+async def borrar_comentario_de_tarea(
+    tarea_id: int,
+    comentario_id: int,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        # Verificar coherencia: el comentario debe estar en alguna tarea del flujo
+        comentarios_flujo = comentarios_service.listar_de_tarea(tarea_id)
+        if not any(c["id"] == comentario_id for c in comentarios_flujo):
+            raise HTTPException(status_code=403, detail="el comentario no pertenece al flujo de esta tarea")
+        comentarios_service.borrar(
+            comentario_id,
+            autor_actor=user["username"],
+            es_admin=_es_admin(user),
+        )
+        return {"ok": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Adjuntos del flujo (compartidos por todas las tareas del flujo) ──
+
+@router.get("/tareas/{tarea_id}/adjuntos")
+async def listar_adjuntos_tarea(
+    tarea_id: int,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Lista los adjuntos del flujo al que pertenece la tarea."""
+    try:
+        return {"items": adjuntos_service.listar_adjuntos_tarea(tarea_id)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/adjuntos")
+@audit_action("GTA_SUBIR_ADJUNTO", severity="info")
+async def subir_adjunto_tarea(
+    tarea_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Sube un archivo asociado al flujo de la tarea."""
+    try:
+        contenido = await file.read()
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return adjuntos_service.subir_adjunto(
+            tarea_id=tarea_id,
+            filename=file.filename or "archivo",
+            contenido=contenido,
+            mime=file.content_type,
+            subido_por=uid,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/tareas/{tarea_id}/adjuntos/{adjunto_id}")
+@audit_action("GTA_BORRAR_ADJUNTO", severity="info")
+async def borrar_adjunto_tarea(
+    tarea_id: int,
+    adjunto_id: int,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    try:
+        # Verificar coherencia: el adjunto debe pertenecer al flujo de esta tarea
+        meta = adjuntos_service.get_adjunto(adjunto_id)
+        if not meta:
+            raise HTTPException(status_code=404, detail="adjunto no encontrado")
+        tarea = tareas_service.get_tarea(tarea_id)
+        if not tarea or str(tarea.get("flujo_id")) != str(meta["flujo_id"]):
+            raise HTTPException(status_code=403, detail="el adjunto no pertenece al flujo de esta tarea")
+
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        adjuntos_service.eliminar_adjunto(
+            adjunto_id,
+            actor_id=uid,
+            es_admin=_es_admin(user),
+        )
+        return {"ok": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/adjuntos/{adjunto_id}/download")
+async def descargar_adjunto(
+    adjunto_id: int,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Descarga el archivo físico del adjunto."""
+    meta = adjuntos_service.get_adjunto(adjunto_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="adjunto no encontrado")
+    full = adjuntos_service.ruta_absoluta(meta["ruta"])
+    if not full.exists():
+        raise HTTPException(status_code=410, detail="archivo no disponible en el filesystem")
+    return FileResponse(
+        path=str(full),
+        filename=meta["filename"],
+        media_type=meta.get("mime") or "application/octet-stream",
+    )
 
 
 # ── Membresías área ↔ persona ─────────────────────────────────────────

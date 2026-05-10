@@ -25,15 +25,20 @@ psql -c "SELECT version();" 2>/dev/null || echo "DB no disponible aún"
 
 **Siempre** rebuildear los containers afectados antes de declarar un cambio listo o pedirle al usuario que lo verifique. Esto incluye cambios en UI (HTML/CSS/JS), backend (Python), o cualquier otro código.
 
+**Usar siempre el script `scripts/dev-rebuild.sh`** — maneja `ASSET_VERSION` correctamente para cache-busting:
+
 ```bash
-ASSET_VERSION=$(git rev-parse --short HEAD) \
-  APP_UID=$(id -u) APP_GID=$(id -g) \
-  docker compose --env-file plataforma/ops/env/.env.server.dev up -d --build <containers>
+./scripts/dev-rebuild.sh                   # rebuild todos los containers
+./scripts/dev-rebuild.sh gateway gta       # rebuild solo gateway+gta
 ```
+
+El script detecta si el árbol git está sucio (cambios sin commit) y agrega un timestamp al `ASSET_VERSION`, garantizando que el browser recargue assets nuevos. Si el árbol está limpio, usa el SHA del commit.
 
 Luego validar runtime con `curl` al endpoint relevante antes de avisar al usuario.
 
-**Por qué importa:** sin rebuild, `window.ASSET_VERSION` queda con el SHA anterior, el navegador sigue sirviendo HTML cacheado mientras el JS es nuevo, y se producen mismatches silenciosos (el JS busca IDs que ya no existen en el HTML cacheado). Síntoma típico: "no veo los cambios" o "no pasa nada al apretar".
+**Por qué importa:** sin un `ASSET_VERSION` único por rebuild, el navegador sigue sirviendo el HTML/JS/CSS cacheado mientras el código del container es nuevo, y se producen mismatches silenciosos (el JS busca IDs que ya no existen en el HTML cacheado). Síntoma típico: "no veo los cambios" o "no pasa nada al apretar".
+
+**Antipatrón conocido:** `ASSET_VERSION=$(git rev-parse --short HEAD)` solo funciona si commiteás antes de rebuildar. Durante desarrollo iterativo (cambios sin commit), el SHA queda igual y el cache no se rompe. **Por eso usamos `dev-rebuild.sh`** en lugar de la receta directa de docker compose.
 
 Hacerlo **antes** del commit es mejor: detecta errores de sintaxis o imports rotos antes de pushear.
 

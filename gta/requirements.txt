@@ -33,3 +33,11 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.6.3
 uvicorn==0.40.0
+
+# Extracción de texto plano para preview de documentos en gta.procesos.
+# Cubrimos los formatos que el navegador NO renderiza nativo (Word, Excel,
+# PowerPoint). PDF/imágenes/TXT van con preview nativo del browser.
+pdfplumber==0.11.4
+mammoth==1.8.0
+openpyxl==3.1.5
+python-pptx==1.0.2

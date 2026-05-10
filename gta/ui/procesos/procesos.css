@@ -248,3 +248,200 @@
     font-style: italic;
 }
 
+
+/* ── Edición de pasos: drag & drop + nuevos campos ─────────────────────── */
+
+.gta-paso-edit-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    margin-bottom: 8px;
+    transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.gta-paso-edit-row.is-dragging {
+    opacity: 0.4;
+    border-style: dashed;
+}
+
+.gta-paso-edit-row.is-drag-over {
+    border-color: var(--neon, #00ff41);
+    background: rgba(0, 255, 65, 0.04);
+}
+
+.gta-paso-edit-handle {
+    cursor: grab;
+    color: var(--text-soft, #a5adb4);
+    padding: 6px 4px;
+    user-select: none;
+    align-self: center;
+}
+.gta-paso-edit-handle:active {
+    cursor: grabbing;
+    color: var(--neon, #00ff41);
+}
+
+.gta-paso-edit-num {
+    font-weight: 700;
+    color: var(--neon, #00ff41);
+    min-width: 32px;
+    text-align: center;
+    padding-top: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.gta-paso-edit-fields {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.gta-paso-edit-fields > div {
+    align-items: center;
+}
+
+/* ── Vista de paso: descripción debajo del título ─────────────────────── */
+
+.gta-pipe-desc {
+    margin: 4px 0 6px 0;
+    color: var(--text-soft, #a5adb4);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+/* ── Empty state cuando un proceso no tiene pasos ─────────────────────── */
+
+.gta-empty-pasos {
+    text-align: center;
+    padding: 24px 16px;
+    border: 1px dashed var(--border, rgba(255,255,255,0.12));
+    border-radius: 10px;
+    color: var(--text-soft, #a5adb4);
+    margin: 8px 0;
+}
+.gta-empty-pasos i {
+    font-size: 32px;
+    opacity: 0.4;
+    display: block;
+    margin-bottom: 10px;
+}
+
+/* ── Guía de referencia (archivo) — discreto, abajo del modal ─────────── */
+
+.gta-guia-ref {
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.gta-guia-ref-head {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gta-guia-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--text-soft, #a5adb4);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gta-guia-ref-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.gta-guia-path {
+    width: 100%;
+    font-size: 0.75rem;
+    color: var(--text-soft, #a5adb4);
+    opacity: 0.7;
+    word-break: break-all;
+}
+
+/* ── Preview de documento (texto extraído) ────────────────────────────── */
+
+.gta-doc-preview-text {
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text, #f5f7f8);
+    padding: 16px;
+    border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 70vh;
+    overflow: auto;
+    margin: 0;
+}
+
+/* ── Editor de campos del formulario obligatorio ────────────────────────── */
+
+.gta-campos-form-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.gta-campo-form-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+}
+
+.gta-campo-form-num {
+    font-weight: 700;
+    color: var(--info, #00f3ff);
+    min-width: 32px;
+    text-align: center;
+    padding-top: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.gta-campo-form-fields {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+/* Toggle "bloqueante" / "obligatorio" */
+.gta-paso-edit-bloqueante {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: var(--text-soft, #a5adb4);
+    cursor: pointer;
+    user-select: none;
+}
+.gta-paso-edit-bloqueante input[type="checkbox"] {
+    cursor: pointer;
+}

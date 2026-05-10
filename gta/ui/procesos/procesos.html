@@ -29,6 +29,50 @@
     </div>
 </div>
 
+<!-- Modal: Iniciar flujo (formulario obligatorio) -->
+<div class="modal-backdrop" id="modal-iniciar-flujo">
+    <div class="modal-content" style="max-width:680px;">
+        <div class="modal-header">
+            <div>
+                <div class="gta-flujo-drawer-eyebrow">Iniciar flujo del proceso</div>
+                <h2 id="iniciar-flujo-titulo-proceso">—</h2>
+            </div>
+            <button class="modal-close-btn" onclick="Procesos.cerrarIniciarFlujo()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label>Título del flujo <span style="color:var(--danger);">*</span></label>
+                <input type="text" id="iniciar-flujo-titulo" class="input-dark" placeholder="Ej: Cliente ABC Corp">
+                <small class="gta-section-help">Identifica esta ejecución del proceso (cliente, proyecto, etc.).</small>
+            </div>
+            <div id="iniciar-flujo-campos"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="Procesos.cerrarIniciarFlujo()">Cancelar</button>
+            <button class="btn-primary" onclick="Procesos.confirmarIniciarFlujo()">
+                <i class="fas fa-rocket"></i> Iniciar flujo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Preview de documento (guía del proceso) -->
+<div class="modal-backdrop" id="modal-doc-preview">
+    <div class="modal-content" style="max-width:960px; max-height:90vh; display:flex; flex-direction:column;">
+        <div class="modal-header">
+            <div>
+                <div class="gta-flujo-drawer-eyebrow">Guía original del proceso</div>
+                <h2 id="doc-preview-title">Documento</h2>
+            </div>
+            <button class="modal-close-btn" onclick="Procesos.cerrarDocPreview()">×</button>
+        </div>
+        <div class="modal-body" id="doc-preview-body" style="flex:1; overflow:auto;">
+            <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando documento…</div>
+        </div>
+        <div class="modal-footer" id="doc-preview-footer"></div>
+    </div>
+</div>
+
 <!-- Modal: Reportar quiebre asociado a proceso -->
 <div class="modal-backdrop" id="modal-quiebre-proc">
     <div class="modal-content" style="max-width:520px;">

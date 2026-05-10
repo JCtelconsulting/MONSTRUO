@@ -163,6 +163,7 @@ window.Procesos = (() => {
     // ── Modal detalle (vista + edición) ───────────────────────────────
     let _modoEdit = false;
     let _pasosEdit = [];
+    let _camposFormEdit = [];
 
     async function abrir(procId) {
         _modoEdit = false;
@@ -197,10 +198,17 @@ window.Procesos = (() => {
         _pasosEdit = (_procActivo.pasos_definicion || []).map((p, i) => ({
             orden: p.orden || (i + 1),
             titulo: p.titulo || p.nombre || '',
+            descripcion: p.descripcion || '',
             area_code: p.area_code || p.area || '',
+            subarea_code: p.subarea_code || null,
             sla_horas: p.sla_horas || 24,
-            depende_de: p.depende_de || [],
+            depende_de: Array.isArray(p.depende_de) ? p.depende_de : [],
+            // Por default los pasos son bloqueantes (los que dependen de él
+            // esperan a que se cierre). Marcarlo como false permite que los
+            // siguientes corran en paralelo sin esperar a éste.
+            bloqueante: p.bloqueante !== false,
         }));
+        _camposFormEdit = _normalizarCamposForm(_procActivo.campos_formulario);
         _renderModal(_procActivo);
     }
 
@@ -229,11 +237,7 @@ window.Procesos = (() => {
         const comentarios = p.comentarios || [];
         const m = p.metricas || {};
 
-        const archivoSection = p.archivo_path
-            ? `<a href="/api/gta/catalogo/download?path=${encodeURIComponent(p.archivo_path)}" class="btn-secondary" download>
-                <i class="fas fa-download"></i> Descargar documento
-               </a>`
-            : `<span class="gta-section-help">Sin documento adjunto.</span>`;
+        const estadoBadge = _estadoBadge(p.estado);
 
         const pasosHtml = pasos.length ? `
             <div class="gta-pipeline" style="margin-top:8px;">
@@ -244,8 +248,9 @@ window.Procesos = (() => {
                             <div class="gta-pipe-header">
                                 <h5>${_esc(paso.titulo || paso.nombre || 'Paso ' + (idx + 1))}</h5>
                             </div>
+                            ${paso.descripcion ? `<p class="gta-pipe-desc">${_esc(paso.descripcion)}</p>` : ''}
                             <div class="gta-pipe-meta">
-                                <span><i class="fas fa-layer-group"></i> ${_esc(_areaLabel(paso.area_code || paso.area || '-'))}${paso.subarea_code ? ' / ' + _esc(paso.subarea_code) : ''}</span>
+                                <span><i class="fas fa-layer-group"></i> ${_esc(_areaLabel(paso.area_code || paso.area || '-'))}${paso.subarea_code ? ' / ' + _esc(_subareaLabel(paso.area_code || paso.area, paso.subarea_code)) : ''}</span>
                                 <span><i class="fas fa-clock"></i> ${paso.sla_horas || 0}h</span>
                                 ${(paso.depende_de || []).length ? `<span><i class="fas fa-link"></i> Depende de: ${paso.depende_de.join(', ')}</span>` : ''}
                             </div>
@@ -253,7 +258,13 @@ window.Procesos = (() => {
                     </div>
                 `).join('')}
             </div>
-        ` : `<p class="gta-section-help">Sin definición ejecutable.</p>`;
+        ` : `
+            <div class="gta-empty-pasos">
+                <i class="fas fa-stream"></i>
+                <p><strong>Este proceso no tiene pasos definidos todavía.</strong></p>
+                <p class="gta-section-help">Apretá <em>Editar</em> para construir la fuente de la verdad.</p>
+            </div>
+        `;
 
         const flujosHtml = flujos.length ? flujos.map(f => `
             <div class="gta-doc-row" style="cursor:default;">
@@ -293,24 +304,46 @@ window.Procesos = (() => {
             </div>
         `).join('') : '<p class="gta-section-help">Sin notas todavía.</p>';
 
-        const iniciarBtn = pasos.length
+        const iniciarBtn = pasos.length && p.estado === 'activo'
             ? `<button class="btn-primary" onclick="Procesos.iniciarFlujo(${p.id})"><i class="fas fa-rocket"></i> Iniciar flujo</button>`
             : '';
+
+        const guiaSection = p.archivo_path
+            ? `<div class="gta-guia-ref">
+                  <div class="gta-guia-ref-head">
+                    <span class="gta-guia-eyebrow"><i class="fas fa-paperclip"></i> Guía original</span>
+                    <span class="gta-section-help" style="font-size:0.78rem;">Documento de referencia que se usó para construir esta definición. <strong>No es la fuente de la verdad</strong> — los pasos lo son.</span>
+                  </div>
+                  <div class="gta-guia-ref-actions">
+                    <button class="btn-secondary" onclick="Procesos.abrirDocPreview('${_esc(p.archivo_path)}')">
+                        <i class="fas fa-eye"></i> Ver
+                    </button>
+                    <a href="/api/gta/catalogo/download?path=${encodeURIComponent(p.archivo_path)}" class="btn-secondary" download>
+                        <i class="fas fa-download"></i> Descargar
+                    </a>
+                  </div>
+                  <div class="gta-guia-path"><code>${_esc(p.archivo_path)}</code></div>
+              </div>`
+            : `<p class="gta-section-help">Sin guía de referencia adjunta.</p>`;
 
         const body = document.getElementById('proc-modal-body');
         body.innerHTML = `
             <div class="gta-flujo-summary">
-                <div><strong>${_esc(p.descripcion || 'Sin descripción')}</strong></div>
-                <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap;">
-                    ${archivoSection}
-                    ${iniciarBtn}
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+                    ${estadoBadge}
                 </div>
+                <div><strong>${_esc(p.descripcion || 'Sin descripción')}</strong></div>
+                ${iniciarBtn ? `<div style="margin-top:10px;">${iniciarBtn}</div>` : ''}
             </div>
 
-            <h4 class="gta-section-subtitle" style="margin-top:18px;">⚙️ Definición ejecutable</h4>
+            <h4 class="gta-section-subtitle" style="margin-top:18px;">
+                <i class="fas fa-bullseye"></i> Fuente de la verdad — pasos del proceso
+            </h4>
             ${pasosHtml}
 
-            <h4 class="gta-section-subtitle" style="margin-top:24px;">📊 Métricas</h4>
+            <h4 class="gta-section-subtitle" style="margin-top:24px;">
+                <i class="fas fa-chart-line"></i> Métricas
+            </h4>
             <div class="gta-flujo-summary">
                 <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.85rem; color:var(--text-soft);">
                     <span><i class="fas fa-clock"></i> SLA esperado: ${m.sla_horas_total || 0}h</span>
@@ -319,16 +352,22 @@ window.Procesos = (() => {
                 </div>
             </div>
 
-            <h4 class="gta-section-subtitle" style="margin-top:24px;">📋 Flujos ejecutados (${flujos.length})</h4>
+            <h4 class="gta-section-subtitle" style="margin-top:24px;">
+                <i class="fas fa-list-check"></i> Flujos ejecutados (${flujos.length})
+            </h4>
             <div>${flujosHtml}</div>
 
-            <h4 class="gta-section-subtitle" style="margin-top:24px;">🚨 Quiebres registrados (${quiebres.length})</h4>
+            <h4 class="gta-section-subtitle" style="margin-top:24px;">
+                <i class="fas fa-flag"></i> Quiebres registrados (${quiebres.length})
+            </h4>
             <div>${quiebresHtml}</div>
             <button class="btn-secondary" style="margin-top:8px;" onclick="Procesos.abrirQuiebre(${p.id})">
                 <i class="fas fa-flag"></i> Reportar nuevo quiebre
             </button>
 
-            <h4 class="gta-section-subtitle" style="margin-top:24px;">📝 Notas y decisiones</h4>
+            <h4 class="gta-section-subtitle" style="margin-top:24px;">
+                <i class="fas fa-comments"></i> Notas y decisiones
+            </h4>
             <div class="gta-flujo-timeline">${comentariosHtml}</div>
             <div style="margin-top:10px; display:flex; gap:8px;">
                 <input type="text" id="proc-comentario-texto" class="input-dark" placeholder="Agregar nota...">
@@ -336,6 +375,11 @@ window.Procesos = (() => {
                     <i class="fas fa-plus"></i> Agregar
                 </button>
             </div>
+
+            <h4 class="gta-section-subtitle" style="margin-top:28px; opacity:0.75;">
+                <i class="fas fa-paperclip"></i> Guía de referencia
+            </h4>
+            ${guiaSection}
         `;
 
         const footer = document.getElementById('proc-modal-footer');
@@ -347,12 +391,24 @@ window.Procesos = (() => {
         `;
     }
 
+    function _estadoBadge(estado) {
+        const e = (estado || 'activo').toLowerCase();
+        const map = {
+            borrador: '<span class="gta-tarea-estado estado-pendiente"><i class="fas fa-pencil"></i> Borrador</span>',
+            activo:   '<span class="gta-tarea-estado estado-completada"><i class="fas fa-check-circle"></i> Activo</span>',
+            archivado:'<span class="gta-tarea-estado estado-vencida" style="opacity:0.6;"><i class="fas fa-archive"></i> Archivado</span>',
+        };
+        return map[e] || `<span class="gta-tarea-estado">${_esc(e)}</span>`;
+    }
+
     function _renderModalEdit(p) {
         const activas = _areas.filter(a => a.activo);
         const subareasDelArea = (() => {
             const a = _areas.find(x => x.code === (p._editArea ?? p.area));
             return (a?.subareas || []).filter(s => s.activo);
         })();
+
+        const estadoActual = (p.estado || 'activo').toLowerCase();
 
         const body = document.getElementById('proc-modal-body');
         body.innerHTML = `
@@ -374,20 +430,48 @@ window.Procesos = (() => {
                         ${subareasDelArea.map(s => `<option value="${s.code}" ${p.subarea_code === s.code ? 'selected' : ''}>${_esc(s.label)}</option>`).join('')}
                     </select>
                 </div>
+                <div class="field" style="flex:1;">
+                    <label>Estado</label>
+                    <select id="ed-estado" class="input-dark">
+                        <option value="borrador" ${estadoActual === 'borrador' ? 'selected' : ''}>Borrador</option>
+                        <option value="activo" ${estadoActual === 'activo' ? 'selected' : ''}>Activo</option>
+                        <option value="archivado" ${estadoActual === 'archivado' ? 'selected' : ''}>Archivado</option>
+                    </select>
+                </div>
             </div>
             <div class="field" style="margin-top:10px;">
                 <label>Descripción breve</label>
                 <textarea id="ed-desc" class="input-dark" rows="2">${_esc(p.descripcion || '')}</textarea>
             </div>
 
-            <h4 class="gta-section-subtitle" style="margin-top:18px;">Pasos del proceso</h4>
-            <p class="gta-section-help">Cada paso necesita título y área. Las dependencias usan el número de orden (ej: <code>1,2</code>).</p>
+            <h4 class="gta-section-subtitle" style="margin-top:18px;">
+                <i class="fas fa-bullseye"></i> Pasos — fuente de la verdad
+            </h4>
+            <p class="gta-section-help">
+                Arrastrá los pasos por el ícono <i class="fas fa-grip-vertical"></i> para reordenarlos.
+                Cada paso detona una tarea para el área/subárea indicada cuando se ejecuta el flujo.
+                Las dependencias usan el número de orden (ej: <code>1,2</code>).
+                Marcá <strong>bloqueante</strong> si los pasos siguientes deben esperar a que se cierre.
+            </p>
             <div id="ed-pasos" class="gta-flujo-tareas-edit"></div>
             <button class="btn-secondary" onclick="Procesos._agregarPasoEdit()" style="margin-top:8px;">
                 <i class="fas fa-plus"></i> Agregar paso
             </button>
+
+            <h4 class="gta-section-subtitle" style="margin-top:24px;">
+                <i class="fas fa-clipboard-list"></i> Formulario al iniciar el flujo
+            </h4>
+            <p class="gta-section-help">
+                Datos que se piden al apretar <em>Iniciar flujo</em>. Si un campo está marcado
+                como obligatorio, el flujo no arranca sin completarlo.
+            </p>
+            <div id="ed-campos-form" class="gta-campos-form-edit"></div>
+            <button class="btn-secondary" onclick="Procesos._agregarCampoForm()" style="margin-top:8px;">
+                <i class="fas fa-plus"></i> Agregar campo
+            </button>
         `;
         _renderPasosEdit();
+        _renderCamposFormEdit();
 
         const footer = document.getElementById('proc-modal-footer');
         footer.innerHTML = `
@@ -412,36 +496,67 @@ window.Procesos = (() => {
         const cont = document.getElementById('ed-pasos');
         if (!cont) return;
         const activas = _areas.filter(a => a.activo);
-        cont.innerHTML = _pasosEdit.map((t, idx) => `
-            <div class="gta-tarea-edit-row">
-                <div class="gta-tarea-edit-num">#${t.orden}</div>
-                <div class="gta-tarea-edit-fields">
-                    <input type="text" class="input-dark" placeholder="Título del paso"
+        cont.innerHTML = _pasosEdit.map((t, idx) => {
+            const area = _areas.find(a => a.code === t.area_code);
+            const subs = (area?.subareas || []).filter(s => s.activo);
+            return `
+            <div class="gta-paso-edit-row" draggable="true" data-idx="${idx}"
+                 ondragstart="Procesos._dragStart(event, ${idx})"
+                 ondragover="Procesos._dragOver(event)"
+                 ondragleave="Procesos._dragLeave(event)"
+                 ondrop="Procesos._drop(event, ${idx})"
+                 ondragend="Procesos._dragEnd(event)">
+                <div class="gta-paso-edit-handle" title="Arrastrar para reordenar">
+                    <i class="fas fa-grip-vertical"></i>
+                </div>
+                <div class="gta-paso-edit-num">#${t.orden}</div>
+                <div class="gta-paso-edit-fields">
+                    <input type="text" class="input-dark" placeholder="Título del paso *"
                            value="${_esc(t.titulo)}" oninput="Procesos._setPasoEdit(${idx}, 'titulo', this.value)">
-                    <div style="display:flex; gap:8px; margin-top:6px;">
-                        <select class="input-dark" style="flex:1;" onchange="Procesos._setPasoEdit(${idx}, 'area_code', this.value)">
-                            <option value="">— Área —</option>
+                    <textarea class="input-dark" rows="2" placeholder="Instrucciones / descripción para quien recibe la tarea (opcional)"
+                              oninput="Procesos._setPasoEdit(${idx}, 'descripcion', this.value)">${_esc(t.descripcion || '')}</textarea>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <select class="input-dark" style="flex:2; min-width:140px;" onchange="Procesos._setPasoArea(${idx}, this.value)">
+                            <option value="">— Área *</option>
                             ${activas.map(a => `<option value="${a.code}" ${t.area_code === a.code ? 'selected' : ''}>${_esc(a.label)}</option>`).join('')}
                         </select>
-                        <input type="number" class="input-dark" min="1" max="999" style="width:90px;"
+                        <select class="input-dark" style="flex:2; min-width:140px;" onchange="Procesos._setPasoEdit(${idx}, 'subarea_code', this.value || null)">
+                            <option value="">— Subárea (opcional) —</option>
+                            ${subs.map(s => `<option value="${s.code}" ${t.subarea_code === s.code ? 'selected' : ''}>${_esc(s.label)}</option>`).join('')}
+                        </select>
+                        <input type="number" class="input-dark" min="1" max="999" style="width:80px;"
                                value="${t.sla_horas}" placeholder="SLA h"
-                               oninput="Procesos._setPasoEdit(${idx}, 'sla_horas', parseInt(this.value, 10) || 24)">
-                        <input type="text" class="input-dark" placeholder="Depende de"
-                               value="${(t.depende_de || []).join(',')}" style="width:120px;"
-                               oninput="Procesos._setDepsEdit(${idx}, this.value)">
+                               oninput="Procesos._setPasoEdit(${idx}, 'sla_horas', parseInt(this.value, 10) || 24)"
+                               title="SLA en horas">
+                        <input type="text" class="input-dark" placeholder="Depende de #"
+                               value="${(t.depende_de || []).join(',')}" style="width:110px;"
+                               oninput="Procesos._setDepsEdit(${idx}, this.value)"
+                               title="Números de paso de los que depende, separados por coma (ej: 1,2)">
                     </div>
+                    <label class="gta-paso-edit-bloqueante" title="Si está marcado, los pasos que dependan de éste esperan a que se cierre antes de empezar.">
+                        <input type="checkbox" ${t.bloqueante !== false ? 'checked' : ''}
+                               onchange="Procesos._setPasoEdit(${idx}, 'bloqueante', this.checked)">
+                        <span>Bloqueante (los siguientes esperan a que se cierre)</span>
+                    </label>
                 </div>
-                <button class="btn-sm btn-danger" onclick="Procesos._quitarPasoEdit(${idx})">
+                <button class="btn-sm btn-danger" onclick="Procesos._quitarPasoEdit(${idx})" title="Quitar paso">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     function _agregarPasoEdit() {
         _pasosEdit.push({
             orden: _pasosEdit.length + 1,
-            titulo: '', area_code: '', sla_horas: 24, depende_de: [],
+            titulo: '',
+            descripcion: '',
+            area_code: '',
+            subarea_code: null,
+            sla_horas: 24,
+            depende_de: [],
+            bloqueante: true,   // por default los pasos bloquean a sus siguientes
         });
         _renderPasosEdit();
     }
@@ -449,6 +564,15 @@ window.Procesos = (() => {
     function _setPasoEdit(idx, k, v) {
         if (_pasosEdit[idx]) _pasosEdit[idx][k] = v;
     }
+
+    function _setPasoArea(idx, areaCode) {
+        // Cambiar de área resetea la subárea (las subáreas son hijas del área)
+        if (!_pasosEdit[idx]) return;
+        _pasosEdit[idx].area_code = areaCode;
+        _pasosEdit[idx].subarea_code = null;
+        _renderPasosEdit();
+    }
+
     function _setDepsEdit(idx, raw) {
         if (!_pasosEdit[idx]) return;
         _pasosEdit[idx].depende_de = (raw || '').split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
@@ -459,27 +583,291 @@ window.Procesos = (() => {
         _renderPasosEdit();
     }
 
+    // ── Drag & Drop de pasos ─────────────────────────────────────────────
+    let _dragSrcIdx = null;
+
+    function _dragStart(ev, idx) {
+        _dragSrcIdx = idx;
+        ev.dataTransfer.effectAllowed = 'move';
+        // Hack para Firefox: setData es obligatorio o el drag no se inicia
+        try { ev.dataTransfer.setData('text/plain', String(idx)); } catch {}
+        ev.currentTarget.classList.add('is-dragging');
+    }
+
+    function _dragOver(ev) {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        ev.currentTarget.classList.add('is-drag-over');
+    }
+
+    function _dragLeave(ev) {
+        ev.currentTarget.classList.remove('is-drag-over');
+    }
+
+    function _drop(ev, dstIdx) {
+        ev.preventDefault();
+        ev.currentTarget.classList.remove('is-drag-over');
+        if (_dragSrcIdx === null || _dragSrcIdx === dstIdx) return;
+        const moved = _pasosEdit.splice(_dragSrcIdx, 1)[0];
+        _pasosEdit.splice(dstIdx, 0, moved);
+        _pasosEdit.forEach((p, i) => p.orden = i + 1);
+        _dragSrcIdx = null;
+        _renderPasosEdit();
+    }
+
+    function _dragEnd(ev) {
+        ev.currentTarget.classList.remove('is-dragging');
+        document.querySelectorAll('.gta-paso-edit-row.is-drag-over')
+            .forEach(el => el.classList.remove('is-drag-over'));
+        _dragSrcIdx = null;
+    }
+
+    // ── Edición de campos del formulario obligatorio ─────────────────────
+
+    function _renderCamposFormEdit() {
+        const cont = document.getElementById('ed-campos-form');
+        if (!cont) return;
+        if (!_camposFormEdit.length) {
+            cont.innerHTML = '<p class="gta-section-help" style="opacity:0.6;">Sin campos definidos. El flujo arranca sin pedir datos.</p>';
+            return;
+        }
+
+        // Lista de campos tipo select para el dropdown "depende de"
+        const camposSelect = _camposFormEdit
+            .map((c, i) => ({ ...c, idx: i }))
+            .filter(c => c.tipo === 'select' && c.key);
+
+        cont.innerHTML = _camposFormEdit.map((c, idx) => {
+            // Header: etiqueta, key, tipo
+            const headerHtml = `
+                <div style="display:flex; gap:8px;">
+                    <input type="text" class="input-dark" placeholder="Etiqueta visible *" style="flex:2;"
+                           value="${_esc(c.label || '')}"
+                           oninput="Procesos._setCampoForm(${idx}, 'label', this.value)">
+                    <input type="text" class="input-dark" placeholder="key (snake_case)" style="flex:1;"
+                           value="${_esc(c.key || '')}"
+                           oninput="Procesos._setCampoForm(${idx}, 'key', this.value.replace(/[^a-z0-9_]/gi, '_').toLowerCase())">
+                    <select class="input-dark" style="width:170px;"
+                            onchange="Procesos._setCampoTipo(${idx}, this.value)">
+                        <option value="texto" ${c.tipo === 'texto' ? 'selected' : ''}>Texto</option>
+                        <option value="textarea" ${c.tipo === 'textarea' ? 'selected' : ''}>Texto largo</option>
+                        <option value="numero" ${c.tipo === 'numero' ? 'selected' : ''}>Número</option>
+                        <option value="fecha" ${c.tipo === 'fecha' ? 'selected' : ''}>Fecha</option>
+                        <option value="select" ${c.tipo === 'select' ? 'selected' : ''}>Lista</option>
+                        <option value="select_dependiente" ${c.tipo === 'select_dependiente' ? 'selected' : ''}>Lista dependiente</option>
+                    </select>
+                </div>
+            `;
+
+            // Bloque específico por tipo
+            let bloqueTipo = '';
+            if (c.tipo === 'select') {
+                bloqueTipo = `
+                    <input type="text" class="input-dark" placeholder="Opciones separadas por coma (ej: si,no,n/a)" style="margin-top:6px;"
+                           value="${_esc((c.opciones || []).join(','))}"
+                           oninput="Procesos._setCampoOpciones(${idx}, this.value)">
+                `;
+            } else if (c.tipo === 'select_dependiente') {
+                // Selector de campo padre
+                const padreSelect = `
+                    <select class="input-dark" style="margin-top:6px;"
+                            onchange="Procesos._setCampoDependeDe(${idx}, this.value)">
+                        <option value="">— Depende de qué campo —</option>
+                        ${camposSelect.map(p => `<option value="${_esc(p.key)}" ${c.depende_de === p.key ? 'selected' : ''}>${_esc(p.label || p.key)} (${_esc(p.key)})</option>`).join('')}
+                    </select>
+                `;
+
+                // Editor de opciones por valor del padre
+                let opcionesPorValorHtml = '';
+                if (c.depende_de) {
+                    const padre = _camposFormEdit.find(x => x.key === c.depende_de);
+                    const valoresPadre = (padre?.opciones || []);
+                    if (!valoresPadre.length) {
+                        opcionesPorValorHtml = `
+                            <p class="gta-section-help" style="margin-top:6px; opacity:0.7;">
+                                El campo padre <code>${_esc(c.depende_de)}</code> no tiene opciones aún.
+                                Agregalas primero al padre y vuelve aquí.
+                            </p>
+                        `;
+                    } else {
+                        opcionesPorValorHtml = `
+                            <div style="margin-top:6px;">
+                                <p class="gta-section-help" style="margin:0 0 6px 0;">
+                                    Opciones disponibles según el valor del padre:
+                                </p>
+                                ${valoresPadre.map(val => `
+                                    <div style="display:flex; gap:8px; margin-bottom:4px; align-items:center;">
+                                        <span style="min-width:160px; font-size:12px; color:var(--text-soft); font-weight:600;">${_esc(val)}:</span>
+                                        <input type="text" class="input-dark" style="flex:1;"
+                                               placeholder="Servicios para esta línea, separados por coma"
+                                               value="${_esc(((c.opciones_por_valor || {})[val] || []).join(','))}"
+                                               oninput="Procesos._setCampoOpcionesPorValor(${idx}, '${_esc(val).replace(/'/g, '&#39;')}', this.value)">
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+                }
+
+                bloqueTipo = padreSelect + opcionesPorValorHtml;
+            }
+
+            return `
+                <div class="gta-campo-form-row">
+                    <div class="gta-campo-form-num">#${idx + 1}</div>
+                    <div class="gta-campo-form-fields">
+                        ${headerHtml}
+                        ${bloqueTipo}
+                        <input type="text" class="input-dark" placeholder="Texto de ayuda (opcional)" style="margin-top:6px;"
+                               value="${_esc(c.ayuda || '')}"
+                               oninput="Procesos._setCampoForm(${idx}, 'ayuda', this.value)">
+                        <label class="gta-paso-edit-bloqueante" style="margin-top:4px;">
+                            <input type="checkbox" ${c.requerido !== false ? 'checked' : ''}
+                                   onchange="Procesos._setCampoForm(${idx}, 'requerido', this.checked)">
+                            <span>Obligatorio (no deja completar la tarea sin este dato)</span>
+                        </label>
+                    </div>
+                    <button class="btn-sm btn-danger" onclick="Procesos._quitarCampoForm(${idx})" title="Quitar campo">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function _agregarCampoForm() {
+        const n = _camposFormEdit.length + 1;
+        _camposFormEdit.push({
+            key: `campo_${n}`,
+            label: '',
+            tipo: 'texto',
+            opciones: [],
+            requerido: true,
+            ayuda: '',
+        });
+        _renderCamposFormEdit();
+    }
+
+    function _setCampoForm(idx, k, v) {
+        if (_camposFormEdit[idx]) _camposFormEdit[idx][k] = v;
+    }
+
+    function _setCampoTipo(idx, tipo) {
+        if (!_camposFormEdit[idx]) return;
+        const c = _camposFormEdit[idx];
+        c.tipo = tipo;
+        // Inicializar campos auxiliares según el tipo nuevo
+        if (tipo === 'select' && !Array.isArray(c.opciones)) {
+            c.opciones = [];
+        }
+        if (tipo === 'select_dependiente') {
+            if (!c.depende_de) c.depende_de = '';
+            if (!c.opciones_por_valor) c.opciones_por_valor = {};
+        }
+        _renderCamposFormEdit();
+    }
+
+    function _setCampoOpciones(idx, raw) {
+        if (!_camposFormEdit[idx]) return;
+        _camposFormEdit[idx].opciones = (raw || '').split(',').map(s => s.trim()).filter(Boolean);
+        // Si hay hijos dependientes que apuntaban a este campo, re-renderizar
+        // para que sus mapas de opciones_por_valor se actualicen visualmente.
+        _renderCamposFormEdit();
+    }
+
+    function _setCampoDependeDe(idx, padreKey) {
+        if (!_camposFormEdit[idx]) return;
+        _camposFormEdit[idx].depende_de = padreKey;
+        // Inicializar opciones_por_valor con las opciones del padre, vacías
+        if (padreKey) {
+            const padre = _camposFormEdit.find(c => c.key === padreKey);
+            const valores = padre?.opciones || [];
+            const actual = _camposFormEdit[idx].opciones_por_valor || {};
+            const nuevo = {};
+            for (const v of valores) {
+                nuevo[v] = actual[v] || [];
+            }
+            _camposFormEdit[idx].opciones_por_valor = nuevo;
+        }
+        _renderCamposFormEdit();
+    }
+
+    function _setCampoOpcionesPorValor(idx, valorPadre, raw) {
+        if (!_camposFormEdit[idx]) return;
+        if (!_camposFormEdit[idx].opciones_por_valor) _camposFormEdit[idx].opciones_por_valor = {};
+        _camposFormEdit[idx].opciones_por_valor[valorPadre] = (raw || '')
+            .split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    function _quitarCampoForm(idx) {
+        _camposFormEdit.splice(idx, 1);
+        _renderCamposFormEdit();
+    }
+
     async function guardarEdicion() {
         if (!_procActivo) return;
         const nombre = document.getElementById('ed-nombre').value.trim();
         const area = document.getElementById('ed-area').value;
+        const subareaCode = document.getElementById('ed-subarea')?.value || null;
         const desc = document.getElementById('ed-desc').value.trim();
+        const estado = document.getElementById('ed-estado')?.value || 'activo';
+
         if (!nombre || !area) {
             alert('Nombre y área son obligatorios');
             return;
         }
-        const pasos = _pasosEdit.filter(p => p.titulo && p.area_code);
+
+        // Filtramos pasos sin título o área (incompletos no se guardan).
+        // Reordenamos por si quedó algún hueco después del drag&drop.
+        const pasos = _pasosEdit
+            .filter(p => p.titulo && p.area_code)
+            .map((p, i) => ({
+                orden: i + 1,
+                titulo: p.titulo,
+                descripcion: p.descripcion || '',
+                area_code: p.area_code,
+                subarea_code: p.subarea_code || null,
+                sla_horas: p.sla_horas || 24,
+                depende_de: Array.isArray(p.depende_de) ? p.depende_de : [],
+                bloqueante: p.bloqueante !== false,
+            }));
+
+        // Filtramos campos sin label
+        const camposForm = (_camposFormEdit || [])
+            .filter(c => c.label && c.label.trim())
+            .map((c, i) => {
+                const base = {
+                    key: (c.key || `campo_${i + 1}`).trim() || `campo_${i + 1}`,
+                    label: c.label.trim(),
+                    tipo: c.tipo || 'texto',
+                    opciones: Array.isArray(c.opciones) ? c.opciones.filter(Boolean) : [],
+                    requerido: c.requerido !== false,
+                    ayuda: (c.ayuda || '').trim(),
+                };
+                if (c.tipo === 'select_dependiente') {
+                    base.depende_de = (c.depende_de || '').trim();
+                    base.opciones_por_valor = c.opciones_por_valor || {};
+                }
+                return base;
+            });
+
         try {
             await GtaApi.actualizarProceso(_procActivo.id, {
-                nombre, area, descripcion: desc,
+                nombre,
+                area,
+                subarea_code: subareaCode,
+                descripcion: desc,
+                estado,
                 pasos_definicion: JSON.stringify(pasos),
+                campos_formulario: JSON.stringify(camposForm),
             });
             _modoEdit = false;
             _pasosEdit = [];
+            _camposFormEdit = [];
             await abrir(_procActivo.id);
             await cargar();
         } catch (e) {
-            alert('Error: ' + (e.message || e));
+            alert('Error: ' + (e.detail || e.message || e));
         }
     }
 
@@ -535,21 +923,52 @@ window.Procesos = (() => {
     }
 
     // ── Iniciar flujo desde proceso ───────────────────────────────────
-    async function iniciarFlujo(procId) {
-        const titulo = prompt('Título del flujo (ej: "Cliente ABC Corp"):');
-        if (!titulo || !titulo.trim()) return;
+    let _iniciarProcId = null;
+
+    function iniciarFlujo(procId) {
+        // Modal simple: solo título + descripción. Los campos del formulario
+        // los pide la TAREA del paso 1 al cerrarla, no el inicio del flujo.
+        _iniciarProcId = procId;
+        const proc = _procActivo && _procActivo.id === procId ? _procActivo : _procesos.find(p => p.id === procId);
+
+        const m = document.getElementById('modal-iniciar-flujo');
+        if (!m) return;
+
+        document.getElementById('iniciar-flujo-titulo-proceso').textContent = proc?.nombre || 'Proceso';
+        document.getElementById('iniciar-flujo-campos').innerHTML = `
+            <p class="gta-section-help" style="margin-top:8px;">
+                Al iniciar, se va a generar la primera tarea asignada a vos.
+                Los datos del proceso se completan al <strong>cerrar</strong> esa tarea,
+                y recién ahí se desbloquean las áreas siguientes.
+            </p>
+        `;
+        document.getElementById('iniciar-flujo-titulo').value = '';
+        m.classList.add('is-open');
+    }
+
+    function cerrarIniciarFlujo() {
+        document.getElementById('modal-iniciar-flujo')?.classList.remove('is-open');
+        _iniciarProcId = null;
+    }
+
+    async function confirmarIniciarFlujo() {
+        if (!_iniciarProcId) return;
+        const titulo = (document.getElementById('iniciar-flujo-titulo').value || '').trim();
+        if (!titulo) return alert('El título del flujo es obligatorio.');
+
         try {
-            const flujo = await GtaApi.crearFlujo({
-                proceso_id: procId,
-                titulo: titulo.trim(),
+            await GtaApi.crearFlujo({
+                proceso_id: _iniciarProcId,
+                titulo,
+                datos_formulario: {},  // se llenan al cerrar la tarea del paso 1
             });
+            cerrarIniciarFlujo();
             cerrarModal();
-            await window.GtaCore.loadTab('tablero');
-            setTimeout(() => {
-                if (window.Tablero?.abrirFlujo) window.Tablero.abrirFlujo(flujo.id);
-            }, 400);
+            // Después de iniciar, llevamos al usuario a la pestaña Tareas:
+            // ahí va a ver el paso 1 ya asignado a él en "Mis tareas".
+            await window.GtaCore.loadTab('tareas');
         } catch (e) {
-            alert('Error al iniciar flujo: ' + (e.message || e));
+            alert('Error al iniciar flujo: ' + (e.detail || e.message || e));
         }
     }
 
@@ -557,12 +976,93 @@ window.Procesos = (() => {
         return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
+    // ── Campos del formulario obligatorio al iniciar el flujo ────────────
+    function _normalizarCamposForm(raw) {
+        if (Array.isArray(raw)) return raw.map(_normalizarCampo);
+        if (typeof raw === 'string' && raw.trim()) {
+            try { return (JSON.parse(raw) || []).map(_normalizarCampo); }
+            catch { return []; }
+        }
+        return [];
+    }
+    function _normalizarCampo(c, i) {
+        return {
+            key: c.key || `campo_${i + 1}`,
+            label: c.label || c.titulo || `Campo ${i + 1}`,
+            tipo: c.tipo || 'texto',  // texto | numero | fecha | select
+            opciones: Array.isArray(c.opciones) ? c.opciones : [],
+            requerido: c.requerido !== false,
+            ayuda: c.ayuda || '',
+        };
+    }
+
+    // ── Preview de documento (guía del proceso) ─────────────────────────
+    async function abrirDocPreview(path) {
+        const m = document.getElementById('modal-doc-preview');
+        const body = document.getElementById('doc-preview-body');
+        const title = document.getElementById('doc-preview-title');
+        const footer = document.getElementById('doc-preview-footer');
+        if (!m || !body) return;
+
+        m.classList.add('is-open');
+        const filename = String(path).split('/').pop() || path;
+        if (title) title.textContent = filename;
+        body.innerHTML = `<div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando documento…</div>`;
+        if (footer) {
+            footer.innerHTML = `
+                <a href="/api/gta/catalogo/download?path=${encodeURIComponent(path)}" class="btn-secondary" download>
+                    <i class="fas fa-download"></i> Descargar
+                </a>
+                <button class="btn-secondary" onclick="Procesos.cerrarDocPreview()">Cerrar</button>
+            `;
+        }
+
+        try {
+            const meta = await GtaApi.getPreviewMeta(path);
+            if (meta.mode === 'iframe') {
+                const url = `/api/gta/catalogo/download?path=${encodeURIComponent(path)}`;
+                body.innerHTML = `<iframe src="${url}" style="width:100%; height:75vh; border:0; background:#fff;"></iframe>`;
+            } else if (meta.mode === 'image') {
+                const url = `/api/gta/catalogo/download?path=${encodeURIComponent(path)}`;
+                body.innerHTML = `<div style="text-align:center;"><img src="${url}" style="max-width:100%; height:auto; border-radius:8px;"></div>`;
+            } else if (meta.mode === 'text') {
+                const data = await GtaApi.getPreviewText(path);
+                const truncMsg = data.truncated
+                    ? `<div class="gta-section-help" style="margin-bottom:10px;"><i class="fas fa-scissors"></i> Documento muy largo, se muestra el inicio (${data.text.length}/${data.total_chars} caracteres). Descargá para ver completo.</div>`
+                    : '';
+                body.innerHTML = `
+                    ${truncMsg}
+                    <pre class="gta-doc-preview-text">${_esc(data.text || '(documento vacío)')}</pre>
+                `;
+            } else {
+                body.innerHTML = `
+                    <div class="gta-empty" style="padding:40px 20px;">
+                        <i class="fas fa-file-circle-question" style="font-size:32px; opacity:0.4;"></i>
+                        <p style="margin-top:10px;">No podemos previsualizar este tipo de archivo en el navegador.</p>
+                        <p class="gta-section-help">Usá "Descargar" abajo para abrirlo localmente.</p>
+                    </div>
+                `;
+            }
+        } catch (e) {
+            body.innerHTML = `<div class="gta-empty">Error al cargar preview: ${_esc(e.detail || e.message || e)}</div>`;
+        }
+    }
+
+    function cerrarDocPreview() {
+        document.getElementById('modal-doc-preview')?.classList.remove('is-open');
+    }
+
     return {
         init, cargar, filtrarArea,
         abrir, cerrarModal,
         entrarModoEdicion, salirModoEdicion, guardarEdicion,
-        _refreshSubareas, _agregarPasoEdit, _setPasoEdit, _setDepsEdit, _quitarPasoEdit,
+        _refreshSubareas, _agregarPasoEdit, _setPasoEdit, _setPasoArea,
+        _setDepsEdit, _quitarPasoEdit,
+        _dragStart, _dragOver, _dragLeave, _drop, _dragEnd,
+        _agregarCampoForm, _setCampoForm, _setCampoTipo, _setCampoOpciones,
+        _setCampoDependeDe, _setCampoOpcionesPorValor, _quitarCampoForm,
         abrirQuiebre, cerrarQuiebre, guardarQuiebre,
-        iniciarFlujo, agregarNota,
+        iniciarFlujo, cerrarIniciarFlujo, confirmarIniciarFlujo, agregarNota,
+        abrirDocPreview, cerrarDocPreview,
     };
 })();

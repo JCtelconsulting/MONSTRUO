@@ -1783,6 +1783,14 @@ form {
   transition: opacity 0.3s;
 }
 
+/* Activación del modal: aceptamos `.is-open` (canónico GTA) y `.show`
+   (legacy, lo usan algunos módulos viejos). Sin esto, el JS agrega la
+   clase pero el display: none de arriba la sigue anulando. */
+.modal-backdrop.is-open,
+.modal-backdrop.show {
+  display: flex;
+}
+
 .modal-content {
   background: rgba(12, 16, 22, 0.85);
   backdrop-filter: blur(25px);

@@ -1,4 +1,5 @@
 <div class="gta-tareas">
+    <div class="gta-area-pills" id="tareas-areas-pills" style="margin-bottom:12px;"></div>
     <div class="gta-tareas-header">
         <div class="gta-tareas-subtabs">
             <button class="gta-subtab active" data-view="bandeja" onclick="Tareas.cambiarVista('bandeja', this)">
@@ -12,6 +13,10 @@
             <button class="gta-subtab" data-view="colaboro" onclick="Tareas.cambiarVista('colaboro', this)">
                 <i class="fas fa-handshake"></i> Donde colaboro
                 <span class="gta-subtab-count" id="count-colaboro">—</span>
+            </button>
+            <button class="gta-subtab gta-subtab-quiebres" data-view="quiebres" onclick="Tareas.cambiarVista('quiebres', this)">
+                <i class="fas fa-flag"></i> Quiebres a mi área
+                <span class="gta-subtab-count" id="count-quiebres">—</span>
             </button>
         </div>
         <div class="gta-tareas-actions">
@@ -34,22 +39,6 @@
 </div>
 
 
-<!-- Modal: Detalle de tarea -->
-<div class="modal-backdrop" id="modal-tarea">
-    <div class="modal-content gta-tarea-modal">
-        <div class="modal-header">
-            <div>
-                <div class="gta-flujo-drawer-eyebrow" id="tarea-modal-eyebrow">Tarea</div>
-                <h2 id="tarea-modal-titulo">Cargando...</h2>
-            </div>
-            <button class="modal-close-btn" onclick="Tareas.cerrarModal()">×</button>
-        </div>
-        <div class="modal-body" id="tarea-modal-body">
-            <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i></div>
-        </div>
-        <div class="modal-footer" id="tarea-modal-footer"></div>
-    </div>
-</div>
 
 
 <!-- Modal: Nueva tarea -->
@@ -129,3 +118,5 @@
         </div>
     </div>
 </div>
+
+

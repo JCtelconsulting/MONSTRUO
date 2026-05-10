@@ -78,6 +78,23 @@ def subarea_ids_de_usuario(usuario_id: int) -> List[int]:
         conn.close()
 
 
+def area_codes_de_usuario(usuario_id: int) -> List[str]:
+    """Códigos de áreas vigentes del usuario (deduplicados). Útil para
+    filtrar quiebres dirigidos a 'mi área'."""
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT DISTINCT s.area_code
+               FROM gta.area_membresias m
+               JOIN gta.subareas s ON s.id = m.subarea_id
+               WHERE m.usuario_id = %s AND m.hasta IS NULL""",
+            (usuario_id,),
+        ).fetchall()
+        return [r["area_code"] for r in rows]
+    finally:
+        conn.close()
+
+
 # ── Asignar / cerrar membresía ──────────────────────────────────────────
 
 def asignar_membresia(
