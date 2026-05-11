@@ -31,17 +31,17 @@
             </div>
             <div class="plan-clima-grid" id="plan-clima-grid"></div>
             <div class="plan-clima-meta">
-                <label>
+                <label class="plan-clima-meta-col1">
                     <span class="plan-field-lbl">Situaciones relevantes</span>
                     <textarea id="plan-situaciones" class="input-dark" rows="2"
                               placeholder="Ej: conflicto entre niños al inicio; energía baja después de la colación"></textarea>
                 </label>
-                <label>
+                <label class="plan-clima-meta-col2">
                     <span class="plan-field-lbl">Estrategias aplicadas</span>
                     <textarea id="plan-estrategias" class="input-dark" rows="2"
                               placeholder="Qué hizo la monitora frente a esas situaciones"></textarea>
                 </label>
-                <label>
+                <label class="plan-clima-meta-full">
                     <span class="plan-field-lbl">Notas adicionales</span>
                     <textarea id="plan-notas" class="input-dark" rows="2"></textarea>
                 </label>
@@ -52,9 +52,17 @@
         <section class="plan-section plan-bloques-section">
             <div class="plan-section-head">
                 <h4><i class="fa-solid fa-layer-group"></i> Bloques del día</h4>
-                <button id="plan-btn-add-bloque" class="btn-secondary btn-sm">
-                    <i class="fa-solid fa-plus"></i> Agregar bloque
-                </button>
+                <div class="plan-section-head-actions">
+                    <button id="plan-btn-collapse-all" class="btn-sm" title="Colapsar todos">
+                        <i class="fa-solid fa-compress"></i> Colapsar
+                    </button>
+                    <button id="plan-btn-expand-all" class="btn-sm" title="Expandir todos">
+                        <i class="fa-solid fa-expand"></i> Expandir
+                    </button>
+                    <button id="plan-btn-add-bloque" class="btn-sm">
+                        <i class="fa-solid fa-plus"></i> Agregar bloque
+                    </button>
+                </div>
             </div>
             <div id="plan-bloques-lista" class="plan-bloques-lista">
                 <p class="plan-bloques-empty">Sin bloques cargados. Usa "Plantilla del día" para los 6 estándar o "Agregar bloque" para uno por uno.</p>
@@ -63,60 +71,99 @@
     </div>
 </div>
 
-<!-- Plantilla HTML que el JS clona para cada bloque -->
+<!-- Plantilla HTML que el JS clona para cada bloque (colapsable) -->
 <template id="tpl-bloque">
-    <article class="plan-bloque" data-bloque-idx="">
-        <header class="plan-bloque-head">
-            <span class="plan-bloque-orden">#<span data-role="orden">1</span></span>
-            <select data-role="tipo" class="input-dark plan-bloque-tipo"></select>
-            <select data-role="subtipo" class="input-dark plan-bloque-subtipo" style="display:none;"></select>
-            <div class="plan-bloque-horas">
-                <input type="time" data-role="hora-inicio" class="input-dark" title="Hora inicio" />
-                <span>–</span>
-                <input type="time" data-role="hora-fin" class="input-dark" title="Hora fin" />
-            </div>
-            <label class="plan-bloque-ejecutado">
-                <input type="checkbox" data-role="se-ejecuto" checked />
-                <span>Se ejecutó</span>
-            </label>
-            <button type="button" class="btn-icon btn-danger-soft" data-role="del" title="Eliminar bloque">
+    <details class="plan-bloque" data-bloque-idx="" open>
+        <summary class="plan-bloque-summary">
+            <i class="fa-solid fa-chevron-right plan-bloque-chevron"></i>
+            <span class="plan-bloque-orden">#<span data-role="orden-label">1</span></span>
+            <span class="plan-bloque-tipo-tag" data-role="tipo-label">—</span>
+            <span class="plan-bloque-subtipo-tag" data-role="subtipo-label"></span>
+            <span class="plan-bloque-hora-tag" data-role="hora-label"></span>
+            <span class="plan-bloque-actividad-label" data-role="actividad-label"></span>
+            <span class="plan-bloque-status" data-role="status-label"></span>
+            <button type="button" class="btn-icon btn-danger-soft plan-bloque-del" data-role="del" title="Eliminar bloque">
                 <i class="fa-solid fa-xmark"></i>
             </button>
-        </header>
+        </summary>
+
         <div class="plan-bloque-body">
+            <!-- Fila 1: tipo + subtipo + horas + ejecutado -->
+            <div class="plan-bloque-controls">
+                <div class="plan-control">
+                    <span class="plan-field-lbl">Tipo de bloque</span>
+                    <select data-role="tipo" class="input-dark"></select>
+                </div>
+                <div class="plan-control" data-role="subtipo-control" style="display:none;">
+                    <span class="plan-field-lbl">Subtipo</span>
+                    <select data-role="subtipo" class="input-dark"></select>
+                </div>
+                <div class="plan-control plan-control-horas">
+                    <span class="plan-field-lbl">Horario</span>
+                    <div class="plan-horas-row">
+                        <input type="time" data-role="hora-inicio" class="input-dark" />
+                        <span class="plan-horas-sep">–</span>
+                        <input type="time" data-role="hora-fin" class="input-dark" />
+                    </div>
+                </div>
+                <div class="plan-control plan-control-ejec">
+                    <span class="plan-field-lbl">Ejecución</span>
+                    <label class="plan-bloque-ejecutado">
+                        <input type="checkbox" data-role="se-ejecuto" checked />
+                        <span>Se ejecutó</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Actividad -->
             <label class="plan-bloque-row">
                 <span class="plan-field-lbl">Actividad</span>
                 <input type="text" data-role="actividad" class="input-dark"
                        placeholder='Ej: "Pelota de la amistad", "Just dance", "Mural de la felicidad"' />
             </label>
+
+            <!-- Resultado de aprendizaje (solo bloques que permiten competencias) -->
             <label class="plan-bloque-row" data-role="resultado-row">
                 <span class="plan-field-lbl">Resultado de aprendizaje</span>
                 <textarea data-role="resultado" class="input-dark" rows="2"></textarea>
             </label>
+
+            <!-- Competencias agrupadas por dominio -->
             <div class="plan-bloque-row" data-role="competencias-row">
-                <span class="plan-field-lbl">Competencias trabajadas</span>
-                <div class="plan-comp-grid" data-role="competencias"></div>
+                <div class="plan-field-lbl-row">
+                    <span class="plan-field-lbl">Competencias trabajadas</span>
+                    <span class="plan-comp-counter" data-role="comp-counter"></span>
+                </div>
+                <div class="plan-comp-domains" data-role="competencias"></div>
             </div>
+
+            <!-- Materiales -->
             <div class="plan-bloque-row">
-                <span class="plan-field-lbl">Materiales</span>
+                <div class="plan-field-lbl-row">
+                    <span class="plan-field-lbl">Materiales</span>
+                    <button type="button" class="btn-link" data-role="add-material">
+                        <i class="fa-solid fa-plus"></i> Agregar
+                    </button>
+                </div>
                 <div data-role="materiales" class="plan-mat-list"></div>
-                <button type="button" class="btn-link" data-role="add-material">
-                    <i class="fa-solid fa-plus"></i> Agregar material
-                </button>
             </div>
+
+            <!-- Motivo no ejecutado (oculto si se ejecutó) -->
             <div class="plan-bloque-row plan-bloque-no-ejec" data-role="no-ejec-row" style="display:none;">
                 <label>
                     <span class="plan-field-lbl">Motivo por el que no se ejecutó</span>
                     <input type="text" data-role="motivo" class="input-dark" />
                 </label>
             </div>
+
+            <!-- Adaptación -->
             <label class="plan-bloque-row">
                 <span class="plan-field-lbl">Adaptación realizada</span>
                 <textarea data-role="adaptacion" class="input-dark" rows="2"
                           placeholder="Cambios al plan original, qué no resultó, mejoras del momento"></textarea>
             </label>
         </div>
-    </article>
+    </details>
 </template>
 
 <!-- Plantilla HTML para una fila de material -->

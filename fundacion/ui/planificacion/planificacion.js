@@ -1,8 +1,9 @@
 window.FundPlanificacion = (() => {
     let _ctx = null;
     let _cat = { dominios: [], competencias: [], bloqueTipos: [], clima: [] };
-    let _bloques = [];       // estado en memoria de la sesión actual
-    let _sesionMeta = {      // metadata de cabecera
+    let _compByDomain = [];  // [{dominio, competencias: [...]}]
+    let _bloques = [];
+    let _sesionMeta = {
         clima_opcion_id: null,
         situaciones_relevantes: '',
         estrategias_aplicadas: '',
@@ -10,7 +11,7 @@ window.FundPlanificacion = (() => {
     };
     let _catLoaded = false;
     let _saving = false;
-    let _bloqueSeq = 0;      // contador interno para data-bloque-idx
+    let _bloqueSeq = 0;
 
     async function init(ctx) {
         _ctx = ctx;
@@ -29,17 +30,12 @@ window.FundPlanificacion = (() => {
     }
 
     function _initEventos() {
-        const btnAdd = document.getElementById('plan-btn-add-bloque');
-        if (btnAdd) btnAdd.addEventListener('click', () => _agregarBloque());
-
-        const btnSug = document.getElementById('plan-btn-sugerir');
-        if (btnSug) btnSug.addEventListener('click', _cargarPlantillaDelDia);
-
-        const btnGuardar = document.getElementById('plan-btn-guardar');
-        if (btnGuardar) btnGuardar.addEventListener('click', _guardar);
-
-        const fecha = document.getElementById('plan-fecha');
-        if (fecha) fecha.addEventListener('change', _refresh);
+        document.getElementById('plan-btn-add-bloque')?.addEventListener('click', () => _agregarBloque({ open: true }));
+        document.getElementById('plan-btn-sugerir')?.addEventListener('click', _cargarPlantillaDelDia);
+        document.getElementById('plan-btn-guardar')?.addEventListener('click', _guardar);
+        document.getElementById('plan-btn-collapse-all')?.addEventListener('click', () => _toggleAll(false));
+        document.getElementById('plan-btn-expand-all')?.addEventListener('click', () => _toggleAll(true));
+        document.getElementById('plan-fecha')?.addEventListener('change', _refresh);
 
         ['plan-situaciones', 'plan-estrategias', 'plan-notas'].forEach(id => {
             const el = document.getElementById(id);
@@ -61,7 +57,7 @@ window.FundPlanificacion = (() => {
         const s = document.getElementById('plan-sede-subtitle');
         const shell = document.getElementById('plan-shell');
         const needs = document.getElementById('plan-needs-sede');
-        if (!_ctx?.sede || !_ctx.sede.id) {
+        if (!_ctx?.sede?.id) {
             if (t) t.textContent = 'Planificación — selecciona una sede';
             if (s) s.textContent = '';
             if (shell) shell.style.display = 'none';
@@ -87,6 +83,12 @@ window.FundPlanificacion = (() => {
             _cat.competencias = comp.items || [];
             _cat.bloqueTipos = bt.items || [];
             _cat.clima = cli.items || [];
+
+            // agrupar competencias por dominio en el orden correcto
+            _compByDomain = _cat.dominios.map(d => ({
+                dominio: d,
+                competencias: _cat.competencias.filter(c => c.dominio_id === d.id),
+            }));
             _catLoaded = true;
         } catch (e) {
             console.error('[Planificación] error cargando catálogos', e);
@@ -98,7 +100,7 @@ window.FundPlanificacion = (() => {
         const grid = document.getElementById('plan-clima-grid');
         if (!grid) return;
         grid.innerHTML = _cat.clima.map(c => `
-            <button type="button" class="plan-clima-opt" data-clima-id="${c.id}" style="--clima-c:${_esc(c.color || '#888')}">
+            <button type="button" class="plan-clima-opt" data-clima-id="${c.id}">
                 <i class="fa-solid ${_esc(c.icono || 'fa-circle')}" style="color:${_esc(c.color || '#888')}"></i>
                 <span>${_esc(c.nombre)}</span>
             </button>
@@ -121,7 +123,6 @@ window.FundPlanificacion = (() => {
 
     async function _refresh() {
         const fecha = document.getElementById('plan-fecha')?.value;
-        const shell = document.getElementById('plan-shell');
         if (!_ctx?.sede?.id || !fecha) {
             _bloques = [];
             _resetMeta();
@@ -131,14 +132,12 @@ window.FundPlanificacion = (() => {
         await _ensureCatalogos();
         try {
             const data = await window.FundApi.getSesionByFecha(_ctx.sede.id, fecha);
-            // poblar estado desde respuesta
             _sesionMeta.clima_opcion_id = data.clima_opcion_id || null;
             _sesionMeta.situaciones_relevantes = data.situaciones_relevantes || '';
             _sesionMeta.estrategias_aplicadas = data.estrategias_aplicadas || '';
             _sesionMeta.notas = data.notas || '';
             _bloques = (data.bloques || []).map(_bloqueFromApi);
         } catch (e) {
-            // 404 = sesión no existe todavía, arrancamos vacío
             _bloques = [];
             _resetMeta();
         }
@@ -163,6 +162,7 @@ window.FundPlanificacion = (() => {
     function _bloqueFromApi(b) {
         return {
             _idx: ++_bloqueSeq,
+            _open: false,  // los bloques existentes arrancan colapsados (legibilidad)
             orden: b.orden,
             bloque_tipo_id: b.bloque_tipo_id,
             bloque_subtipo_id: b.bloque_subtipo_id,
@@ -188,6 +188,7 @@ window.FundPlanificacion = (() => {
         const tipoDefault = _cat.bloqueTipos[0];
         _bloques.push({
             _idx: ++_bloqueSeq,
+            _open: preset?.open !== false,
             orden: _bloques.length + 1,
             bloque_tipo_id: preset?.bloque_tipo_id ?? (tipoDefault?.id || null),
             bloque_subtipo_id: preset?.bloque_subtipo_id ?? null,
@@ -214,22 +215,28 @@ window.FundPlanificacion = (() => {
             return t?.subtipos?.find(s => s.codigo === subCodigo)?.id || null;
         };
         const plantilla = [
-            { tipo: 'juegos_para_crecer',  sub: 'psicomotor', ini: '15:30', fin: '16:00' },
-            { tipo: 'taller_socioemocional', sub: null,       ini: '16:00', fin: '17:00' },
-            { tipo: 'colacion',            sub: null,         ini: '17:00', fin: '17:15' },
-            { tipo: 'glifing',             sub: null,         ini: '17:15', fin: '17:45' },
-            { tipo: 'juegos_para_crecer',  sub: 'sensorial',  ini: '17:45', fin: '18:15' },
-            { tipo: 'juego_libre',         sub: null,         ini: '18:15', fin: '18:30' },
+            { tipo: 'juegos_para_crecer',   sub: 'psicomotor', ini: '15:30', fin: '16:00' },
+            { tipo: 'taller_socioemocional',sub: null,         ini: '16:00', fin: '17:00' },
+            { tipo: 'colacion',             sub: null,         ini: '17:00', fin: '17:15' },
+            { tipo: 'glifing',              sub: null,         ini: '17:15', fin: '17:45' },
+            { tipo: 'juegos_para_crecer',   sub: 'sensorial',  ini: '17:45', fin: '18:15' },
+            { tipo: 'juego_libre',          sub: null,         ini: '18:15', fin: '18:30' },
         ];
-        for (const p of plantilla) {
+        plantilla.forEach((p, i) => {
             const t = tipo(p.tipo);
             _agregarBloque({
                 bloque_tipo_id: t?.id || null,
                 bloque_subtipo_id: subtipo(p.tipo, p.sub),
                 hora_inicio: p.ini,
                 hora_fin: p.fin,
+                open: i === 0,  // solo el primero abierto
             });
-        }
+        });
+    }
+
+    function _toggleAll(open) {
+        _bloques.forEach(b => b._open = open);
+        document.querySelectorAll('.plan-bloque').forEach(d => d.open = open);
     }
 
     function _renderBloques() {
@@ -247,9 +254,38 @@ window.FundPlanificacion = (() => {
         const tpl = document.getElementById('tpl-bloque');
         const node = tpl.content.firstElementChild.cloneNode(true);
         node.dataset.bloqueIdx = b._idx;
-        node.querySelector('[data-role="orden"]').textContent = b.orden;
+        node.open = !!b._open;
+        node.addEventListener('toggle', () => { b._open = node.open; });
 
-        // selector de tipo
+        // Summary
+        const sumOrden = node.querySelector('[data-role="orden-label"]');
+        if (sumOrden) sumOrden.textContent = b.orden;
+
+        const sumTipo = node.querySelector('[data-role="tipo-label"]');
+        const sumSub  = node.querySelector('[data-role="subtipo-label"]');
+        const sumHora = node.querySelector('[data-role="hora-label"]');
+        const sumAct  = node.querySelector('[data-role="actividad-label"]');
+        const sumStat = node.querySelector('[data-role="status-label"]');
+
+        function syncSummary() {
+            const tipo = _cat.bloqueTipos.find(t => t.id === b.bloque_tipo_id);
+            const sub = (tipo?.subtipos || []).find(s => s.id === b.bloque_subtipo_id);
+            if (sumTipo) sumTipo.textContent = tipo?.nombre || '—';
+            if (sumSub)  sumSub.textContent  = sub?.nombre || '';
+            if (sumHora) sumHora.textContent = (b.hora_inicio && b.hora_fin) ? `${b.hora_inicio}–${b.hora_fin}` : '';
+            if (sumAct)  sumAct.textContent  = b.nombre_actividad ? `· ${b.nombre_actividad}` : '';
+            if (sumStat) {
+                if (b.se_ejecuto) {
+                    sumStat.textContent = '✓ ejecutado';
+                    sumStat.className = 'plan-bloque-status is-ok';
+                } else {
+                    sumStat.textContent = '✗ no ejec.';
+                    sumStat.className = 'plan-bloque-status is-not-ok';
+                }
+            }
+        }
+
+        // Selector de tipo
         const selTipo = node.querySelector('[data-role="tipo"]');
         selTipo.innerHTML = _cat.bloqueTipos.map(t =>
             `<option value="${t.id}" ${t.id === b.bloque_tipo_id ? 'selected' : ''}>${_esc(t.nombre)}</option>`
@@ -260,17 +296,22 @@ window.FundPlanificacion = (() => {
             const tipo = _cat.bloqueTipos.find(t => t.id === b.bloque_tipo_id);
             _refreshSubtipo(node, tipo, b);
             _refreshCompetencias(node, tipo, b);
+            syncSummary();
         });
+
+        // Subtipo
         const tipoActual = _cat.bloqueTipos.find(t => t.id === b.bloque_tipo_id);
-        _refreshSubtipo(node, tipoActual, b);
+        _refreshSubtipo(node, tipoActual, b, syncSummary);
 
-        // horas
-        node.querySelector('[data-role="hora-inicio"]').value = b.hora_inicio || '';
-        node.querySelector('[data-role="hora-fin"]').value = b.hora_fin || '';
-        node.querySelector('[data-role="hora-inicio"]').addEventListener('change', e => b.hora_inicio = e.target.value);
-        node.querySelector('[data-role="hora-fin"]').addEventListener('change', e => b.hora_fin = e.target.value);
+        // Horas
+        const inIni = node.querySelector('[data-role="hora-inicio"]');
+        const inFin = node.querySelector('[data-role="hora-fin"]');
+        inIni.value = b.hora_inicio || '';
+        inFin.value = b.hora_fin || '';
+        inIni.addEventListener('change', e => { b.hora_inicio = e.target.value; syncSummary(); });
+        inFin.addEventListener('change', e => { b.hora_fin = e.target.value; syncSummary(); });
 
-        // se ejecutó
+        // Ejecutado
         const cbEjec = node.querySelector('[data-role="se-ejecuto"]');
         cbEjec.checked = b.se_ejecuto;
         const noEjecRow = node.querySelector('[data-role="no-ejec-row"]');
@@ -278,63 +319,75 @@ window.FundPlanificacion = (() => {
         cbEjec.addEventListener('change', () => {
             b.se_ejecuto = cbEjec.checked;
             noEjecRow.style.display = b.se_ejecuto ? 'none' : '';
+            syncSummary();
         });
         const inputMotivo = node.querySelector('[data-role="motivo"]');
         inputMotivo.value = b.motivo_no_ejecucion || '';
         inputMotivo.addEventListener('input', e => b.motivo_no_ejecucion = e.target.value);
 
-        // eliminar
-        node.querySelector('[data-role="del"]').addEventListener('click', () => {
+        // Eliminar bloque (stop propagation para no toggle el details)
+        const btnDel = node.querySelector('[data-role="del"]');
+        btnDel.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
             if (!confirm('¿Eliminar este bloque?')) return;
             _bloques = _bloques.filter(x => x._idx !== b._idx);
             _bloques.forEach((x, i) => x.orden = i + 1);
             _renderBloques();
         });
 
-        // actividad / resultado / adaptación / notas
+        // Actividad
         const inputAct = node.querySelector('[data-role="actividad"]');
         inputAct.value = b.nombre_actividad || '';
-        inputAct.addEventListener('input', e => b.nombre_actividad = e.target.value);
+        inputAct.addEventListener('input', e => { b.nombre_actividad = e.target.value; syncSummary(); });
 
+        // Resultado de aprendizaje
         const inputRes = node.querySelector('[data-role="resultado"]');
         inputRes.value = b.resultado_aprendizaje || '';
         inputRes.addEventListener('input', e => b.resultado_aprendizaje = e.target.value);
 
+        // Adaptación
         const inputAdapt = node.querySelector('[data-role="adaptacion"]');
         inputAdapt.value = b.adaptacion || '';
         inputAdapt.addEventListener('input', e => b.adaptacion = e.target.value);
 
-        // competencias (solo si permite_competencias)
+        // Competencias (agrupadas por dominio)
         _refreshCompetencias(node, tipoActual, b);
 
-        // materiales
+        // Materiales
         _refreshMateriales(node, b);
         node.querySelector('[data-role="add-material"]').addEventListener('click', () => {
             b.materiales.push({ product_id: null, nombre_libre: '', cantidad_solicitada: '', cantidad_usada: '' });
             _refreshMateriales(node, b);
         });
 
+        syncSummary();
         return node;
     }
 
-    function _refreshSubtipo(node, tipo, b) {
+    function _refreshSubtipo(node, tipo, b, onChange) {
+        const ctrl = node.querySelector('[data-role="subtipo-control"]');
         const sel = node.querySelector('[data-role="subtipo"]');
         if (!tipo || !tipo.requiere_subtipo || !tipo.subtipos?.length) {
-            sel.style.display = 'none';
+            if (ctrl) ctrl.style.display = 'none';
             sel.innerHTML = '';
             b.bloque_subtipo_id = null;
             return;
         }
-        sel.style.display = '';
+        if (ctrl) ctrl.style.display = '';
         sel.innerHTML = `<option value="">— Subtipo —</option>` + tipo.subtipos.map(s =>
             `<option value="${s.id}" ${s.id === b.bloque_subtipo_id ? 'selected' : ''}>${_esc(s.nombre)}</option>`
         ).join('');
-        sel.onchange = () => b.bloque_subtipo_id = sel.value ? Number(sel.value) : null;
+        sel.onchange = () => {
+            b.bloque_subtipo_id = sel.value ? Number(sel.value) : null;
+            if (onChange) onChange();
+        };
     }
 
     function _refreshCompetencias(node, tipo, b) {
         const row = node.querySelector('[data-role="competencias-row"]');
         const cont = node.querySelector('[data-role="competencias"]');
+        const counter = node.querySelector('[data-role="comp-counter"]');
         const resultadoRow = node.querySelector('[data-role="resultado-row"]');
         if (!tipo || !tipo.permite_competencias) {
             row.style.display = 'none';
@@ -344,22 +397,37 @@ window.FundPlanificacion = (() => {
         }
         row.style.display = '';
         resultadoRow.style.display = '';
-        cont.innerHTML = _cat.competencias.map(c => {
-            const checked = b.competencias.includes(c.id) ? 'checked' : '';
-            const sel = checked ? 'is-selected' : '';
+
+        // render por dominio
+        cont.innerHTML = _compByDomain.map(grp => {
+            const dotColor = _esc(grp.dominio.color || '#888');
+            const chips = grp.competencias.map(c => {
+                const isSel = b.competencias.includes(c.id);
+                return `
+                  <label class="plan-comp-chip ${isSel ? 'is-selected' : ''}"
+                         title="${_esc(c.descripcion)}" data-comp-id="${c.id}">
+                    <input type="checkbox" ${isSel ? 'checked' : ''} />
+                    <span class="plan-comp-chip-code" style="color:${dotColor}">${_esc(c.codigo)}</span>
+                  </label>
+                `;
+            }).join('');
             return `
-              <label class="plan-comp-chip ${sel}" title="${_esc(c.descripcion)}" data-comp-id="${c.id}">
-                <input type="checkbox" ${checked} />
-                <span class="plan-comp-chip-code" style="color:${_esc(c.dominio_color || '#888')}">${_esc(c.codigo)}</span>
-                <span class="plan-comp-chip-desc">${_esc(c.descripcion.slice(0, 50))}${c.descripcion.length > 50 ? '…' : ''}</span>
-              </label>
+              <div class="plan-comp-domain">
+                <div class="plan-comp-domain-head">
+                  <span class="plan-comp-domain-dot" style="background:${dotColor}"></span>
+                  <span class="plan-comp-domain-name">${_esc(grp.dominio.nombre)}</span>
+                  <span class="plan-comp-domain-count">${grp.competencias.length}</span>
+                </div>
+                <div class="plan-comp-chips">${chips}</div>
+              </div>
             `;
         }).join('');
+
         cont.querySelectorAll('.plan-comp-chip').forEach(el => {
             el.addEventListener('click', (ev) => {
                 ev.preventDefault();
-                const cb = el.querySelector('input[type="checkbox"]');
                 const id = Number(el.dataset.compId);
+                const cb = el.querySelector('input[type="checkbox"]');
                 cb.checked = !cb.checked;
                 el.classList.toggle('is-selected', cb.checked);
                 if (cb.checked) {
@@ -367,8 +435,15 @@ window.FundPlanificacion = (() => {
                 } else {
                     b.competencias = b.competencias.filter(x => x !== id);
                 }
+                _updateCounter(counter, b.competencias.length);
             });
         });
+        _updateCounter(counter, b.competencias.length);
+    }
+
+    function _updateCounter(el, n) {
+        if (!el) return;
+        el.textContent = n > 0 ? `${n} seleccionada${n > 1 ? 's' : ''}` : 'Ninguna seleccionada';
     }
 
     function _refreshMateriales(node, b) {
@@ -401,7 +476,6 @@ window.FundPlanificacion = (() => {
             window.showToast?.('Selecciona sede y fecha primero', 'warn');
             return;
         }
-        // Validación blanda: bloques sin tipo o con subtipo requerido y vacío
         for (const b of _bloques) {
             if (!b.bloque_tipo_id) {
                 window.showToast?.(`Bloque #${b.orden} sin tipo`, 'error');
@@ -446,7 +520,7 @@ window.FundPlanificacion = (() => {
 
         _saving = true;
         const btn = document.getElementById('plan-btn-guardar');
-        if (btn) { btn.disabled = true; btn.classList.add('is-syncing'); }
+        if (btn) { btn.disabled = true; }
         try {
             await window.FundApi.upsertSesion(payload);
             window.showToast?.('Sesión guardada', 'success');
@@ -456,7 +530,7 @@ window.FundPlanificacion = (() => {
             window.showToast?.('Error al guardar: ' + (e?.detail || e?.message || e), 'error');
         } finally {
             _saving = false;
-            if (btn) { btn.disabled = false; btn.classList.remove('is-syncing'); }
+            if (btn) { btn.disabled = false; }
         }
     }
 
