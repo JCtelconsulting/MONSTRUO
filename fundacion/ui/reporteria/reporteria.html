@@ -1,27 +1,89 @@
 <div class="fund-pane" data-pane="reporteria">
-    <div class="fund-pane-head">
-        <h3 id="rep-sede-title">Reportería</h3>
-        <p id="rep-sede-subtitle" class="fund-pane-sub">—</p>
+    <div class="fund-pane-head reporteria-head">
+        <div>
+            <h3 id="rep-sede-title">Reportería</h3>
+            <p id="rep-sede-subtitle" class="fund-pane-sub">—</p>
+        </div>
+        <div class="reporteria-actions">
+            <span id="rep-ultimo-sync" class="reporteria-meta">Sin syncs todavía</span>
+            <button id="btn-sync-now" class="btn-primary">
+                <i class="fa-solid fa-rotate"></i> Sincronizar ahora
+            </button>
+        </div>
     </div>
 
     <div class="kpi-row">
         <div class="kpi-card">
-            <div class="kpi-val" id="rep-kpi-activas">0</div>
-            <div class="kpi-lbl">Tareas activas</div>
+            <div class="kpi-val" id="rep-kpi-alumnos">—</div>
+            <div class="kpi-lbl">Alumnos totales</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-val" id="rep-kpi-completadas">0</div>
-            <div class="kpi-lbl">Tareas completadas</div>
+            <div class="kpi-val" id="rep-kpi-activos">—</div>
+            <div class="kpi-lbl">Matrícula activa</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-val" id="rep-kpi-cumplimiento">0%</div>
-            <div class="kpi-lbl">Cumplimiento estimado</div>
+            <div class="kpi-val" id="rep-kpi-asistencia">—</div>
+            <div class="kpi-lbl">% asistencia global</div>
+        </div>
+        <div class="kpi-card kpi-card-warn">
+            <div class="kpi-val" id="rep-kpi-riesgo-alto">—</div>
+            <div class="kpi-lbl">En riesgo alto</div>
         </div>
     </div>
 
-    <div class="fund-empty" style="margin-top:2rem;">
-        <i class="fas fa-chart-line"></i>
-        <p>Reportería en construcción.</p>
-        <p style="font-size:0.8rem; opacity:0.7;">Pronto: agenda próxima, cumplimiento por curso, movimientos de bodega.</p>
-    </div>
+    <section class="reporteria-section">
+        <div class="reporteria-section-head">
+            <h4><i class="fa-solid fa-building-columns"></i> Sedes</h4>
+            <span class="reporteria-meta">Datos sincronizados desde las planillas de Drive</span>
+        </div>
+        <div class="reporteria-tabla-wrap">
+            <table class="reporteria-tabla">
+                <thead>
+                    <tr>
+                        <th>Sede</th>
+                        <th class="num">Alumnos</th>
+                        <th class="num">Activos</th>
+                        <th class="num">Cupos</th>
+                        <th class="num">Cobertura</th>
+                        <th class="num">% asistencia</th>
+                    </tr>
+                </thead>
+                <tbody id="rep-tabla-sedes">
+                    <tr><td colspan="6" class="empty-row">Cargando…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="reporteria-section">
+        <div class="reporteria-section-head">
+            <h4><i class="fa-solid fa-triangle-exclamation"></i> Alumnos por nivel de riesgo</h4>
+            <div class="reporteria-section-actions">
+                <select id="rep-filtro-riesgo" class="input-dark">
+                    <option value="alto" selected>Riesgo alto (&lt;50%)</option>
+                    <option value="medio">Riesgo medio (50–75%)</option>
+                    <option value="bajo">Riesgo bajo (≥75%)</option>
+                    <option value="sin_datos">Sin datos</option>
+                </select>
+            </div>
+        </div>
+        <div class="reporteria-tabla-wrap">
+            <table class="reporteria-tabla">
+                <thead>
+                    <tr>
+                        <th>Sede</th>
+                        <th>Alumno</th>
+                        <th>Curso</th>
+                        <th>Plan</th>
+                        <th>Gestora</th>
+                        <th class="num">% asist.</th>
+                        <th class="num">P / contables</th>
+                    </tr>
+                </thead>
+                <tbody id="rep-tabla-riesgo">
+                    <tr><td colspan="7" class="empty-row">Cargando…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
 </div>

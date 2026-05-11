@@ -1,0 +1,13 @@
+[Unit]
+Description=MONSTRUO Fundación - Sync diario de planillas (timer)
+
+[Timer]
+# Todos los días a las 3:00 AM hora local del servidor
+OnCalendar=*-*-* 03:00:00
+# Si la máquina estaba apagada, corre apenas pueda
+Persistent=true
+AccuracySec=1min
+Unit=fundacion-sync-sheets.service
+
+[Install]
+WantedBy=timers.target

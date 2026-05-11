@@ -1,1 +1,132 @@
-/* Tab Reportería — placeholder. */
+.reporteria-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.reporteria-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.reporteria-meta {
+    font-size: 0.8rem;
+    color: var(--text-soft);
+}
+
+.kpi-card-warn {
+    border-color: rgba(245, 158, 11, 0.45) !important;
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.12) 0%, var(--panel) 100%);
+}
+
+.reporteria-section {
+    margin-top: 2rem;
+}
+
+.reporteria-section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.reporteria-section-head h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.reporteria-section-head h4 i {
+    color: var(--text-soft);
+}
+
+.reporteria-tabla-wrap {
+    overflow-x: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.reporteria-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.reporteria-tabla th,
+.reporteria-tabla td {
+    padding: 0.6rem 0.85rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.reporteria-tabla th {
+    background: rgba(255, 255, 255, 0.02);
+    font-weight: 600;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+}
+
+.reporteria-tabla tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.reporteria-tabla td.num,
+.reporteria-tabla th.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.reporteria-tabla .empty-row {
+    text-align: center;
+    color: var(--text-soft);
+    padding: 1.5rem;
+    font-style: italic;
+}
+
+.reporteria-tabla .pill-riesgo {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.reporteria-tabla .pill-riesgo.alto   { background: rgba(239, 68, 68, 0.18);  color: #fca5a5; }
+.reporteria-tabla .pill-riesgo.medio  { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+.reporteria-tabla .pill-riesgo.bajo   { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+.reporteria-tabla .pill-riesgo.sin    { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
+
+.reporteria-tabla .pct-strong { font-weight: 700; }
+
+#btn-sync-now {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+#btn-sync-now.is-syncing {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+#btn-sync-now.is-syncing i {
+    animation: rep-spin 1s linear infinite;
+}
+
+@keyframes rep-spin {
+    from { transform: rotate(0); }
+    to   { transform: rotate(360deg); }
+}
