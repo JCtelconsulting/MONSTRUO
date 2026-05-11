@@ -79,12 +79,10 @@ window.Tablero = (() => {
     function _flujosFiltrados() {
         const area = document.getElementById('filtro-area')?.value || '';
         const estado = document.getElementById('filtro-estado')?.value || '';
-        const enRiesgo = document.getElementById('filtro-en-riesgo')?.checked || false;
         const q = (document.getElementById('filtro-busqueda')?.value || '').toLowerCase().trim();
 
         return _flujos.filter(f => {
             if (estado && f.estado !== estado) return false;
-            if (enRiesgo && !(f.vencidas > 0 || f.por_vencer > 0)) return false;
             if (q && !((f.titulo || '') + ' ' + (f.proceso_nombre || '')).toLowerCase().includes(q)) return false;
             if (area && f.paso_actual?.area_label) {
                 // Filtro por área: el paso actual está en esa área

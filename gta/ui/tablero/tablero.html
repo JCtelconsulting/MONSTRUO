@@ -1,29 +1,29 @@
 <div class="gta-tablero">
-    <!-- KPIs -->
+    <!-- KPIs (3 por fila, orden: activos · por vencer · vencidos / completados · esperando · quiebres) -->
     <div class="gta-kpi-row" id="tablero-kpis">
         <div class="gta-kpi-card">
             <div class="gta-kpi-val" id="kpi-flujos-activos">—</div>
             <div class="gta-kpi-lbl">Flujos activos</div>
         </div>
-        <div class="gta-kpi-card kpi-danger">
-            <div class="gta-kpi-val" id="kpi-vencidas">—</div>
-            <div class="gta-kpi-lbl">Tareas vencidas</div>
-        </div>
         <div class="gta-kpi-card kpi-warning">
             <div class="gta-kpi-val" id="kpi-por-vencer">—</div>
             <div class="gta-kpi-lbl">Por vencer</div>
         </div>
-        <div class="gta-kpi-card kpi-warning">
-            <div class="gta-kpi-val" id="kpi-quiebres">—</div>
-            <div class="gta-kpi-lbl">Quiebres abiertos</div>
+        <div class="gta-kpi-card kpi-danger">
+            <div class="gta-kpi-val" id="kpi-vencidas">—</div>
+            <div class="gta-kpi-lbl">Tareas vencidas</div>
+        </div>
+        <div class="gta-kpi-card kpi-ok">
+            <div class="gta-kpi-val" id="kpi-completados">—</div>
+            <div class="gta-kpi-lbl">Completados</div>
         </div>
         <div class="gta-kpi-card">
             <div class="gta-kpi-val" id="kpi-esperando-quiebre">—</div>
             <div class="gta-kpi-lbl">Esperando otra área</div>
         </div>
-        <div class="gta-kpi-card kpi-ok">
-            <div class="gta-kpi-val" id="kpi-completados">—</div>
-            <div class="gta-kpi-lbl">Completados</div>
+        <div class="gta-kpi-card kpi-warning">
+            <div class="gta-kpi-val" id="kpi-quiebres">—</div>
+            <div class="gta-kpi-lbl">Quiebres abiertos</div>
         </div>
     </div>
 
@@ -38,10 +38,6 @@
             <option value="completado">Completados</option>
             <option value="cancelado">Cancelados</option>
         </select>
-        <label class="gta-filter-check" style="display:flex; align-items:center; gap:6px;">
-            <input type="checkbox" id="filtro-en-riesgo" onchange="Tablero.filtrar()">
-            <span>Solo en riesgo (vencidas / por vencer)</span>
-        </label>
         <input type="text" id="filtro-busqueda" class="input-dark" placeholder="🔍 Buscar..." oninput="Tablero.filtrar()" style="min-width:200px;">
         <button class="btn-secondary" onclick="Tablero.cargar()" title="Refrescar">
             <i class="fas fa-sync-alt"></i>
