@@ -9,7 +9,6 @@ from gta.backend.models import (
     QuiebreCreate, QuiebreResolverBody,
     FlujoCrear,
     TareaCreate, TareaCerrarBody, TareaDevolverBody, TareaReasignarBody, TareaLiberarBody,
-    QuiebreReporteBody,
     ColaboradorAgregar, ColaboradorQuitar,
     MembresiaAsignar, MembresiaCerrar,
 )
@@ -20,7 +19,6 @@ from gta.backend.services import tareas as tareas_service
 from gta.backend.services import membresias as membresias_service
 from gta.backend.services import preview as preview_service
 from gta.backend.services import adjuntos as adjuntos_service
-from gta.backend.services import quiebres as quiebres_service
 from gta.backend.services import comentarios as comentarios_service
 from gta.backend.services import flujo_eventos as flujo_eventos_service
 from gta.backend.services import avisos as avisos_service
@@ -1015,86 +1013,6 @@ async def guardar_borrador(
             usuario_id=uid,
             datos_formulario=body.get("datos_formulario") or {},
             bypass_responsable=_es_admin(user),
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-# ── Quiebres dirigidos desde una tarea hacia otra área del flujo ──────
-
-@router.get("/tareas/{tarea_id}/quiebres/areas-disponibles")
-async def areas_disponibles_quiebre(
-    tarea_id: int,
-    user: dict = Depends(deps.require_permission("gta:read")),
-):
-    """Áreas del flujo a las que se puede reportar un quiebre desde esta tarea
-    (excluye la propia área de la tarea)."""
-    try:
-        return {"items": quiebres_service.areas_disponibles_para_quiebre(tarea_id)}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/tareas/{tarea_id}/quiebres")
-async def listar_quiebres_de_tarea(
-    tarea_id: int,
-    user: dict = Depends(deps.require_permission("gta:read")),
-):
-    """Quiebres del flujo al que pertenece la tarea (visibles desde cualquier paso)."""
-    return {"items": quiebres_service.listar_de_tarea(tarea_id)}
-
-
-@router.post("/tareas/{tarea_id}/quiebres")
-@audit_action("GTA_REPORTAR_QUIEBRE_TAREA", severity="warning")
-async def reportar_quiebre_desde_tarea(
-    tarea_id: int,
-    body: QuiebreReporteBody,
-    request: Request,
-    user: dict = Depends(deps.require_permission("gta:write")),
-):
-    """Reporta un quiebre desde la tarea hacia un área del flujo. La tarea
-    queda 'esperando_quiebre' hasta que esa área lo resuelva."""
-    try:
-        return quiebres_service.reportar_desde_tarea(
-            tarea_id=tarea_id,
-            area_destino=body.area_destino,
-            descripcion=body.descripcion,
-            tipo=body.tipo,
-            reportado_por=user["username"],
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/quiebres/mios")
-async def listar_quiebres_para_mi_area(
-    user: dict = Depends(deps.require_permission("gta:read")),
-):
-    """Quiebres abiertos dirigidos a las áreas vigentes del usuario.
-    Admin ve todos los quiebres abiertos sin filtro de área."""
-    uid = tareas_service.usuario_id_de_username(user["username"])
-    codes = membresias_service.area_codes_de_usuario(uid)
-    es_admin = _es_admin(user)
-    items = quiebres_service.listar_pendientes_para_areas(codes, todos=es_admin)
-    return {"items": items, "areas": codes, "es_admin": es_admin}
-
-
-@router.post("/quiebres/{qid}/resolver-tarea")
-@audit_action("GTA_RESOLVER_QUIEBRE_TAREA", severity="info")
-async def resolver_quiebre_de_tarea(
-    qid: int,
-    body: QuiebreResolverBody,
-    request: Request,
-    user: dict = Depends(deps.require_permission("gta:write")),
-):
-    """Resuelve un quiebre vinculado a una tarea: marca como resuelto y
-    restaura el estado previo de la tarea (sale de 'esperando_quiebre')."""
-    try:
-        return quiebres_service.resolver(
-            qid,
-            nota=body.nota,
-            resuelto_por=user["username"],
-            bypass_area=_es_admin(user),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

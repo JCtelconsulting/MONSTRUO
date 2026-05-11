@@ -9,7 +9,7 @@ window.Tareas = (() => {
     let _areasUsuario = [];      // áreas que el usuario puede ver
     let _areaActiva = '';        // '' = todas; o area_code
     let _esAdmin = false;
-    let _data = { bandeja: [], mias: [], colaboro: [], quiebres: [] };
+    let _data = { bandeja: [], mias: [], colaboro: [] };
     let _tareasExpandidas = new Set();
     let _miembrosCache = new Map();   // subarea_id → array de miembros (cache local)
     let _asignarPopover = null;       // popover de asignación abierto (si hay)
@@ -59,7 +59,6 @@ window.Tareas = (() => {
                 const tarea = _buscarTarea(tareaId);
                 if (tarea?.flujo_id) {
                     _refrescarAdjuntos(tareaId);
-                    _refrescarQuiebres(tareaId);
                     _refrescarComentarios(tareaId);
                 }
                 // Scroll a la tarea
@@ -181,9 +180,6 @@ window.Tareas = (() => {
             } else if (_vista === 'colaboro') {
                 resp = await GtaApi.getDondeColaboro(incluirCerradas);
                 _data.colaboro = resp.items || [];
-            } else if (_vista === 'quiebres') {
-                resp = await GtaApi.listarMisQuiebres();
-                _data.quiebres = resp.items || [];
             }
             _refreshCounts();
             _render();
@@ -201,26 +197,12 @@ window.Tareas = (() => {
         set('count-bandeja',  _data.bandeja?.length);
         set('count-mias',     _data.mias?.length);
         set('count-colaboro', _data.colaboro?.length);
-        set('count-quiebres', _data.quiebres?.length);
     }
 
     function _render() {
         const cont = document.getElementById('tareas-content');
         if (!cont) return;
         let items = _data[_vista] || [];
-
-        // Vista de quiebres: render distinto (no son tareas)
-        if (_vista === 'quiebres') {
-            if (!items.length) {
-                cont.innerHTML = `<div class="gta-empty-state">
-                    <i class="fas fa-circle-check"></i>
-                    No tenés quiebres pendientes dirigidos a tu área.
-                </div>`;
-                return;
-            }
-            cont.innerHTML = items.map(_quiebreCardHtml).join('');
-            return;
-        }
 
         // Filtro de área: vacío = todas (solo admin); valor = filtrar por area_code
         if (_areaActiva) {
@@ -234,37 +216,6 @@ window.Tareas = (() => {
             return;
         }
         cont.innerHTML = items.map(t => _cardHtml(t, _vista)).join('');
-    }
-
-    function _quiebreCardHtml(q) {
-        const fecha = q.created_at ? new Date(q.created_at).toLocaleString() : '';
-        const desdePaso = q.paso_orden ? `paso ${q.paso_orden}` : 'tarea';
-        return `
-            <div class="gta-quiebre-card">
-                <div class="gta-quiebre-card-head">
-                    <span class="gta-quiebre-area-badge"><i class="fas fa-flag"></i> ${_esc(q.area_label || q.area)}</span>
-                    <span class="gta-quiebre-card-meta">
-                        Reportado por <strong>${_esc(q.reportado_por || '?')}</strong>
-                        desde ${desdePaso}
-                        ${q.tarea_titulo ? `: "${_esc(q.tarea_titulo)}"` : ''}
-                        · ${fecha}
-                    </span>
-                </div>
-                ${q.proceso_nombre || q.flujo_titulo ? `
-                    <div class="gta-quiebre-card-flujo">
-                        <i class="fas fa-project-diagram"></i>
-                        ${_esc(q.proceso_nombre || '')}${q.flujo_titulo ? ` — ${_esc(q.flujo_titulo)}` : ''}
-                    </div>
-                ` : ''}
-                <div class="gta-quiebre-card-desc">${_esc(q.descripcion)}</div>
-                <div class="gta-quiebre-card-actions">
-                    <button class="btn-primary"
-                            onclick="Tareas.resolverQuiebre(${q.id})">
-                        <i class="fas fa-check"></i> Resolver
-                    </button>
-                </div>
-            </div>
-        `;
     }
 
     function _emptyMsg(vista) {
@@ -332,8 +283,7 @@ window.Tareas = (() => {
         const camposProc = t.campos_formulario_proceso || [];
         const esBloqueada = t.estado === 'bloqueada';
         const esCerrada = t.estado === 'cerrada' || t.estado === 'cancelada' || t.estado === 'devuelta';
-        const esEsperandoQuiebre = t.estado === 'esperando_quiebre';
-        const editable = !esBloqueada && !esCerrada && !esEsperandoQuiebre && (soyResp || _esAdmin);
+        const editable = !esBloqueada && !esCerrada && (soyResp || _esAdmin);
         const tieneFormulario = t.es_paso_inicial && camposProc.length > 0;
 
         // Banner si está bloqueada por dependencias del flujo
@@ -344,15 +294,6 @@ window.Tareas = (() => {
                 <div class="gta-banner-bloqueada">
                     <i class="fas fa-lock"></i>
                     <span>Esta tarea espera a que se completen los pasos: <strong>${_esc(deps || '?')}</strong>. Lectura solamente hasta que se desbloquee.</span>
-                </div>
-            `;
-        }
-        // Banner si está esperando que otra área resuelva un quiebre
-        if (esEsperandoQuiebre) {
-            bannerBloq += `
-                <div class="gta-banner-quiebre">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>Esta tarea está <strong>esperando que otra área resuelva un quiebre</strong>. No se puede avanzar hasta que se resuelva. Mirá la sección "Quiebres del flujo" abajo.</span>
                 </div>
             `;
         }
@@ -432,7 +373,7 @@ window.Tareas = (() => {
                         <i class="fas fa-undo"></i> Soltar
                     </button>`);
                 }
-                if (!esBloqueada && !esEsperandoQuiebre) {
+                if (!esBloqueada) {
                     // Devolver: cualquier tarea de flujo en paso ≥ 2 puede
                     // devolver a un paso anterior. El modal elige el destino.
                     const hayDestinos = (t.paso_devolver_a_info || []).length > 0;
@@ -473,16 +414,6 @@ window.Tareas = (() => {
             </div>
         ` : '';
 
-        // Quiebres del flujo (sección colapsable, se rellena async tras render)
-        const quiebresHtml = t.flujo_id ? `
-            <div class="gta-acc-section">
-                <h4 class="gta-acc-h4">Quiebres del flujo</h4>
-                <div id="quiebres-tarea-${t.id}" class="gta-quiebres-box">
-                    <em style="opacity:0.6;">Cargando…</em>
-                </div>
-            </div>
-        ` : '';
-
         // Comentarios libres del flujo (visibles a todos, cualquier responsable comenta)
         const puedeComentar = t.flujo_id && !esCerrada;
         const comentariosHtml = t.flujo_id ? `
@@ -511,7 +442,6 @@ window.Tareas = (() => {
             ${datosHtml}
             ${formHtml}
             ${adjuntosHtml}
-            ${quiebresHtml}
             ${comentariosHtml}
             ${acciones.length ? `<div class="gta-acc-actions">${acciones.join('')}</div>` : ''}
         `;
@@ -611,7 +541,6 @@ window.Tareas = (() => {
             const tarea = _buscarTarea(id);
             if (tarea?.flujo_id) {
                 _refrescarAdjuntos(id);
-                _refrescarQuiebres(id);
                 _refrescarComentarios(id);
                 if (tarea.tiene_avisos_pendientes) _refrescarAvisos(id);
             }
@@ -824,106 +753,7 @@ window.Tareas = (() => {
         } catch (e) { alert(_humanizeErr(e)); }
     }
 
-    // ── Quiebres del flujo (reportar / listar) ────────────────────────
-    async function _refrescarQuiebres(tareaId) {
-        const cont = document.getElementById(`quiebres-tarea-${tareaId}`);
-        if (!cont) return;
-        try {
-            const resp = await GtaApi.listarQuiebresTarea(tareaId);
-            const items = resp.items || [];
-            if (!items.length) {
-                cont.innerHTML = '<em style="opacity:0.6;">Sin quiebres reportados en este flujo.</em>';
-                return;
-            }
-            cont.innerHTML = items.map(q => {
-                const fecha = q.created_at ? new Date(q.created_at).toLocaleString() : '';
-                const resueltoBadge = q.estado === 'resuelto'
-                    ? `<span class="gta-quiebre-badge gta-quiebre-badge-ok">resuelto</span>`
-                    : `<span class="gta-quiebre-badge gta-quiebre-badge-open">abierto</span>`;
-                const notaResol = q.nota_resolucion
-                    ? `<div class="gta-quiebre-nota"><strong>Resolución:</strong> ${_esc(q.nota_resolucion)} <em>(${_esc(q.resuelto_por || '')})</em></div>`
-                    : '';
-                const desdePaso = q.paso_orden
-                    ? `desde paso ${q.paso_orden}`
-                    : '';
-                return `
-                    <div class="gta-quiebre-item">
-                        <div class="gta-quiebre-head">
-                            ${resueltoBadge}
-                            <span class="gta-quiebre-area">→ ${_esc(q.area_label || q.area)}</span>
-                            <span class="gta-quiebre-meta">${desdePaso} · ${_esc(q.reportado_por || '')} · ${fecha}</span>
-                        </div>
-                        <div class="gta-quiebre-desc">${_esc(q.descripcion)}</div>
-                        ${notaResol}
-                    </div>
-                `;
-            }).join('');
-        } catch (e) {
-            cont.innerHTML = `<em style="color:#c00;">Error al cargar quiebres: ${_esc(_humanizeErr(e))}</em>`;
-        }
-    }
-
-    async function reportarQuiebre(tareaId) {
-        // Cargar las áreas disponibles para esta tarea
-        let areas = [];
-        try {
-            const resp = await GtaApi.areasDisponiblesQuiebre(tareaId);
-            areas = resp.items || [];
-        } catch (e) {
-            alert(_humanizeErr(e));
-            return;
-        }
-        if (!areas.length) {
-            alert('No hay otras áreas en este flujo a las que reportar un quiebre.');
-            return;
-        }
-
-        // Modal simple armado al vuelo
-        const modal = document.createElement('div');
-        modal.className = 'modal show gta-quiebre-modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h3><i class="fas fa-flag"></i> Reportar a otra área</h3>
-                <p style="opacity:0.75;">La tarea queda en pausa hasta que esa área resuelva el quiebre.</p>
-                <label style="display:block; margin:12px 0 4px;">Área destino</label>
-                <select id="qkb-area" style="width:100%; padding:8px;">
-                    ${areas.map(a => `<option value="${_esc(a.code)}">${_esc(a.label || a.code)}</option>`).join('')}
-                </select>
-                <label style="display:block; margin:12px 0 4px;">Descripción del quiebre</label>
-                <textarea id="qkb-desc" rows="4" style="width:100%; padding:8px;"
-                          placeholder="¿Qué necesitás de esa área? Sé específico."></textarea>
-                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
-                    <button class="btn-secondary" id="qkb-cancel">Cancelar</button>
-                    <button class="btn-danger" id="qkb-ok"><i class="fas fa-flag"></i> Reportar</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        const cleanup = () => modal.remove();
-        modal.querySelector('#qkb-cancel').onclick = cleanup;
-        modal.querySelector('#qkb-ok').onclick = async () => {
-            const area = modal.querySelector('#qkb-area').value;
-            const desc = modal.querySelector('#qkb-desc').value.trim();
-            if (!desc) { alert('La descripción es obligatoria.'); return; }
-            try {
-                await GtaApi.reportarQuiebreTarea(tareaId, area, desc, null);
-                cleanup();
-                _tareasExpandidas.delete(tareaId);
-                await recargar();
-            } catch (e) { alert(_humanizeErr(e)); }
-        };
-    }
-
-    async function resolverQuiebre(quiebreId) {
-        const nota = (prompt('¿Cómo lo resolviste? (nota opcional para que vea el reportante)') ?? null);
-        if (nota === null) return;  // canceló
-        try {
-            await GtaApi.resolverQuiebreTarea(quiebreId, nota);
-            await recargar();
-        } catch (e) { alert(_humanizeErr(e)); }
-    }
-
-    // ── Devolver (rechazo de validación → reabre paso destino) ────────
+    // ── Devolver al paso… (modelo unificado) ──────────────────────────
     async function devolver(id) {
         const tarea = _buscarTarea(id);
         const destinos = tarea?.paso_devolver_a_info || [];
@@ -1309,7 +1139,6 @@ window.Tareas = (() => {
         toggleExpansion, toggleAsignar, _asignarA, _onCampoSelectChange,
         tomar, liberar, completar, guardarBorrador, devolver,
         subirAdjunto, borrarAdjunto,
-        reportarQuiebre, resolverQuiebre,
         agregarComentario, borrarComentario,
         marcarAvisoRevisado,
         // Nueva tarea (sigue siendo modal por ahora)

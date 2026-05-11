@@ -81,14 +81,6 @@ window.GtaApi = (() => {
         crearComentarioTarea:   (id, texto)        => post(`/tareas/${id}/comentarios`, { texto: texto || '' }),
         borrarComentarioTarea:  (tareaId, comId)   => window.fetchApi(`${base}/tareas/${tareaId}/comentarios/${comId}`, { method: 'DELETE' }),
 
-        // Quiebres dirigidos desde una tarea hacia otra área del flujo
-        areasDisponiblesQuiebre: (id)             => get(`/tareas/${id}/quiebres/areas-disponibles`),
-        listarQuiebresTarea:     (id)             => get(`/tareas/${id}/quiebres`),
-        reportarQuiebreTarea:    (id, area_destino, descripcion, tipo) =>
-            post(`/tareas/${id}/quiebres`, { area_destino, descripcion, tipo: tipo || null }),
-        listarMisQuiebres:       ()               => get('/quiebres/mios'),
-        resolverQuiebreTarea:    (qid, nota)      => post(`/quiebres/${qid}/resolver-tarea`, { nota: nota || null }),
-
         // Adjuntos del flujo (compartidos entre todas las tareas del mismo flujo)
         listarAdjuntosTarea:  (id)             => get(`/tareas/${id}/adjuntos`),
         subirAdjuntoTarea:    (id, file)       => {

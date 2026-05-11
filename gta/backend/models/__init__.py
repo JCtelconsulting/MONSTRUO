@@ -107,13 +107,6 @@ class TareaDevolverBody(BaseModel):
     paso_destino: int   # paso_orden anterior al actual (cualquier paso del flujo, no solo validación)
 
 
-class QuiebreReporteBody(BaseModel):
-    """Reportar un quiebre desde una tarea hacia otra área del flujo."""
-    area_destino: str
-    descripcion: str
-    tipo: Optional[str] = None
-
-
 class TareaReasignarBody(BaseModel):
     nuevo_usuario_id: int
     motivo: Optional[str] = None
