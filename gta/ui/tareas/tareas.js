@@ -425,32 +425,21 @@ window.Tareas = (() => {
                     </button>`);
                 }
                 if (!esBloqueada && !esEsperandoQuiebre) {
-                    if (t.flujo_id) {
-                        acciones.push(`<button class="btn-secondary"
-                            title="Pedir info o acción a otra área del flujo. La tarea queda en pausa hasta que esa área lo resuelva."
-                            onclick="event.stopPropagation(); Tareas.reportarQuiebre(${t.id})">
-                            <i class="fas fa-flag"></i> Reportar a otra área
-                        </button>`);
-                    }
-                    const esValidacion = t.paso_tipo === 'validacion';
-                    if (esValidacion) {
+                    // Devolver: cualquier tarea de flujo en paso ≥ 2 puede
+                    // devolver a un paso anterior. El modal elige el destino.
+                    const hayDestinos = (t.paso_devolver_a_info || []).length > 0;
+                    if (t.flujo_id && hayDestinos) {
                         acciones.push(`<button class="btn-danger"
-                            title="Rechazar y devolver al paso anterior para que corrija"
+                            title="Devolver esta tarea a un paso anterior para que su responsable corrija"
                             onclick="event.stopPropagation(); Tareas.devolver(${t.id})">
-                            <i class="fas fa-undo-alt"></i> Devolver
-                        </button>`);
-                        acciones.push(`<button class="btn-primary"
-                            title="Aprobar la validación y avanzar el flujo"
-                            onclick="event.stopPropagation(); Tareas.completar(${t.id})">
-                            <i class="fas fa-check"></i> Aprobar
-                        </button>`);
-                    } else {
-                        acciones.push(`<button class="btn-primary"
-                            title="Marcar la tarea como hecha y cerrarla (valida campos obligatorios)"
-                            onclick="event.stopPropagation(); Tareas.completar(${t.id})">
-                            <i class="fas fa-check"></i> Completar
+                            <i class="fas fa-undo-alt"></i> Devolver al paso…
                         </button>`);
                     }
+                    acciones.push(`<button class="btn-primary"
+                        title="Marcar la tarea como hecha y cerrarla (valida campos obligatorios)"
+                        onclick="event.stopPropagation(); Tareas.completar(${t.id})">
+                        <i class="fas fa-check"></i> Completar
+                    </button>`);
                 }
             }
         }
@@ -877,37 +866,24 @@ window.Tareas = (() => {
         const tarea = _buscarTarea(id);
         const destinos = tarea?.paso_devolver_a_info || [];
         if (!destinos.length) {
-            alert('Este paso no tiene destinos configurados para devolución.');
+            alert('No hay pasos anteriores a los que devolver esta tarea.');
             return;
         }
 
-        // Si hay un solo destino, prompt rápido (UX como antes)
-        if (destinos.length === 1) {
-            const d = destinos[0];
-            const motivo = (prompt(`Devolver a "${d.titulo}" (paso ${d.orden}). ¿Qué no cumple?`) || '').trim();
-            if (!motivo) return;
-            try {
-                await GtaApi.devolverTareaArea(id, motivo, d.orden);
-                _tareasExpandidas.delete(id);
-                await recargar();
-            } catch (e) { alert(_humanizeErr(e)); }
-            return;
-        }
-
-        // Si hay varios, modal con selector
+        // Modal único: siempre selector de paso (cualquier paso anterior) + motivo
         const modal = document.createElement('div');
         modal.className = 'modal show gta-quiebre-modal';
         modal.innerHTML = `
             <div class="modal-content">
-                <h3><i class="fas fa-undo-alt"></i> Devolver tarea</h3>
-                <p style="opacity:0.75;">Elegí a qué paso devolver y explicá qué debe corregirse.</p>
-                <label style="display:block; margin:12px 0 4px;">Devolver a</label>
+                <h3><i class="fas fa-undo-alt"></i> Devolver tarea al paso…</h3>
+                <p style="opacity:0.75;">Esta tarea se pausa hasta que el paso destino se vuelva a cerrar. Los pasos cerrados intermedios siguen como están; si el responsable del destino modifica datos o adjuntos, esos pasos verán un aviso para revisar.</p>
+                <label style="display:block; margin:12px 0 4px;">Devolver al paso</label>
                 <select id="dev-destino" style="width:100%; padding:8px;">
                     ${destinos.map(d => `<option value="${d.orden}">Paso ${d.orden} — ${_esc(d.titulo)} (${_esc(d.area_code || '?')})</option>`).join('')}
                 </select>
-                <label style="display:block; margin:12px 0 4px;">¿Qué no cumple?</label>
+                <label style="display:block; margin:12px 0 4px;">¿Qué tiene que corregir?</label>
                 <textarea id="dev-motivo" rows="4" style="width:100%; padding:8px;"
-                          placeholder="Detalla qué debe corregir el responsable del paso destino."></textarea>
+                          placeholder="Describe el problema lo más claro posible (qué dato/archivo está mal, qué falta, etc.)"></textarea>
                 <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
                     <button class="btn-secondary" id="dev-cancel">Cancelar</button>
                     <button class="btn-danger" id="dev-ok"><i class="fas fa-undo-alt"></i> Devolver</button>

@@ -749,31 +749,27 @@ def _attach_contexto_flujo(conn, tarea: Dict[str, Any]) -> Dict[str, Any]:
     }
     tarea["es_paso_inicial"] = (tarea.get("paso_orden") == 1)
     tarea["campos_formulario_proceso"] = campos_def
-    tarea["paso_tipo"] = paso_def.get("tipo") or "ejecucion"
-    raw_destinos = paso_def.get("devolver_a")
-    if raw_destinos is None:
-        destinos = []
-    elif isinstance(raw_destinos, int):
-        destinos = [raw_destinos]
-    elif isinstance(raw_destinos, list):
-        destinos = [int(d) for d in raw_destinos if isinstance(d, (int, float))]
-    else:
-        destinos = []
-    # Enriquecer con título y área para el selector de la UI
+    # Modelo nuevo: cualquier paso de flujo puede devolver a cualquier paso
+    # anterior. La UI muestra como opciones todos los pasos < paso_orden actual.
     pasos_def_list = pasos_def if isinstance(pasos_def, list) else []
-    destinos_info = []
-    for d in destinos:
-        info = next(
-            (p for p in pasos_def_list if isinstance(p, dict) and p.get("orden") == d),
-            None,
-        )
-        destinos_info.append({
-            "orden": d,
-            "titulo": (info or {}).get("titulo") or f"Paso {d}",
-            "area_code": (info or {}).get("area_code"),
-        })
-    tarea["paso_devolver_a"] = destinos
+    mi_orden = tarea.get("paso_orden") or 0
+    destinos_info = sorted(
+        [
+            {
+                "orden": p.get("orden"),
+                "titulo": p.get("titulo") or f"Paso {p.get('orden')}",
+                "area_code": p.get("area_code"),
+            }
+            for p in pasos_def_list
+            if isinstance(p, dict) and isinstance(p.get("orden"), int)
+            and p["orden"] < mi_orden
+        ],
+        key=lambda x: x["orden"],
+    )
     tarea["paso_devolver_a_info"] = destinos_info
+    # paso_tipo se mantiene por compatibilidad pero ya no controla la UI:
+    # cualquier paso ≥ 2 muestra el botón "Devolver al paso..."
+    tarea["paso_tipo"] = paso_def.get("tipo") or "ejecucion"
     return tarea
 
 
