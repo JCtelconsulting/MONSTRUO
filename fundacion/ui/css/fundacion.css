@@ -62,3 +62,120 @@
     padding: 1.5rem 0.8rem;
     font-style: italic;
 }
+
+/* ── Botones de Fundación ────────────────────────────────────────────────
+   Definimos los estilos acá (en lugar de monstruo.css global) para no afectar
+   los otros módulos. Aplican dentro de .fundacion-shell. */
+
+.fundacion-shell .btn-primary,
+.fundacion-shell .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 36px;
+    padding: 0.45rem 0.95rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease, transform 80ms ease, opacity 150ms ease;
+    white-space: nowrap;
+    line-height: 1.2;
+    font-family: inherit;
+}
+
+.fundacion-shell .btn-primary {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: #0b1220;
+    border: 1px solid transparent;
+}
+
+.fundacion-shell .btn-primary:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+}
+
+.fundacion-shell .btn-primary:disabled,
+.fundacion-shell .btn-primary[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.fundacion-shell .btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    border: 1px solid var(--border);
+}
+
+.fundacion-shell .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* override del .btn-sm global: dentro de Fundación queremos un sm un poco
+   menos comprimido para que la letra respire. */
+.fundacion-shell .btn-sm {
+    min-height: 30px;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.78rem;
+    text-transform: none;
+    letter-spacing: 0;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+
+.fundacion-shell .btn-sm:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.fundacion-shell .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-soft);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease;
+}
+
+.fundacion-shell .btn-icon:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+
+.fundacion-shell .btn-icon.btn-danger-soft {
+    color: #fca5a5;
+}
+
+.fundacion-shell .btn-icon.btn-danger-soft:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+
+.fundacion-shell .btn-link {
+    background: none;
+    border: none;
+    color: #60a5fa;
+    cursor: pointer;
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.fundacion-shell .btn-link:hover { text-decoration: underline; }
