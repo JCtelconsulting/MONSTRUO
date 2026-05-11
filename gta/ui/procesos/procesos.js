@@ -1,13 +1,24 @@
 // Procesos — Biblioteca unificada de procesos del GTA
 window.Procesos = (() => {
+    const ADMIN_ROLES = new Set(['admin']);
+
     let _procesos = [];
     let _areas = [];
+    let _areasUsuario = [];   // áreas visibles según membresías (o todas si admin)
     let _areaFiltro = '';
     let _procActivo = null;
+    let _sesion = null;
+    let _esAdmin = false;
 
     // ── Init ───────────────────────────────────────────────────────────
     async function init(sesion) {
+        _sesion = sesion;
+        const role = String(_sesion?.role || '').toLowerCase();
+        const roles = (_sesion?.roles || []).map(r => String(r).toLowerCase());
+        _esAdmin = ADMIN_ROLES.has(role) || roles.some(r => ADMIN_ROLES.has(r));
+
         await _cargarAreas();
+        await _cargarAreasUsuario();
         await cargar();
     }
 
@@ -16,6 +27,31 @@ window.Procesos = (() => {
             const resp = await window.fetchApi('/api/gta/areas');
             _areas = resp?.items || [];
         } catch (e) { _areas = []; }
+    }
+
+    async function _cargarAreasUsuario() {
+        // Misma lógica que la pestaña Tareas:
+        //   admin → todas las áreas activas (de _areas)
+        //   usuario común → solo áreas con membresía vigente
+        if (_esAdmin) {
+            _areasUsuario = _areas.filter(a => a.activo).map(a => ({
+                code: a.code, label: a.label,
+            }));
+            return;
+        }
+        try {
+            const r = await GtaApi.getMisMembresias();
+            const map = new Map();
+            (r.items || []).forEach(m => {
+                if (!map.has(m.area_code)) {
+                    map.set(m.area_code, { code: m.area_code, label: m.area_label });
+                }
+            });
+            _areasUsuario = Array.from(map.values());
+        } catch (e) {
+            console.warn('[Procesos] no se pudo cargar membresías', e);
+            _areasUsuario = [];
+        }
     }
 
     async function cargar() {
@@ -35,16 +71,22 @@ window.Procesos = (() => {
     function _renderPills() {
         const pills = document.getElementById('procs-area-pills');
         if (!pills) return;
-        const activas = _areas.filter(a => a.activo);
-        const html = ['<button class="gta-area-pill active" data-area="" onclick="Procesos.filtrarArea(this)">Todas</button>'];
-        activas.forEach(a => {
-            html.push(`<button class="gta-area-pill" data-area="${a.code}" onclick="Procesos.filtrarArea(this)">${_esc(a.label)}</button>`);
+        if (!_areasUsuario.length) {
+            pills.innerHTML = '<span class="gta-section-help">No tenés áreas asignadas. Pídele al admin que te asigne membresía.</span>';
+            return;
+        }
+        const html = [];
+        if (_esAdmin) {
+            html.push(`<button class="gta-area-pill ${_areaFiltro === '' ? 'active' : ''}" data-area="" onclick="Procesos.filtrarArea(this)">Todas</button>`);
+        }
+        _areasUsuario.forEach(a => {
+            html.push(`<button class="gta-area-pill ${_areaFiltro === a.code ? 'active' : ''}" data-area="${a.code}" onclick="Procesos.filtrarArea(this)">${_esc(a.label)}</button>`);
         });
         pills.innerHTML = html.join('');
-        if (_areaFiltro) {
-            pills.querySelectorAll('.gta-area-pill').forEach(b => {
-                b.classList.toggle('active', b.dataset.area === _areaFiltro);
-            });
+
+        // Si no es admin, forzamos que el área activa sea una de las suyas
+        if (!_esAdmin && !_areasUsuario.some(a => a.code === _areaFiltro)) {
+            _areaFiltro = _areasUsuario[0]?.code || '';
         }
     }
 
