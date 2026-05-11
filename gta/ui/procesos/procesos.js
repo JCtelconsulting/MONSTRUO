@@ -35,13 +35,10 @@ window.Procesos = (() => {
     function _renderPills() {
         const pills = document.getElementById('procs-area-pills');
         if (!pills) return;
-        const counts = {};
-        _procesos.forEach(p => { counts[p.area] = (counts[p.area] || 0) + 1; });
         const activas = _areas.filter(a => a.activo);
         const html = ['<button class="gta-area-pill active" data-area="" onclick="Procesos.filtrarArea(this)">Todas</button>'];
         activas.forEach(a => {
-            const c = counts[a.code] || 0;
-            html.push(`<button class="gta-area-pill" data-area="${a.code}" onclick="Procesos.filtrarArea(this)">${_esc(a.label)} <span class="gta-pill-count">${c}</span></button>`);
+            html.push(`<button class="gta-area-pill" data-area="${a.code}" onclick="Procesos.filtrarArea(this)">${_esc(a.label)}</button>`);
         });
         pills.innerHTML = html.join('');
         if (_areaFiltro) {
@@ -77,11 +74,9 @@ window.Procesos = (() => {
     // ── Render principal: agrupado por área → subárea ─────────────────
     function _render() {
         const cont = document.getElementById('procs-content');
-        const counter = document.getElementById('procs-counter');
         if (!cont) return;
 
         const list = _filtered();
-        if (counter) counter.textContent = `${list.length} proceso${list.length === 1 ? '' : 's'}`;
 
         const porArea = {};
         list.forEach(p => {
