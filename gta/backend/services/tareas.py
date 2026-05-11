@@ -127,13 +127,16 @@ def cerrar_tarea(
     cerrado_por: int,
     reporte: Optional[str] = None,
     datos_formulario: Optional[Dict[str, Any]] = None,
+    bypass_responsable: bool = False,
 ) -> Dict[str, Any]:
     """Cierra una tarea.
 
-    Si la tarea pertenece a un flujo y es el paso inicial (paso_orden=1),
-    valida que los campos del formulario obligatorios estén completos y los
-    guarda en TODAS las tareas del flujo (datos_flujo) para que los pasos
-    siguientes los vean al ser tomadas.
+    - Solo el responsable vigente (o admin con bypass=True) puede cerrar.
+      Esto evita que cualquier usuario con gta:write pise datos del flujo.
+    - Si la tarea pertenece a un flujo y es el paso inicial (paso_orden=1),
+      valida que los campos del formulario obligatorios estén completos y
+      los guarda en TODAS las tareas del flujo (datos_flujo) para que los
+      pasos siguientes los vean al ser tomadas.
     """
     conn = db.get_conn()
     try:
@@ -146,9 +149,23 @@ def cerrar_tarea(
                WHERE t.id = %s""",
             (tarea_id,),
         ).fetchone()
+        if not ctx:
+            raise ValueError("tarea no encontrada")
+
+        # Validar que el actor sea responsable vigente (o admin con bypass).
+        # Patrón idéntico al de guardar_borrador_formulario para consistencia.
+        if not bypass_responsable:
+            es_resp = conn.execute(
+                """SELECT 1 FROM gta.tarea_participaciones
+                   WHERE tarea_id = %s AND usuario_id = %s
+                     AND rol = 'responsable' AND hasta IS NULL""",
+                (tarea_id, cerrado_por),
+            ).fetchone()
+            if not es_resp:
+                raise ValueError("Solo el responsable vigente de la tarea puede cerrarla")
 
         es_paso_inicial = bool(
-            ctx and ctx.get("flujo_id") and ctx.get("paso_orden") == 1
+            ctx.get("flujo_id") and ctx.get("paso_orden") == 1
         )
 
         if es_paso_inicial:

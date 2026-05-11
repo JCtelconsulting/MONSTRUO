@@ -967,6 +967,7 @@ async def cerrar_tarea(
             cerrado_por=uid,
             reporte=body.reporte,
             datos_formulario=body.datos_formulario,
+            bypass_responsable=_es_admin(user),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
