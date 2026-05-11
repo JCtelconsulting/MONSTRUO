@@ -970,6 +970,21 @@ _BASE_SELECT = """
     LEFT JOIN auth.users ur ON ur.id = gta.responsable_vigente(t.id)
 """
 
+# Orden estándar para listados de tareas:
+#   1. Tareas de flujo primero (agrupadas por flujo_id, ordenadas por inicio del flujo).
+#   2. Dentro de cada flujo, por paso_orden ascendente (1, 2, 3, ...).
+#   3. Tareas sueltas después: prioridad (urgente → baja) y fecha más reciente.
+_ORDER_BY = """
+    ORDER BY
+      (t.flujo_id IS NULL),
+      MIN(t.created_at) OVER (PARTITION BY t.flujo_id),
+      t.flujo_id,
+      t.paso_orden NULLS LAST,
+      CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1
+                       WHEN 'media' THEN 2 ELSE 3 END,
+      t.created_at DESC
+"""
+
 
 def listar_bandeja_subarea(subarea_id: int) -> List[Dict[str, Any]]:
     """Tareas de una subárea sin responsable vigente y no cerradas."""
@@ -980,11 +995,8 @@ def listar_bandeja_subarea(subarea_id: int) -> List[Dict[str, Any]]:
             WHERE t.subarea_id = %s
               AND t.estado NOT IN ('cerrada', 'cancelada')
               AND gta.responsable_vigente(t.id) IS NULL
-            ORDER BY
-              CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1
-                               WHEN 'media' THEN 2 ELSE 3 END,
-              t.created_at DESC
-            """,
+            """ + _ORDER_BY + """
+""",
             (subarea_id,),
         ).fetchall()
         return [_serialize_tarea(r) for r in rows]
@@ -1005,11 +1017,8 @@ def listar_bandeja_de_usuario(usuario_id: int) -> List[Dict[str, Any]]:
             WHERE t.subarea_id IN ({placeholders})
               AND t.estado NOT IN ('cerrada', 'cancelada')
               AND gta.responsable_vigente(t.id) IS NULL
-            ORDER BY
-              CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1
-                               WHEN 'media' THEN 2 ELSE 3 END,
-              t.created_at DESC
-            """,
+            """ + _ORDER_BY + """
+""",
             tuple(sub_ids),
         ).fetchall()
         return [_serialize_tarea(r) for r in rows]
@@ -1025,11 +1034,8 @@ def listar_bandeja_global() -> List[Dict[str, Any]]:
             _BASE_SELECT + """
             WHERE t.estado NOT IN ('cerrada', 'cancelada')
               AND gta.responsable_vigente(t.id) IS NULL
-            ORDER BY
-              CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1
-                               WHEN 'media' THEN 2 ELSE 3 END,
-              t.created_at DESC
-            """,
+            """ + _ORDER_BY + """
+""",
         ).fetchall()
         return [_serialize_tarea(r) for r in rows]
     finally:
@@ -1044,11 +1050,8 @@ def listar_todas_global(*, incluir_cerradas: bool = False) -> List[Dict[str, Any
         rows = conn.execute(
             _BASE_SELECT + f"""
             {where_estado}
-            ORDER BY
-              CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1
-                               WHEN 'media' THEN 2 ELSE 3 END,
-              t.created_at DESC
-            """,
+            """ + _ORDER_BY + """
+""",
         ).fetchall()
         return [_serialize_tarea(r) for r in rows]
     finally:
@@ -1066,11 +1069,8 @@ def listar_mis_tareas(usuario_id: int, *, incluir_cerradas: bool = False) -> Lis
               ON p.tarea_id = t.id AND p.rol = 'responsable' AND p.hasta IS NULL
             WHERE p.usuario_id = %s
               {where_estado}
-            ORDER BY
-              CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1
-                               WHEN 'media' THEN 2 ELSE 3 END,
-              t.sla_due_at NULLS LAST, t.created_at DESC
-            """,
+            """ + _ORDER_BY + """
+""",
             (usuario_id,),
         ).fetchall()
         return [_serialize_tarea(r) for r in rows]
@@ -1090,8 +1090,8 @@ def listar_donde_colaboro(usuario_id: int, *, incluir_cerradas: bool = False) ->
             WHERE p.usuario_id = %s
               AND p.rol IN ('co_responsable', 'ayuda')
               {where_estado}
-            ORDER BY t.created_at DESC
-            """,
+            """ + _ORDER_BY + """
+""",
             (usuario_id,),
         ).fetchall()
         # Adjuntar el rol con el que participa
@@ -1111,11 +1111,8 @@ def listar_todas_subarea(subarea_id: int) -> List[Dict[str, Any]]:
         rows = conn.execute(
             _BASE_SELECT + """
             WHERE t.subarea_id = %s
-            ORDER BY
-              CASE t.estado WHEN 'pendiente' THEN 0 WHEN 'en_curso' THEN 1
-                            WHEN 'bloqueada' THEN 2 ELSE 3 END,
-              t.created_at DESC
-            """,
+            """ + _ORDER_BY + """
+""",
             (subarea_id,),
         ).fetchall()
         return [_serialize_tarea(r) for r in rows]
