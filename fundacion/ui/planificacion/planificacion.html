@@ -5,10 +5,6 @@
             <p id="plan-sede-subtitle" class="fund-pane-sub">Registro diario de bloques y clima por sede</p>
         </div>
         <div class="plan-actions">
-            <label class="plan-fecha-label">
-                <i class="fa-regular fa-calendar"></i>
-                <input type="date" id="plan-fecha" class="input-dark" />
-            </label>
             <button id="plan-btn-sugerir" class="btn-secondary" title="Cargar plantilla de 6 bloques estándar">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> Plantilla del día
             </button>
@@ -24,6 +20,37 @@
     </div>
 
     <div id="plan-shell" style="display:none;">
+
+        <!-- Calendario -->
+        <section class="plan-section plan-cal-section">
+            <div class="plan-cal-toolbar">
+                <div class="plan-cal-nav">
+                    <button class="btn-icon" id="plan-cal-prev" title="Anterior">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button class="btn-sm" id="plan-cal-today">Hoy</button>
+                    <button class="btn-icon" id="plan-cal-next" title="Siguiente">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                    <h4 id="plan-cal-title" class="plan-cal-title">—</h4>
+                </div>
+                <div class="plan-cal-view-tabs" role="tablist">
+                    <button class="plan-cal-view-btn is-active" data-view="mes">Mes</button>
+                    <button class="plan-cal-view-btn" data-view="semana">Semana</button>
+                    <button class="plan-cal-view-btn" data-view="dia">Día</button>
+                </div>
+            </div>
+            <div id="plan-cal-body" class="plan-cal-body"></div>
+        </section>
+
+        <!-- Separador del editor del día seleccionado -->
+        <div class="plan-editor-header" id="plan-editor-header">
+            <h4>
+                <i class="fa-solid fa-pen-to-square"></i>
+                Sesión del <span id="plan-editor-fecha-label">—</span>
+            </h4>
+        </div>
+
         <!-- Clima del día -->
         <section class="plan-section plan-clima-section">
             <div class="plan-section-head">

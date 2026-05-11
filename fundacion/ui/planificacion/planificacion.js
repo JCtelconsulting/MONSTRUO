@@ -1,7 +1,7 @@
 window.FundPlanificacion = (() => {
     let _ctx = null;
     let _cat = { dominios: [], competencias: [], bloqueTipos: [], clima: [] };
-    let _compByDomain = [];  // [{dominio, competencias: [...]}]
+    let _compByDomain = [];
     let _bloques = [];
     let _sesionMeta = {
         clima_opcion_id: null,
@@ -13,19 +13,28 @@ window.FundPlanificacion = (() => {
     let _saving = false;
     let _bloqueSeq = 0;
 
+    // Estado del calendario
+    let _view = 'mes';            // 'mes' | 'semana' | 'dia'
+    let _cursor = new Date();     // fecha "ancla" del período visible
+    let _selected = new Date();   // día seleccionado para el editor
+    let _sesionesIdx = {};        // { 'YYYY-MM-DD': { bloques_total, bloques_ejecutados, clima_codigo, clima_nombre } }
+
     async function init(ctx) {
         _ctx = ctx;
+        _selected = new Date(); _selected.setHours(0, 0, 0, 0);
+        _cursor = new Date(_selected);
         _initEventos();
-        _setFechaHoy();
         _renderHead();
         await _ensureCatalogos();
         _renderClimaGrid();
+        await _renderCalendar();
         await _refresh();
     }
 
     async function onSedeChange(sede) {
         _ctx = { ..._ctx, sede };
         _renderHead();
+        await _renderCalendar();
         await _refresh();
     }
 
@@ -35,7 +44,14 @@ window.FundPlanificacion = (() => {
         document.getElementById('plan-btn-guardar')?.addEventListener('click', _guardar);
         document.getElementById('plan-btn-collapse-all')?.addEventListener('click', () => _toggleAll(false));
         document.getElementById('plan-btn-expand-all')?.addEventListener('click', () => _toggleAll(true));
-        document.getElementById('plan-fecha')?.addEventListener('change', _refresh);
+
+        // Calendario
+        document.getElementById('plan-cal-prev')?.addEventListener('click', () => _nav(-1));
+        document.getElementById('plan-cal-next')?.addEventListener('click', () => _nav(+1));
+        document.getElementById('plan-cal-today')?.addEventListener('click', _goToday);
+        document.querySelectorAll('.plan-cal-view-btn').forEach(btn => {
+            btn.addEventListener('click', () => _setView(btn.dataset.view));
+        });
 
         ['plan-situaciones', 'plan-estrategias', 'plan-notas'].forEach(id => {
             const el = document.getElementById(id);
@@ -47,9 +63,241 @@ window.FundPlanificacion = (() => {
         });
     }
 
-    function _setFechaHoy() {
-        const f = document.getElementById('plan-fecha');
-        if (f && !f.value) f.value = new Date().toISOString().slice(0, 10);
+    function _ymd(d) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function _sameDay(a, b) {
+        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+
+    function _rangoVisible() {
+        // Devuelve {desde, hasta} del período visible según _view
+        const d = new Date(_cursor);
+        if (_view === 'mes') {
+            const desde = new Date(d.getFullYear(), d.getMonth(), 1);
+            const hasta = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+            return { desde, hasta };
+        }
+        if (_view === 'semana') {
+            const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;  // lunes = 0
+            const desde = new Date(d); desde.setDate(d.getDate() - dow);
+            const hasta = new Date(desde); hasta.setDate(desde.getDate() + 6);
+            return { desde, hasta };
+        }
+        return { desde: new Date(d), hasta: new Date(d) };
+    }
+
+    async function _renderCalendar() {
+        _updateNavTitle();
+        if (!_ctx?.sede?.id) {
+            const body = document.getElementById('plan-cal-body');
+            if (body) body.innerHTML = '';
+            return;
+        }
+        await _loadSesionesIdx();
+        if (_view === 'mes') _renderMes();
+        else if (_view === 'semana') _renderSemana();
+        else _renderDia();
+    }
+
+    function _updateNavTitle() {
+        const t = document.getElementById('plan-cal-title');
+        if (!t) return;
+        const fmtMes = (d) => d.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+        const fmtDia = (d) => d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        if (_view === 'mes') {
+            t.textContent = fmtMes(_cursor);
+        } else if (_view === 'semana') {
+            const { desde, hasta } = _rangoVisible();
+            const di = desde.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+            const dh = hasta.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
+            t.textContent = `${di} – ${dh}`;
+        } else {
+            t.textContent = fmtDia(_cursor);
+        }
+    }
+
+    async function _loadSesionesIdx() {
+        const { desde, hasta } = _rangoVisible();
+        try {
+            const data = await window.FundApi.listSesiones(_ctx.sede.id, _ymd(desde), _ymd(hasta));
+            _sesionesIdx = {};
+            (data.items || []).forEach(s => {
+                _sesionesIdx[s.fecha] = s;
+            });
+        } catch (e) {
+            console.error('[Planificación] error cargando índice de sesiones', e);
+            _sesionesIdx = {};
+        }
+    }
+
+    function _renderMes() {
+        const body = document.getElementById('plan-cal-body');
+        if (!body) return;
+        const y = _cursor.getFullYear(), m = _cursor.getMonth();
+        const primero = new Date(y, m, 1);
+        const ultimo = new Date(y, m + 1, 0);
+        const dowPrimero = primero.getDay() === 0 ? 6 : primero.getDay() - 1;
+        const inicio = new Date(primero); inicio.setDate(1 - dowPrimero);
+        const cantSem = Math.ceil((dowPrimero + ultimo.getDate()) / 7);
+        const totalCells = cantSem * 7;
+
+        const dows = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+
+        let html = '<div class="plan-cal-mes">';
+        html += '<div class="plan-cal-mes-dow">' + dows.map(d => `<div>${d}</div>`).join('') + '</div>';
+        html += '<div class="plan-cal-mes-grid">';
+        for (let i = 0; i < totalCells; i++) {
+            const d = new Date(inicio); d.setDate(inicio.getDate() + i);
+            const ymd = _ymd(d);
+            const sesion = _sesionesIdx[ymd];
+            const isOut = d.getMonth() !== m;
+            const isToday = _sameDay(d, hoy);
+            const isSelected = _sameDay(d, _selected);
+            const cls = ['plan-cal-day'];
+            if (isOut) cls.push('is-out');
+            if (isToday) cls.push('is-today');
+            if (isSelected) cls.push('is-selected');
+            const dotColor = sesion?.clima_codigo ? _climaColor(sesion.clima_codigo) : null;
+            const dot = sesion ? `<span class="plan-cal-day-dot" style="background:${dotColor || '#4facfe'}" title="${_esc(sesion.clima_nombre || 'Sesión registrada')}"></span>` : '';
+            const count = sesion?.bloques_total ? `<span class="plan-cal-day-count">${sesion.bloques_ejecutados}/${sesion.bloques_total}</span>` : '';
+            html += `
+              <div class="${cls.join(' ')}" data-fecha="${ymd}">
+                <div class="plan-cal-day-head">
+                  <span class="plan-cal-day-num">${d.getDate()}</span>
+                </div>
+                <div class="plan-cal-day-marks">${dot}${count}</div>
+              </div>`;
+        }
+        html += '</div></div>';
+        body.innerHTML = html;
+        body.querySelectorAll('.plan-cal-day').forEach(el => {
+            el.addEventListener('click', () => _selectFecha(el.dataset.fecha));
+        });
+    }
+
+    function _renderSemana() {
+        const body = document.getElementById('plan-cal-body');
+        if (!body) return;
+        const { desde } = _rangoVisible();
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        const dows = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+        let html = '<div class="plan-cal-semana">';
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(desde); d.setDate(desde.getDate() + i);
+            const ymd = _ymd(d);
+            const isToday = _sameDay(d, hoy);
+            const isSelected = _sameDay(d, _selected);
+            const cls = ['plan-cal-semana-col'];
+            if (isToday) cls.push('is-today');
+            if (isSelected) cls.push('is-selected');
+            html += `
+              <div class="${cls.join(' ')}" data-fecha="${ymd}">
+                <div class="plan-cal-semana-head">${dows[i]} ${d.getDate()}</div>
+                <div class="plan-cal-semana-body" data-role="bloques-${ymd}"></div>
+              </div>`;
+        }
+        html += '</div>';
+        body.innerHTML = html;
+
+        // Cargar bloques en paralelo para cada día con sesión
+        const fechas = Object.keys(_sesionesIdx);
+        for (const f of fechas) {
+            const cont = body.querySelector(`[data-role="bloques-${f}"]`);
+            if (!cont) continue;
+            window.FundApi.getSesionByFecha(_ctx.sede.id, f).then(data => {
+                const bloques = (data.bloques || []).slice(0, 4);
+                if (!bloques.length) { cont.innerHTML = '<div class="plan-cal-semana-empty">—</div>'; return; }
+                cont.innerHTML = bloques.map(b => `
+                    <div class="plan-cal-semana-bloque">
+                      <span class="plan-cal-semana-hora">${b.hora_inicio ? b.hora_inicio.slice(0, 5) : ''}</span>
+                      <span class="plan-cal-semana-titulo">${_esc(b.nombre_actividad || b.bloque_tipo_nombre || '—')}</span>
+                    </div>
+                `).join('');
+            }).catch(() => { cont.innerHTML = '<div class="plan-cal-semana-empty">—</div>'; });
+        }
+
+        body.querySelectorAll('.plan-cal-semana-col').forEach(el => {
+            el.addEventListener('click', () => _selectFecha(el.dataset.fecha));
+        });
+    }
+
+    function _renderDia() {
+        const body = document.getElementById('plan-cal-body');
+        if (!body) return;
+        const ymd = _ymd(_cursor);
+        body.innerHTML = '<div class="plan-cal-dia" id="plan-cal-dia-cont"><div class="plan-cal-dia-empty">Cargando…</div></div>';
+        const cont = body.querySelector('#plan-cal-dia-cont');
+        window.FundApi.getSesionByFecha(_ctx.sede.id, ymd).then(data => {
+            const bloques = data.bloques || [];
+            if (!bloques.length) { cont.innerHTML = '<div class="plan-cal-dia-empty">Sin bloques registrados para este día.</div>'; return; }
+            cont.innerHTML = bloques.map(b => {
+                const hora = (b.hora_inicio && b.hora_fin) ? `${b.hora_inicio.slice(0,5)}–${b.hora_fin.slice(0,5)}` : '';
+                return `
+                  <div class="plan-cal-dia-bloque">
+                    <span class="plan-cal-dia-bloque-hora">${hora || '—'}</span>
+                    <div>
+                      <div class="plan-cal-dia-bloque-titulo">${_esc(b.nombre_actividad || b.bloque_tipo_nombre || '—')}</div>
+                      <div class="plan-cal-dia-bloque-sub">${_esc(b.bloque_tipo_nombre)}${b.bloque_subtipo_nombre ? ' · ' + _esc(b.bloque_subtipo_nombre) : ''}</div>
+                    </div>
+                    <span>${b.se_ejecuto ? '<span class="plan-bloque-status is-ok">✓</span>' : '<span class="plan-bloque-status is-not-ok">✗</span>'}</span>
+                  </div>`;
+            }).join('');
+        }).catch(() => { cont.innerHTML = '<div class="plan-cal-dia-empty">Sin bloques registrados para este día.</div>'; });
+        // Asegurar que _selected coincida con cursor en vista día
+        _selected = new Date(_cursor);
+        _refresh();
+    }
+
+    function _climaColor(codigo) {
+        const c = (_cat.clima || []).find(x => x.codigo === codigo);
+        return c?.color || '#4facfe';
+    }
+
+    function _setView(view) {
+        if (_view === view) return;
+        _view = view;
+        document.querySelectorAll('.plan-cal-view-btn').forEach(b => {
+            b.classList.toggle('is-active', b.dataset.view === view);
+        });
+        _renderCalendar();
+    }
+
+    function _nav(delta) {
+        const d = new Date(_cursor);
+        if (_view === 'mes') d.setMonth(d.getMonth() + delta);
+        else if (_view === 'semana') d.setDate(d.getDate() + 7 * delta);
+        else d.setDate(d.getDate() + delta);
+        _cursor = d;
+        _renderCalendar();
+    }
+
+    function _goToday() {
+        _cursor = new Date(); _cursor.setHours(0, 0, 0, 0);
+        _selected = new Date(_cursor);
+        _renderCalendar();
+        _refresh();
+    }
+
+    function _selectFecha(ymd) {
+        const [y, m, d] = ymd.split('-').map(Number);
+        _selected = new Date(y, m - 1, d);
+        if (_view === 'mes') {
+            // marcar el día seleccionado sin recargar todo
+            document.querySelectorAll('.plan-cal-day').forEach(el => {
+                el.classList.toggle('is-selected', el.dataset.fecha === ymd);
+            });
+        } else if (_view === 'semana') {
+            document.querySelectorAll('.plan-cal-semana-col').forEach(el => {
+                el.classList.toggle('is-selected', el.dataset.fecha === ymd);
+            });
+        }
+        _refresh();
     }
 
     function _renderHead() {
@@ -122,8 +370,9 @@ window.FundPlanificacion = (() => {
     }
 
     async function _refresh() {
-        const fecha = document.getElementById('plan-fecha')?.value;
-        if (!_ctx?.sede?.id || !fecha) {
+        const fecha = _ymd(_selected);
+        _updateEditorHeader();
+        if (!_ctx?.sede?.id) {
             _bloques = [];
             _resetMeta();
             _renderBloques();
@@ -143,6 +392,15 @@ window.FundPlanificacion = (() => {
         }
         _hydrateMeta();
         _renderBloques();
+    }
+
+    function _updateEditorHeader() {
+        const label = document.getElementById('plan-editor-fecha-label');
+        if (label) {
+            label.textContent = _selected.toLocaleDateString('es-CL', {
+                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+            });
+        }
     }
 
     function _resetMeta() {
@@ -471,7 +729,7 @@ window.FundPlanificacion = (() => {
 
     async function _guardar() {
         if (_saving) return;
-        const fecha = document.getElementById('plan-fecha')?.value;
+        const fecha = _ymd(_selected);
         if (!_ctx?.sede?.id || !fecha) {
             window.showToast?.('Selecciona sede y fecha primero', 'warn');
             return;
@@ -525,6 +783,7 @@ window.FundPlanificacion = (() => {
             await window.FundApi.upsertSesion(payload);
             window.showToast?.('Sesión guardada', 'success');
             await _refresh();
+            await _renderCalendar();  // refrescar marcas del calendario
         } catch (e) {
             console.error('[Planificación] error guardando', e);
             window.showToast?.('Error al guardar: ' + (e?.detail || e?.message || e), 'error');
