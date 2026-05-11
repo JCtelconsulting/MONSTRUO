@@ -199,6 +199,16 @@ def crear_flujo(
             ).fetchone()
             ids_creados.append(int(row["id"]))
 
+        # Evento: inicio del flujo (timeline del tablero)
+        from gta.backend.services import flujo_eventos as evt
+        evt.registrar(
+            conn, flujo_id,
+            tipo=evt.FLUJO_INICIADO,
+            actor=iniciado_por,
+            mensaje=f"Inició flujo: {titulo.strip()}",
+            metadata={"proceso_id": proceso_id, "pasos": len(pasos)},
+        )
+
         conn.commit()
         return {
             "flujo_id": flujo_id,

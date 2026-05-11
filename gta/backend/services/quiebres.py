@@ -135,6 +135,21 @@ def reportar_desde_tarea(
             (tarea_id,),
         )
 
+        # Evento: timeline del flujo
+        from gta.backend.services import flujo_eventos as evt
+        evt.registrar(
+            conn, ctx["flujo_id"],
+            tipo=evt.QUIEBRE_REPORTADO,
+            actor=reportado_por,
+            tarea_id=tarea_id,
+            mensaje=f"Reportó quiebre a {area_destino}: {desc_clean}",
+            metadata={
+                "quiebre_id": q["id"],
+                "area_destino": area_destino,
+                "descripcion": desc_clean,
+            },
+        )
+
         conn.commit()
         return dict(q)
     except Exception:
@@ -269,6 +284,21 @@ def resolver(
                    WHERE id = %s AND estado = 'esperando_quiebre'""",
                 (previo, q["tarea_id"]),
             )
+            # Evento: timeline del flujo
+            tarea_row = conn.execute(
+                "SELECT flujo_id FROM gta.tareas WHERE id = %s",
+                (q["tarea_id"],),
+            ).fetchone()
+            if tarea_row and tarea_row.get("flujo_id"):
+                from gta.backend.services import flujo_eventos as evt
+                evt.registrar(
+                    conn, tarea_row["flujo_id"],
+                    tipo=evt.QUIEBRE_RESUELTO,
+                    actor=resuelto_por,
+                    tarea_id=q["tarea_id"],
+                    mensaje=f"Resolvió quiebre #{quiebre_id}" + (f": {nota.strip()}" if nota else ""),
+                    metadata={"quiebre_id": quiebre_id, "nota": (nota or "").strip() or None},
+                )
 
         conn.commit()
         return {"ok": True, "id": quiebre_id}

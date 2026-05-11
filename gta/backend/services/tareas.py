@@ -210,6 +210,35 @@ def cerrar_tarea(
                 paso_predecesor=int(result["paso_orden"]),
             )
 
+            # Evento: tarea cerrada (y quizás flujo completado)
+            from gta.backend.services import flujo_eventos as evt
+            actor_username = conn.execute(
+                "SELECT username FROM auth.users WHERE id = %s", (cerrado_por,),
+            ).fetchone()
+            actor = (actor_username or {}).get("username") or "sistema"
+            paso_n = result["paso_orden"]
+            evt.registrar(
+                conn, result["flujo_id"],
+                tipo=evt.TAREA_CERRADA,
+                actor=actor,
+                tarea_id=tarea_id,
+                mensaje=f"Cerró paso {paso_n}",
+                metadata={"paso_orden": paso_n},
+            )
+            # Si todas las tareas del flujo están cerradas, registrar completado
+            pendientes = conn.execute(
+                """SELECT COUNT(*) AS n FROM gta.tareas
+                   WHERE flujo_id = %s AND estado NOT IN ('cerrada','cancelada')""",
+                (result["flujo_id"],),
+            ).fetchone()
+            if pendientes and int(pendientes.get("n") or 0) == 0:
+                evt.registrar(
+                    conn, result["flujo_id"],
+                    tipo=evt.FLUJO_COMPLETADO,
+                    actor=actor,
+                    mensaje="Flujo completado",
+                )
+
         conn.commit()
         return get_tarea(tarea_id)
     except Exception:
@@ -360,6 +389,29 @@ def devolver_tarea(
                 autor,
                 f"[Devuelto desde paso {ctx['paso_orden']}] {motivo_clean}",
             ),
+        )
+
+        # Eventos: timeline del flujo
+        from gta.backend.services import flujo_eventos as evt
+        evt.registrar(
+            conn, ctx["flujo_id"],
+            tipo=evt.TAREA_DEVUELTA,
+            actor=autor,
+            tarea_id=tarea_id,
+            mensaje=f"Devolvió paso {ctx['paso_orden']} → paso {destino_orden}: {motivo_clean}",
+            metadata={
+                "paso_origen": ctx["paso_orden"],
+                "paso_destino": destino_orden,
+                "motivo": motivo_clean,
+            },
+        )
+        evt.registrar(
+            conn, ctx["flujo_id"],
+            tipo=evt.TAREA_REABIERTA,
+            actor=autor,
+            tarea_id=destino["id"],
+            mensaje=f"Reabierto paso {destino_orden} para corregir",
+            metadata={"paso_orden": destino_orden},
         )
 
         conn.commit()
