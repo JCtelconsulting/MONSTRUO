@@ -110,6 +110,9 @@ services:
       - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9006
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+      - FUNDACION_DRIVE_SA_PATH=/run/secrets/monstruo-fundacion-drive.json
+    volumes:
+      - ./plataforma/ops/secrets:/run/secrets:ro
     depends_on:
       - db
     mem_limit: 256m
