@@ -34,6 +34,9 @@ services:
     volumes:
       - ./plataforma/data/postgres:/var/lib/postgresql/data
     # NO exponer 5432 al host: la DB solo es accesible por la red interna docker.
+    # Postgres con margen para work_mem, vacuums y conexiones concurrentes.
+    mem_limit: 512m
+    mem_reservation: 128m
     restart: unless-stopped
 
   gateway:
@@ -58,6 +61,8 @@ services:
       - ./ticketera/data/compliance:/app/ticketera/data/compliance
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "gateway.backend.main:app", "--host", "0.0.0.0", "--port", "9001" ]
 
@@ -83,6 +88,8 @@ services:
       - ./ticketera/data/compliance:/app/ticketera/data/compliance
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "ticketera.backend.main:app", "--host", "0.0.0.0", "--port", "9005" ]
 
@@ -105,6 +112,8 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "fundacion.backend.main:app", "--host", "0.0.0.0", "--port", "9006" ]
 
@@ -127,6 +136,8 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "bodega.backend.main:app", "--host", "0.0.0.0", "--port", "9007" ]
 
@@ -149,6 +160,8 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "crm.backend.main:app", "--host", "0.0.0.0", "--port", "9008" ]
 
@@ -171,6 +184,8 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "erp.backend.main:app", "--host", "0.0.0.0", "--port", "9009" ]
 
@@ -193,6 +208,8 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "pmo.backend.main:app", "--host", "0.0.0.0", "--port", "9010" ]
 
@@ -215,6 +232,8 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "ia.backend.main:app", "--host", "0.0.0.0", "--port", "9011" ]
 
@@ -237,6 +256,8 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "gta.backend.main:app", "--host", "0.0.0.0", "--port", "9012" ]
 
@@ -259,5 +280,7 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "zabbix.backend.main:app", "--host", "0.0.0.0", "--port", "9013" ]
