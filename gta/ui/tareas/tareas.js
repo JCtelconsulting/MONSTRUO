@@ -4,6 +4,7 @@ window.Tareas = (() => {
 
     let _sesion = null;
     let _vista = 'bandeja';      // bandeja | mias | colaboro
+    let _areas = [];             // áreas completas del catálogo (para admin)
     let _subareas = [];
     let _areasUsuario = [];      // áreas que el usuario puede ver
     let _areaActiva = '';        // '' = todas; o area_code
@@ -31,8 +32,9 @@ window.Tareas = (() => {
         // de áreas y subáreas. /catalogo solo trae los archivos.
         try {
             const r = await window.fetchApi('/api/gta/areas');
+            _areas = r?.items || [];
             const subs = [];
-            (r?.items || []).forEach(a => {
+            _areas.forEach(a => {
                 (a.subareas || []).forEach(s => {
                     subs.push({
                         area_code: a.code,
@@ -45,21 +47,18 @@ window.Tareas = (() => {
             _subareas = subs;
         } catch (e) {
             console.warn('[Tareas] no se pudo cargar áreas', e);
+            _areas = [];
             _subareas = [];
         }
     }
 
     async function cargarAreasUsuario() {
-        // Admin ve todas las áreas activas. Usuario común ve solo las áreas
-        // donde tiene membresía vigente (vía /membresias/mias).
+        // Admin ve todas las áreas activas (incluso sin subáreas todavía).
+        // Usuario común ve solo las áreas donde tiene membresía vigente (vía /membresias/mias).
         if (_esAdmin) {
-            const map = new Map();
-            _subareas.forEach(s => {
-                if (!map.has(s.area_code)) {
-                    map.set(s.area_code, { code: s.area_code, label: s.area_label });
-                }
-            });
-            _areasUsuario = Array.from(map.values());
+            _areasUsuario = _areas.filter(a => a.activo).map(a => ({
+                code: a.code, label: a.label,
+            }));
             return;
         }
         try {
