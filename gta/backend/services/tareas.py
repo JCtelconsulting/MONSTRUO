@@ -277,13 +277,21 @@ def cerrar_tarea(
             # Reanimar tareas que estaban devueltas esperando a este paso.
             # La tarea origen vuelve a 'pendiente' o 'en_curso' según conserve
             # responsable vigente, y se limpia espera_devolucion_paso.
+            # También trackeamos el MAX paso_orden de las que esperaban: ese
+            # es el "origen" más alto de la cadena de devolución, y delimita
+            # el rango de pasos que recibirán el aviso de revisión (evita
+            # avisar a pasos posteriores que NUNCA estuvieron activos).
             esperando = conn.execute(
-                """SELECT id FROM gta.tareas
+                """SELECT id, paso_orden FROM gta.tareas
                    WHERE flujo_id = %s
                      AND espera_devolucion_paso = %s
                      AND estado = 'devuelta'""",
                 (result["flujo_id"], int(result["paso_orden"])),
             ).fetchall()
+            paso_orden_origen = max(
+                (int(t["paso_orden"]) for t in esperando if t.get("paso_orden") is not None),
+                default=None,
+            )
             for t in esperando:
                 tiene_resp = conn.execute(
                     """SELECT 1 FROM gta.tarea_participaciones
@@ -341,6 +349,7 @@ def cerrar_tarea(
                     tarea_cerrada_id=tarea_id,
                     flujo_id=result["flujo_id"],
                     paso_orden_cerrado=int(result["paso_orden"]),
+                    paso_orden_origen=paso_orden_origen,
                     datos_flujo_antes=datos_antes,
                     datos_flujo_despues=datos_despues,
                     adjuntos_antes_count=adjuntos_antes,

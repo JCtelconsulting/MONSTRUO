@@ -131,18 +131,26 @@ def detectar_cambios_y_avisar(
     tarea_cerrada_id: int,
     flujo_id: str,
     paso_orden_cerrado: int,
+    paso_orden_origen: Optional[int],
     datos_flujo_antes: Dict[str, Any],
     datos_flujo_despues: Dict[str, Any],
     adjuntos_antes_count: int,
     adjuntos_despues_count: int,
 ) -> int:
-    """Genera avisos para todas las tareas cerradas del flujo que estén
-    entre paso_orden_cerrado y el paso más alto (sin contar el actual).
+    """Genera avisos solo para los pasos que estuvieron activos entre el
+    paso destino (recién cerrado) y el paso origen (la tarea que disparó
+    la devolución).
+
+    Ejemplo: si paso 5 devolvió al paso 1, y al cerrar el 1 hay cambios,
+    se avisa SOLO a pasos 2, 3, 4 y 5 (los que estuvieron cerrados o
+    devueltos en algún momento). NO a 6, 7, 8 — esos están 'bloqueada' y
+    nunca vieron datos del flujo.
+
+    Si paso_orden_origen es None (no hubo devolución detectable), se cae
+    al comportamiento legacy de avisar a todos los pasos posteriores
+    cerrados/devueltos.
 
     Retorna cantidad de avisos creados. NO commitea (usa la conn del caller).
-
-    Solo se llama cuando la tarea fue reabierta por una devolución previa
-    (sino no hay motivo para alertar — el flujo nunca pasó por ahí).
     """
     motivos = []
     if datos_flujo_antes != datos_flujo_despues:
@@ -167,14 +175,27 @@ def detectar_cambios_y_avisar(
 
     motivo = "; ".join(motivos)
 
-    # Tareas cerradas del flujo con paso_orden > el del paso cerrado
-    afectadas = conn.execute(
-        """SELECT id FROM gta.tareas
-           WHERE flujo_id = %s
-             AND paso_orden > %s
-             AND estado IN ('cerrada', 'devuelta', 'bloqueada')""",
-        (flujo_id, paso_orden_cerrado),
-    ).fetchall()
+    # Filtro: solo pasos entre destino y origen de la devolución, en estado
+    # 'cerrada' o 'devuelta' (los que sí vieron datos en algún momento).
+    # Excluye 'bloqueada' (nunca fueron tomadas, no tienen nada que revisar).
+    if paso_orden_origen is not None:
+        afectadas = conn.execute(
+            """SELECT id FROM gta.tareas
+               WHERE flujo_id = %s
+                 AND paso_orden > %s
+                 AND paso_orden <= %s
+                 AND estado IN ('cerrada', 'devuelta')""",
+            (flujo_id, paso_orden_cerrado, paso_orden_origen),
+        ).fetchall()
+    else:
+        # Fallback legacy: paso_orden > destino, sin tope superior
+        afectadas = conn.execute(
+            """SELECT id FROM gta.tareas
+               WHERE flujo_id = %s
+                 AND paso_orden > %s
+                 AND estado IN ('cerrada', 'devuelta')""",
+            (flujo_id, paso_orden_cerrado),
+        ).fetchall()
     count = 0
     for t in afectadas:
         crear_aviso(
