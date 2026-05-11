@@ -72,6 +72,10 @@ window.GtaApi = (() => {
             paso_destino: (paso_destino == null ? null : Number(paso_destino)),
         }),
 
+        // Avisos de revisión (cambios post-cierre que afectan tareas previas)
+        listarAvisosTarea:    (id)             => get(`/tareas/${id}/avisos`),
+        marcarAvisoRevisado:  (tareaId, avisoId) => post(`/tareas/${tareaId}/avisos/${avisoId}/revisar`, {}),
+
         // Comentarios libres del flujo (visibles desde cualquier tarea)
         listarComentariosTarea: (id)               => get(`/tareas/${id}/comentarios`),
         crearComentarioTarea:   (id, texto)        => post(`/tareas/${id}/comentarios`, { texto: texto || '' }),

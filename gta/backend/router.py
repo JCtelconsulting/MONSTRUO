@@ -23,6 +23,7 @@ from gta.backend.services import adjuntos as adjuntos_service
 from gta.backend.services import quiebres as quiebres_service
 from gta.backend.services import comentarios as comentarios_service
 from gta.backend.services import flujo_eventos as flujo_eventos_service
+from gta.backend.services import avisos as avisos_service
 
 router = APIRouter(prefix="/api/gta", tags=["gta"])
 
@@ -1095,6 +1096,40 @@ async def resolver_quiebre_de_tarea(
             resuelto_por=user["username"],
             bypass_area=_es_admin(user),
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Avisos de revisión (cambios post-cierre que afectan tareas previas) ──
+
+@router.get("/tareas/{tarea_id}/avisos")
+async def listar_avisos_tarea(
+    tarea_id: int,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Avisos pendientes (sin revisar) para esta tarea."""
+    return {"items": avisos_service.listar_pendientes_de_tarea(tarea_id)}
+
+
+@router.post("/tareas/{tarea_id}/avisos/{aviso_id}/revisar")
+@audit_action("GTA_REVISAR_AVISO", severity="info")
+async def marcar_aviso_revisado(
+    tarea_id: int,
+    aviso_id: int,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Marca un aviso de revisión como ya leído / revisado."""
+    try:
+        # Coherencia: el aviso debe pertenecer a esta tarea
+        pendientes = avisos_service.listar_pendientes_de_tarea(tarea_id)
+        if not any(a["id"] == aviso_id for a in pendientes):
+            raise HTTPException(
+                status_code=403,
+                detail="el aviso no pertenece a esta tarea o ya está revisado",
+            )
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return avisos_service.marcar_revisado(aviso_id, revisado_por_id=uid)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

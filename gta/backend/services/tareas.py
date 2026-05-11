@@ -1030,7 +1030,10 @@ _BASE_SELECT = """
            s.area_code,
            a.label AS area_label,
            gta.responsable_vigente(t.id) AS responsable_id,
-           ur.username AS responsable_username
+           ur.username AS responsable_username,
+           EXISTS (SELECT 1 FROM gta.avisos_revision av
+                   WHERE av.tarea_id = t.id AND av.revisado_at IS NULL)
+             AS tiene_avisos_pendientes
     FROM gta.tareas t
     JOIN gta.subareas s ON s.id = t.subarea_id
     JOIN gta.areas a ON a.code = s.area_code

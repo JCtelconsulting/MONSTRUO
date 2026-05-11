@@ -886,3 +886,61 @@
 .gta-comentario-form button {
     align-self: flex-end;
 }
+
+/* ── Avisos de revisión (cambios post-cierre en pasos anteriores) ──── */
+
+.gta-card-aviso-badge {
+    background: rgba(255, 204, 0, 0.18);
+    color: #ffcc00;
+    border: 1px solid rgba(255, 204, 0, 0.4);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.gta-banner-aviso {
+    background: rgba(255, 204, 0, 0.08);
+    border: 1px solid rgba(255, 204, 0, 0.35);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+}
+
+.gta-banner-aviso-head {
+    color: #ffcc00;
+    font-size: 0.92rem;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gta-banner-aviso-head i { color: #ffcc00; }
+
+.gta-banner-aviso-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-aviso-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255, 204, 0, 0.15);
+    font-size: 0.88rem;
+}
+
+.gta-aviso-item:first-child {
+    border-top: 0;
+}
+
+.gta-aviso-msg { flex: 1; line-height: 1.4; color: #e0e4e8; }
+
+.gta-aviso-meta { color: var(--text-soft, #a5adb4); font-size: 0.78rem; }

@@ -309,6 +309,7 @@ window.Tareas = (() => {
                     <div class="gta-tarea-card-head-left">
                         <i class="fas fa-chevron-right gta-card-chevron"></i>
                         <h3 class="gta-tarea-card-titulo">${_esc(t.titulo)}</h3>
+                        ${t.tiene_avisos_pendientes ? `<span class="gta-card-aviso-badge" title="Hubo cambios en pasos anteriores después de tu cierre">⚠ Revisar</span>` : ''}
                     </div>
                     <div class="gta-tarea-card-head-right">
                         <span class="pill gta-prioridad-${t.prioridad}" title="Prioridad ${_esc(t.prioridad)}">${_esc(t.prioridad)}</span>
@@ -355,6 +356,13 @@ window.Tareas = (() => {
                 </div>
             `;
         }
+
+        // Avisos de revisión (placeholder, se llena async tras render)
+        const avisosHtml = t.flujo_id && t.tiene_avisos_pendientes
+            ? `<div id="avisos-tarea-${t.id}" class="gta-banner-aviso">
+                   <em style="opacity:0.6;">Cargando avisos…</em>
+               </div>`
+            : '';
 
         // Descripción
         const descHtml = t.descripcion
@@ -498,6 +506,7 @@ window.Tareas = (() => {
 
         return `
             ${bannerBloq}
+            ${avisosHtml}
             ${descHtml}
             ${datosHtml}
             ${formHtml}
@@ -604,6 +613,7 @@ window.Tareas = (() => {
                 _refrescarAdjuntos(id);
                 _refrescarQuiebres(id);
                 _refrescarComentarios(id);
+                if (tarea.tiene_avisos_pendientes) _refrescarAvisos(id);
             }
         }
     }
@@ -704,6 +714,58 @@ window.Tareas = (() => {
         try {
             await GtaApi.borrarAdjuntoTarea(tareaId, adjId);
             await _refrescarAdjuntos(tareaId);
+        } catch (e) { alert(_humanizeErr(e)); }
+    }
+
+    // ── Avisos de revisión (cambios post-cierre) ──────────────────────
+    async function _refrescarAvisos(tareaId) {
+        const cont = document.getElementById(`avisos-tarea-${tareaId}`);
+        if (!cont) return;
+        try {
+            const resp = await GtaApi.listarAvisosTarea(tareaId);
+            const items = resp.items || [];
+            if (!items.length) {
+                cont.remove();
+                // También limpiar badge en card colapsada
+                const tarea = _buscarTarea(tareaId);
+                if (tarea) tarea.tiene_avisos_pendientes = false;
+                return;
+            }
+            cont.innerHTML = `
+                <div class="gta-banner-aviso-head">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Hubo cambios en pasos anteriores después de tu cierre</strong>
+                </div>
+                <div class="gta-banner-aviso-list">
+                    ${items.map(a => {
+                        const fecha = a.created_at ? new Date(a.created_at).toLocaleString() : '';
+                        const desde = a.por_tarea_paso
+                            ? `paso ${a.por_tarea_paso} (${_esc(a.por_tarea_titulo || '')})`
+                            : 'otro paso';
+                        return `
+                            <div class="gta-aviso-item">
+                                <div class="gta-aviso-msg">
+                                    <strong>${_esc(desde)}:</strong> ${_esc(a.motivo || 'modificación')}
+                                    <span class="gta-aviso-meta"> · ${fecha}</span>
+                                </div>
+                                <button class="btn-sm btn-secondary"
+                                        onclick="event.stopPropagation(); Tareas.marcarAvisoRevisado(${tareaId}, ${a.id})">
+                                    <i class="fas fa-check"></i> Marcar revisado
+                                </button>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        } catch (e) {
+            cont.innerHTML = `<em style="color:#c00;">Error al cargar avisos: ${_esc(_humanizeErr(e))}</em>`;
+        }
+    }
+
+    async function marcarAvisoRevisado(tareaId, avisoId) {
+        try {
+            await GtaApi.marcarAvisoRevisado(tareaId, avisoId);
+            await _refrescarAvisos(tareaId);
         } catch (e) { alert(_humanizeErr(e)); }
     }
 
@@ -1249,6 +1311,7 @@ window.Tareas = (() => {
         subirAdjunto, borrarAdjunto,
         reportarQuiebre, resolverQuiebre,
         agregarComentario, borrarComentario,
+        marcarAvisoRevisado,
         // Nueva tarea (sigue siendo modal por ahora)
         abrirNueva, cerrarNueva, guardarNueva,
         // Colaboradores (siguen siendo modal — pendiente de mover al acordeón)
