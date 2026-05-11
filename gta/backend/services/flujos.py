@@ -255,11 +255,26 @@ def listar_flujos(
                 MIN(t.created_at) AS iniciado_at,
                 MAX(u.username) AS iniciado_por,
                 COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE t.estado = 'pendiente')  AS pendientes,
-                COUNT(*) FILTER (WHERE t.estado = 'en_curso')   AS en_curso,
-                COUNT(*) FILTER (WHERE t.estado = 'bloqueada')  AS bloqueadas,
-                COUNT(*) FILTER (WHERE t.estado = 'cerrada')    AS cerradas,
-                COUNT(*) FILTER (WHERE t.estado = 'cancelada')  AS canceladas,
+                COUNT(*) FILTER (WHERE t.estado = 'pendiente')          AS pendientes,
+                COUNT(*) FILTER (WHERE t.estado = 'en_curso')           AS en_curso,
+                COUNT(*) FILTER (WHERE t.estado = 'bloqueada')          AS bloqueadas,
+                COUNT(*) FILTER (WHERE t.estado = 'cerrada')            AS cerradas,
+                COUNT(*) FILTER (WHERE t.estado = 'cancelada')          AS canceladas,
+                COUNT(*) FILTER (WHERE t.estado = 'esperando_quiebre')  AS esperando_quiebre,
+                COUNT(*) FILTER (WHERE t.estado = 'devuelta')           AS devueltas,
+                COUNT(*) FILTER (
+                    WHERE t.estado NOT IN ('cerrada','cancelada')
+                      AND t.sla_due_at IS NOT NULL
+                      AND t.sla_due_at < NOW()
+                ) AS vencidas,
+                COUNT(*) FILTER (
+                    WHERE t.estado NOT IN ('cerrada','cancelada')
+                      AND t.sla_due_at IS NOT NULL
+                      AND t.sla_due_at >= NOW()
+                      AND t.sla_horas IS NOT NULL AND t.sla_horas > 0
+                      AND EXTRACT(EPOCH FROM (NOW() - t.created_at)) / 3600.0
+                          / NULLIF(t.sla_horas, 0) >= 0.7
+                ) AS por_vencer,
                 MAX(CASE WHEN t.estado NOT IN ('cerrada','cancelada')
                          THEN t.sla_due_at END) AS proximo_vencimiento,
                 MAX(t.datos_flujo::text) AS datos_flujo
@@ -289,6 +304,33 @@ def listar_flujos(
                 datos = json.loads(r.get("datos_flujo") or "{}")
             except Exception:
                 datos = {}
+
+            # Paso "actual": el de menor paso_orden que esté pendiente/en_curso
+            paso_actual_row = conn.execute(
+                """SELECT t.paso_orden, t.titulo, t.estado, t.sla_due_at,
+                          a.label AS area_label
+                   FROM gta.tareas t
+                   JOIN gta.subareas s ON s.id = t.subarea_id
+                   JOIN gta.areas a ON a.code = s.area_code
+                   WHERE t.flujo_id = %s
+                     AND t.estado IN ('pendiente','en_curso','bloqueada','esperando_quiebre','devuelta')
+                   ORDER BY t.paso_orden ASC
+                   LIMIT 1""",
+                (r["flujo_id"],),
+            ).fetchone()
+            paso_actual = dict(paso_actual_row) if paso_actual_row else None
+
+            vencidas_n = int(r["vencidas"] or 0)
+            por_vencer_n = int(r["por_vencer"] or 0)
+            esperando_n = int(r["esperando_quiebre"] or 0)
+            # Salud SLA del flujo: rojo si hay vencidas, amarillo si hay por vencer, verde si todo OK
+            if vencidas_n > 0:
+                salud_sla = "rojo"
+            elif por_vencer_n > 0:
+                salud_sla = "amarillo"
+            else:
+                salud_sla = "verde"
+
             flujos.append({
                 "flujo_id": r["flujo_id"],
                 "titulo": r.get("titulo") or "",
@@ -304,6 +346,12 @@ def listar_flujos(
                 "bloqueadas": int(r["bloqueadas"] or 0),
                 "cerradas": cerradas,
                 "canceladas": canceladas,
+                "esperando_quiebre": esperando_n,
+                "devueltas": int(r["devueltas"] or 0),
+                "vencidas": vencidas_n,
+                "por_vencer": por_vencer_n,
+                "salud_sla": salud_sla,
+                "paso_actual": paso_actual,
                 "proximo_vencimiento": r.get("proximo_vencimiento"),
                 "datos_flujo": datos,
             })
@@ -313,7 +361,8 @@ def listar_flujos(
 
 
 def get_flujo(flujo_id: str) -> Dict[str, Any]:
-    """Detalle del flujo: resumen + lista de tareas con su estado actual."""
+    """Detalle del flujo para el drawer del tablero: tareas con estado, SLA,
+    responsable y alertas (quiebres abiertos, vencidas)."""
     conn = db.get_conn()
     try:
         rows = conn.execute(
@@ -327,7 +376,11 @@ def get_flujo(flujo_id: str) -> Dict[str, Any]:
                       gta.responsable_vigente(t.id) AS responsable_id,
                       ur.username AS responsable_username,
                       ui.username AS iniciado_por,
-                      t.datos_flujo
+                      t.datos_flujo,
+                      (SELECT COUNT(*) FROM gta.quiebres q
+                       WHERE q.tarea_id = t.id AND q.estado = 'abierto') AS quiebres_abiertos,
+                      (SELECT COUNT(*) FROM gta.comentarios c
+                       WHERE c.tarea_id = t.id) AS comentarios_count
                FROM gta.tareas t
                JOIN gta.subareas s ON s.id = t.subarea_id
                JOIN gta.areas a ON a.code = s.area_code
@@ -340,20 +393,51 @@ def get_flujo(flujo_id: str) -> Dict[str, Any]:
         if not rows:
             return {}
 
+        from datetime import datetime, timezone
+
         tareas = []
+        ahora = datetime.now(timezone.utc)
         for r in rows:
-            try:
-                deps = json.loads(r.get("paso_depende_de") or "[]")
-            except Exception:
+            raw_deps = r.get("paso_depende_de")
+            if isinstance(raw_deps, list):
+                deps = raw_deps
+            elif isinstance(raw_deps, str):
+                try:
+                    deps = json.loads(raw_deps or "[]")
+                except Exception:
+                    deps = []
+            else:
                 deps = []
+
+            # Salud SLA por tarea
+            sla_due = r.get("sla_due_at")
+            sla_horas = r.get("sla_horas") or 0
+            estado = r["estado"]
+            salud = "verde"
+            sla_pct = None
+            if estado in ("cerrada", "cancelada"):
+                salud = "neutral"
+            elif sla_due and sla_horas and sla_horas > 0:
+                _due = sla_due if sla_due.tzinfo else sla_due.replace(tzinfo=timezone.utc)
+                _created = r["created_at"]
+                _created = _created if _created.tzinfo else _created.replace(tzinfo=timezone.utc)
+                consumido_h = max(0.0, (ahora - _created).total_seconds() / 3600.0)
+                sla_pct = round(min(consumido_h / float(sla_horas) * 100.0, 999.0), 1)
+                if ahora > _due:
+                    salud = "rojo"
+                elif sla_pct >= 70:
+                    salud = "amarillo"
+
             tareas.append({
                 "id": int(r["id"]),
                 "titulo": r["titulo"],
                 "descripcion": r["descripcion"],
-                "estado": r["estado"],
+                "estado": estado,
                 "prioridad": r["prioridad"],
                 "sla_horas": r.get("sla_horas"),
                 "sla_due_at": r.get("sla_due_at"),
+                "sla_pct": sla_pct,
+                "salud_sla": salud,
                 "created_at": r["created_at"],
                 "cerrado_at": r.get("cerrado_at"),
                 "paso_orden": r.get("paso_orden"),
@@ -365,6 +449,8 @@ def get_flujo(flujo_id: str) -> Dict[str, Any]:
                 "area_label": r["area_label"],
                 "responsable_id": r.get("responsable_id"),
                 "responsable_username": r.get("responsable_username"),
+                "quiebres_abiertos": int(r.get("quiebres_abiertos") or 0),
+                "comentarios_count": int(r.get("comentarios_count") or 0),
             })
 
         primera = rows[0]
@@ -373,12 +459,30 @@ def get_flujo(flujo_id: str) -> Dict[str, Any]:
         except Exception:
             datos = {}
 
+        # Resumen del flujo
+        total = len(tareas)
+        cerradas = sum(1 for t in tareas if t["estado"] == "cerrada")
+        canceladas = sum(1 for t in tareas if t["estado"] == "cancelada")
+        avance_pct = round((cerradas / total * 100) if total else 0, 1)
+        if cerradas == total:
+            estado_flujo = "completado"
+        elif canceladas == total:
+            estado_flujo = "cancelado"
+        else:
+            estado_flujo = "activo"
+
         return {
             "flujo_id": flujo_id,
             "titulo": primera.get("flujo_titulo") or "",
             "proceso_id": primera.get("proceso_id"),
+            "proceso_nombre": None,  # se puede agregar con un join opcional
             "iniciado_por": primera.get("iniciado_por"),
+            "iniciado_at": min((t["created_at"] for t in tareas), default=None),
             "datos_flujo": datos,
+            "estado": estado_flujo,
+            "avance_pct": avance_pct,
+            "total": total,
+            "cerradas": cerradas,
             "tareas": tareas,
         }
     finally:
@@ -386,20 +490,48 @@ def get_flujo(flujo_id: str) -> Dict[str, Any]:
 
 
 def metricas_globales() -> Dict[str, Any]:
-    """KPIs sobre flujos y tareas activas."""
+    """KPIs sobre flujos y tareas activas para el tablero."""
     conn = db.get_conn()
     try:
-        # Totales por estado
+        # Totales por estado de tarea
         rows = conn.execute(
             """SELECT
                   COUNT(*) AS total_tareas,
-                  COUNT(*) FILTER (WHERE estado = 'pendiente') AS pendientes,
-                  COUNT(*) FILTER (WHERE estado = 'en_curso')  AS en_curso,
-                  COUNT(*) FILTER (WHERE estado = 'bloqueada') AS bloqueadas,
-                  COUNT(*) FILTER (WHERE estado = 'cerrada')   AS cerradas,
+                  COUNT(*) FILTER (WHERE estado = 'pendiente')           AS pendientes,
+                  COUNT(*) FILTER (WHERE estado = 'en_curso')            AS en_curso,
+                  COUNT(*) FILTER (WHERE estado = 'bloqueada')           AS bloqueadas,
+                  COUNT(*) FILTER (WHERE estado = 'cerrada')             AS cerradas,
+                  COUNT(*) FILTER (WHERE estado = 'esperando_quiebre')   AS esperando_quiebre,
+                  COUNT(*) FILTER (WHERE estado = 'devuelta')            AS devueltas,
                   COUNT(DISTINCT flujo_id) FILTER (WHERE flujo_id IS NOT NULL) AS flujos_total
                FROM gta.tareas"""
         ).fetchone()
+
+        # Conteo de flujos por estado (computamos a mano: completado si todas
+        # cerradas/canceladas, cancelado si todas canceladas, sino activo)
+        flujos_estados = conn.execute(
+            """SELECT flujo_id,
+                      COUNT(*) AS total,
+                      COUNT(*) FILTER (WHERE estado = 'cerrada')   AS cerradas,
+                      COUNT(*) FILTER (WHERE estado = 'cancelada') AS canceladas
+               FROM gta.tareas
+               WHERE flujo_id IS NOT NULL
+               GROUP BY flujo_id"""
+        ).fetchall()
+        flujos_activos = 0
+        flujos_completados = 0
+        flujos_cancelados = 0
+        for f in flujos_estados:
+            total = int(f["total"])
+            cer = int(f["cerradas"])
+            can = int(f["canceladas"])
+            if cer + can == total:
+                if can == total:
+                    flujos_cancelados += 1
+                else:
+                    flujos_completados += 1
+            else:
+                flujos_activos += 1
 
         # Promedio horas para cerrar tareas (últimos 30 días)
         prom = conn.execute(
@@ -419,15 +551,41 @@ def metricas_globales() -> Dict[str, Any]:
                  AND sla_due_at < NOW()"""
         ).fetchone()
 
+        # Tareas por vencer (≥70% del SLA consumido pero no vencidas todavía)
+        por_vencer = conn.execute(
+            """SELECT COUNT(*) AS n
+               FROM gta.tareas
+               WHERE estado NOT IN ('cerrada', 'cancelada')
+                 AND sla_due_at IS NOT NULL
+                 AND sla_due_at >= NOW()
+                 AND sla_horas IS NOT NULL AND sla_horas > 0
+                 AND EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600.0
+                     / NULLIF(sla_horas, 0) >= 0.7"""
+        ).fetchone()
+
+        # Quiebres abiertos vinculados a tareas
+        quiebres = conn.execute(
+            """SELECT COUNT(*) AS n
+               FROM gta.quiebres
+               WHERE estado = 'abierto' AND tarea_id IS NOT NULL"""
+        ).fetchone()
+
         return {
             "total_tareas": int(rows["total_tareas"] or 0),
             "pendientes": int(rows["pendientes"] or 0),
             "en_curso": int(rows["en_curso"] or 0),
             "bloqueadas": int(rows["bloqueadas"] or 0),
             "cerradas": int(rows["cerradas"] or 0),
-            "flujos_total": int(rows["flujos_total"] or 0),
+            "esperando_quiebre": int(rows["esperando_quiebre"] or 0),
+            "devueltas": int(rows["devueltas"] or 0),
+            "flujos_total":       int(rows["flujos_total"] or 0),
+            "flujos_activos":     flujos_activos,
+            "flujos_completados": flujos_completados,
+            "flujos_cancelados":  flujos_cancelados,
             "promedio_horas_cierre": float(prom["horas"]) if prom and prom.get("horas") else None,
-            "vencidas": int(vencidas["n"] or 0) if vencidas else 0,
+            "vencidas":   int(vencidas["n"] or 0) if vencidas else 0,
+            "por_vencer": int(por_vencer["n"] or 0) if por_vencer else 0,
+            "quiebres_abiertos": int(quiebres["n"] or 0) if quiebres else 0,
         }
     finally:
         conn.close()

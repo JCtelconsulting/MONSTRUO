@@ -22,6 +22,7 @@ from gta.backend.services import preview as preview_service
 from gta.backend.services import adjuntos as adjuntos_service
 from gta.backend.services import quiebres as quiebres_service
 from gta.backend.services import comentarios as comentarios_service
+from gta.backend.services import flujo_eventos as flujo_eventos_service
 
 router = APIRouter(prefix="/api/gta", tags=["gta"])
 
@@ -731,6 +732,16 @@ async def ver_flujo(flujo_id: str, user: dict = Depends(deps.require_permission(
     if not flujo:
         raise HTTPException(status_code=404, detail="flujo no encontrado")
     return flujo
+
+
+@router.get("/flujos/{flujo_id}/timeline")
+async def ver_timeline_flujo(
+    flujo_id: str,
+    limit: int = 200,
+    user: dict = Depends(deps.require_permission("gta:read")),
+):
+    """Timeline de eventos del flujo (cierres, devoluciones, quiebres) en orden cronológico."""
+    return {"items": flujo_eventos_service.listar_de_flujo(flujo_id, limit=limit)}
 
 
 @router.get("/metricas")
