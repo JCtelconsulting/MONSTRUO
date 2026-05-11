@@ -340,7 +340,7 @@ window.Tareas = (() => {
                 <div class="gta-acc-section">
                     <h4 class="gta-acc-h4">Formulario del proceso ${editable ? '<span class="gta-acc-tag-editable">editable</span>' : '<span class="gta-acc-tag-readonly">solo lectura</span>'}</h4>
                     <div class="gta-acc-form-grid" id="form-tarea-${t.id}">
-                        ${camposProc.map(c => _campoHtml(c, datosFlujo[c.key], editable, t.id)).join('')}
+                        ${camposProc.map(c => _campoHtml(c, datosFlujo[c.key], editable, t.id, datosFlujo)).join('')}
                     </div>
                 </div>
             `;
@@ -452,7 +452,7 @@ window.Tareas = (() => {
     }
 
     // Render de un campo del formulario inline en el acordeón
-    function _campoHtml(c, valor, editable, tareaId) {
+    function _campoHtml(c, valor, editable, tareaId, datosFlujo) {
         const requerido = c.requerido !== false;
         const v = valor != null ? String(valor) : '';
         const disabled = editable ? '' : 'disabled';
@@ -483,13 +483,12 @@ window.Tareas = (() => {
             </select>`;
         } else if (c.tipo === 'select_dependiente') {
             // Las opciones se calculan según el valor actual del campo padre.
-            // Si el padre está vacío, mostramos un select deshabilitado con
-            // mensaje de ayuda hasta que el usuario elija el padre.
+            // Leemos el valor del padre desde datosFlujo (NO desde el DOM:
+            // en el primer render el HTML del padre todavía no está
+            // insertado, lo que dejaba el campo vacío y perdía el valor
+            // guardado al re-cerrar la tarea).
             const padreKey = c.depende_de;
-            const padreInput = padreKey
-                ? document.querySelector(`#form-tarea-${tareaId} [data-campo-key="${padreKey}"]`)
-                : null;
-            const padreValor = padreInput ? padreInput.value : '';
+            const padreValor = padreKey ? (datosFlujo?.[padreKey] || '') : '';
             const opcionesHijo = (c.opciones_por_valor || {})[padreValor] || [];
             const phOpt = c.ayuda ? _esc(c.ayuda) : '— Seleccionar —';
             const noHayPadre = !padreValor;
