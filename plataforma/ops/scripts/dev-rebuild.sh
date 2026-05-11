@@ -17,15 +17,16 @@
 # el browser se ve forzado a recargar todos los assets.
 #
 # Uso:
-#   ./scripts/dev-rebuild.sh                   # rebuild todos
-#   ./scripts/dev-rebuild.sh gateway gta       # rebuild solo gateway+gta
+#   ./plataforma/ops/scripts/dev-rebuild.sh                   # rebuild todos
+#   ./plataforma/ops/scripts/dev-rebuild.sh gateway gta       # rebuild solo gateway+gta
 #
 # En PROD: NO usar este script. PROD debe usar el SHA del commit como
 # ASSET_VERSION (que se setea en el deploy formal con CI/CD).
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# El script vive en plataforma/ops/scripts/, raíz del repo a 3 niveles arriba
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$REPO_ROOT"
 
 # Si el árbol está limpio (sin cambios sin commit), usamos el SHA del commit.

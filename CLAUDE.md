@@ -25,11 +25,11 @@ psql -c "SELECT version();" 2>/dev/null || echo "DB no disponible aún"
 
 **Siempre** rebuildear los containers afectados antes de declarar un cambio listo o pedirle al usuario que lo verifique. Esto incluye cambios en UI (HTML/CSS/JS), backend (Python), o cualquier otro código.
 
-**Usar siempre el script `scripts/dev-rebuild.sh`** — maneja `ASSET_VERSION` correctamente para cache-busting:
+**Usar siempre el script `plataforma/ops/scripts/dev-rebuild.sh`** — maneja `ASSET_VERSION` correctamente para cache-busting:
 
 ```bash
-./scripts/dev-rebuild.sh                   # rebuild todos los containers
-./scripts/dev-rebuild.sh gateway gta       # rebuild solo gateway+gta
+./plataforma/ops/scripts/dev-rebuild.sh                   # rebuild todos los containers
+./plataforma/ops/scripts/dev-rebuild.sh gateway gta       # rebuild solo gateway+gta
 ```
 
 El script detecta si el árbol git está sucio (cambios sin commit) y agrega un timestamp al `ASSET_VERSION`, garantizando que el browser recargue assets nuevos. Si el árbol está limpio, usa el SHA del commit.
