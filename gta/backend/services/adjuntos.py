@@ -187,5 +187,18 @@ def get_adjunto(adjunto_id: int) -> Optional[Dict[str, Any]]:
 
 
 def ruta_absoluta(ruta_relativa: str) -> Path:
-    """Convierte la ruta relativa de DB en absoluta del filesystem."""
-    return _data_root() / ruta_relativa
+    """Convierte la ruta relativa de DB en absoluta del filesystem.
+
+    Defensa contra path traversal: aunque el escritor (subir_adjunto) sanea
+    el filename y los paths los emite el propio service, validamos al leer
+    que el resultado quede contenido en _data_root. Si un día una ruta entra
+    por otra vía (importador, fix manual en DB, migración), no debe poder
+    devolver archivos arbitrarios del filesystem vía /adjuntos/{id}/download.
+    """
+    root = _data_root().resolve()
+    full = (root / ruta_relativa).resolve()
+    try:
+        full.relative_to(root)
+    except ValueError:
+        raise ValueError(f"ruta inválida (fuera de data root): {ruta_relativa}")
+    return full
