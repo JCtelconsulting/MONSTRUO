@@ -143,6 +143,7 @@ def cerrar_tarea(
         # Contexto: ¿pertenece a un flujo? ¿es el paso 1?
         ctx = conn.execute(
             """SELECT t.flujo_id, t.paso_orden, t.proceso_id,
+                      t.datos_flujo,
                       p.campos_formulario AS proceso_campos
                FROM gta.tareas t
                LEFT JOIN gta.procesos p ON p.id = t.proceso_id
@@ -167,6 +168,37 @@ def cerrar_tarea(
         es_paso_inicial = bool(
             ctx.get("flujo_id") and ctx.get("paso_orden") == 1
         )
+
+        # Snapshot pre-cierre para detectar cambios si esta tarea fue
+        # reabierta antes (devolución). Sin esto no podemos avisar a los
+        # pasos cerrados posteriores que algo cambió.
+        import json as _json_snap
+        raw_datos_antes = ctx.get("datos_flujo")
+        try:
+            if isinstance(raw_datos_antes, dict):
+                datos_antes = raw_datos_antes
+            elif isinstance(raw_datos_antes, str):
+                datos_antes = _json_snap.loads(raw_datos_antes or "{}") or {}
+            else:
+                datos_antes = {}
+        except Exception:
+            datos_antes = {}
+        adjuntos_antes = 0
+        if ctx.get("flujo_id"):
+            adj_row = conn.execute(
+                "SELECT COUNT(*) AS n FROM gta.flujo_adjuntos WHERE flujo_id = %s",
+                (ctx["flujo_id"],),
+            ).fetchone()
+            adjuntos_antes = int((adj_row or {}).get("n") or 0)
+        # ¿Esta tarea fue reabierta antes? (si hay un evento TAREA_REABIERTA con su id)
+        fue_reabierta = False
+        if ctx.get("flujo_id"):
+            ev_row = conn.execute(
+                """SELECT 1 FROM gta.flujo_eventos
+                   WHERE tarea_id = %s AND tipo = 'tarea_reabierta' LIMIT 1""",
+                (tarea_id,),
+            ).fetchone()
+            fue_reabierta = bool(ev_row)
 
         if es_paso_inicial:
             import json as _json
@@ -242,6 +274,79 @@ def cerrar_tarea(
                 mensaje=f"Cerró paso {paso_n}",
                 metadata={"paso_orden": paso_n},
             )
+            # Reanimar tareas que estaban devueltas esperando a este paso.
+            # La tarea origen vuelve a 'pendiente' o 'en_curso' según conserve
+            # responsable vigente, y se limpia espera_devolucion_paso.
+            esperando = conn.execute(
+                """SELECT id FROM gta.tareas
+                   WHERE flujo_id = %s
+                     AND espera_devolucion_paso = %s
+                     AND estado = 'devuelta'""",
+                (result["flujo_id"], int(result["paso_orden"])),
+            ).fetchall()
+            for t in esperando:
+                tiene_resp = conn.execute(
+                    """SELECT 1 FROM gta.tarea_participaciones
+                       WHERE tarea_id = %s AND rol = 'responsable' AND hasta IS NULL""",
+                    (t["id"],),
+                ).fetchone()
+                nuevo_estado = 'en_curso' if tiene_resp else 'pendiente'
+                conn.execute(
+                    """UPDATE gta.tareas
+                       SET estado = %s,
+                           espera_devolucion_paso = NULL,
+                           cerrado_por = NULL,
+                           cerrado_at = NULL,
+                           reporte_cierre = NULL,
+                           fecha_fin = NULL,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE id = %s""",
+                    (nuevo_estado, t["id"]),
+                )
+                evt.registrar(
+                    conn, result["flujo_id"],
+                    tipo=evt.TAREA_REABIERTA,
+                    actor=actor,
+                    tarea_id=t["id"],
+                    mensaje=f"Reanudada tras cierre del paso {result['paso_orden']}",
+                    metadata={"reanudada_por_paso": result["paso_orden"]},
+                )
+
+            # Si esta tarea había sido reabierta antes (por devolución), comparamos
+            # datos del flujo y adjuntos antes/después; si hubo cambios, avisamos
+            # a los pasos cerrados posteriores que revisen.
+            if fue_reabierta:
+                datos_despues_row = conn.execute(
+                    "SELECT datos_flujo FROM gta.tareas WHERE id = %s",
+                    (tarea_id,),
+                ).fetchone()
+                raw_d = (datos_despues_row or {}).get("datos_flujo")
+                try:
+                    if isinstance(raw_d, dict):
+                        datos_despues = raw_d
+                    elif isinstance(raw_d, str):
+                        datos_despues = _json_snap.loads(raw_d or "{}") or {}
+                    else:
+                        datos_despues = {}
+                except Exception:
+                    datos_despues = {}
+                adj_despues_row = conn.execute(
+                    "SELECT COUNT(*) AS n FROM gta.flujo_adjuntos WHERE flujo_id = %s",
+                    (result["flujo_id"],),
+                ).fetchone()
+                adjuntos_despues = int((adj_despues_row or {}).get("n") or 0)
+                from gta.backend.services import avisos as avisos_service
+                avisos_service.detectar_cambios_y_avisar(
+                    conn,
+                    tarea_cerrada_id=tarea_id,
+                    flujo_id=result["flujo_id"],
+                    paso_orden_cerrado=int(result["paso_orden"]),
+                    datos_flujo_antes=datos_antes,
+                    datos_flujo_despues=datos_despues,
+                    adjuntos_antes_count=adjuntos_antes,
+                    adjuntos_despues_count=adjuntos_despues,
+                )
+
             # Si todas las tareas del flujo están cerradas, registrar completado
             pendientes = conn.execute(
                 """SELECT COUNT(*) AS n FROM gta.tareas
@@ -270,34 +375,35 @@ def devolver_tarea(
     *,
     devuelto_por: int,
     motivo: str,
-    paso_destino: Optional[int] = None,
+    paso_destino: int,
 ) -> Dict[str, Any]:
-    """Rechaza una tarea de validación y reabre el paso destino para corregir.
+    """Devuelve la tarea actual al paso destino para que su responsable corrija.
 
-    Solo aplicable a tareas cuyo paso de definición tiene tipo='validacion' y
-    devolver_a apuntando al paso_orden destino. `devolver_a` puede ser:
-      - un int → único destino posible (legacy)
-      - una lista de int → varios destinos posibles; el responsable elige cuál
-        en `paso_destino`. Si la lista tiene un solo valor, no hace falta
-        pasar paso_destino.
+    Modelo unificado (sin distinción validación/quiebre): cualquier paso de
+    flujo puede devolver a cualquier paso anterior del mismo flujo.
 
     Efecto:
-      - La tarea actual queda en 'devuelta' con el motivo en reporte_cierre.
-      - La tarea destino del mismo flujo se reabre: 'pendiente', se limpian
-        cerrado_at/cerrado_por.
-      - Las hermanas siguientes (bloqueadas) se quedan bloqueadas.
+      - La tarea actual queda 'devuelta' con motivo en reporte_cierre y
+        espera_devolucion_paso=destino. NO se desbloquea hasta que el paso
+        destino se cierre nuevamente (vía cerrar_tarea, que reanima las
+        tareas con espera_devolucion_paso = paso recién cerrado).
+      - Los pasos intermedios entre destino y origen siguen cerrados (no
+        se rehace trabajo). Si al cerrarse de nuevo el paso destino los
+        datos del flujo cambiaron o se modificaron adjuntos, esos pasos
+        intermedios reciben un aviso de revisión (ver avisos.py).
+      - La tarea destino se reabre: 'pendiente', limpia cierre.
     """
     motivo_clean = (motivo or "").strip()
     if not motivo_clean:
         raise ValueError("El motivo es obligatorio para devolver una tarea")
+    if paso_destino is None or paso_destino < 1:
+        raise ValueError("paso_destino requerido y debe ser >= 1")
 
     conn = db.get_conn()
     try:
         ctx = conn.execute(
-            """SELECT t.flujo_id, t.paso_orden, t.proceso_id, t.estado,
-                      p.pasos_definicion
+            """SELECT t.flujo_id, t.paso_orden, t.proceso_id, t.estado
                FROM gta.tareas t
-               LEFT JOIN gta.procesos p ON p.id = t.proceso_id
                WHERE t.id = %s""",
             (tarea_id,),
         ).fetchone()
@@ -307,56 +413,19 @@ def devolver_tarea(
             raise ValueError("solo se pueden devolver tareas que pertenecen a un flujo")
         if ctx["estado"] in ("cerrada", "cancelada", "devuelta"):
             raise ValueError("la tarea ya está finalizada")
-
-        # Validar que el paso es de tipo 'validacion' y obtener devolver_a
-        import json as _json
-        try:
-            pasos_def = _json.loads(ctx.get("pasos_definicion") or "[]") or []
-        except Exception:
-            pasos_def = []
-        paso_def = next(
-            (p for p in pasos_def if isinstance(p, dict)
-             and p.get("orden") == ctx["paso_orden"]),
-            None,
-        )
-        if not paso_def or paso_def.get("tipo") != "validacion":
-            raise ValueError("este paso no es de tipo 'validacion', no se puede devolver")
-
-        # devolver_a puede ser int (legacy) o lista de int (multi-destino)
-        raw_destinos = paso_def.get("devolver_a")
-        if raw_destinos is None:
-            raise ValueError("el paso no define a qué paso devolver (devolver_a)")
-        if isinstance(raw_destinos, int):
-            destinos_posibles = [raw_destinos]
-        elif isinstance(raw_destinos, list):
-            destinos_posibles = [int(d) for d in raw_destinos if isinstance(d, (int, float))]
-        else:
-            raise ValueError("devolver_a debe ser un int o una lista de int")
-        if not destinos_posibles:
-            raise ValueError("devolver_a está vacío")
-
-        if paso_destino is None:
-            if len(destinos_posibles) > 1:
-                raise ValueError(
-                    f"este paso permite devolver a varios destinos {destinos_posibles}, "
-                    "elegí uno en paso_destino"
-                )
-            destino_orden = destinos_posibles[0]
-        else:
-            if paso_destino not in destinos_posibles:
-                raise ValueError(
-                    f"paso_destino={paso_destino} no es un destino válido "
-                    f"(opciones: {destinos_posibles})"
-                )
-            destino_orden = paso_destino
+        if paso_destino >= ctx["paso_orden"]:
+            raise ValueError(
+                f"paso_destino={paso_destino} debe ser anterior al paso actual "
+                f"({ctx['paso_orden']}). Solo se puede devolver hacia atrás."
+            )
 
         # Tarea destino del mismo flujo
         destino = conn.execute(
-            "SELECT id FROM gta.tareas WHERE flujo_id = %s AND paso_orden = %s",
-            (ctx["flujo_id"], int(destino_orden)),
+            "SELECT id, estado FROM gta.tareas WHERE flujo_id = %s AND paso_orden = %s",
+            (ctx["flujo_id"], int(paso_destino)),
         ).fetchone()
         if not destino:
-            raise ValueError(f"no se encontró el paso destino (orden={destino_orden})")
+            raise ValueError(f"no se encontró el paso destino (orden={paso_destino})")
 
         # Cerrar participaciones vigentes de la tarea actual
         conn.execute(
@@ -366,7 +435,7 @@ def devolver_tarea(
             (tarea_id,),
         )
 
-        # Marcar tarea actual como devuelta
+        # Marcar tarea actual como devuelta, esperando al paso destino
         conn.execute(
             """UPDATE gta.tareas
                SET estado = 'devuelta',
@@ -374,9 +443,10 @@ def devolver_tarea(
                    cerrado_at = CURRENT_TIMESTAMP,
                    reporte_cierre = %s,
                    fecha_fin = CURRENT_TIMESTAMP,
+                   espera_devolucion_paso = %s,
                    updated_at = CURRENT_TIMESTAMP
                WHERE id = %s""",
-            (devuelto_por, motivo_clean, tarea_id),
+            (devuelto_por, motivo_clean, int(paso_destino), tarea_id),
         )
 
         # Reabrir tarea destino: limpiar cierre y dejar pendiente
@@ -415,10 +485,10 @@ def devolver_tarea(
             tipo=evt.TAREA_DEVUELTA,
             actor=autor,
             tarea_id=tarea_id,
-            mensaje=f"Devolvió paso {ctx['paso_orden']} → paso {destino_orden}: {motivo_clean}",
+            mensaje=f"Devolvió paso {ctx['paso_orden']} → paso {paso_destino}: {motivo_clean}",
             metadata={
                 "paso_origen": ctx["paso_orden"],
-                "paso_destino": destino_orden,
+                "paso_destino": paso_destino,
                 "motivo": motivo_clean,
             },
         )
@@ -427,8 +497,8 @@ def devolver_tarea(
             tipo=evt.TAREA_REABIERTA,
             actor=autor,
             tarea_id=destino["id"],
-            mensaje=f"Reabierto paso {destino_orden} para corregir",
-            metadata={"paso_orden": destino_orden},
+            mensaje=f"Reabierto paso {paso_destino} para corregir",
+            metadata={"paso_orden": paso_destino},
         )
 
         conn.commit()
@@ -515,13 +585,14 @@ def _desbloquear_dependientes(conn, *, flujo_id: str, paso_predecesor: int) -> N
     El modelo nuevo guarda paso_depende_de como JSONB en gta.tareas, con los
     paso_orden de los predecesores. Identificamos hermanas por flujo_id.
     """
-    # Hermanas del mismo flujo, bloqueadas o devueltas (re-abrir tras corrección),
-    # que tienen al predecesor en su lista de dependencias
+    # Hermanas del mismo flujo, bloqueadas, que tienen al predecesor en su
+    # lista de dependencias. Las tareas 'devuelta' ya no se reanudan por
+    # cascada normal: lo hace cerrar_tarea mirando espera_devolucion_paso.
     hermanas = conn.execute(
         """SELECT id, paso_orden, paso_depende_de, sla_horas, sla_due_at
            FROM gta.tareas
            WHERE flujo_id = %s
-             AND estado IN ('bloqueada', 'devuelta')
+             AND estado = 'bloqueada'
              AND paso_depende_de @> %s::jsonb""",
         (flujo_id, json.dumps([paso_predecesor])),
     ).fetchall()

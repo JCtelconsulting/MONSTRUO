@@ -103,8 +103,8 @@ class TareaCerrarBody(BaseModel):
 
 
 class TareaDevolverBody(BaseModel):
-    motivo: str                        # qué no cumple, qué debe corregir el paso destino
-    paso_destino: Optional[int] = None # si el paso permite varios destinos, el responsable elige
+    motivo: str         # qué no cumple, qué debe corregir el paso destino
+    paso_destino: int   # paso_orden anterior al actual (cualquier paso del flujo, no solo validación)
 
 
 class QuiebreReporteBody(BaseModel):
