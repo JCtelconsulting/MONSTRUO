@@ -246,44 +246,67 @@ def listar_flujos(
 
     conn = db.get_conn()
     try:
+        # Una sola query con LATERAL JOIN para resolver paso_actual y evitar N+1.
+        # Estructura: agregamos primero por flujo_id, después LATERAL JOIN trae el
+        # paso "actual" (menor paso_orden con estado activo) en O(1) por flujo.
         rows = conn.execute(
-            f"""SELECT
-                t.flujo_id,
-                MAX(t.flujo_titulo) AS titulo,
-                MAX(t.proceso_id) AS proceso_id,
-                MAX(p.nombre) AS proceso_nombre,
-                MIN(t.created_at) AS iniciado_at,
-                MAX(u.username) AS iniciado_por,
-                COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE t.estado = 'pendiente')          AS pendientes,
-                COUNT(*) FILTER (WHERE t.estado = 'en_curso')           AS en_curso,
-                COUNT(*) FILTER (WHERE t.estado = 'bloqueada')          AS bloqueadas,
-                COUNT(*) FILTER (WHERE t.estado = 'cerrada')            AS cerradas,
-                COUNT(*) FILTER (WHERE t.estado = 'cancelada')          AS canceladas,
-                COUNT(*) FILTER (WHERE t.estado = 'esperando_quiebre')  AS esperando_quiebre,
-                COUNT(*) FILTER (WHERE t.estado = 'devuelta')           AS devueltas,
-                COUNT(*) FILTER (
-                    WHERE t.estado NOT IN ('cerrada','cancelada')
-                      AND t.sla_due_at IS NOT NULL
-                      AND t.sla_due_at < NOW()
-                ) AS vencidas,
-                COUNT(*) FILTER (
-                    WHERE t.estado NOT IN ('cerrada','cancelada')
-                      AND t.sla_due_at IS NOT NULL
-                      AND t.sla_due_at >= NOW()
-                      AND t.sla_horas IS NOT NULL AND t.sla_horas > 0
-                      AND EXTRACT(EPOCH FROM (NOW() - t.created_at)) / 3600.0
-                          / NULLIF(t.sla_horas, 0) >= 0.7
-                ) AS por_vencer,
-                MAX(CASE WHEN t.estado NOT IN ('cerrada','cancelada')
-                         THEN t.sla_due_at END) AS proximo_vencimiento,
-                MAX(t.datos_flujo::text) AS datos_flujo
-            FROM gta.tareas t
-            LEFT JOIN gta.procesos p ON p.id = t.proceso_id
-            LEFT JOIN auth.users u ON u.id = t.iniciado_por_id
-            WHERE {' AND '.join(where)}
-            GROUP BY t.flujo_id
-            ORDER BY iniciado_at DESC""",
+            f"""WITH agg AS (
+                SELECT
+                    t.flujo_id,
+                    MAX(t.flujo_titulo) AS titulo,
+                    MAX(t.proceso_id) AS proceso_id,
+                    MAX(p.nombre) AS proceso_nombre,
+                    MIN(t.created_at) AS iniciado_at,
+                    MAX(u.username) AS iniciado_por,
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE t.estado = 'pendiente')          AS pendientes,
+                    COUNT(*) FILTER (WHERE t.estado = 'en_curso')           AS en_curso,
+                    COUNT(*) FILTER (WHERE t.estado = 'bloqueada')          AS bloqueadas,
+                    COUNT(*) FILTER (WHERE t.estado = 'cerrada')            AS cerradas,
+                    COUNT(*) FILTER (WHERE t.estado = 'cancelada')          AS canceladas,
+                    COUNT(*) FILTER (WHERE t.estado = 'esperando_quiebre')  AS esperando_quiebre,
+                    COUNT(*) FILTER (WHERE t.estado = 'devuelta')           AS devueltas,
+                    COUNT(*) FILTER (
+                        WHERE t.estado NOT IN ('cerrada','cancelada')
+                          AND t.sla_due_at IS NOT NULL
+                          AND t.sla_due_at < NOW()
+                    ) AS vencidas,
+                    COUNT(*) FILTER (
+                        WHERE t.estado NOT IN ('cerrada','cancelada')
+                          AND t.sla_due_at IS NOT NULL
+                          AND t.sla_due_at >= NOW()
+                          AND t.sla_horas IS NOT NULL AND t.sla_horas > 0
+                          AND EXTRACT(EPOCH FROM (NOW() - t.created_at)) / 3600.0
+                              / NULLIF(t.sla_horas, 0) >= 0.7
+                    ) AS por_vencer,
+                    MAX(CASE WHEN t.estado NOT IN ('cerrada','cancelada')
+                             THEN t.sla_due_at END) AS proximo_vencimiento,
+                    MAX(t.datos_flujo::text) AS datos_flujo
+                FROM gta.tareas t
+                LEFT JOIN gta.procesos p ON p.id = t.proceso_id
+                LEFT JOIN auth.users u ON u.id = t.iniciado_por_id
+                WHERE {' AND '.join(where)}
+                GROUP BY t.flujo_id
+            )
+            SELECT agg.*,
+                   paso.paso_orden  AS paso_actual_orden,
+                   paso.titulo      AS paso_actual_titulo,
+                   paso.estado      AS paso_actual_estado,
+                   paso.sla_due_at  AS paso_actual_sla_due_at,
+                   paso.area_label  AS paso_actual_area_label
+            FROM agg
+            LEFT JOIN LATERAL (
+                SELECT t2.paso_orden, t2.titulo, t2.estado, t2.sla_due_at,
+                       a.label AS area_label
+                FROM gta.tareas t2
+                JOIN gta.subareas s ON s.id = t2.subarea_id
+                JOIN gta.areas a ON a.code = s.area_code
+                WHERE t2.flujo_id = agg.flujo_id
+                  AND t2.estado IN ('pendiente','en_curso','bloqueada','esperando_quiebre','devuelta')
+                ORDER BY t2.paso_orden ASC
+                LIMIT 1
+            ) paso ON TRUE
+            ORDER BY agg.iniciado_at DESC""",
             tuple(params) if params else (),
         ).fetchall()
 
@@ -305,20 +328,16 @@ def listar_flujos(
             except Exception:
                 datos = {}
 
-            # Paso "actual": el de menor paso_orden que esté pendiente/en_curso
-            paso_actual_row = conn.execute(
-                """SELECT t.paso_orden, t.titulo, t.estado, t.sla_due_at,
-                          a.label AS area_label
-                   FROM gta.tareas t
-                   JOIN gta.subareas s ON s.id = t.subarea_id
-                   JOIN gta.areas a ON a.code = s.area_code
-                   WHERE t.flujo_id = %s
-                     AND t.estado IN ('pendiente','en_curso','bloqueada','esperando_quiebre','devuelta')
-                   ORDER BY t.paso_orden ASC
-                   LIMIT 1""",
-                (r["flujo_id"],),
-            ).fetchone()
-            paso_actual = dict(paso_actual_row) if paso_actual_row else None
+            # Paso actual viene del LATERAL JOIN (puede ser None si flujo terminó)
+            paso_actual = None
+            if r.get("paso_actual_orden") is not None:
+                paso_actual = {
+                    "paso_orden": r["paso_actual_orden"],
+                    "titulo":     r["paso_actual_titulo"],
+                    "estado":     r["paso_actual_estado"],
+                    "sla_due_at": r["paso_actual_sla_due_at"],
+                    "area_label": r["paso_actual_area_label"],
+                }
 
             vencidas_n = int(r["vencidas"] or 0)
             por_vencer_n = int(r["por_vencer"] or 0)
