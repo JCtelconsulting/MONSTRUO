@@ -64,6 +64,7 @@ runner/
 
 # Local secrets (machine-specific)
 .secrets/
+plataforma/ops/secrets/
 
 # Runtime data por módulo (excluir contenido, mantener carpeta vía .gitkeep)
 ticketera/data/tickets/
