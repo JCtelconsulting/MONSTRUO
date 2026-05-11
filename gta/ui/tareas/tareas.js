@@ -21,6 +21,11 @@ window.Tareas = (() => {
         const roles = (_sesion?.roles || []).map(r => String(r).toLowerCase());
         _esAdmin = ADMIN_ROLES.has(role) || roles.some(r => ADMIN_ROLES.has(r));
 
+        // Cada vez que se entra a la pestaña, las tareas arrancan colapsadas.
+        // Si no, los acordeones quedaban "semi-abiertos" (HTML expandido pero
+        // sin contenido async cargado) tras volver desde otra pestaña.
+        _tareasExpandidas.clear();
+
         await cargarSubareasCatalogo();
         await cargarAreasUsuario();
         _renderAreasPills();

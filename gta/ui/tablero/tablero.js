@@ -14,6 +14,10 @@ window.Tablero = (() => {
     // ── Init ────────────────────────────────────────────────────────────
     function init(sesion) {
         _sesion = sesion;
+        // Arrancar siempre con todos los flujos colapsados (evita acordeones
+        // "semi-abiertos" al volver a la pestaña sin contenido async cargado).
+        _flujosExpandidos.clear();
+        _detalleCache.clear();
         _cargarAreas();
         cargar();
     }
