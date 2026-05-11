@@ -1093,6 +1093,7 @@ async def resolver_quiebre_de_tarea(
             qid,
             nota=body.nota,
             resuelto_por=user["username"],
+            bypass_area=_es_admin(user),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

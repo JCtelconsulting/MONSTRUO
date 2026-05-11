@@ -102,13 +102,17 @@ def reportar_desde_tarea(
         if area_destino == ctx.get("area_code"):
             raise ValueError("no podés reportar un quiebre a tu propia área")
 
-        # Validar que el área destino exista
-        area_row = conn.execute(
-            "SELECT 1 FROM gta.areas WHERE code = %s",
-            (area_destino,),
-        ).fetchone()
-        if not area_row:
-            raise ValueError(f"área destino no existe: {area_destino}")
+        # Validar que el área destino sea una de las que participan en el flujo.
+        # No basta con que exista en gta.areas: el quiebre tiene que ir a alguien
+        # con contexto del flujo. La UI ya restringe el dropdown, pero esto cierra
+        # el endpoint a clientes API.
+        areas_flujo = _areas_del_flujo(conn, ctx["flujo_id"])
+        codes_flujo = {a["code"] for a in areas_flujo}
+        if area_destino not in codes_flujo:
+            raise ValueError(
+                f"área destino '{area_destino}' no participa en este flujo. "
+                f"Áreas válidas: {sorted(codes_flujo - {ctx.get('area_code')})}"
+            )
 
         estado_previo = ctx["estado"]
 
@@ -248,13 +252,19 @@ def resolver(
     *,
     nota: Optional[str],
     resuelto_por: str,
+    bypass_area: bool = False,
 ) -> Dict[str, Any]:
     """Marca el quiebre como resuelto. Si está vinculado a una tarea, restaura
-    el estado previo de la tarea (sale del 'esperando_quiebre')."""
+    el estado previo de la tarea (sale del 'esperando_quiebre').
+
+    Solo puede resolver un usuario con membresía vigente en el área del
+    quiebre, o admin con bypass_area=True. Esto evita que cualquier usuario
+    con gta:write cierre quiebres ajenos y reactive tareas con notas falsas.
+    """
     conn = db.get_conn()
     try:
         q = conn.execute(
-            """SELECT id, estado, tarea_id, tarea_estado_previo
+            """SELECT id, estado, tarea_id, tarea_estado_previo, area
                FROM gta.quiebres WHERE id = %s""",
             (quiebre_id,),
         ).fetchone()
@@ -262,6 +272,27 @@ def resolver(
             raise ValueError("quiebre no encontrado")
         if q["estado"] != "abierto":
             raise ValueError(f"el quiebre ya está {q['estado']}")
+
+        # Validar que el actor pertenezca al área destino del quiebre
+        if not bypass_area:
+            area_destino = q.get("area")
+            usuario_row = conn.execute(
+                "SELECT id FROM auth.users WHERE username = %s",
+                (resuelto_por,),
+            ).fetchone()
+            if not usuario_row:
+                raise ValueError("usuario no encontrado")
+            es_miembro = conn.execute(
+                """SELECT 1 FROM gta.area_membresias m
+                   JOIN gta.subareas s ON s.id = m.subarea_id
+                   WHERE m.usuario_id = %s AND s.area_code = %s
+                     AND m.hasta IS NULL""",
+                (int(usuario_row["id"]), area_destino),
+            ).fetchone()
+            if not es_miembro:
+                raise ValueError(
+                    f"solo un miembro del área '{area_destino}' puede resolver este quiebre"
+                )
 
         conn.execute(
             """UPDATE gta.quiebres
