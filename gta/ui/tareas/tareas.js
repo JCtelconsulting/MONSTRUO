@@ -25,6 +25,49 @@ window.Tareas = (() => {
         await cargarAreasUsuario();
         _renderAreasPills();
         await recargar();
+
+        // Bridge desde el Tablero: si vino con un "abrir tarea X", lo intentamos.
+        const pending = window.GtaCore?.pendingExpandTarea;
+        if (pending) {
+            window.GtaCore.pendingExpandTarea = null;
+            await _intentarAbrirTareaPin(pending);
+        }
+    }
+
+    async function _intentarAbrirTareaPin(tareaId) {
+        // Buscar la tarea en alguna de las vistas; si no está, probar cargando otra
+        const vistasAProbar = ['mias', 'bandeja', 'colaboro'];
+        for (const v of vistasAProbar) {
+            if (_vista !== v) {
+                _vista = v;
+                document.querySelectorAll('.gta-subtab').forEach(b => b.classList.remove('active'));
+                document.querySelector(`[data-view="${v}"]`)?.classList.add('active');
+                await recargar();
+            }
+            if (_buscarTarea(tareaId)) {
+                _tareasExpandidas.add(tareaId);
+                try {
+                    const detalle = await GtaApi.getTareaArea(tareaId);
+                    _mergeDetalle(detalle);
+                } catch (e) { /* silent */ }
+                _render();
+                const tarea = _buscarTarea(tareaId);
+                if (tarea?.flujo_id) {
+                    _refrescarAdjuntos(tareaId);
+                    _refrescarQuiebres(tareaId);
+                    _refrescarComentarios(tareaId);
+                }
+                // Scroll a la tarea
+                setTimeout(() => {
+                    const card = document.querySelector(`[data-tarea-id="${tareaId}"]`)
+                              || document.querySelector(`#form-tarea-${tareaId}`)?.closest('.gta-tarea-card');
+                    card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+                return;
+            }
+        }
+        // Si no la encontramos en ninguna vista, avisamos suave
+        console.warn(`[Tareas] tarea ${tareaId} no aparece en ninguna vista del usuario actual`);
     }
 
     async function cargarSubareasCatalogo() {

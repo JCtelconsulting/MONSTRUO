@@ -1,16 +1,20 @@
-// Tablero — Kanban de flujos cross-área
+// Tablero — Kanban de flujos cross-área (solo lectura)
+//
+// Foco: estado y tiempos. NO muestra contenido detallado de tareas; para
+// eso el botón "Abrir tarea" navega a la pestaña Tareas con la tarea
+// expandida.
 window.Tablero = (() => {
     let _flujos = [];
     let _metricas = null;
     let _sesion = null;
     let _areas = [];
-    let _flujoActivo = null;  // detalle abierto
+    let _flujoActivo = null;
 
     // ── Init ────────────────────────────────────────────────────────────
     function init(sesion) {
         _sesion = sesion;
-        cargar();
         _cargarAreas();
+        cargar();
     }
 
     async function _cargarAreas() {
@@ -26,7 +30,9 @@ window.Tablero = (() => {
         if (!sel || !_areas.length) return;
         const current = sel.value;
         sel.innerHTML = '<option value="">Todas las áreas</option>' +
-            _areas.filter(a => a.activo).map(a => `<option value="${a.code}">${_esc(a.label)}</option>`).join('');
+            _areas.filter(a => a.activo).map(a =>
+                `<option value="${a.code}">${_esc(a.label)}</option>`
+            ).join('');
         sel.value = current;
     }
 
@@ -44,20 +50,20 @@ window.Tablero = (() => {
             _actualizarKpis();
             _renderKanban();
         } catch (e) {
-            kanban.innerHTML = GtaUi.empty('Error al cargar flujos: ' + (e.message || e));
+            kanban.innerHTML = `<div class="gta-empty">Error al cargar flujos: ${_esc(e.message || e)}</div>`;
         }
     }
 
     // ── KPIs ────────────────────────────────────────────────────────────
     function _actualizarKpis() {
-        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v ?? '0'; };
-        const t = _metricas?.totales || {};
-        const porValidar = _flujos.reduce((acc, f) => acc + (f._tareas_por_validar || 0), 0);
-        const vencidas = (_metricas?.por_persona || []).reduce((acc, p) => acc + (Number(p.vencidas) || 0), 0);
-        set('kpi-activos',     t.activos || _flujos.filter(f => f.estado === 'activo').length);
-        set('kpi-por-validar', porValidar);
-        set('kpi-vencidos',    vencidas);
-        set('kpi-completados', t.completados || 0);
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v ?? '0'); };
+        const m = _metricas || {};
+        set('kpi-flujos-activos',     m.flujos_activos);
+        set('kpi-vencidas',           m.vencidas);
+        set('kpi-por-vencer',         m.por_vencer);
+        set('kpi-quiebres',           m.quiebres_abiertos);
+        set('kpi-esperando-quiebre',  m.esperando_quiebre);
+        set('kpi-completados',        m.flujos_completados);
     }
 
     // ── Filtros ─────────────────────────────────────────────────────────
@@ -68,41 +74,43 @@ window.Tablero = (() => {
     function _flujosFiltrados() {
         const area = document.getElementById('filtro-area')?.value || '';
         const estado = document.getElementById('filtro-estado')?.value || '';
-        const q = (document.getElementById('filtro-busqueda')?.value || '').toLowerCase();
+        const enRiesgo = document.getElementById('filtro-en-riesgo')?.checked || false;
+        const q = (document.getElementById('filtro-busqueda')?.value || '').toLowerCase().trim();
 
         return _flujos.filter(f => {
             if (estado && f.estado !== estado) return false;
-            if (q && !(f.titulo || '').toLowerCase().includes(q)) return false;
-            // Filtro por área: el flujo tiene tareas del área? (requiere getFlujo, lo aproximamos)
-            // Si tenemos info por área, lo aplicamos; sino lo dejamos pasar
+            if (enRiesgo && !(f.vencidas > 0 || f.por_vencer > 0)) return false;
+            if (q && !((f.titulo || '') + ' ' + (f.proceso_nombre || '')).toLowerCase().includes(q)) return false;
+            if (area && f.paso_actual?.area_label) {
+                // Filtro por área: el paso actual está en esa área
+                const areaObj = _areas.find(a => a.code === area);
+                if (areaObj && f.paso_actual.area_label !== areaObj.label) return false;
+            }
             return true;
         });
     }
 
-    // ── Kanban: agrupado por estado ────────────────────────────────────
+    // ── Kanban: agrupado por estado del flujo ──────────────────────────
     function _renderKanban() {
         const kanban = document.getElementById('tablero-kanban');
         if (!kanban) return;
 
         const flujos = _flujosFiltrados();
         if (!flujos.length) {
-            kanban.innerHTML = GtaUi.empty('No hay flujos. Crea uno con "Nuevo flujo".');
+            kanban.innerHTML = `<div class="gta-empty">No hay flujos que cumplan los filtros.</div>`;
             return;
         }
 
-        // Agrupar por estado del flujo
         const grupos = {
-            'borrador':   { label: 'Borrador',   icon: 'fa-pen',           items: [] },
-            'activo':     { label: 'Activos',    icon: 'fa-bolt',          items: [] },
-            'vencido':    { label: 'Vencidos',   icon: 'fa-triangle-exclamation', items: [] },
-            'completado': { label: 'Completados', icon: 'fa-check',        items: [] },
-            'cancelado':  { label: 'Cancelados', icon: 'fa-ban',           items: [] },
+            'activo':     { label: 'Activos',     icon: 'fa-bolt',  items: [] },
+            'completado': { label: 'Completados', icon: 'fa-check', items: [] },
+            'cancelado':  { label: 'Cancelados',  icon: 'fa-ban',   items: [] },
         };
         flujos.forEach(f => {
             (grupos[f.estado] || grupos['activo']).items.push(f);
         });
 
-        const ordenCols = ['activo', 'borrador', 'vencido', 'completado', 'cancelado'];
+        const ordenCols = ['activo', 'completado', 'cancelado'];
         const cols = ordenCols.filter(k => grupos[k].items.length > 0);
 
         kanban.innerHTML = cols.map(estado => {
@@ -122,17 +130,40 @@ window.Tablero = (() => {
     }
 
     function _cardFlujo(f) {
-        const pct = Number(f.pct_completado || 0);
-        const total = Number(f.total_tareas || 0);
-        const done = Number(f.completadas || 0);
-        const fechaCreado = f.created_at ? new Date(f.created_at).toLocaleDateString('es-CL') : '';
+        const pct = Number(f.avance_pct || 0);
+        const total = Number(f.total || 0);
+        const done = Number(f.cerradas || 0);
+        const fecha = f.iniciado_at ? new Date(f.iniciado_at).toLocaleDateString('es-CL') : '';
+        const dotColor = { rojo: 'gta-dot-red', amarillo: 'gta-dot-yellow', verde: 'gta-dot-green' }[f.salud_sla] || 'gta-dot-gray';
+
+        // Badges de alertas
+        const badges = [];
+        if (f.vencidas > 0) badges.push(`<span class="gta-badge-alert badge-danger" title="Tareas vencidas">🔥 ${f.vencidas}</span>`);
+        if (f.por_vencer > 0 && f.vencidas === 0) badges.push(`<span class="gta-badge-alert badge-warning" title="Por vencer">⏰ ${f.por_vencer}</span>`);
+        if (f.esperando_quiebre > 0) badges.push(`<span class="gta-badge-alert badge-info" title="Esperando otra área">⏸ ${f.esperando_quiebre}</span>`);
+        if (f.devueltas > 0) badges.push(`<span class="gta-badge-alert badge-warning" title="Devueltas">↩ ${f.devueltas}</span>`);
+
+        // Paso actual
+        const pasoActual = f.paso_actual
+            ? `<div class="gta-flujo-paso-actual">
+                  <i class="fas fa-arrow-right"></i>
+                  <span><strong>Paso ${f.paso_actual.paso_orden}:</strong> ${_esc(f.paso_actual.titulo)} <em>(${_esc(f.paso_actual.area_label || '')})</em></span>
+               </div>`
+            : '';
+
         return `
-        <div class="gta-flujo-card" onclick="Tablero.abrirFlujo(${f.id})">
-            <div class="gta-flujo-card-title">${_esc(f.titulo)}</div>
+        <div class="gta-flujo-card" onclick="Tablero.abrirFlujo('${f.flujo_id}')">
+            <div class="gta-flujo-card-head">
+                <span class="gta-dot ${dotColor}" title="Salud SLA"></span>
+                <div class="gta-flujo-card-title">${_esc(f.titulo)}</div>
+            </div>
+            ${f.proceso_nombre ? `<div class="gta-flujo-card-proceso"><i class="fas fa-project-diagram"></i> ${_esc(f.proceso_nombre)}</div>` : ''}
+            ${pasoActual}
             <div class="gta-flujo-card-meta">
                 <span><i class="fas fa-user"></i> ${_esc(f.iniciado_por || '-')}</span>
-                <span><i class="fas fa-calendar"></i> ${fechaCreado}</span>
+                <span><i class="fas fa-calendar"></i> ${fecha}</span>
             </div>
+            ${badges.length ? `<div class="gta-flujo-card-badges">${badges.join('')}</div>` : ''}
             <div class="gta-flujo-card-progress">
                 <div class="gta-flujo-progress-bar">
                     <div class="gta-flujo-progress-fill" style="width:${pct}%"></div>
@@ -142,25 +173,27 @@ window.Tablero = (() => {
         </div>`;
     }
 
-    // ── Drawer detalle de flujo ─────────────────────────────────────────
+    // ── Drawer detalle del flujo (solo lectura) ─────────────────────────
     async function abrirFlujo(flujoId) {
         const drawer = document.getElementById('flujo-drawer');
         const overlay = document.getElementById('flujo-drawer-overlay');
         const body = document.getElementById('flujo-drawer-body');
 
         document.getElementById('flujo-drawer-titulo').textContent = 'Cargando...';
-        document.getElementById('flujo-drawer-codigo').textContent = `Flujo #${flujoId}`;
+        document.getElementById('flujo-drawer-codigo').textContent = `Flujo ${flujoId.slice(0, 8)}…`;
         body.innerHTML = `<div class="gta-loading"><i class="fas fa-spinner fa-spin"></i></div>`;
         drawer.classList.add('open');
         overlay.classList.add('open');
 
         try {
-            const flujo = await GtaApi.getFlujo(flujoId);
-            const eventos = await GtaApi.getEventosFlujo(flujoId).catch(() => []);
+            const [flujo, timelineResp] = await Promise.all([
+                GtaApi.getFlujo(flujoId),
+                GtaApi.getFlujoTimeline(flujoId).catch(() => ({ items: [] })),
+            ]);
             _flujoActivo = flujo;
-            _renderDrawer(flujo, eventos);
+            _renderDrawer(flujo, timelineResp.items || []);
         } catch (e) {
-            body.innerHTML = GtaUi.empty('Error al cargar el flujo: ' + (e.message || e));
+            body.innerHTML = `<div class="gta-empty">Error al cargar el flujo: ${_esc(e.message || e)}</div>`;
         }
     }
 
@@ -174,87 +207,100 @@ window.Tablero = (() => {
         const body = document.getElementById('flujo-drawer-body');
         document.getElementById('flujo-drawer-titulo').textContent = flujo.titulo || 'Flujo';
         document.getElementById('flujo-drawer-codigo').textContent =
-            `Flujo #${flujo.id} · ${(flujo.estado || '').toUpperCase()}`;
+            `${flujo.flujo_id.slice(0, 8)}… · ${(flujo.estado || '').toUpperCase()}`;
 
         const tareas = flujo.tareas || [];
-        const resumen = flujo.resumen || {};
-        const esIniciador = (flujo.iniciado_por === _sesion?.username);
+        const inicio = flujo.iniciado_at ? new Date(flujo.iniciado_at).toLocaleString('es-CL') : '—';
+
+        // Resumen
+        const cerradas = flujo.cerradas || 0;
+        const total = flujo.total || 0;
+        const enCurso = tareas.filter(t => t.estado === 'en_curso').length;
+        const pendientes = tareas.filter(t => t.estado === 'pendiente').length;
+        const bloqueadas = tareas.filter(t => t.estado === 'bloqueada').length;
+        const esperando = tareas.filter(t => t.estado === 'esperando_quiebre').length;
+        const devueltas = tareas.filter(t => t.estado === 'devuelta').length;
+        const vencidas = tareas.filter(t => t.salud_sla === 'rojo').length;
 
         body.innerHTML = `
         <div class="gta-flujo-summary">
-            <div><strong>${_esc(flujo.descripcion || 'Sin descripción')}</strong></div>
-            <div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; font-size:0.82rem; color:var(--text-soft);">
-                <span><i class="fas fa-user"></i> Iniciado por: ${_esc(flujo.iniciado_por)}</span>
-                <span><i class="fas fa-clock"></i> SLA total: ${flujo.sla_horas_total || 0}h</span>
-                <span><i class="fas fa-list-check"></i> ${resumen.completadas || 0}/${resumen.total_tareas || 0} tareas (${resumen.pct_completado || 0}%)</span>
-                ${resumen.vencidas ? `<span style="color:var(--danger);"><i class="fas fa-triangle-exclamation"></i> ${resumen.vencidas} vencidas</span>` : ''}
+            <div class="gta-flujo-summary-meta">
+                <span><i class="fas fa-user"></i> Iniciado por <strong>${_esc(flujo.iniciado_por || '?')}</strong></span>
+                <span><i class="fas fa-clock"></i> ${inicio}</span>
+                <span><i class="fas fa-list-check"></i> ${cerradas}/${total} cerradas (${flujo.avance_pct || 0}%)</span>
+            </div>
+            <div class="gta-flujo-summary-counts">
+                ${enCurso ? `<span class="gta-pill estado-en_curso">${enCurso} en curso</span>` : ''}
+                ${pendientes ? `<span class="gta-pill estado-pendiente">${pendientes} pendiente${pendientes>1?'s':''}</span>` : ''}
+                ${bloqueadas ? `<span class="gta-pill estado-bloqueada">${bloqueadas} bloqueada${bloqueadas>1?'s':''}</span>` : ''}
+                ${esperando ? `<span class="gta-pill estado-esperando_quiebre">${esperando} esperando otra área</span>` : ''}
+                ${devueltas ? `<span class="gta-pill estado-devuelta">${devueltas} devuelta${devueltas>1?'s':''}</span>` : ''}
+                ${vencidas ? `<span class="gta-pill estado-vencida">${vencidas} vencida${vencidas>1?'s':''}</span>` : ''}
             </div>
         </div>
 
-        <h4 class="gta-section-subtitle" style="margin-top:18px;">Pipeline de tareas</h4>
+        <h4 class="gta-section-subtitle">Pipeline de tareas</h4>
         <div class="gta-pipeline">
-            ${tareas.map(t => _renderTareaPipeline(t, esIniciador)).join('')}
+            ${tareas.map(_renderTareaPipeline).join('')}
         </div>
 
         <h4 class="gta-section-subtitle" style="margin-top:24px;">Timeline</h4>
         <div class="gta-flujo-timeline">
-            ${(eventos || []).slice(0, 30).map(_renderEvento).join('') ||
-              '<p class="gta-section-help">Sin eventos todavía.</p>'}
+            ${eventos.length
+                ? eventos.map(_renderEvento).join('')
+                : '<p class="gta-section-help">Sin eventos registrados todavía.</p>'}
         </div>
         `;
     }
 
-    function _renderTareaPipeline(t, esIniciador) {
-        const sla = t.sla || {};
-        const color = sla.color || 'gray';
-        const pct = Number(sla.pct || 0);
-        const username = _sesion?.username;
-        const esAsignado = (t.asignado_a === username);
-        const esJefe = false; // se maneja en el backend; en UI solo iniciador puede validar
-        const dependeDe = (t.depende_de || []);
+    function _renderTareaPipeline(t) {
+        const dotColor = { rojo: 'gta-dot-red', amarillo: 'gta-dot-yellow', verde: 'gta-dot-green', neutral: 'gta-dot-gray' }[t.salud_sla] || 'gta-dot-gray';
+        const slaPct = t.sla_pct != null ? Math.min(t.sla_pct, 100) : null;
+        const slaLabel = (t.sla_horas
+            ? (slaPct != null ? `${slaPct}% del SLA (${t.sla_horas}h)` : `SLA: ${t.sla_horas}h`)
+            : 'Sin SLA');
 
-        // Botones según estado y rol
-        let acciones = '';
-        if (esAsignado && (t.estado === 'lista' || t.estado === 'en_progreso')) {
-            acciones += `<button class="btn-sm btn-primary" onclick="Tablero.completarTarea(${t.id})">
-                            <i class="fas fa-check"></i> Marcar como hecha
-                         </button>`;
-            acciones += `<button class="btn-sm btn-secondary" onclick="Tablero.abrirAyuda(${t.id})">
-                            <i class="fas fa-hands-helping"></i> Pedir ayuda
-                         </button>`;
-        }
-        if (esIniciador && t.estado === 'por_validar') {
-            acciones += `<button class="btn-sm btn-primary" onclick="Tablero.validarTarea(${t.id}, true)">
-                            <i class="fas fa-check-double"></i> Validar
-                         </button>`;
-            acciones += `<button class="btn-sm btn-danger" onclick="Tablero.validarTarea(${t.id}, false)">
-                            <i class="fas fa-rotate-left"></i> Rechazar
-                         </button>`;
-        }
+        const due = t.sla_due_at ? new Date(t.sla_due_at).toLocaleString('es-CL') : '';
+        const cerrado = t.cerrado_at ? `Cerrada ${new Date(t.cerrado_at).toLocaleString('es-CL')}` : '';
+        const responsable = t.responsable_username
+            ? `<i class="fas fa-user"></i> ${_esc(t.responsable_username)}`
+            : `<i class="fas fa-user-slash"></i> Sin asignar`;
 
-        const pctLabel = sla.minutos_total > 0 ? `${pct}% — ${_minToHum(sla.minutos_consumidos)} / ${_minToHum(sla.minutos_total)}` : 'Sin SLA';
+        // Badges chicos por tarea
+        const badges = [];
+        if (t.quiebres_abiertos > 0) badges.push(`<span class="gta-badge-alert badge-warning" title="Quiebres abiertos">🚩 ${t.quiebres_abiertos}</span>`);
+        if (t.comentarios_count > 0) badges.push(`<span class="gta-badge-alert badge-info" title="Comentarios">💬 ${t.comentarios_count}</span>`);
 
         return `
-        <div class="gta-pipe-tarea sla-${color}" data-tarea="${t.id}">
-            <div class="gta-pipe-num">${t.orden}</div>
+        <div class="gta-pipe-tarea sla-${t.salud_sla || 'neutral'}" data-tarea="${t.id}">
+            <div class="gta-pipe-num">${t.paso_orden || '·'}</div>
             <div class="gta-pipe-body">
                 <div class="gta-pipe-header">
+                    <span class="gta-dot ${dotColor}" title="Salud SLA"></span>
                     <h5>${_esc(t.titulo)}</h5>
                     <span class="gta-tarea-estado estado-${t.estado}">${_estadoLabel(t.estado)}</span>
                 </div>
                 <div class="gta-pipe-meta">
-                    <span><i class="fas fa-layer-group"></i> ${_areaLabel(t.area_code)}${t.subarea_code ? ' / ' + _esc(t.subarea_code) : ''}</span>
-                    <span><i class="fas fa-user"></i> ${_esc(t.asignado_a || 'Sin asignar')}</span>
-                    ${dependeDe.length ? `<span><i class="fas fa-link"></i> Depende de: ${dependeDe.join(', ')}</span>` : ''}
+                    <span><i class="fas fa-layer-group"></i> ${_esc(t.area_label)}${t.subarea_code ? ' / ' + _esc(t.subarea_label || t.subarea_code) : ''}</span>
+                    <span>${responsable}</span>
+                    ${due ? `<span><i class="fas fa-hourglass-end"></i> Vence: ${due}</span>` : ''}
+                    ${cerrado ? `<span><i class="fas fa-check"></i> ${cerrado}</span>` : ''}
                 </div>
-                <div class="gta-pipe-sla">
-                    <div class="gta-pipe-sla-bar">
-                        <div class="gta-pipe-sla-fill" style="width:${Math.min(pct, 100)}%"></div>
-                    </div>
-                    <span class="gta-pipe-sla-label">${pctLabel}</span>
-                    ${sla.esta_pausada ? '<span class="gta-tag prioridad-baja">PAUSADA</span>' : ''}
-                </div>
-                ${acciones ? `<div class="gta-pipe-actions">${acciones}</div>` : ''}
+                ${slaPct != null ? `
+                    <div class="gta-pipe-sla">
+                        <div class="gta-pipe-sla-bar">
+                            <div class="gta-pipe-sla-fill" style="width:${slaPct}%"></div>
+                        </div>
+                        <span class="gta-pipe-sla-label">${slaLabel}</span>
+                    </div>` : ''}
+                ${badges.length ? `<div class="gta-pipe-badges">${badges.join('')}</div>` : ''}
+                ${(t.estado !== 'cerrada' && t.estado !== 'cancelada')
+                    ? `<div class="gta-pipe-actions">
+                        <button class="btn-sm btn-secondary" onclick="event.stopPropagation(); Tablero.abrirEnTareas(${t.id})">
+                            <i class="fas fa-external-link-alt"></i> Abrir tarea
+                        </button>
+                       </div>`
+                    : ''}
             </div>
         </div>`;
     }
@@ -262,106 +308,80 @@ window.Tablero = (() => {
     function _renderEvento(e) {
         const fecha = e.created_at ? new Date(e.created_at).toLocaleString('es-CL') : '';
         const icon = _eventoIcon(e.tipo);
+        const cls = _eventoClass(e.tipo);
         return `
-        <div class="gta-evento-item">
+        <div class="gta-evento-item ${cls}">
             <div class="gta-evento-icon"><i class="fas ${icon}"></i></div>
             <div class="gta-evento-body">
-                <div class="gta-evento-msg">${_esc(e.mensaje || e.tipo)}</div>
+                <div class="gta-evento-msg">${_esc(e.mensaje || _eventoLabel(e.tipo))}</div>
                 <div class="gta-evento-meta">${_esc(e.actor || 'sistema')} · ${fecha}</div>
             </div>
         </div>`;
     }
 
-    // ── Acciones sobre tareas ───────────────────────────────────────────
-    async function completarTarea(tareaId) {
-        if (!confirm('¿Marcar esta tarea como hecha? El iniciador del flujo deberá validarla después.')) return;
-        try {
-            await GtaApi.completarTarea(tareaId, {});
-            await abrirFlujo(_flujoActivo.id);
-            cargar();
-        } catch (e) {
-            alert('Error: ' + (e.message || e));
-        }
-    }
-
-    async function validarTarea(tareaId, aceptada) {
-        const comentario = aceptada ? '' : (prompt('Motivo del rechazo:') || '');
-        if (!aceptada && !comentario) return;
-        try {
-            await GtaApi.validarTarea(tareaId, { aceptada, comentario });
-            await abrirFlujo(_flujoActivo.id);
-            cargar();
-        } catch (e) {
-            alert('Error: ' + (e.message || e));
-        }
-    }
-
-    // ── Pedir ayuda ─────────────────────────────────────────────────────
-    function abrirAyuda(tareaId) {
-        document.getElementById('ayuda-tarea-id').value = tareaId;
-        const sel = document.getElementById('ayuda-area');
-        sel.innerHTML = _areas.filter(a => a.activo && !a.es_externa)
-            .map(a => `<option value="${a.code}">${_esc(a.label)}</option>`).join('');
-        document.getElementById('ayuda-mensaje').value = '';
-        document.getElementById('ayuda-bloquea-sla').checked = false;
-        document.getElementById('modal-pedir-ayuda').classList.add('is-open');
-    }
-
-    function cerrarModalAyuda() {
-        document.getElementById('modal-pedir-ayuda')?.classList.remove('is-open');
-    }
-
-    async function enviarAyuda() {
-        const tareaId = parseInt(document.getElementById('ayuda-tarea-id').value, 10);
-        const area = document.getElementById('ayuda-area').value;
-        const mensaje = document.getElementById('ayuda-mensaje').value.trim();
-        const bloquea = document.getElementById('ayuda-bloquea-sla').checked;
-        if (!area || !mensaje) {
-            alert('Completa área y mensaje');
-            return;
-        }
-        try {
-            await GtaApi.pedirAyuda(tareaId, { pedido_a_area: area, mensaje, bloquea_sla: bloquea });
-            cerrarModalAyuda();
-            await abrirFlujo(_flujoActivo.id);
-        } catch (e) {
-            alert('Error: ' + (e.message || e));
+    // ── Bridge a la pestaña Tareas ──────────────────────────────────────
+    function abrirEnTareas(tareaId) {
+        // Guardamos un pin para que la pestaña Tareas, al cargar, expanda esta tarea
+        window.GtaCore = window.GtaCore || {};
+        window.GtaCore.pendingExpandTarea = tareaId;
+        cerrarDrawer();
+        if (window.GtaCore.loadTab) {
+            window.GtaCore.loadTab('tareas');
+        } else {
+            // Fallback: click en el botón del tab
+            const btn = document.querySelector('[data-gta-tab="tareas"]');
+            btn?.click();
         }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
-    function _areaLabel(code) {
-        const a = _areas.find(x => x.code === code);
-        return a ? _esc(a.label) : _esc(code || '-');
-    }
-
     function _estadoLabel(e) {
         const labels = {
-            pendiente: 'Pendiente', lista: 'Lista', en_progreso: 'En progreso',
-            por_validar: 'Por validar', completada: 'Completada',
-            ayuda_pedida: 'Ayuda pedida', vencida: 'Vencida', cancelada: 'Cancelada',
+            pendiente: 'Pendiente', en_curso: 'En curso',
+            bloqueada: 'Bloqueada', cerrada: 'Cerrada',
+            cancelada: 'Cancelada', devuelta: 'Devuelta',
+            esperando_quiebre: 'Esperando otra área',
         };
         return labels[e] || e;
     }
 
     function _eventoIcon(tipo) {
         const m = {
-            iniciado: 'fa-flag', tarea_lista: 'fa-circle-play',
-            ejecutor_completo: 'fa-check', validada: 'fa-check-double',
-            rechazada: 'fa-rotate-left', ayuda_pedida: 'fa-hands-helping',
-            ayuda_respondida: 'fa-reply', sla_warn_70: 'fa-clock',
-            sla_warn_85: 'fa-triangle-exclamation', sla_vencida: 'fa-fire',
+            flujo_iniciado: 'fa-flag',
+            tarea_cerrada: 'fa-check',
+            tarea_devuelta: 'fa-rotate-left',
+            tarea_reabierta: 'fa-circle-play',
+            quiebre_reportado: 'fa-flag-checkered',
+            quiebre_resuelto: 'fa-handshake',
             flujo_completado: 'fa-trophy',
         };
         return m[tipo] || 'fa-circle-info';
     }
 
-    function _minToHum(min) {
-        if (!min || min < 1) return '0min';
-        if (min < 60) return `${Math.round(min)}min`;
-        const h = Math.floor(min / 60);
-        const r = Math.round(min % 60);
-        return r ? `${h}h ${r}min` : `${h}h`;
+    function _eventoClass(tipo) {
+        const m = {
+            flujo_iniciado: 'evt-info',
+            tarea_cerrada: 'evt-ok',
+            tarea_devuelta: 'evt-warn',
+            tarea_reabierta: 'evt-info',
+            quiebre_reportado: 'evt-warn',
+            quiebre_resuelto: 'evt-ok',
+            flujo_completado: 'evt-ok',
+        };
+        return m[tipo] || '';
+    }
+
+    function _eventoLabel(tipo) {
+        const m = {
+            flujo_iniciado: 'Flujo iniciado',
+            tarea_cerrada: 'Tarea cerrada',
+            tarea_devuelta: 'Tarea devuelta',
+            tarea_reabierta: 'Tarea reabierta',
+            quiebre_reportado: 'Quiebre reportado',
+            quiebre_resuelto: 'Quiebre resuelto',
+            flujo_completado: 'Flujo completado',
+        };
+        return m[tipo] || tipo;
     }
 
     function _esc(s) {
@@ -371,7 +391,6 @@ window.Tablero = (() => {
     return {
         init, cargar, filtrar,
         abrirFlujo, cerrarDrawer,
-        completarTarea, validarTarea,
-        abrirAyuda, cerrarModalAyuda, enviarAyuda,
+        abrirEnTareas,
     };
 })();

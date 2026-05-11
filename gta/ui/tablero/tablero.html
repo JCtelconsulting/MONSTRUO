@@ -2,16 +2,24 @@
     <!-- KPIs -->
     <div class="gta-kpi-row" id="tablero-kpis">
         <div class="gta-kpi-card">
-            <div class="gta-kpi-val" id="kpi-activos">—</div>
+            <div class="gta-kpi-val" id="kpi-flujos-activos">—</div>
             <div class="gta-kpi-lbl">Flujos activos</div>
         </div>
-        <div class="gta-kpi-card kpi-warning">
-            <div class="gta-kpi-val" id="kpi-por-validar">—</div>
-            <div class="gta-kpi-lbl">Por validar</div>
-        </div>
         <div class="gta-kpi-card kpi-danger">
-            <div class="gta-kpi-val" id="kpi-vencidos">—</div>
+            <div class="gta-kpi-val" id="kpi-vencidas">—</div>
             <div class="gta-kpi-lbl">Tareas vencidas</div>
+        </div>
+        <div class="gta-kpi-card kpi-warning">
+            <div class="gta-kpi-val" id="kpi-por-vencer">—</div>
+            <div class="gta-kpi-lbl">Por vencer</div>
+        </div>
+        <div class="gta-kpi-card kpi-warning">
+            <div class="gta-kpi-val" id="kpi-quiebres">—</div>
+            <div class="gta-kpi-lbl">Quiebres abiertos</div>
+        </div>
+        <div class="gta-kpi-card">
+            <div class="gta-kpi-val" id="kpi-esperando-quiebre">—</div>
+            <div class="gta-kpi-lbl">Esperando otra área</div>
         </div>
         <div class="gta-kpi-card kpi-ok">
             <div class="gta-kpi-val" id="kpi-completados">—</div>
@@ -28,8 +36,12 @@
             <option value="">Todos los estados</option>
             <option value="activo">Activos</option>
             <option value="completado">Completados</option>
-            <option value="vencido">Vencidos</option>
+            <option value="cancelado">Cancelados</option>
         </select>
+        <label class="gta-filter-check" style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="filtro-en-riesgo" onchange="Tablero.filtrar()">
+            <span>Solo en riesgo (vencidas / por vencer)</span>
+        </label>
         <input type="text" id="filtro-busqueda" class="input-dark" placeholder="🔍 Buscar..." oninput="Tablero.filtrar()" style="min-width:200px;">
         <button class="btn-secondary" onclick="Tablero.cargar()" title="Refrescar">
             <i class="fas fa-sync-alt"></i>
@@ -42,7 +54,7 @@
     </div>
 </div>
 
-<!-- Drawer de detalle de flujo -->
+<!-- Drawer de detalle de flujo (solo lectura) -->
 <div id="flujo-drawer" class="gta-flujo-drawer">
     <div class="gta-flujo-drawer-header">
         <div>
@@ -56,37 +68,3 @@
     </div>
 </div>
 <div id="flujo-drawer-overlay" class="gta-flujo-drawer-overlay" onclick="Tablero.cerrarDrawer()"></div>
-
-<!-- Modal: Pedir ayuda -->
-<div class="modal-backdrop" id="modal-pedir-ayuda">
-    <div class="modal-content" style="max-width:560px;">
-        <div class="modal-header">
-            <h2>Pedir ayuda</h2>
-            <button class="modal-close-btn" onclick="Tablero.cerrarModalAyuda()">×</button>
-        </div>
-        <div class="modal-body">
-            <input type="hidden" id="ayuda-tarea-id">
-            <div class="field">
-                <label>Área a la que pides ayuda *</label>
-                <select id="ayuda-area" class="input-dark"></select>
-            </div>
-            <div class="field" style="margin-top:12px;">
-                <label>Mensaje *</label>
-                <textarea id="ayuda-mensaje" class="input-dark" rows="3" placeholder="¿Qué necesitas?"></textarea>
-            </div>
-            <div class="field" style="margin-top:12px;">
-                <label class="gta-checkbox-label">
-                    <input type="checkbox" id="ayuda-bloquea-sla">
-                    <span>Pausar SLA (la tarea es dependencia oficial del proceso)</span>
-                </label>
-                <p class="gta-section-help" style="margin-top:6px;">Marca esto solo si la otra área es responsable directa del paso. Si es solo orientación o consulta, déjalo desmarcado.</p>
-            </div>
-        </div>
-        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-            <button class="btn-secondary" onclick="Tablero.cerrarModalAyuda()">Cancelar</button>
-            <button class="btn-primary" onclick="Tablero.enviarAyuda()">
-                <i class="fas fa-hands-helping"></i> Enviar
-            </button>
-        </div>
-    </div>
-</div>
