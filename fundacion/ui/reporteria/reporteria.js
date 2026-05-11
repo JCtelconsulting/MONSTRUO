@@ -17,7 +17,25 @@ window.FundReporteria = (() => {
         const sel = document.getElementById('rep-filtro-riesgo');
         if (sel) sel.addEventListener('change', () => _loadRiesgo(sel.value));
 
+        _initRangoPed();
         _loadAll();
+    }
+
+    function _initRangoPed() {
+        const hoy = new Date();
+        const hace30 = new Date(); hace30.setDate(hace30.getDate() - 30);
+        const desde = document.getElementById('rep-ped-desde');
+        const hasta = document.getElementById('rep-ped-hasta');
+        if (desde && !desde.value) desde.value = hace30.toISOString().slice(0, 10);
+        if (hasta && !hasta.value) hasta.value = hoy.toISOString().slice(0, 10);
+        const btn = document.getElementById('rep-ped-refresh');
+        if (btn) btn.addEventListener('click', _loadPedagogicos);
+        // Cargar al abrir cada accordion (solo la primera vez)
+        document.querySelectorAll('.ped-card').forEach(card => {
+            card.addEventListener('toggle', () => {
+                if (card.open) _loadRep(card.dataset.rep);
+            });
+        });
     }
 
     function onSedeChange(sede) {
@@ -39,7 +57,143 @@ window.FundReporteria = (() => {
     }
 
     async function _loadAll() {
-        await Promise.all([_loadDashboard(), _loadRiesgo(_currentRiesgo())]);
+        await Promise.all([_loadDashboard(), _loadRiesgo(_currentRiesgo()), _loadPedagogicos()]);
+    }
+
+    function _rango() {
+        return {
+            desde: document.getElementById('rep-ped-desde')?.value || null,
+            hasta: document.getElementById('rep-ped-hasta')?.value || null,
+        };
+    }
+
+    async function _loadPedagogicos() {
+        // Cargar todos los que estén abiertos
+        const cards = document.querySelectorAll('.ped-card[open]');
+        for (const c of cards) await _loadRep(c.dataset.rep);
+    }
+
+    async function _loadRep(rep) {
+        const sedeId = _ctx?.sede?.id || null;
+        const { desde, hasta } = _rango();
+        try {
+            switch (rep) {
+                case 'cobertura':     return _renderCobertura(await window.FundApi.repCobertura(sedeId, desde, hasta));
+                case 'competencias':  return _renderCompetencias(await window.FundApi.repCompetencias(sedeId, desde, hasta));
+                case 'materiales':    return _renderMateriales(await window.FundApi.repMateriales(sedeId, desde, hasta));
+                case 'adaptaciones':  return _renderAdaptaciones(await window.FundApi.repAdaptaciones(sedeId, desde, hasta));
+                case 'clima':         return _renderClima(await window.FundApi.repClima(sedeId, desde, hasta));
+                case 'actividad':     return _renderActividad(await window.FundApi.repActividadPeriodo(sedeId, desde, hasta));
+            }
+        } catch (e) {
+            console.error(`[Reportería] error en ${rep}`, e);
+        }
+    }
+
+    function _renderCobertura(data) {
+        const tb = document.getElementById('rep-ped-cobertura');
+        if (!tb) return;
+        const items = data.items || [];
+        if (!items.length) { tb.innerHTML = '<tr><td colspan="5" class="empty-row">Sin datos para el rango seleccionado.</td></tr>'; return; }
+        tb.innerHTML = items.map(r => `
+            <tr>
+                <td>${_esc(r.bloque_nombre)}</td>
+                <td>${_esc(r.subtipo_nombre || '—')}</td>
+                <td class="num pct-strong">${r.ejecutados}</td>
+                <td class="num">${r.no_ejecutados}</td>
+                <td class="num">${r.planificados}</td>
+            </tr>`).join('');
+    }
+
+    function _renderCompetencias(data) {
+        const tb = document.getElementById('rep-ped-competencias');
+        if (!tb) return;
+        const items = data.items || [];
+        if (!items.length) { tb.innerHTML = '<tr><td colspan="5" class="empty-row">Sin datos.</td></tr>'; return; }
+        tb.innerHTML = items.map(r => `
+            <tr>
+                <td><span class="pill-riesgo bajo">${_esc(r.dominio_codigo)}</span> ${_esc(r.dominio_nombre)}</td>
+                <td><strong>${_esc(r.competencia_codigo)}</strong></td>
+                <td>${_esc(r.competencia_descripcion)}</td>
+                <td class="num pct-strong">${r.veces_trabajada}</td>
+                <td class="num">${r.planificada_no_ejecutada}</td>
+            </tr>`).join('');
+    }
+
+    function _renderMateriales(data) {
+        const tb = document.getElementById('rep-ped-materiales');
+        if (!tb) return;
+        const items = data.items || [];
+        if (!items.length) { tb.innerHTML = '<tr><td colspan="6" class="empty-row">Sin datos.</td></tr>'; return; }
+        tb.innerHTML = items.map(r => `
+            <tr>
+                <td>${_esc(r.material || '—')}</td>
+                <td>${_esc(r.sku || '—')}</td>
+                <td class="num">${r.total_solicitada ?? '—'}</td>
+                <td class="num">${r.total_usada ?? '—'}</td>
+                <td class="num">${r.diferencia ?? '—'}</td>
+                <td class="num">${r.apariciones ?? 0}</td>
+            </tr>`).join('');
+    }
+
+    function _renderAdaptaciones(data) {
+        const tb = document.getElementById('rep-ped-adaptaciones');
+        if (!tb) return;
+        const items = data.items || [];
+        if (!items.length) { tb.innerHTML = '<tr><td colspan="6" class="empty-row">Sin adaptaciones registradas.</td></tr>'; return; }
+        tb.innerHTML = items.map(r => `
+            <tr>
+                <td>${_esc(r.fecha)}</td>
+                <td>${_esc(r.sede_nombre)}</td>
+                <td>${_esc(r.bloque_nombre)}</td>
+                <td>${_esc(r.nombre_actividad || '—')}</td>
+                <td>${r.se_ejecuto ? '<span class="pill-riesgo bajo">Sí</span>' : '<span class="pill-riesgo alto">No</span>'}</td>
+                <td>${_esc(r.adaptacion || r.motivo_no_ejecucion || '—')}</td>
+            </tr>`).join('');
+    }
+
+    function _renderClima(data) {
+        const distrib = data.distribucion || [];
+        const detalle = data.detalle || [];
+        const dEl = document.getElementById('rep-ped-clima-distrib');
+        if (dEl) {
+            dEl.innerHTML = distrib.length
+                ? distrib.map(c => `
+                    <span class="ped-clima-chip">
+                        <span class="ped-clima-chip-dot" style="background:${_esc(c.clima_color || '#888')}"></span>
+                        ${_esc(c.clima_nombre)}
+                        <span class="ped-clima-chip-n">${c.dias}</span>
+                    </span>`).join('')
+                : '<span class="reporteria-meta">Sin clima registrado en el rango.</span>';
+        }
+        const tb = document.getElementById('rep-ped-clima');
+        if (!tb) return;
+        if (!detalle.length) { tb.innerHTML = '<tr><td colspan="5" class="empty-row">Sin datos.</td></tr>'; return; }
+        tb.innerHTML = detalle.map(r => `
+            <tr>
+                <td>${_esc(r.fecha)}</td>
+                <td>${_esc(r.sede_nombre)}</td>
+                <td><span class="ped-clima-chip"><span class="ped-clima-chip-dot" style="background:${_esc(r.clima_color || '#888')}"></span>${_esc(r.clima_nombre || '—')}</span></td>
+                <td>${_esc(r.situaciones_relevantes || '—')}</td>
+                <td>${_esc(r.estrategias_aplicadas || '—')}</td>
+            </tr>`).join('');
+    }
+
+    function _renderActividad(data) {
+        const tb = document.getElementById('rep-ped-actividad');
+        if (!tb) return;
+        const items = data.items || [];
+        if (!items.length) { tb.innerHTML = '<tr><td colspan="6" class="empty-row">Sin datos.</td></tr>'; return; }
+        const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        tb.innerHTML = items.map(r => `
+            <tr>
+                <td>${_esc(r.sede_nombre)}</td>
+                <td>${r.anio}</td>
+                <td>${_esc(meses[r.mes_num - 1] || r.mes_num)}</td>
+                <td class="num">${r.planificados}</td>
+                <td class="num">${r.ejecutados}</td>
+                <td class="num pct-strong">${_fmtPct(r.pct_ejecucion)}</td>
+            </tr>`).join('');
     }
 
     function _currentRiesgo() {

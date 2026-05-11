@@ -7,6 +7,15 @@ window.FundApi = (() => {
     const patch = (p, b) => window.fetchApi(`${base}${p}`, { method: 'PATCH', headers: h, body: JSON.stringify(b) });
     const del = (p) => window.fetchApi(`${base}${p}`, { method: 'DELETE' });
 
+    const _repQS = (path, sedeId, desde, hasta) => {
+        const qs = new URLSearchParams();
+        if (sedeId != null) qs.set('sede_id', sedeId);
+        if (desde) qs.set('desde', desde);
+        if (hasta) qs.set('hasta', hasta);
+        const q = qs.toString();
+        return get(`${path}${q ? `?${q}` : ''}`);
+    };
+
     return {
         // Sedes accesibles según scope
         getSedesAccesibles:   ()                  => get('/sedes'),
@@ -31,6 +40,34 @@ window.FundApi = (() => {
             method: 'POST', headers: h, body: JSON.stringify({}), timeoutMs: 180000,
         }),
         getSyncLogs:          (limit=20)          => get(`/sync/logs?limit=${limit}`),
+
+        // Catálogos pedagógicos
+        getCatDominios:       ()                  => get('/catalogos/dominios'),
+        getCatCompetencias:   ()                  => get('/catalogos/competencias'),
+        getCatBloqueTipos:    ()                  => get('/catalogos/bloque-tipos'),
+        getCatClima:          ()                  => get('/catalogos/clima'),
+
+        // Sesiones pedagógicas
+        listSesiones:         (sedeId, desde, hasta) => {
+            const qs = new URLSearchParams({ sede_id: sedeId });
+            if (desde) qs.set('desde', desde);
+            if (hasta) qs.set('hasta', hasta);
+            return get(`/sesiones?${qs}`);
+        },
+        getSesionByFecha:     (sedeId, fecha)     => get(`/sesiones/by-fecha?sede_id=${sedeId}&fecha=${fecha}`),
+        getSesion:            (id)                => get(`/sesiones/${id}`),
+        upsertSesion:         (data)              => window.fetchApi(`${base}/sesiones`, {
+            method: 'PUT', headers: h, body: JSON.stringify(data), timeoutMs: 30000,
+        }),
+        deleteSesion:         (id)                => del(`/sesiones/${id}`),
+
+        // Reportes pedagógicos (a-f)
+        repCobertura:         (sedeId, desde, hasta) => _repQS('/reportes/cobertura-bloques', sedeId, desde, hasta),
+        repCompetencias:      (sedeId, desde, hasta) => _repQS('/reportes/competencias-trabajadas', sedeId, desde, hasta),
+        repMateriales:        (sedeId, desde, hasta) => _repQS('/reportes/materiales-uso', sedeId, desde, hasta),
+        repAdaptaciones:      (sedeId, desde, hasta) => _repQS('/reportes/adaptaciones', sedeId, desde, hasta),
+        repClima:             (sedeId, desde, hasta) => _repQS('/reportes/clima', sedeId, desde, hasta),
+        repActividadPeriodo:  (sedeId, desde, hasta) => _repQS('/reportes/actividad-periodo', sedeId, desde, hasta),
 
         // Reportes (vistas SQL)
         getDashboard:         ()                  => get('/reportes/dashboard'),

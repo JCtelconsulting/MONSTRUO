@@ -1,4 +1,273 @@
-/* Tab Planificación — solo overrides locales. Reutiliza monstruo.css global. */
-.fund-pane[data-pane="planificacion"] .kpi-row {
-    margin-top: 0.6rem;
+/* Tab Planificación — registro diario de sesión por sede. */
+
+.plan-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.plan-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.plan-fecha-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.25rem 0.6rem;
+}
+
+.plan-fecha-label input[type="date"] {
+    background: transparent;
+    border: none;
+    color: inherit;
+    padding: 0.15rem 0.25rem;
+}
+
+.plan-field-lbl {
+    display: block;
+    color: var(--text-soft);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.25rem;
+}
+
+/* Sección */
+
+.plan-section {
+    margin-top: 1.5rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem 1.25rem 1.25rem 1.25rem;
+}
+
+.plan-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.plan-section-head h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.plan-section-head h4 i { color: var(--text-soft); }
+
+/* Clima */
+
+.plan-clima-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.plan-clima-opt {
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.7rem 0.5rem;
+    text-align: center;
+    transition: all 120ms ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.plan-clima-opt:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+}
+
+.plan-clima-opt.is-selected {
+    background: linear-gradient(180deg, rgba(79, 172, 254, 0.18) 0%, var(--panel) 100%);
+    border-color: rgba(79, 172, 254, 0.6);
+    box-shadow: 0 0 0 1px rgba(79, 172, 254, 0.35);
+}
+
+.plan-clima-opt i { font-size: 1.4rem; opacity: 0.85; }
+.plan-clima-opt span { font-size: 0.8rem; font-weight: 600; }
+
+.plan-clima-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.plan-clima-meta label:last-child { grid-column: 1 / -1; }
+
+/* Bloques */
+
+.plan-bloques-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.plan-bloques-empty {
+    color: var(--text-soft);
+    text-align: center;
+    padding: 1.5rem;
+    font-style: italic;
+}
+
+.plan-bloque {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem 1rem 1rem;
+}
+
+.plan-bloque-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px dashed var(--border);
+}
+
+.plan-bloque-orden {
+    font-weight: 700;
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.plan-bloque-tipo { min-width: 200px; }
+.plan-bloque-subtipo { min-width: 140px; }
+
+.plan-bloque-horas {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-soft);
+}
+
+.plan-bloque-horas input[type="time"] {
+    width: 6rem;
+    padding: 0.2rem 0.35rem;
+}
+
+.plan-bloque-ejecutado {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    margin-left: auto;
+}
+
+.plan-bloque-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.plan-bloque-row { display: block; }
+
+.plan-comp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.35rem;
+    background: rgba(0, 0, 0, 0.15);
+    padding: 0.6rem;
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.plan-comp-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.25rem 0.45rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.plan-comp-chip:hover { background: rgba(255, 255, 255, 0.06); }
+
+.plan-comp-chip input { margin: 0; }
+
+.plan-comp-chip.is-selected {
+    background: rgba(79, 172, 254, 0.16);
+    border-color: rgba(79, 172, 254, 0.5);
+}
+
+.plan-comp-chip-code {
+    font-weight: 700;
+    color: var(--text-soft);
+    font-size: 0.7rem;
+}
+
+.plan-mat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+.plan-mat-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 100px 36px;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.plan-mat-num { text-align: right; }
+
+.plan-bloque-no-ejec input[type="text"] { width: 100%; }
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+}
+
+.btn-link:hover { text-decoration: underline; }
+
+.btn-icon.btn-danger-soft {
+    color: #fca5a5;
+}
+
+.btn-icon.btn-danger-soft:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+
+.btn-sm {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.8rem;
+}
+
+.input-dark {
+    width: 100%;
 }

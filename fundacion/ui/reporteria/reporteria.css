@@ -130,3 +130,92 @@
     from { transform: rotate(0); }
     to   { transform: rotate(360deg); }
 }
+
+.ped-rango {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ped-rango label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-soft);
+}
+
+.ped-rango input[type="date"] {
+    width: 9rem;
+}
+
+.ped-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+.ped-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.5rem 0.75rem 0.5rem 0.75rem;
+}
+
+.ped-card[open] {
+    padding-bottom: 0.85rem;
+}
+
+.ped-card > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.5rem 0.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ped-card > summary::-webkit-details-marker { display: none; }
+.ped-card > summary::before {
+    content: "▸";
+    color: var(--text-soft);
+    transition: transform 150ms ease;
+    display: inline-block;
+}
+.ped-card[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.ped-card > summary i { color: var(--text-soft); }
+
+.ped-clima-distrib {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 0.5rem 0 0.75rem 0;
+}
+
+.ped-clima-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+}
+
+.ped-clima-chip-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.ped-clima-chip-n {
+    font-weight: 700;
+    margin-left: 0.15rem;
+}

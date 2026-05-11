@@ -1,0 +1,450 @@
+"""Endpoints para registrar sesiones pedagógicas diarias y consultar catálogos.
+
+Modelo:
+- Una sesión = (sede, fecha). Contiene clima, situaciones, estrategias y N bloques.
+- La UI envía la sesión completa al guardar; el backend reemplaza los bloques
+  en una transacción (delete + insert). Esto evita el problema de "qué cambió"
+  y deja la BD siempre consistente.
+"""
+from __future__ import annotations
+
+import logging
+from datetime import date as date_type
+from typing import Any, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from plataforma.core import db, deps
+from plataforma.core.audit_decorator import audit_action
+
+from fundacion.backend.services import sedes as sedes_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/fundacion", tags=["fundacion-sesiones"])
+
+
+def _user_id(user: dict) -> Optional[int]:
+    return sedes_service.usuario_id_de_username(user.get("username", ""))
+
+
+def _ensure_sede_access(user: dict, sede_id: int) -> int:
+    uid = _user_id(user)
+    if uid is None:
+        raise HTTPException(status_code=401, detail="usuario no resoluble")
+    if not sedes_service.es_super_scope(uid) and not sedes_service.tiene_acceso_sede(uid, sede_id):
+        raise HTTPException(status_code=403, detail="No tiene acceso a esa sede")
+    return uid
+
+
+# ── Catálogos ───────────────────────────────────────────────────────────────
+
+@router.get("/catalogos/dominios")
+async def get_dominios(user: dict = Depends(deps.require_permission("fundacion:read"))):
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT id, codigo, nombre, color, orden FROM fundacion.competencia_dominios ORDER BY orden"
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/catalogos/competencias")
+async def get_competencias(user: dict = Depends(deps.require_permission("fundacion:read"))):
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """
+            SELECT c.id, c.codigo, c.descripcion, c.activo, c.orden,
+                   d.id AS dominio_id, d.codigo AS dominio_codigo, d.nombre AS dominio_nombre, d.color AS dominio_color
+            FROM fundacion.competencias c
+            JOIN fundacion.competencia_dominios d ON d.id = c.dominio_id
+            WHERE c.activo = TRUE
+            ORDER BY d.orden, c.orden
+            """
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/catalogos/bloque-tipos")
+async def get_bloque_tipos(user: dict = Depends(deps.require_permission("fundacion:read"))):
+    conn = db.get_conn()
+    try:
+        tipos = conn.execute(
+            """
+            SELECT id, codigo, nombre, descripcion, requiere_subtipo, permite_competencias,
+                   color, icono, orden
+            FROM fundacion.bloque_tipos WHERE activo = TRUE ORDER BY orden
+            """
+        ).fetchall()
+        subtipos = conn.execute(
+            """
+            SELECT id, bloque_tipo_id, codigo, nombre, descripcion, orden
+            FROM fundacion.bloque_subtipos WHERE activo = TRUE ORDER BY bloque_tipo_id, orden
+            """
+        ).fetchall()
+        sub_por_tipo: dict[int, list] = {}
+        for s in subtipos:
+            sub_por_tipo.setdefault(s["bloque_tipo_id"], []).append(dict(s))
+        items = []
+        for t in tipos:
+            d = dict(t)
+            d["subtipos"] = sub_por_tipo.get(t["id"], [])
+            items.append(d)
+        return {"items": items}
+    finally:
+        conn.close()
+
+
+@router.get("/catalogos/clima")
+async def get_clima_opciones(user: dict = Depends(deps.require_permission("fundacion:read"))):
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT id, codigo, nombre, descripcion, color, icono, orden FROM fundacion.clima_opciones WHERE activo = TRUE ORDER BY orden"
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+# ── Sesiones ────────────────────────────────────────────────────────────────
+
+class MaterialIn(BaseModel):
+    product_id: Optional[int] = None
+    nombre_libre: Optional[str] = None
+    cantidad_solicitada: Optional[float] = None
+    cantidad_usada: Optional[float] = None
+    notas: Optional[str] = None
+
+
+class BloqueIn(BaseModel):
+    orden: int
+    bloque_tipo_id: int
+    bloque_subtipo_id: Optional[int] = None
+    nombre_actividad: Optional[str] = None
+    resultado_aprendizaje: Optional[str] = None
+    hora_inicio: Optional[str] = None      # "HH:MM" o "HH:MM:SS"
+    hora_fin: Optional[str] = None
+    se_ejecuto: bool = True
+    motivo_no_ejecucion: Optional[str] = None
+    adaptacion: Optional[str] = None
+    notas: Optional[str] = None
+    competencias: List[int] = Field(default_factory=list)
+    materiales: List[MaterialIn] = Field(default_factory=list)
+
+
+class SesionIn(BaseModel):
+    sede_id: int
+    fecha: date_type
+    clima_opcion_id: Optional[int] = None
+    situaciones_relevantes: Optional[str] = None
+    estrategias_aplicadas: Optional[str] = None
+    notas: Optional[str] = None
+    cerrado: bool = False
+    bloques: List[BloqueIn] = Field(default_factory=list)
+
+
+def _sesion_to_dict(conn, sesion_id: int) -> dict:
+    sd = conn.execute(
+        """
+        SELECT sd.*, co.codigo AS clima_codigo, co.nombre AS clima_nombre, co.color AS clima_color
+        FROM fundacion.sesion_dia sd
+        LEFT JOIN fundacion.clima_opciones co ON co.id = sd.clima_opcion_id
+        WHERE sd.id = %s
+        """,
+        (sesion_id,),
+    ).fetchone()
+    if not sd:
+        return None
+    bloques = conn.execute(
+        """
+        SELECT sb.*, bt.codigo AS bloque_tipo_codigo, bt.nombre AS bloque_tipo_nombre,
+               bs.codigo AS bloque_subtipo_codigo, bs.nombre AS bloque_subtipo_nombre
+        FROM fundacion.sesion_bloque sb
+        JOIN fundacion.bloque_tipos bt ON bt.id = sb.bloque_tipo_id
+        LEFT JOIN fundacion.bloque_subtipos bs ON bs.id = sb.bloque_subtipo_id
+        WHERE sb.sesion_dia_id = %s
+        ORDER BY sb.orden
+        """,
+        (sesion_id,),
+    ).fetchall()
+    bloque_ids = [b["id"] for b in bloques]
+    competencias_por_bloque: dict[int, list] = {bid: [] for bid in bloque_ids}
+    materiales_por_bloque: dict[int, list] = {bid: [] for bid in bloque_ids}
+    if bloque_ids:
+        ph = ",".join(["%s"] * len(bloque_ids))
+        comps = conn.execute(
+            f"""
+            SELECT sbc.sesion_bloque_id, c.id, c.codigo, c.descripcion,
+                   d.codigo AS dominio_codigo, d.nombre AS dominio_nombre, d.color AS dominio_color
+            FROM fundacion.sesion_bloque_competencias sbc
+            JOIN fundacion.competencias c ON c.id = sbc.competencia_id
+            JOIN fundacion.competencia_dominios d ON d.id = c.dominio_id
+            WHERE sbc.sesion_bloque_id IN ({ph})
+            ORDER BY d.orden, c.orden
+            """,
+            tuple(bloque_ids),
+        ).fetchall()
+        for c in comps:
+            competencias_por_bloque[c["sesion_bloque_id"]].append({
+                "id": c["id"], "codigo": c["codigo"], "descripcion": c["descripcion"],
+                "dominio_codigo": c["dominio_codigo"], "dominio_nombre": c["dominio_nombre"],
+                "dominio_color": c["dominio_color"],
+            })
+        mats = conn.execute(
+            f"""
+            SELECT sbm.id, sbm.sesion_bloque_id, sbm.product_id, sbm.nombre_libre,
+                   sbm.cantidad_solicitada, sbm.cantidad_usada, sbm.notas,
+                   p.name AS product_name, p.sku AS product_sku
+            FROM fundacion.sesion_bloque_materiales sbm
+            LEFT JOIN bodega.products p ON p.id = sbm.product_id
+            WHERE sbm.sesion_bloque_id IN ({ph})
+            """,
+            tuple(bloque_ids),
+        ).fetchall()
+        for m in mats:
+            materiales_por_bloque[m["sesion_bloque_id"]].append(dict(m))
+
+    items = []
+    for b in bloques:
+        d = dict(b)
+        # serializar time → str
+        if d.get("hora_inicio"):
+            d["hora_inicio"] = str(d["hora_inicio"])
+        if d.get("hora_fin"):
+            d["hora_fin"] = str(d["hora_fin"])
+        d["competencias"] = competencias_por_bloque.get(b["id"], [])
+        d["materiales"] = materiales_por_bloque.get(b["id"], [])
+        items.append(d)
+    out = dict(sd)
+    if out.get("fecha"):
+        out["fecha"] = out["fecha"].isoformat()
+    out["bloques"] = items
+    return out
+
+
+@router.get("/sesiones")
+async def list_sesiones(
+    sede_id: int,
+    desde: Optional[date_type] = None,
+    hasta: Optional[date_type] = None,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    _ensure_sede_access(user, sede_id)
+    conn = db.get_conn()
+    try:
+        clauses = ["sd.sede_id = %s"]
+        params: list = [sede_id]
+        if desde:
+            clauses.append("sd.fecha >= %s")
+            params.append(desde)
+        if hasta:
+            clauses.append("sd.fecha <= %s")
+            params.append(hasta)
+        rows = conn.execute(
+            f"""
+            SELECT sd.id, sd.sede_id, sd.fecha, sd.cerrado, sd.clima_opcion_id,
+                   co.codigo AS clima_codigo, co.nombre AS clima_nombre,
+                   COUNT(sb.id) AS bloques_total,
+                   COUNT(sb.id) FILTER (WHERE sb.se_ejecuto) AS bloques_ejecutados
+            FROM fundacion.sesion_dia sd
+            LEFT JOIN fundacion.clima_opciones co ON co.id = sd.clima_opcion_id
+            LEFT JOIN fundacion.sesion_bloque sb ON sb.sesion_dia_id = sd.id
+            WHERE {" AND ".join(clauses)}
+            GROUP BY sd.id, co.codigo, co.nombre
+            ORDER BY sd.fecha DESC
+            """,
+            tuple(params),
+        ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            if d.get("fecha"):
+                d["fecha"] = d["fecha"].isoformat()
+            out.append(d)
+        return {"items": out}
+    finally:
+        conn.close()
+
+
+@router.get("/sesiones/by-fecha")
+async def get_sesion_by_fecha(
+    sede_id: int,
+    fecha: date_type,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """Devuelve la sesión de (sede, fecha) si existe; 404 si no."""
+    _ensure_sede_access(user, sede_id)
+    conn = db.get_conn()
+    try:
+        row = conn.execute(
+            "SELECT id FROM fundacion.sesion_dia WHERE sede_id = %s AND fecha = %s",
+            (sede_id, fecha),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Sesión no existe")
+        return _sesion_to_dict(conn, row["id"])
+    finally:
+        conn.close()
+
+
+@router.get("/sesiones/{sesion_id}")
+async def get_sesion(
+    sesion_id: int,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    conn = db.get_conn()
+    try:
+        row = conn.execute(
+            "SELECT sede_id FROM fundacion.sesion_dia WHERE id = %s", (sesion_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Sesión no existe")
+        _ensure_sede_access(user, row["sede_id"])
+        return _sesion_to_dict(conn, sesion_id)
+    finally:
+        conn.close()
+
+
+@router.put("/sesiones")
+@audit_action("UPSERT_FUNDACION_SESION", severity="info")
+async def upsert_sesion(
+    body: SesionIn,
+    user: dict = Depends(deps.require_permission("fundacion:write")),
+):
+    """Crea o actualiza una sesión completa (con todos sus bloques).
+
+    Reemplaza los bloques existentes — el cliente debe mandar el estado final.
+    """
+    uid = _ensure_sede_access(user, body.sede_id)
+
+    conn = db.get_conn()
+    try:
+        # Si la sesión existe y está cerrada → 409
+        existing = conn.execute(
+            "SELECT id, cerrado FROM fundacion.sesion_dia WHERE sede_id = %s AND fecha = %s",
+            (body.sede_id, body.fecha),
+        ).fetchone()
+
+        if existing and existing["cerrado"]:
+            raise HTTPException(status_code=409, detail="Sesión cerrada, no se puede editar")
+
+        if existing:
+            sesion_id = existing["id"]
+            conn.execute(
+                """
+                UPDATE fundacion.sesion_dia
+                SET clima_opcion_id = %s,
+                    situaciones_relevantes = %s,
+                    estrategias_aplicadas = %s,
+                    notas = %s,
+                    cerrado = %s,
+                    actualizado_por = %s,
+                    actualizado_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                """,
+                (body.clima_opcion_id, body.situaciones_relevantes,
+                 body.estrategias_aplicadas, body.notas, body.cerrado, uid, sesion_id),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO fundacion.sesion_dia (
+                    sede_id, fecha, clima_opcion_id, situaciones_relevantes,
+                    estrategias_aplicadas, notas, cerrado, creado_por, actualizado_por
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (body.sede_id, body.fecha, body.clima_opcion_id,
+                 body.situaciones_relevantes, body.estrategias_aplicadas,
+                 body.notas, body.cerrado, uid, uid),
+            )
+            sesion_id = cur.fetchone()["id"]
+
+        # Reemplazar bloques: borrar todo (CASCADE limpia competencias y materiales)
+        conn.execute("DELETE FROM fundacion.sesion_bloque WHERE sesion_dia_id = %s", (sesion_id,))
+
+        for b in body.bloques:
+            cur = conn.execute(
+                """
+                INSERT INTO fundacion.sesion_bloque (
+                    sesion_dia_id, orden, bloque_tipo_id, bloque_subtipo_id,
+                    nombre_actividad, resultado_aprendizaje, hora_inicio, hora_fin,
+                    se_ejecuto, motivo_no_ejecucion, adaptacion, notas
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (sesion_id, b.orden, b.bloque_tipo_id, b.bloque_subtipo_id,
+                 b.nombre_actividad, b.resultado_aprendizaje, b.hora_inicio, b.hora_fin,
+                 b.se_ejecuto, b.motivo_no_ejecucion, b.adaptacion, b.notas),
+            )
+            bloque_id = cur.fetchone()["id"]
+
+            for comp_id in b.competencias:
+                conn.execute(
+                    """
+                    INSERT INTO fundacion.sesion_bloque_competencias (sesion_bloque_id, competencia_id)
+                    VALUES (%s, %s) ON CONFLICT DO NOTHING
+                    """,
+                    (bloque_id, comp_id),
+                )
+
+            for m in b.materiales:
+                # Validar al menos uno: product_id o nombre_libre con contenido
+                if m.product_id is None and (not m.nombre_libre or not m.nombre_libre.strip()):
+                    continue
+                conn.execute(
+                    """
+                    INSERT INTO fundacion.sesion_bloque_materiales (
+                        sesion_bloque_id, product_id, nombre_libre,
+                        cantidad_solicitada, cantidad_usada, notas
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (bloque_id, m.product_id,
+                     m.nombre_libre.strip() if m.nombre_libre else None,
+                     m.cantidad_solicitada, m.cantidad_usada, m.notas),
+                )
+
+        conn.commit()
+        return _sesion_to_dict(conn, sesion_id)
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Error guardando sesión")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@router.delete("/sesiones/{sesion_id}")
+@audit_action("DELETE_FUNDACION_SESION", severity="warning")
+async def delete_sesion(
+    sesion_id: int,
+    user: dict = Depends(deps.require_permission("fundacion:write")),
+):
+    conn = db.get_conn()
+    try:
+        row = conn.execute(
+            "SELECT sede_id, cerrado FROM fundacion.sesion_dia WHERE id = %s", (sesion_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Sesión no existe")
+        _ensure_sede_access(user, row["sede_id"])
+        if row["cerrado"]:
+            raise HTTPException(status_code=409, detail="Sesión cerrada, no se puede borrar")
+        conn.execute("DELETE FROM fundacion.sesion_dia WHERE id = %s", (sesion_id,))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()

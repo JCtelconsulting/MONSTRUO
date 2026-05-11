@@ -16,6 +16,7 @@ load_runtime_env(Path(__file__).resolve())
 from fundacion.backend import router as fundacion_router
 from fundacion.backend.routers import sync as sync_router
 from fundacion.backend.routers import reportes as reportes_router
+from fundacion.backend.routers import sesiones as sesiones_router
 from plataforma.core import db, deps
 from plataforma.core.web import build_login_redirect_url
 
@@ -40,6 +41,7 @@ if shared_ui_dir.exists():
 app.include_router(fundacion_router.router)
 app.include_router(sync_router.router)
 app.include_router(reportes_router.router)
+app.include_router(sesiones_router.router)
 
 
 async def _proxy_to_gateway(target_path: str, request: Request) -> FastAPIResponse:

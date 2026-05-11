@@ -218,6 +218,227 @@ async def get_asistencia_mensual(
         conn.close()
 
 
+# ── Reportes pedagógicos (correo de la encargada: a, b, c, d, f) ───────────
+
+def _rango_filtro(sede_id: Optional[int], desde: Optional[str], hasta: Optional[str],
+                   sede_ids: Optional[set[int]]) -> tuple[list[str], list]:
+    clauses: list[str] = ["TRUE"]
+    params: list = []
+    if sede_id is not None:
+        if sede_ids is not None and sede_id not in sede_ids:
+            raise HTTPException(status_code=403, detail="No tiene acceso a esa sede")
+        clauses.append("sede_id = %s")
+        params.append(sede_id)
+    elif sede_ids is not None:
+        if not sede_ids:
+            clauses.append("FALSE")
+        else:
+            ph = ", ".join(["%s"] * len(sede_ids))
+            clauses.append(f"sede_id IN ({ph})")
+            params.extend(sede_ids)
+    if desde:
+        clauses.append("fecha >= %s")
+        params.append(desde)
+    if hasta:
+        clauses.append("fecha <= %s")
+        params.append(hasta)
+    return clauses, params
+
+
+@router.get("/cobertura-bloques")
+async def get_cobertura_bloques(
+    sede_id: Optional[int] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """(a) Cobertura por dimensión: cuántos bloques de cada tipo + subtipo."""
+    sede_ids = _scope_sede_ids(user)
+    clauses, params = _rango_filtro(sede_id, desde, hasta, sede_ids)
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT bloque_codigo, bloque_nombre, subtipo_codigo, subtipo_nombre,
+                   SUM(ejecutados)::int AS ejecutados,
+                   SUM(no_ejecutados)::int AS no_ejecutados,
+                   SUM(planificados)::int AS planificados
+            FROM fundacion.v_cobertura_bloques
+            WHERE {" AND ".join(clauses)}
+            GROUP BY bloque_codigo, bloque_nombre, subtipo_codigo, subtipo_nombre
+            ORDER BY bloque_codigo, subtipo_codigo NULLS FIRST
+            """,
+            tuple(params),
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/competencias-trabajadas")
+async def get_competencias_trabajadas(
+    sede_id: Optional[int] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """(b) Competencias trabajadas: ranking de cada AC/AG/CS/HR/RD."""
+    sede_ids = _scope_sede_ids(user)
+    clauses, params = _rango_filtro(sede_id, desde, hasta, sede_ids)
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT competencia_codigo, competencia_descripcion,
+                   dominio_codigo, dominio_nombre,
+                   SUM(veces_trabajada)::int AS veces_trabajada,
+                   SUM(veces_planificada_no_ejecutada)::int AS planificada_no_ejecutada
+            FROM fundacion.v_competencias_trabajadas
+            WHERE {" AND ".join(clauses)}
+            GROUP BY competencia_codigo, competencia_descripcion, dominio_codigo, dominio_nombre
+            ORDER BY dominio_codigo, competencia_codigo
+            """,
+            tuple(params),
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/materiales-uso")
+async def get_materiales_uso(
+    sede_id: Optional[int] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """(c) Materiales solicitados vs usados."""
+    sede_ids = _scope_sede_ids(user)
+    clauses, params = _rango_filtro(sede_id, desde, hasta, sede_ids)
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT material, sku,
+                   SUM(total_solicitada)::numeric(12,2) AS total_solicitada,
+                   SUM(total_usada)::numeric(12,2) AS total_usada,
+                   SUM(diferencia)::numeric(12,2) AS diferencia,
+                   SUM(apariciones)::int AS apariciones
+            FROM fundacion.v_materiales_uso
+            WHERE {" AND ".join(clauses)}
+            GROUP BY material, sku
+            ORDER BY total_solicitada DESC NULLS LAST
+            """,
+            tuple(params),
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/adaptaciones")
+async def get_adaptaciones(
+    sede_id: Optional[int] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """(d) Adaptaciones realizadas y bloques no ejecutados."""
+    sede_ids = _scope_sede_ids(user)
+    clauses, params = _rango_filtro(sede_id, desde, hasta, sede_ids)
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT sede_code, sede_nombre, fecha::text AS fecha,
+                   bloque_codigo, bloque_nombre, nombre_actividad,
+                   se_ejecuto, motivo_no_ejecucion, adaptacion
+            FROM fundacion.v_adaptaciones
+            WHERE {" AND ".join(clauses)}
+            ORDER BY fecha DESC, sede_code, bloque_codigo
+            """,
+            tuple(params),
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/clima")
+async def get_clima(
+    sede_id: Optional[int] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """(f) Clima y convivencia por día. Devuelve detalle + distribución."""
+    sede_ids = _scope_sede_ids(user)
+    clauses, params = _rango_filtro(sede_id, desde, hasta, sede_ids)
+    conn = db.get_conn()
+    try:
+        detalle = conn.execute(
+            f"""
+            SELECT sede_code, sede_nombre, fecha::text AS fecha,
+                   clima_codigo, clima_nombre, clima_color,
+                   situaciones_relevantes, estrategias_aplicadas
+            FROM fundacion.v_clima_dia
+            WHERE {" AND ".join(clauses)}
+            ORDER BY fecha DESC, sede_code
+            """,
+            tuple(params),
+        ).fetchall()
+        distrib = conn.execute(
+            f"""
+            SELECT clima_codigo, clima_nombre, clima_color, COUNT(*)::int AS dias
+            FROM fundacion.v_clima_dia
+            WHERE {" AND ".join(clauses)} AND clima_codigo IS NOT NULL
+            GROUP BY clima_codigo, clima_nombre, clima_color
+            ORDER BY dias DESC
+            """,
+            tuple(params),
+        ).fetchall()
+        return {
+            "detalle": [dict(r) for r in detalle],
+            "distribucion": [dict(r) for r in distrib],
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/actividad-periodo")
+async def get_actividad_periodo(
+    sede_id: Optional[int] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """(e) Dashboard de actividad: bloques ejecutados vs planificados por sede + mes."""
+    sede_ids = _scope_sede_ids(user)
+    clauses, params = _rango_filtro(sede_id, desde, hasta, sede_ids)
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT sede_id, sede_code, sede_nombre, anio, mes_num,
+                   SUM(bloques_planificados)::int AS planificados,
+                   SUM(bloques_ejecutados)::int AS ejecutados,
+                   CASE
+                     WHEN SUM(bloques_planificados) > 0
+                     THEN ROUND(100.0 * SUM(bloques_ejecutados) / SUM(bloques_planificados), 1)
+                     ELSE NULL
+                   END AS pct_ejecucion
+            FROM fundacion.v_actividad_periodo
+            WHERE {" AND ".join(clauses)}
+            GROUP BY sede_id, sede_code, sede_nombre, anio, mes_num
+            ORDER BY anio, mes_num, sede_id
+            """,
+            tuple(params),
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
 @router.get("/asistencia-matriz")
 async def get_asistencia_matriz(
     sede_id: int,
