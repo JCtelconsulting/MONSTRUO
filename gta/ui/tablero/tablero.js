@@ -8,7 +8,8 @@ window.Tablero = (() => {
     let _metricas = null;
     let _sesion = null;
     let _areas = [];
-    let _flujoActivo = null;
+    let _flujosExpandidos = new Set();   // ids expandidos en el acordeón
+    let _detalleCache = new Map();       // flujo_id → { flujo, eventos }
 
     // ── Init ────────────────────────────────────────────────────────────
     function init(sesion) {
@@ -135,6 +136,7 @@ window.Tablero = (() => {
         const done = Number(f.cerradas || 0);
         const fecha = f.iniciado_at ? new Date(f.iniciado_at).toLocaleDateString('es-CL') : '';
         const dotColor = { rojo: 'gta-dot-red', amarillo: 'gta-dot-yellow', verde: 'gta-dot-green' }[f.salud_sla] || 'gta-dot-gray';
+        const expandida = _flujosExpandidos.has(f.flujo_id);
 
         // Badges de alertas
         const badges = [];
@@ -152,67 +154,72 @@ window.Tablero = (() => {
             : '';
 
         return `
-        <div class="gta-flujo-card" onclick="Tablero.abrirFlujo('${f.flujo_id}')">
-            <div class="gta-flujo-card-head">
-                <span class="gta-dot ${dotColor}" title="Salud SLA"></span>
-                <div class="gta-flujo-card-title">${_esc(f.titulo)}</div>
-            </div>
-            ${f.proceso_nombre ? `<div class="gta-flujo-card-proceso"><i class="fas fa-project-diagram"></i> ${_esc(f.proceso_nombre)}</div>` : ''}
-            ${pasoActual}
-            <div class="gta-flujo-card-meta">
-                <span><i class="fas fa-user"></i> ${_esc(f.iniciado_por || '-')}</span>
-                <span><i class="fas fa-calendar"></i> ${fecha}</span>
-            </div>
-            ${badges.length ? `<div class="gta-flujo-card-badges">${badges.join('')}</div>` : ''}
-            <div class="gta-flujo-card-progress">
-                <div class="gta-flujo-progress-bar">
-                    <div class="gta-flujo-progress-fill" style="width:${pct}%"></div>
+        <div class="gta-flujo-card ${expandida ? 'is-open' : ''}" data-flujo-id="${f.flujo_id}">
+            <div class="gta-flujo-card-head-clickable" onclick="Tablero.toggleFlujo('${f.flujo_id}')">
+                <div class="gta-flujo-card-head">
+                    <span class="gta-dot ${dotColor}" title="Salud SLA"></span>
+                    <div class="gta-flujo-card-title">${_esc(f.titulo)}</div>
+                    <i class="fas fa-chevron-${expandida ? 'up' : 'down'} gta-flujo-card-chevron"></i>
                 </div>
-                <span class="gta-flujo-progress-label">${done}/${total} tareas — ${pct}%</span>
+                ${f.proceso_nombre ? `<div class="gta-flujo-card-proceso"><i class="fas fa-project-diagram"></i> ${_esc(f.proceso_nombre)}</div>` : ''}
+                ${pasoActual}
+                <div class="gta-flujo-card-meta">
+                    <span><i class="fas fa-user"></i> ${_esc(f.iniciado_por || '-')}</span>
+                    <span><i class="fas fa-calendar"></i> ${fecha}</span>
+                </div>
+                ${badges.length ? `<div class="gta-flujo-card-badges">${badges.join('')}</div>` : ''}
+                <div class="gta-flujo-card-progress">
+                    <div class="gta-flujo-progress-bar">
+                        <div class="gta-flujo-progress-fill" style="width:${pct}%"></div>
+                    </div>
+                    <span class="gta-flujo-progress-label">${done}/${total} tareas — ${pct}%</span>
+                </div>
+            </div>
+            <div class="gta-flujo-card-detalle" id="flujo-detalle-${f.flujo_id}">
+                ${expandida ? '<div class="gta-loading"><i class="fas fa-spinner fa-spin"></i></div>' : ''}
             </div>
         </div>`;
     }
 
-    // ── Drawer detalle del flujo (solo lectura) ─────────────────────────
-    async function abrirFlujo(flujoId) {
-        const drawer = document.getElementById('flujo-drawer');
-        const overlay = document.getElementById('flujo-drawer-overlay');
-        const body = document.getElementById('flujo-drawer-body');
+    // ── Acordeón inline: expandir/colapsar el detalle del flujo ─────────
+    async function toggleFlujo(flujoId) {
+        if (_flujosExpandidos.has(flujoId)) {
+            _flujosExpandidos.delete(flujoId);
+            _renderKanban();
+            return;
+        }
+        _flujosExpandidos.add(flujoId);
+        _renderKanban();
 
-        document.getElementById('flujo-drawer-titulo').textContent = 'Cargando...';
-        document.getElementById('flujo-drawer-codigo').textContent = `Flujo ${flujoId.slice(0, 8)}…`;
-        body.innerHTML = `<div class="gta-loading"><i class="fas fa-spinner fa-spin"></i></div>`;
-        drawer.classList.add('open');
-        overlay.classList.add('open');
+        const cont = document.getElementById(`flujo-detalle-${flujoId}`);
+        if (!cont) return;
+
+        // Cache: si ya lo cargamos, lo pintamos inmediato; igual lo refrescamos en background
+        if (_detalleCache.has(flujoId)) {
+            const { flujo, eventos } = _detalleCache.get(flujoId);
+            cont.innerHTML = _renderDetalleInline(flujo, eventos);
+        }
 
         try {
             const [flujo, timelineResp] = await Promise.all([
                 GtaApi.getFlujo(flujoId),
                 GtaApi.getFlujoTimeline(flujoId).catch(() => ({ items: [] })),
             ]);
-            _flujoActivo = flujo;
-            _renderDrawer(flujo, timelineResp.items || []);
+            const eventos = timelineResp.items || [];
+            _detalleCache.set(flujoId, { flujo, eventos });
+            // Solo actualizamos si la tarjeta sigue expandida
+            if (_flujosExpandidos.has(flujoId)) {
+                cont.innerHTML = _renderDetalleInline(flujo, eventos);
+            }
         } catch (e) {
-            body.innerHTML = `<div class="gta-empty">Error al cargar el flujo: ${_esc(e.message || e)}</div>`;
+            cont.innerHTML = `<div class="gta-empty">Error al cargar detalle: ${_esc(e.message || e)}</div>`;
         }
     }
 
-    function cerrarDrawer() {
-        document.getElementById('flujo-drawer')?.classList.remove('open');
-        document.getElementById('flujo-drawer-overlay')?.classList.remove('open');
-        _flujoActivo = null;
-    }
-
-    function _renderDrawer(flujo, eventos) {
-        const body = document.getElementById('flujo-drawer-body');
-        document.getElementById('flujo-drawer-titulo').textContent = flujo.titulo || 'Flujo';
-        document.getElementById('flujo-drawer-codigo').textContent =
-            `${flujo.flujo_id.slice(0, 8)}… · ${(flujo.estado || '').toUpperCase()}`;
-
+    function _renderDetalleInline(flujo, eventos) {
         const tareas = flujo.tareas || [];
         const inicio = flujo.iniciado_at ? new Date(flujo.iniciado_at).toLocaleString('es-CL') : '—';
 
-        // Resumen
         const cerradas = flujo.cerradas || 0;
         const total = flujo.total || 0;
         const enCurso = tareas.filter(t => t.estado === 'en_curso').length;
@@ -222,7 +229,7 @@ window.Tablero = (() => {
         const devueltas = tareas.filter(t => t.estado === 'devuelta').length;
         const vencidas = tareas.filter(t => t.salud_sla === 'rojo').length;
 
-        body.innerHTML = `
+        return `
         <div class="gta-flujo-summary">
             <div class="gta-flujo-summary-meta">
                 <span><i class="fas fa-user"></i> Iniciado por <strong>${_esc(flujo.iniciado_por || '?')}</strong></span>
@@ -390,7 +397,7 @@ window.Tablero = (() => {
 
     return {
         init, cargar, filtrar,
-        abrirFlujo, cerrarDrawer,
+        toggleFlujo,
         abrirEnTareas,
     };
 })();

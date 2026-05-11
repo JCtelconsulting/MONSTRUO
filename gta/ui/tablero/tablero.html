@@ -48,23 +48,8 @@
         </button>
     </div>
 
-    <!-- Kanban por estado del flujo -->
+    <!-- Kanban por estado del flujo (acordeón inline al expandir cada card) -->
     <div class="gta-flujos-kanban" id="tablero-kanban">
         <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando flujos...</div>
     </div>
 </div>
-
-<!-- Drawer de detalle de flujo (solo lectura) -->
-<div id="flujo-drawer" class="gta-flujo-drawer">
-    <div class="gta-flujo-drawer-header">
-        <div>
-            <div class="gta-flujo-drawer-eyebrow" id="flujo-drawer-codigo">Flujo</div>
-            <h3 id="flujo-drawer-titulo">Cargando...</h3>
-        </div>
-        <button class="btn-icon" onclick="Tablero.cerrarDrawer()"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="gta-flujo-drawer-body" id="flujo-drawer-body">
-        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i></div>
-    </div>
-</div>
-<div id="flujo-drawer-overlay" class="gta-flujo-drawer-overlay" onclick="Tablero.cerrarDrawer()"></div>

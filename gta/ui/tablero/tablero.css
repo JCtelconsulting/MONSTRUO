@@ -568,3 +568,34 @@
 }
 .gta-evento-msg { font-size: 0.88rem; line-height: 1.4; color: #e0e4e8; }
 .gta-evento-meta { font-size: 0.75rem; color: var(--text-soft, #a5adb4); margin-top: 2px; }
+
+/* ── Acordeón del flujo (reemplaza el drawer lateral) ──────────────── */
+
+.gta-flujo-card-head-clickable {
+    cursor: pointer;
+}
+
+.gta-flujo-card-chevron {
+    margin-left: auto;
+    color: var(--text-soft, #a5adb4);
+    font-size: 0.75rem;
+    transition: transform 0.15s;
+}
+
+.gta-flujo-card-detalle {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.25s ease;
+}
+
+.gta-flujo-card.is-open .gta-flujo-card-detalle {
+    max-height: none;            /* sin tope al expandir */
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gta-flujo-card.is-open {
+    background: rgba(0, 0, 0, 0.15);
+    border-color: rgba(78, 161, 255, 0.3);
+}
