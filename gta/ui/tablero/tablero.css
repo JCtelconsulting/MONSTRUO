@@ -19,17 +19,30 @@
     padding: 14px 16px;
     text-align: center;
 }
+/* 6 colores únicos, sin repeticiones (un color por KPI):
+   info (cyan)    → activos
+   warning (amarillo) → por vencer
+   danger (rojo)  → vencidas
+   ok (verde)     → completados
+   pause (violeta) → esperando otra área
+   alert (naranja) → quiebres abiertos */
+.gta-kpi-card.kpi-info    { border-color: rgba(0, 243, 255, 0.3); }
 .gta-kpi-card.kpi-warning { border-color: rgba(255, 204, 0, 0.3); }
 .gta-kpi-card.kpi-danger  { border-color: rgba(255, 51, 51, 0.35); }
 .gta-kpi-card.kpi-ok      { border-color: rgba(0, 255, 65, 0.3); }
+.gta-kpi-card.kpi-pause   { border-color: rgba(184, 92, 255, 0.35); }
+.gta-kpi-card.kpi-alert   { border-color: rgba(255, 140, 66, 0.35); }
 .gta-kpi-val {
     font-size: 1.6rem;
     font-weight: 700;
     color: var(--text);
 }
+.gta-kpi-card.kpi-info    .gta-kpi-val { color: var(--info); }
 .gta-kpi-card.kpi-warning .gta-kpi-val { color: var(--warning); }
 .gta-kpi-card.kpi-danger  .gta-kpi-val { color: var(--danger); }
 .gta-kpi-card.kpi-ok      .gta-kpi-val { color: var(--neon); }
+.gta-kpi-card.kpi-pause   .gta-kpi-val { color: #b85cff; }
+.gta-kpi-card.kpi-alert   .gta-kpi-val { color: #ff8c42; }
 .gta-kpi-lbl {
     font-size: 0.74rem;
     color: var(--text-soft);
