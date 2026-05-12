@@ -116,15 +116,21 @@ window.Procesos = (() => {
     function _renderPasosDiagrama(pasos) {
         if (!pasos.length) return '';
 
-        // Áreas únicas en orden de aparición (primer paso que las menciona)
-        const areasOrden = [];
-        const areasVistas = new Set();
-        for (const p of pasos) {
-            const a = p.area_code || p.area || '-';
-            if (!areasVistas.has(a)) {
-                areasVistas.add(a);
-                areasOrden.push(a);
-            }
+        // Áreas únicas presentes en este proceso, ordenadas por el campo
+        // 'orden' del catálogo gta.areas (no por aparición). Así el orden
+        // visual sigue una secuencia lógica del negocio configurable desde
+        // un solo lugar (admin de áreas), en vez de depender de qué paso
+        // toca cuál área primero.
+        const areasUsadas = new Set(pasos.map(p => p.area_code || p.area || '-'));
+        const areasOrden = _areas
+            .slice()
+            .sort((a, b) => (a.orden || 999) - (b.orden || 999))
+            .map(a => a.code)
+            .filter(c => areasUsadas.has(c));
+        // Fallback defensivo: si alguna área usada no está en _areas
+        // (raro — sería un area_code huérfano), agregarla al final.
+        for (const c of areasUsadas) {
+            if (!areasOrden.includes(c)) areasOrden.push(c);
         }
 
         // Cada paso queda en su carril. Para el layout vertical, ordenamos
