@@ -167,44 +167,65 @@ window.Procesos = (() => {
                   stroke="rgba(255, 255, 255, 0.08)" stroke-dasharray="4 4"></line>
         `).join('');
 
+        // Cajas con texto en wrap (foreignObject + HTML), sin número de
+        // orden (para no sugerir que se ejecutan en ese orden cuando hay
+        // pasos paralelos). Click abre el modal de detalle del paso.
         const cajas = sorted.map(p => {
             const pos = posPaso[p.orden];
             const x = pos.cx - boxW / 2;
             const y = pos.cy - boxH / 2;
-            const titulo = (p.titulo || `Paso ${p.orden}`).slice(0, 40);
+            const titulo = (p.titulo || 'Sin título');
             return `
-                <g class="gta-flow-step">
+                <g class="gta-flow-step" data-paso-orden="${p.orden}"
+                   onclick="Procesos.abrirDetallePaso(${p.orden})" style="cursor:pointer;">
                     <rect x="${x}" y="${y}" width="${boxW}" height="${boxH}"
                           rx="8" fill="rgba(0, 243, 255, 0.15)" stroke="rgba(0, 243, 255, 0.6)" stroke-width="1.5"></rect>
-                    <text x="${pos.cx}" y="${y + 22}" text-anchor="middle" fill="#00f3ff" font-size="11" font-weight="700">${p.orden}</text>
-                    <text x="${pos.cx}" y="${y + 42}" text-anchor="middle" fill="#e6edf7" font-size="11">${_esc(titulo)}</text>
+                    <foreignObject x="${x + 6}" y="${y + 6}" width="${boxW - 12}" height="${boxH - 12}">
+                        <div xmlns="http://www.w3.org/1999/xhtml"
+                             style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+                                    text-align:center; color:#e6edf7; font-size:11px; line-height:1.25;
+                                    overflow:hidden; word-wrap:break-word; hyphens:auto;">
+                            ${_esc(titulo)}
+                        </div>
+                    </foreignObject>
                 </g>
             `;
         }).join('');
 
-        // Flechas: para cada paso, dibujar línea desde cada uno de sus depende_de
-        // hasta este paso. Las flechas salen del centro inferior del origen y
-        // entran por el centro superior del destino (o lateral si están en
-        // la misma fila — caso raro).
+        // Routing de flechas: salir por el lateral del origen y entrar por
+        // el lateral del destino, con la vertical pasando por el canal entre
+        // columnas. Evita cruzar cajas intermedias en filas adyacentes.
+        // (Si origen y destino están en la misma columna, sale por abajo y
+        // entra por arriba — línea recta vertical.)
         const flechas = sorted.flatMap(p => {
             const deps = p.depende_de || [];
             return deps.map(depOrden => {
                 const desde = posPaso[depOrden];
                 const hasta = posPaso[p.orden];
                 if (!desde || !hasta) return '';
-                // Salida desde el borde inferior del origen, entrada por el superior del destino
-                const x1 = desde.cx;
-                const y1 = desde.cy + boxH / 2;
-                const x2 = hasta.cx;
-                const y2 = hasta.cy - boxH / 2;
-                // Path simple: si están alineados verticalmente, línea recta; si no, ruta L (esquinas)
+
+                const desdeCol = areasOrden.indexOf(desde.paso.area_code || desde.paso.area || '-');
+                const hastaCol = areasOrden.indexOf(hasta.paso.area_code || hasta.paso.area || '-');
                 let pathD;
-                if (x1 === x2) {
-                    pathD = `M ${x1} ${y1} L ${x2} ${y2}`;
+
+                if (desdeCol === hastaCol) {
+                    // Misma columna: línea vertical recta del bottom del origen al top del destino
+                    const x = desde.cx;
+                    const y1 = desde.cy + boxH / 2;
+                    const y2 = hasta.cy - boxH / 2;
+                    pathD = `M ${x} ${y1} L ${x} ${y2}`;
                 } else {
-                    // Esquina: baja media altura, después horizontal, después vertical
-                    const midY = (y1 + y2) / 2;
-                    pathD = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+                    // Columnas distintas: salida lateral del origen, vertical en el canal
+                    // entre columnas, llegada lateral al destino.
+                    const aDerecha = hastaCol > desdeCol;
+                    const x1 = desde.cx + (aDerecha ? boxW / 2 : -boxW / 2);
+                    const y1 = desde.cy;
+                    const x2 = hasta.cx + (aDerecha ? -boxW / 2 : boxW / 2);
+                    const y2 = hasta.cy;
+                    // Canal vertical: entre columnas, a 1/4 del ancho de columna del lado del origen
+                    // (suficiente para evitar tocar cajas adyacentes).
+                    const midX = (desde.cx + hasta.cx) / 2;
+                    pathD = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
                 }
                 return `<path d="${pathD}" stroke="rgba(0, 243, 255, 0.5)" stroke-width="1.5" fill="none" marker-end="url(#flowarrow)"></path>`;
             });
@@ -1033,6 +1054,52 @@ window.Procesos = (() => {
     }
 
     // ── Preview de documento (guía del proceso) ─────────────────────────
+    // ── Detalle de un paso (click en una caja del diagrama) ────────────
+    function abrirDetallePaso(pasoOrden) {
+        if (!_procActivo) return;
+        const pasos = _procActivo.pasos_definicion || [];
+        const paso = pasos.find(p => p.orden === pasoOrden);
+        if (!paso) return;
+
+        const depende = (paso.depende_de || []).join(', ') || '—';
+        const areaTxt = _areaLabel(paso.area_code || paso.area || '-');
+        const subTxt = paso.subarea_code ? ' / ' + _subareaLabel(paso.area_code || paso.area, paso.subarea_code) : '';
+
+        // Modal canónico (modal-backdrop + modal-content del design system)
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop is-open';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:600px;">
+                <div class="modal-header">
+                    <div>
+                        <div class="gta-flujo-drawer-eyebrow">Paso del proceso</div>
+                        <h2>${_esc(paso.titulo || 'Sin título')}</h2>
+                    </div>
+                    <button class="modal-close-btn" id="paso-det-close" type="button">×</button>
+                </div>
+                <div class="modal-body">
+                    ${paso.descripcion ? `<p style="margin:0 0 14px;">${_esc(paso.descripcion)}</p>` : ''}
+                    <div class="gta-flujo-summary" style="margin:0;">
+                        <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.85rem;">
+                            <span><i class="fas fa-layer-group"></i> <strong>Área:</strong> ${_esc(areaTxt)}${_esc(subTxt)}</span>
+                            <span><i class="fas fa-clock"></i> <strong>SLA:</strong> ${GtaUi.fmtSla(paso.sla_horas)}</span>
+                            <span><i class="fas fa-link"></i> <strong>Depende de paso${(paso.depende_de||[]).length>1?'s':''}:</strong> ${_esc(depende)}</span>
+                            <span><i class="fas fa-lock"></i> <strong>Bloqueante:</strong> ${paso.bloqueante !== false ? 'sí' : 'no'}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button class="btn-secondary" id="paso-det-close-2" type="button">Cerrar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const cleanup = () => modal.remove();
+        modal.querySelector('#paso-det-close').onclick = cleanup;
+        modal.querySelector('#paso-det-close-2').onclick = cleanup;
+        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
+    }
+
     async function abrirDocPreview(path) {
         const m = document.getElementById('modal-doc-preview');
         const body = document.getElementById('doc-preview-body');
@@ -1099,5 +1166,6 @@ window.Procesos = (() => {
         _setCampoDependeDe, _setCampoOpcionesPorValor, _quitarCampoForm,
         iniciarFlujo, cerrarIniciarFlujo, confirmarIniciarFlujo,
         abrirDocPreview, cerrarDocPreview,
+        abrirDetallePaso,
     };
 })();
