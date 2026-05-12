@@ -493,3 +493,32 @@
 .gta-flow-diagram.editing svg .gta-flow-step rect {
     stroke-dasharray: 6 4;
 }
+
+/* Lista de checkboxes de dependencias en el modal de editar paso */
+.gta-deps-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.gta-dep-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.gta-dep-check input { cursor: pointer; }
+
+/* Botón × de eliminar y + de agregar — hover */
+.gta-flow-step-del:hover circle {
+    fill: rgb(255, 80, 80);
+}
+.gta-flow-add:hover circle {
+    fill: rgba(0, 255, 65, 0.35);
+}

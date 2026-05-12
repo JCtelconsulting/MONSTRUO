@@ -155,7 +155,9 @@ window.Procesos = (() => {
         const numCols = areasOrden.length;
         const numRows = sorted.length;
         const totalW = numCols * colW + 20;
-        const totalH = headerH + padTop + numRows * rowH + 20;
+        // En modo edición agregamos espacio extra abajo para los botones +.
+        const extraEditH = _modoEditDiag ? 40 : 0;
+        const totalH = headerH + padTop + numRows * rowH + 20 + extraEditH;
 
         // Posición de cada paso: (col, row) → centro de la caja
         const posPaso = {};
@@ -181,17 +183,25 @@ window.Procesos = (() => {
                   stroke="rgba(255, 255, 255, 0.08)" stroke-dasharray="4 4"></line>
         `).join('');
 
-        // Cajas con texto en wrap (foreignObject + HTML), sin número de
-        // orden (para no sugerir que se ejecutan en ese orden cuando hay
-        // pasos paralelos). Click abre el modal de detalle del paso.
+        // Cajas con texto en wrap. En modo vista: click → detalle.
+        // En modo edición: click → editor del paso, y aparece × en la esquina.
         const cajas = sorted.map(p => {
             const pos = posPaso[p.orden];
             const x = pos.cx - boxW / 2;
             const y = pos.cy - boxH / 2;
             const titulo = (p.titulo || 'Sin título');
+            const onclick = _modoEditDiag
+                ? `Procesos._editarPasoDiag(${p.orden})`
+                : `Procesos.abrirDetallePaso(${p.orden})`;
+            const btnEliminar = _modoEditDiag
+                ? `<g class="gta-flow-step-del" onclick="event.stopPropagation(); Procesos._eliminarPasoDiag(${p.orden})" style="cursor:pointer;">
+                       <circle cx="${x + boxW - 8}" cy="${y + 8}" r="10" fill="rgba(255, 51, 51, 0.85)"></circle>
+                       <text x="${x + boxW - 8}" y="${y + 12}" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">×</text>
+                   </g>`
+                : '';
             return `
                 <g class="gta-flow-step" data-paso-orden="${p.orden}"
-                   onclick="Procesos.abrirDetallePaso(${p.orden})" style="cursor:pointer;">
+                   onclick="${onclick}" style="cursor:pointer;">
                     <rect x="${x}" y="${y}" width="${boxW}" height="${boxH}"
                           rx="8" fill="rgba(0, 243, 255, 0.15)" stroke="rgba(0, 243, 255, 0.6)" stroke-width="1.5"></rect>
                     <foreignObject x="${x + 6}" y="${y + 6}" width="${boxW - 12}" height="${boxH - 12}">
@@ -202,9 +212,23 @@ window.Procesos = (() => {
                             ${_esc(titulo)}
                         </div>
                     </foreignObject>
+                    ${btnEliminar}
                 </g>
             `;
         }).join('');
+
+        // En modo edición: botón "+" debajo de cada columna para agregar
+        // un paso en esa área.
+        const botonesAgregar = _modoEditDiag ? areasOrden.map((areaCode, idx) => {
+            const cx = idx * colW + colW / 2;
+            const cy = totalH - 14;
+            return `
+                <g class="gta-flow-add" onclick="Procesos._agregarPasoDiag('${_esc(areaCode)}')" style="cursor:pointer;">
+                    <circle cx="${cx}" cy="${cy}" r="14" fill="rgba(0, 255, 65, 0.18)" stroke="rgba(0, 255, 65, 0.6)" stroke-width="1.5"></circle>
+                    <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#00ff41" font-size="20" font-weight="700">+</text>
+                </g>
+            `;
+        }).join('') : '';
 
         // Routing de flechas: salir por el lateral del origen y entrar por
         // el lateral del destino, con la vertical pasando por el canal entre
@@ -263,6 +287,7 @@ window.Procesos = (() => {
                     ${headers}
                     ${flechas}
                     ${cajas}
+                    ${botonesAgregar}
                 </svg>
             </div>
         `;
@@ -1117,6 +1142,150 @@ window.Procesos = (() => {
         return orig !== edit;
     }
 
+    // Agrega un paso nuevo en el área dada. Por defecto sin deps y orden
+    // = max(orden actual) + 1. El usuario edita los detalles después.
+    function _agregarPasoDiag(areaCode) {
+        const maxOrden = _pasosEditDiag.reduce((m, p) => Math.max(m, p.orden || 0), 0);
+        const nuevo = {
+            orden: maxOrden + 1,
+            titulo: 'Nuevo paso',
+            descripcion: '',
+            area_code: areaCode,
+            subarea_code: null,
+            sla_horas: 24,
+            depende_de: [],
+            bloqueante: true,
+        };
+        _pasosEditDiag.push(nuevo);
+        _renderModal(_procActivo);
+        // Abrir editor inmediatamente para que el usuario termine de llenar
+        setTimeout(() => _editarPasoDiag(nuevo.orden), 50);
+    }
+
+    function _eliminarPasoDiag(pasoOrden) {
+        const p = _pasosEditDiag.find(x => x.orden === pasoOrden);
+        if (!p) return;
+        if (!confirm(`¿Eliminar el paso "${p.titulo}"?`)) return;
+        // Quitar el paso y limpiar referencias en depende_de de los demás
+        _pasosEditDiag = _pasosEditDiag.filter(x => x.orden !== pasoOrden);
+        _pasosEditDiag.forEach(x => {
+            x.depende_de = (x.depende_de || []).filter(d => d !== pasoOrden);
+        });
+        _renderModal(_procActivo);
+    }
+
+    // Modal de edición de un paso individual (título, descripción, área,
+    // subárea, sla, deps, bloqueante).
+    function _editarPasoDiag(pasoOrden) {
+        const p = _pasosEditDiag.find(x => x.orden === pasoOrden);
+        if (!p) return;
+
+        // Áreas con subáreas para los dropdowns
+        const areasActivas = _areas.filter(a => a.activo);
+        const subareasDeArea = (code) => {
+            const a = _areas.find(x => x.code === code);
+            return a?.subareas || [];
+        };
+
+        // Dependencias posibles: cualquier paso de orden distinto (para evitar
+        // ciclos triviales el usuario marca con cuidado; no validamos grafos
+        // complejos acá — el backend ya tolera grafos válidos).
+        const otros = _pasosEditDiag.filter(x => x.orden !== pasoOrden)
+            .sort((a, b) => a.orden - b.orden);
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop is-open';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:700px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-pen"></i> Editar paso</h2>
+                    <button class="modal-close-btn" id="ep-close" type="button">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="field">
+                        <label>Título *</label>
+                        <input id="ep-titulo" class="input-dark" value="${_esc(p.titulo)}">
+                    </div>
+                    <div class="field" style="margin-top:10px;">
+                        <label>Descripción</label>
+                        <textarea id="ep-desc" class="input-dark" rows="3">${_esc(p.descripcion)}</textarea>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <div class="field" style="flex:1;">
+                            <label>Área *</label>
+                            <select id="ep-area" class="input-dark">
+                                ${areasActivas.map(a => `<option value="${a.code}" ${a.code===p.area_code?'selected':''}>${_esc(a.label)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="field" style="flex:1;">
+                            <label>Subárea</label>
+                            <select id="ep-subarea" class="input-dark">
+                                <option value="">— Sin subárea —</option>
+                                ${subareasDeArea(p.area_code).map(s => `<option value="${s.code}" ${s.code===p.subarea_code?'selected':''}>${_esc(s.label)}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <div class="field" style="flex:1;">
+                            <label>SLA (horas laborales)</label>
+                            <input type="number" id="ep-sla" class="input-dark" min="0" value="${p.sla_horas || 0}">
+                        </div>
+                        <div class="field" style="flex:1; align-self:flex-end;">
+                            <label class="gta-checkbox-label" style="display:flex; align-items:center; gap:6px;">
+                                <input type="checkbox" id="ep-bloq" ${p.bloqueante !== false ? 'checked' : ''}>
+                                <span>Bloqueante (los siguientes esperan a éste)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="field" style="margin-top:14px;">
+                        <label>Depende de los pasos:</label>
+                        <div class="gta-deps-list">
+                            ${otros.length ? otros.map(o => `
+                                <label class="gta-dep-check">
+                                    <input type="checkbox" data-dep="${o.orden}" ${(p.depende_de||[]).includes(o.orden)?'checked':''}>
+                                    <span>${o.orden}. ${_esc(o.titulo)}</span>
+                                </label>
+                            `).join('') : '<p class="gta-section-help">No hay otros pasos para depender.</p>'}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+                    <button class="btn-secondary" id="ep-cancel" type="button">Cancelar</button>
+                    <button class="btn-primary" id="ep-ok" type="button"><i class="fas fa-check"></i> Aplicar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const cleanup = () => modal.remove();
+        modal.querySelector('#ep-close').onclick = cleanup;
+        modal.querySelector('#ep-cancel').onclick = cleanup;
+        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
+
+        // Al cambiar área, refrescar subáreas
+        modal.querySelector('#ep-area').onchange = (e) => {
+            const sel = modal.querySelector('#ep-subarea');
+            const subs = subareasDeArea(e.target.value);
+            sel.innerHTML = '<option value="">— Sin subárea —</option>' +
+                subs.map(s => `<option value="${s.code}">${_esc(s.label)}</option>`).join('');
+        };
+
+        modal.querySelector('#ep-ok').onclick = () => {
+            const titulo = modal.querySelector('#ep-titulo').value.trim();
+            if (!titulo) { alert('El título es obligatorio'); return; }
+            p.titulo = titulo;
+            p.descripcion = modal.querySelector('#ep-desc').value.trim();
+            p.area_code = modal.querySelector('#ep-area').value;
+            p.subarea_code = modal.querySelector('#ep-subarea').value || null;
+            p.sla_horas = parseInt(modal.querySelector('#ep-sla').value, 10) || 0;
+            p.bloqueante = modal.querySelector('#ep-bloq').checked;
+            p.depende_de = Array.from(modal.querySelectorAll('[data-dep]:checked'))
+                .map(c => parseInt(c.getAttribute('data-dep'), 10))
+                .sort((a, b) => a - b);
+            cleanup();
+            _renderModal(_procActivo);
+        };
+    }
+
     async function _guardarEditDiagrama() {
         if (!_procActivo) return;
         try {
@@ -1247,5 +1416,6 @@ window.Procesos = (() => {
         abrirDocPreview, cerrarDocPreview,
         abrirDetallePaso,
         _entrarEditDiagrama, _cancelarEditDiagrama, _guardarEditDiagrama,
+        _agregarPasoDiag, _eliminarPasoDiag, _editarPasoDiag,
     };
 })();
