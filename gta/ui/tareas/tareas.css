@@ -732,35 +732,6 @@
 .gta-quiebre-badge-open  { background: rgba(255, 165, 0, 0.18); color: #ffb84d; }
 .gta-quiebre-badge-ok    { background: rgba(76, 175, 80, 0.18); color: #81c784; }
 
-/* ── Modal de reportar quiebre (creado al vuelo) ───────────────────── */
-
-.gta-quiebre-modal {
-    position: fixed; inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 9999;
-    display: flex; align-items: center; justify-content: center;
-}
-
-.gta-quiebre-modal .modal-content {
-    background: var(--surface, #1f2429);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-    padding: 20px 24px;
-    width: 100%;
-    max-width: 500px;
-    color: var(--text, #e6e9ed);
-}
-
-.gta-quiebre-modal select,
-.gta-quiebre-modal textarea {
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #e6e9ed;
-    border-radius: 6px;
-    font-family: inherit;
-    font-size: 0.9rem;
-}
-
 /* ── Vista "Quiebres a mi área" (cards principales) ────────────────── */
 
 .gta-subtab-quiebres { color: #ffb84d; }

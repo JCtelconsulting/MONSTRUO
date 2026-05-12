@@ -763,29 +763,43 @@ window.Tareas = (() => {
             return;
         }
 
-        // Modal único: siempre selector de paso (cualquier paso anterior) + motivo
+        // Modal único usando el design system canónico (modal-backdrop + modal-content)
         const modal = document.createElement('div');
-        modal.className = 'modal show gta-quiebre-modal';
+        modal.className = 'modal-backdrop is-open';
         modal.innerHTML = `
-            <div class="modal-content">
-                <h3><i class="fas fa-undo-alt"></i> Devolver tarea al paso…</h3>
-                <p style="opacity:0.75;">Esta tarea se pausa hasta que el paso destino se vuelva a cerrar. Los pasos cerrados intermedios siguen como están; si el responsable del destino modifica datos o adjuntos, esos pasos verán un aviso para revisar.</p>
-                <label style="display:block; margin:12px 0 4px;">Devolver al paso</label>
-                <select id="dev-destino" style="width:100%; padding:8px;">
-                    ${destinos.map(d => `<option value="${d.orden}">Paso ${d.orden} — ${_esc(d.titulo)} (${_esc(d.area_code || '?')})</option>`).join('')}
-                </select>
-                <label style="display:block; margin:12px 0 4px;">¿Qué tiene que corregir?</label>
-                <textarea id="dev-motivo" rows="4" style="width:100%; padding:8px;"
-                          placeholder="Describe el problema lo más claro posible (qué dato/archivo está mal, qué falta, etc.)"></textarea>
-                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
-                    <button class="btn-secondary" id="dev-cancel">Cancelar</button>
-                    <button class="btn-danger" id="dev-ok"><i class="fas fa-undo-alt"></i> Devolver</button>
+            <div class="modal-content" style="max-width:640px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-undo-alt"></i> Devolver tarea al paso…</h2>
+                    <button class="modal-close-btn" id="dev-cancel" type="button">×</button>
+                </div>
+                <div class="modal-body">
+                    <p class="gta-section-help" style="margin-bottom:16px;">
+                        Esta tarea se pausa hasta que el paso destino se vuelva a cerrar. Los pasos cerrados intermedios siguen como están; si el responsable del destino modifica datos o adjuntos, esos pasos verán un aviso para revisar.
+                    </p>
+                    <div class="field">
+                        <label>Devolver al paso *</label>
+                        <select id="dev-destino" class="input-dark">
+                            ${destinos.map(d => `<option value="${d.orden}">Paso ${d.orden} — ${_esc(d.titulo)} (${_esc(d.area_code || '?')})</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="field" style="margin-top:14px;">
+                        <label>¿Qué tiene que corregir? *</label>
+                        <textarea id="dev-motivo" class="input-dark" rows="4"
+                                  placeholder="Describe el problema lo más claro posible (qué dato/archivo está mal, qué falta, etc.)"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button class="btn-secondary" id="dev-cancel-2" type="button">Cancelar</button>
+                    <button class="btn-danger" id="dev-ok" type="button"><i class="fas fa-undo-alt"></i> Devolver</button>
                 </div>
             </div>
         `;
         document.body.appendChild(modal);
         const cleanup = () => modal.remove();
         modal.querySelector('#dev-cancel').onclick = cleanup;
+        modal.querySelector('#dev-cancel-2').onclick = cleanup;
+        // Cerrar al click en backdrop
+        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
         modal.querySelector('#dev-ok').onclick = async () => {
             const dest = parseInt(modal.querySelector('#dev-destino').value, 10);
             const motivo = modal.querySelector('#dev-motivo').value.trim();
