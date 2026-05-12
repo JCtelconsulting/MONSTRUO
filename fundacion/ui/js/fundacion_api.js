@@ -58,6 +58,7 @@ window.FundApi = (() => {
         },
         getPlanificacionOficial: (nivelId, fecha) => get(`/planificacion-oficial?nivel_id=${nivelId}&fecha=${fecha}`),
         listPlanificaciones:    (nivelId, desde, hasta) => get(`/planificacion-oficial/listar?nivel_id=${nivelId}&desde=${desde}&hasta=${hasta}`),
+        getCalendarioBloques:   (sedeId, nivelId, desde, hasta) => get(`/calendario/bloques?sede_id=${sedeId}&nivel_id=${nivelId}&desde=${desde}&hasta=${hasta}`),
 
         // Sesiones pedagógicas
         listSesiones:         (sedeId, nivelId, desde, hasta) => {

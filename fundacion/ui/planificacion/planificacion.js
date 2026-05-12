@@ -19,8 +19,9 @@ window.FundPlanificacion = (() => {
     let _view = 'mes';
     let _cursor = new Date();
     let _selected = new Date();
-    let _sesionesIdx = {};        // sesiones GUARDADAS
-    let _planificacionIdx = {};   // días con PLAN OFICIAL
+    let _sesionesIdx = {};        // sesiones GUARDADAS (resumen para puntito/contador)
+    let _planificacionIdx = {};   // días con PLAN OFICIAL (resumen)
+    let _bloquesIdx = {};         // { 'YYYY-MM-DD': { status: 'sesion'|'plan', bloques: [...] } }
 
     async function init(ctx) {
         _ctx = ctx;
@@ -128,19 +129,37 @@ window.FundPlanificacion = (() => {
 
     async function _loadSesionesIdx() {
         const { desde, hasta } = _rangoVisible();
+        if (!_currentNivelId) {
+            _sesionesIdx = {}; _planificacionIdx = {}; _bloquesIdx = {};
+            return;
+        }
         try {
-            const [ses, plan] = await Promise.all([
-                window.FundApi.listSesiones(_ctx.sede.id, _currentNivelId, _ymd(desde), _ymd(hasta)),
-                _currentNivelId ? window.FundApi.listPlanificaciones(_currentNivelId, _ymd(desde), _ymd(hasta)) : Promise.resolve({ items: [] }),
-            ]);
+            const data = await window.FundApi.getCalendarioBloques(
+                _ctx.sede.id, _currentNivelId, _ymd(desde), _ymd(hasta)
+            );
             _sesionesIdx = {};
-            (ses.items || []).forEach(s => { _sesionesIdx[s.fecha] = s; });
             _planificacionIdx = {};
-            (plan.items || []).forEach(p => { _planificacionIdx[p.fecha] = p; });
+            _bloquesIdx = {};
+            (data.items || []).forEach(d => {
+                _bloquesIdx[d.fecha] = d;
+                const bloquesTot = (d.bloques || []).length;
+                const ejecutados = (d.bloques || []).filter(b => b.se_ejecuto).length;
+                if (d.status === 'sesion') {
+                    _sesionesIdx[d.fecha] = {
+                        fecha: d.fecha,
+                        clima_codigo: d.clima_codigo,
+                        clima_nombre: d.clima_nombre,
+                        clima_color: d.clima_color,
+                        bloques_total: bloquesTot,
+                        bloques_ejecutados: ejecutados,
+                    };
+                } else {
+                    _planificacionIdx[d.fecha] = { fecha: d.fecha, bloques: bloquesTot };
+                }
+            });
         } catch (e) {
             console.error('[Planificación] error cargando índice', e);
-            _sesionesIdx = {};
-            _planificacionIdx = {};
+            _sesionesIdx = {}; _planificacionIdx = {}; _bloquesIdx = {};
         }
     }
 
@@ -173,22 +192,39 @@ window.FundPlanificacion = (() => {
             if (isToday) cls.push('is-today');
             if (isSelected) cls.push('is-selected');
             const plan = _planificacionIdx[ymd];
+            const det = _bloquesIdx[ymd];
             let dot = '';
-            let count = '';
             if (sesion) {
                 const dotColor = sesion.clima_codigo ? _climaColor(sesion.clima_codigo) : '#4facfe';
                 dot = `<span class="plan-cal-day-dot is-sesion" style="background:${dotColor}" title="${_esc(sesion.clima_nombre || 'Sesión guardada')}"></span>`;
-                if (sesion.bloques_total) count = `<span class="plan-cal-day-count">${sesion.bloques_ejecutados}/${sesion.bloques_total}</span>`;
             } else if (plan) {
-                dot = `<span class="plan-cal-day-dot is-plan" title="Plan oficial: ${plan.bloques} bloques"></span>`;
-                count = `<span class="plan-cal-day-count is-plan">${plan.bloques}</span>`;
+                dot = `<span class="plan-cal-day-dot is-plan" title="Plan oficial"></span>`;
             }
+
+            // Mini-eventos del día (top 3 bloques con hora + nombre)
+            let eventos = '';
+            if (det && det.bloques && det.bloques.length) {
+                const statusCls = det.status === 'plan' ? 'is-plan' : 'is-sesion';
+                eventos = det.bloques.slice(0, 3).map(b => {
+                    const hora = b.hora_inicio ? b.hora_inicio.slice(0, 5) : '';
+                    const nombre = b.nombre_actividad || b.bloque_nombre || '';
+                    const color = b.bloque_color || '#4facfe';
+                    return `<div class="plan-cal-day-evento ${statusCls}" style="border-left-color:${color}" title="${_esc(b.bloque_nombre || '')}${b.subtipo_nombre ? ' · ' + _esc(b.subtipo_nombre) : ''}: ${_esc(nombre)}">
+                        ${hora ? `<span class="plan-cal-day-evento-hora">${hora}</span>` : ''}
+                        <span class="plan-cal-day-evento-titulo">${_esc(nombre)}</span>
+                    </div>`;
+                }).join('');
+                const extras = det.bloques.length - 3;
+                if (extras > 0) eventos += `<div class="plan-cal-day-evento-mas">+${extras} más</div>`;
+            }
+
             html += `
               <div class="${cls.join(' ')}" data-fecha="${ymd}">
                 <div class="plan-cal-day-head">
                   <span class="plan-cal-day-num">${d.getDate()}</span>
+                  ${dot}
                 </div>
-                <div class="plan-cal-day-marks">${dot}${count}</div>
+                <div class="plan-cal-day-eventos">${eventos}</div>
               </div>`;
         }
         html += '</div></div>';
@@ -222,22 +258,22 @@ window.FundPlanificacion = (() => {
         html += '</div>';
         body.innerHTML = html;
 
-        // Cargar bloques en paralelo para cada día con sesión
-        const fechas = Object.keys(_sesionesIdx);
-        for (const f of fechas) {
+        // Llenar bloques usando el índice precargado (sin requests extra)
+        Object.keys(_bloquesIdx).forEach(f => {
             const cont = body.querySelector(`[data-role="bloques-${f}"]`);
-            if (!cont) continue;
-            window.FundApi.getSesionByFecha(_ctx.sede.id, f, _currentNivelId).then(data => {
-                const bloques = (data.bloques || []).slice(0, 4);
-                if (!bloques.length) { cont.innerHTML = '<div class="plan-cal-semana-empty">—</div>'; return; }
-                cont.innerHTML = bloques.map(b => `
-                    <div class="plan-cal-semana-bloque">
-                      <span class="plan-cal-semana-hora">${b.hora_inicio ? b.hora_inicio.slice(0, 5) : ''}</span>
-                      <span class="plan-cal-semana-titulo">${_esc(b.nombre_actividad || b.bloque_tipo_nombre || '—')}</span>
-                    </div>
-                `).join('');
-            }).catch(() => { cont.innerHTML = '<div class="plan-cal-semana-empty">—</div>'; });
-        }
+            if (!cont) return;
+            const det = _bloquesIdx[f];
+            const bloques = (det.bloques || []).slice(0, 5);
+            if (!bloques.length) { cont.innerHTML = '<div class="plan-cal-semana-empty">—</div>'; return; }
+            const statusCls = det.status === 'plan' ? 'is-plan' : 'is-sesion';
+            cont.innerHTML = bloques.map(b => {
+                const color = b.bloque_color || '#4facfe';
+                return `<div class="plan-cal-semana-bloque ${statusCls}" style="border-left-color:${color}">
+                  <span class="plan-cal-semana-hora">${b.hora_inicio ? b.hora_inicio.slice(0, 5) : ''}</span>
+                  <span class="plan-cal-semana-titulo" title="${_esc(b.bloque_nombre || '')}">${_esc(b.nombre_actividad || b.bloque_nombre || '—')}</span>
+                </div>`;
+            }).join('');
+        });
 
         body.querySelectorAll('.plan-cal-semana-col').forEach(el => {
             el.addEventListener('click', () => _selectFecha(el.dataset.fecha));
@@ -248,25 +284,37 @@ window.FundPlanificacion = (() => {
         const body = document.getElementById('plan-cal-body');
         if (!body) return;
         const ymd = _ymd(_cursor);
-        body.innerHTML = '<div class="plan-cal-dia" id="plan-cal-dia-cont"><div class="plan-cal-dia-empty">Cargando…</div></div>';
-        const cont = body.querySelector('#plan-cal-dia-cont');
-        window.FundApi.getSesionByFecha(_ctx.sede.id, ymd, _currentNivelId).then(data => {
-            const bloques = data.bloques || [];
-            if (!bloques.length) { cont.innerHTML = '<div class="plan-cal-dia-empty">Sin bloques registrados para este día.</div>'; return; }
-            cont.innerHTML = bloques.map(b => {
-                const hora = (b.hora_inicio && b.hora_fin) ? `${b.hora_inicio.slice(0,5)}–${b.hora_fin.slice(0,5)}` : '';
-                return `
-                  <div class="plan-cal-dia-bloque">
-                    <span class="plan-cal-dia-bloque-hora">${hora || '—'}</span>
-                    <div>
-                      <div class="plan-cal-dia-bloque-titulo">${_esc(b.nombre_actividad || b.bloque_tipo_nombre || '—')}</div>
-                      <div class="plan-cal-dia-bloque-sub">${_esc(b.bloque_tipo_nombre)}${b.bloque_subtipo_nombre ? ' · ' + _esc(b.bloque_subtipo_nombre) : ''}</div>
-                    </div>
-                    <span>${b.se_ejecuto ? '<span class="plan-bloque-status is-ok">✓</span>' : '<span class="plan-bloque-status is-not-ok">✗</span>'}</span>
-                  </div>`;
-            }).join('');
-        }).catch(() => { cont.innerHTML = '<div class="plan-cal-dia-empty">Sin bloques registrados para este día.</div>'; });
-        // Asegurar que _selected coincida con cursor en vista día
+        const det = _bloquesIdx[ymd];
+        if (!det || !det.bloques?.length) {
+            body.innerHTML = '<div class="plan-cal-dia"><div class="plan-cal-dia-empty">Sin bloques planificados ni registrados para este día.</div></div>';
+            _selected = new Date(_cursor);
+            _refresh();
+            return;
+        }
+        const statusCls = det.status === 'plan' ? 'is-plan' : 'is-sesion';
+        const statusLabel = det.status === 'plan'
+            ? '<span class="plan-cal-dia-banner is-plan">Mostrando plan oficial — aún no registrado</span>'
+            : '<span class="plan-cal-dia-banner is-sesion">Sesión guardada</span>';
+        body.innerHTML = `
+            <div class="plan-cal-dia ${statusCls}">
+                ${statusLabel}
+                ${det.bloques.map(b => {
+                    const hora = (b.hora_inicio && b.hora_fin) ? `${b.hora_inicio.slice(0,5)}–${b.hora_fin.slice(0,5)}` : (b.hora_inicio ? b.hora_inicio.slice(0,5) : '');
+                    const color = b.bloque_color || '#4facfe';
+                    const ejec = det.status === 'sesion'
+                        ? (b.se_ejecuto ? '<span class="plan-bloque-status is-ok">✓ ejec.</span>' : '<span class="plan-bloque-status is-not-ok">✗ no ejec.</span>')
+                        : '';
+                    return `
+                      <div class="plan-cal-dia-bloque" style="border-left-color:${color}">
+                        <span class="plan-cal-dia-bloque-hora">${hora || '—'}</span>
+                        <div>
+                          <div class="plan-cal-dia-bloque-titulo">${_esc(b.nombre_actividad || b.bloque_nombre || '—')}</div>
+                          <div class="plan-cal-dia-bloque-sub">${_esc(b.bloque_nombre || '')}${b.subtipo_nombre ? ' · ' + _esc(b.subtipo_nombre) : ''}</div>
+                        </div>
+                        <span>${ejec}</span>
+                      </div>`;
+                }).join('')}
+            </div>`;
         _selected = new Date(_cursor);
         _refresh();
     }

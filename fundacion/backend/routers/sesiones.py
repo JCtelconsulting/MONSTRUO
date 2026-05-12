@@ -105,6 +105,104 @@ async def get_actividades(
         conn.close()
 
 
+@router.get("/calendario/bloques")
+async def get_calendario_bloques(
+    sede_id: int,
+    nivel_id: int,
+    desde: date_type,
+    hasta: date_type,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """Devuelve los bloques de cada día en el rango.
+
+    Para cada día: si hay sesión guardada usa sus bloques (status='sesion'),
+    si no usa los del plan oficial (status='plan'). Una sola request alcanza
+    para pintar el calendario completo del mes.
+    """
+    _ensure_sede_access(user, sede_id)
+    conn = db.get_conn()
+    try:
+        # 1) Bloques de sesiones guardadas
+        sesion_rows = conn.execute(
+            """
+            SELECT sd.fecha::text AS fecha, sb.orden, sb.hora_inicio, sb.hora_fin,
+                   sb.nombre_actividad, sb.se_ejecuto,
+                   bt.codigo AS bloque_codigo, bt.nombre AS bloque_nombre, bt.color AS bloque_color,
+                   bs.codigo AS subtipo_codigo, bs.nombre AS subtipo_nombre,
+                   co.codigo AS clima_codigo, co.nombre AS clima_nombre, co.color AS clima_color
+            FROM fundacion.sesion_dia sd
+            JOIN fundacion.sesion_bloque sb ON sb.sesion_dia_id = sd.id
+            JOIN fundacion.bloque_tipos bt ON bt.id = sb.bloque_tipo_id
+            LEFT JOIN fundacion.bloque_subtipos bs ON bs.id = sb.bloque_subtipo_id
+            LEFT JOIN fundacion.clima_opciones co ON co.id = sd.clima_opcion_id
+            WHERE sd.sede_id = %s AND sd.nivel_id = %s
+              AND sd.fecha BETWEEN %s AND %s
+            ORDER BY sd.fecha, sb.orden
+            """,
+            (sede_id, nivel_id, desde, hasta),
+        ).fetchall()
+
+        sesion_por_fecha: dict[str, dict] = {}
+        for r in sesion_rows:
+            d = dict(r)
+            if d.get("hora_inicio"): d["hora_inicio"] = str(d["hora_inicio"])
+            if d.get("hora_fin"): d["hora_fin"] = str(d["hora_fin"])
+            fecha = d["fecha"]
+            if fecha not in sesion_por_fecha:
+                sesion_por_fecha[fecha] = {
+                    "fecha": fecha,
+                    "status": "sesion",
+                    "clima_codigo": d.pop("clima_codigo"),
+                    "clima_nombre": d.pop("clima_nombre"),
+                    "clima_color": d.pop("clima_color"),
+                    "bloques": [],
+                }
+            else:
+                # Limpiar clima fields que vienen repetidos en cada fila
+                d.pop("clima_codigo", None); d.pop("clima_nombre", None); d.pop("clima_color", None)
+            sesion_por_fecha[fecha]["bloques"].append(d)
+
+        # 2) Bloques del plan oficial (solo para los días que no tienen sesión)
+        plan_rows = conn.execute(
+            """
+            SELECT pd.fecha::text AS fecha, pb.orden, pb.hora_inicio, pb.hora_fin,
+                   pb.nombre_actividad,
+                   bt.codigo AS bloque_codigo, bt.nombre AS bloque_nombre, bt.color AS bloque_color,
+                   bs.codigo AS subtipo_codigo, bs.nombre AS subtipo_nombre
+            FROM fundacion.planificacion_dia pd
+            JOIN fundacion.planificacion_bloque pb ON pb.planificacion_dia_id = pd.id
+            JOIN fundacion.bloque_tipos bt ON bt.id = pb.bloque_tipo_id
+            LEFT JOIN fundacion.bloque_subtipos bs ON bs.id = pb.bloque_subtipo_id
+            WHERE pd.nivel_id = %s AND pd.fecha BETWEEN %s AND %s
+            ORDER BY pd.fecha, pb.orden
+            """,
+            (nivel_id, desde, hasta),
+        ).fetchall()
+
+        plan_por_fecha: dict[str, dict] = {}
+        for r in plan_rows:
+            d = dict(r)
+            if d.get("hora_inicio"): d["hora_inicio"] = str(d["hora_inicio"])
+            if d.get("hora_fin"): d["hora_fin"] = str(d["hora_fin"])
+            fecha = d["fecha"]
+            if fecha in sesion_por_fecha:
+                continue  # ya tiene sesión, ignoramos plan
+            if fecha not in plan_por_fecha:
+                plan_por_fecha[fecha] = {
+                    "fecha": fecha,
+                    "status": "plan",
+                    "bloques": [],
+                }
+            plan_por_fecha[fecha]["bloques"].append(d)
+
+        # 3) Combinar y devolver
+        items = list(sesion_por_fecha.values()) + list(plan_por_fecha.values())
+        items.sort(key=lambda x: x["fecha"])
+        return {"items": items}
+    finally:
+        conn.close()
+
+
 @router.get("/planificacion-oficial/listar")
 async def listar_planificacion(
     nivel_id: int,
