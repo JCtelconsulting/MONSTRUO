@@ -327,6 +327,30 @@
     align-items: center;
 }
 
+.plan-nivel-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.25rem 0.6rem;
+}
+
+.plan-nivel-label i {
+    color: var(--text-soft);
+    font-size: 0.85rem;
+}
+
+.plan-nivel-label select {
+    background: transparent;
+    border: none;
+    color: inherit;
+    padding: 0.15rem 0.25rem;
+    min-width: 180px;
+    cursor: pointer;
+}
+
 .plan-fecha-label {
     display: inline-flex;
     align-items: center;
@@ -744,6 +768,91 @@
 .plan-mat-num { text-align: right; }
 
 .plan-bloque-no-ejec input[type="text"] { width: 100%; }
+
+/* ── Autocomplete de actividad ──────────────────────────────────────── */
+
+.plan-actividad-row { position: relative; }
+
+.plan-actividad-wrap {
+    position: relative;
+}
+
+.plan-actividad-fuente {
+    margin-left: 0.4rem;
+    font-size: 0.65rem;
+    background: rgba(16, 185, 129, 0.18);
+    color: #6ee7b7;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+    display: none;
+}
+
+.plan-actividad-fuente.is-visible { display: inline-block; }
+
+.plan-actividad-suggest {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #0f172a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    z-index: 50;
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.plan-actividad-suggest[hidden] { display: none; }
+
+.plan-actividad-item {
+    padding: 0.5rem 0.7rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.plan-actividad-item:last-child { border-bottom: none; }
+
+.plan-actividad-item:hover,
+.plan-actividad-item.is-focused {
+    background: rgba(79, 172, 254, 0.12);
+}
+
+.plan-actividad-item-title {
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.plan-actividad-item-meta {
+    color: var(--text-soft);
+    font-size: 0.7rem;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.plan-actividad-item-comp {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.05rem 0.4rem;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 0.65rem;
+}
+
+.plan-actividad-item-uso {
+    color: var(--text-soft);
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+}
 
 /* Responsive: stack en pantallas chicas */
 

@@ -40,6 +40,125 @@ def _ensure_sede_access(user: dict, sede_id: int) -> int:
 
 # ── Catálogos ───────────────────────────────────────────────────────────────
 
+@router.get("/catalogos/niveles")
+async def get_niveles(user: dict = Depends(deps.require_permission("fundacion:read"))):
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT id, codigo, nombre, descripcion, color, orden FROM fundacion.niveles WHERE activo = TRUE ORDER BY orden"
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/catalogos/actividades")
+async def get_actividades(
+    q: Optional[str] = None,
+    bloque_tipo_id: Optional[int] = None,
+    bloque_subtipo_id: Optional[int] = None,
+    limit: int = 30,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """Búsqueda de actividades (catálogo). Soporta autocomplete por nombre."""
+    limit = max(1, min(limit, 100))
+    conn = db.get_conn()
+    try:
+        clauses = ["a.activo = TRUE"]
+        params: list = []
+        if bloque_tipo_id is not None:
+            clauses.append("a.bloque_tipo_id = %s")
+            params.append(bloque_tipo_id)
+        if bloque_subtipo_id is not None:
+            clauses.append("a.bloque_subtipo_id = %s")
+            params.append(bloque_subtipo_id)
+        if q and q.strip():
+            clauses.append("a.nombre_normalizado ILIKE %s")
+            params.append(f"%{q.strip().lower()}%")
+        sql = f"""
+            SELECT a.id, a.nombre, a.bloque_tipo_id, a.bloque_subtipo_id,
+                   a.resultado_aprendizaje, a.materiales_tipicos, a.veces_referenciada,
+                   bt.codigo AS bloque_tipo_codigo, bt.nombre AS bloque_tipo_nombre,
+                   bs.codigo AS bloque_subtipo_codigo, bs.nombre AS bloque_subtipo_nombre,
+                   COALESCE((
+                       SELECT array_agg(c.codigo ORDER BY c.codigo)
+                       FROM fundacion.actividad_competencias ac
+                       JOIN fundacion.competencias c ON c.id = ac.competencia_id
+                       WHERE ac.actividad_id = a.id
+                   ), ARRAY[]::text[]) AS competencias_codigos,
+                   COALESCE((
+                       SELECT array_agg(ac.competencia_id ORDER BY c.codigo)
+                       FROM fundacion.actividad_competencias ac
+                       JOIN fundacion.competencias c ON c.id = ac.competencia_id
+                       WHERE ac.actividad_id = a.id
+                   ), ARRAY[]::int[]) AS competencias_ids
+            FROM fundacion.actividades a
+            JOIN fundacion.bloque_tipos bt ON bt.id = a.bloque_tipo_id
+            LEFT JOIN fundacion.bloque_subtipos bs ON bs.id = a.bloque_subtipo_id
+            WHERE {" AND ".join(clauses)}
+            ORDER BY a.veces_referenciada DESC, a.nombre
+            LIMIT %s
+        """
+        rows = conn.execute(sql, tuple(params) + (limit,)).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/planificacion-oficial")
+async def get_planificacion_oficial(
+    nivel_id: int,
+    fecha: date_type,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """Devuelve los bloques planificados oficialmente para un nivel y fecha
+    según los docs de la fundación. Si no hay plan para ese día, 404."""
+    conn = db.get_conn()
+    try:
+        dia = conn.execute(
+            """
+            SELECT id, nivel_id, fecha, numero_dia, dia_semana, fuente_doc
+            FROM fundacion.planificacion_dia
+            WHERE nivel_id = %s AND fecha = %s
+            """,
+            (nivel_id, fecha),
+        ).fetchone()
+        if not dia:
+            raise HTTPException(status_code=404, detail="Sin planificación oficial para este día y nivel")
+
+        bloques = conn.execute(
+            """
+            SELECT pb.*, bt.codigo AS bloque_tipo_codigo, bt.nombre AS bloque_tipo_nombre,
+                   bs.codigo AS bloque_subtipo_codigo, bs.nombre AS bloque_subtipo_nombre,
+                   COALESCE((
+                       SELECT array_agg(c.id ORDER BY c.codigo)
+                       FROM fundacion.planificacion_bloque_competencias pbc
+                       JOIN fundacion.competencias c ON c.id = pbc.competencia_id
+                       WHERE pbc.planificacion_bloque_id = pb.id
+                   ), ARRAY[]::int[]) AS competencias_ids
+            FROM fundacion.planificacion_bloque pb
+            JOIN fundacion.bloque_tipos bt ON bt.id = pb.bloque_tipo_id
+            LEFT JOIN fundacion.bloque_subtipos bs ON bs.id = pb.bloque_subtipo_id
+            WHERE pb.planificacion_dia_id = %s
+            ORDER BY pb.orden
+            """,
+            (dia["id"],),
+        ).fetchall()
+
+        out = dict(dia)
+        if out.get("fecha"):
+            out["fecha"] = out["fecha"].isoformat()
+        out["bloques"] = [dict(b) for b in bloques]
+        for b in out["bloques"]:
+            if b.get("hora_inicio"):
+                b["hora_inicio"] = str(b["hora_inicio"])
+            if b.get("hora_fin"):
+                b["hora_fin"] = str(b["hora_fin"])
+        return out
+    finally:
+        conn.close()
+
+
 @router.get("/catalogos/dominios")
 async def get_dominios(user: dict = Depends(deps.require_permission("fundacion:read"))):
     conn = db.get_conn()
@@ -127,6 +246,7 @@ class BloqueIn(BaseModel):
     orden: int
     bloque_tipo_id: int
     bloque_subtipo_id: Optional[int] = None
+    actividad_id: Optional[int] = None     # FK al catálogo si la gestora eligió de ahí
     nombre_actividad: Optional[str] = None
     resultado_aprendizaje: Optional[str] = None
     hora_inicio: Optional[str] = None      # "HH:MM" o "HH:MM:SS"
@@ -141,6 +261,7 @@ class BloqueIn(BaseModel):
 
 class SesionIn(BaseModel):
     sede_id: int
+    nivel_id: int
     fecha: date_type
     clima_opcion_id: Optional[int] = None
     situaciones_relevantes: Optional[str] = None
@@ -153,9 +274,11 @@ class SesionIn(BaseModel):
 def _sesion_to_dict(conn, sesion_id: int) -> dict:
     sd = conn.execute(
         """
-        SELECT sd.*, co.codigo AS clima_codigo, co.nombre AS clima_nombre, co.color AS clima_color
+        SELECT sd.*, co.codigo AS clima_codigo, co.nombre AS clima_nombre, co.color AS clima_color,
+               n.codigo AS nivel_codigo, n.nombre AS nivel_nombre, n.color AS nivel_color
         FROM fundacion.sesion_dia sd
         LEFT JOIN fundacion.clima_opciones co ON co.id = sd.clima_opcion_id
+        LEFT JOIN fundacion.niveles n ON n.id = sd.nivel_id
         WHERE sd.id = %s
         """,
         (sesion_id,),
@@ -232,6 +355,7 @@ def _sesion_to_dict(conn, sesion_id: int) -> dict:
 @router.get("/sesiones")
 async def list_sesiones(
     sede_id: int,
+    nivel_id: Optional[int] = None,
     desde: Optional[date_type] = None,
     hasta: Optional[date_type] = None,
     user: dict = Depends(deps.require_permission("fundacion:read")),
@@ -241,6 +365,9 @@ async def list_sesiones(
     try:
         clauses = ["sd.sede_id = %s"]
         params: list = [sede_id]
+        if nivel_id is not None:
+            clauses.append("sd.nivel_id = %s")
+            params.append(nivel_id)
         if desde:
             clauses.append("sd.fecha >= %s")
             params.append(desde)
@@ -249,15 +376,17 @@ async def list_sesiones(
             params.append(hasta)
         rows = conn.execute(
             f"""
-            SELECT sd.id, sd.sede_id, sd.fecha, sd.cerrado, sd.clima_opcion_id,
+            SELECT sd.id, sd.sede_id, sd.nivel_id, sd.fecha, sd.cerrado, sd.clima_opcion_id,
                    co.codigo AS clima_codigo, co.nombre AS clima_nombre,
+                   n.codigo AS nivel_codigo, n.nombre AS nivel_nombre, n.color AS nivel_color,
                    COUNT(sb.id) AS bloques_total,
                    COUNT(sb.id) FILTER (WHERE sb.se_ejecuto) AS bloques_ejecutados
             FROM fundacion.sesion_dia sd
             LEFT JOIN fundacion.clima_opciones co ON co.id = sd.clima_opcion_id
+            LEFT JOIN fundacion.niveles n ON n.id = sd.nivel_id
             LEFT JOIN fundacion.sesion_bloque sb ON sb.sesion_dia_id = sd.id
             WHERE {" AND ".join(clauses)}
-            GROUP BY sd.id, co.codigo, co.nombre
+            GROUP BY sd.id, co.codigo, co.nombre, n.codigo, n.nombre, n.color
             ORDER BY sd.fecha DESC
             """,
             tuple(params),
@@ -277,15 +406,16 @@ async def list_sesiones(
 async def get_sesion_by_fecha(
     sede_id: int,
     fecha: date_type,
+    nivel_id: int,
     user: dict = Depends(deps.require_permission("fundacion:read")),
 ):
-    """Devuelve la sesión de (sede, fecha) si existe; 404 si no."""
+    """Devuelve la sesión de (sede, nivel, fecha) si existe; 404 si no."""
     _ensure_sede_access(user, sede_id)
     conn = db.get_conn()
     try:
         row = conn.execute(
-            "SELECT id FROM fundacion.sesion_dia WHERE sede_id = %s AND fecha = %s",
-            (sede_id, fecha),
+            "SELECT id FROM fundacion.sesion_dia WHERE sede_id = %s AND nivel_id = %s AND fecha = %s",
+            (sede_id, nivel_id, fecha),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Sesión no existe")
@@ -328,8 +458,11 @@ async def upsert_sesion(
     try:
         # Si la sesión existe y está cerrada → 409
         existing = conn.execute(
-            "SELECT id, cerrado FROM fundacion.sesion_dia WHERE sede_id = %s AND fecha = %s",
-            (body.sede_id, body.fecha),
+            """
+            SELECT id, cerrado FROM fundacion.sesion_dia
+            WHERE sede_id = %s AND nivel_id = %s AND fecha = %s
+            """,
+            (body.sede_id, body.nivel_id, body.fecha),
         ).fetchone()
 
         if existing and existing["cerrado"]:
@@ -356,13 +489,13 @@ async def upsert_sesion(
             cur = conn.execute(
                 """
                 INSERT INTO fundacion.sesion_dia (
-                    sede_id, fecha, clima_opcion_id, situaciones_relevantes,
+                    sede_id, nivel_id, fecha, clima_opcion_id, situaciones_relevantes,
                     estrategias_aplicadas, notas, cerrado, creado_por, actualizado_por
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (body.sede_id, body.fecha, body.clima_opcion_id,
+                (body.sede_id, body.nivel_id, body.fecha, body.clima_opcion_id,
                  body.situaciones_relevantes, body.estrategias_aplicadas,
                  body.notas, body.cerrado, uid, uid),
             )
@@ -375,14 +508,14 @@ async def upsert_sesion(
             cur = conn.execute(
                 """
                 INSERT INTO fundacion.sesion_bloque (
-                    sesion_dia_id, orden, bloque_tipo_id, bloque_subtipo_id,
+                    sesion_dia_id, orden, bloque_tipo_id, bloque_subtipo_id, actividad_id,
                     nombre_actividad, resultado_aprendizaje, hora_inicio, hora_fin,
                     se_ejecuto, motivo_no_ejecucion, adaptacion, notas
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (sesion_id, b.orden, b.bloque_tipo_id, b.bloque_subtipo_id,
+                (sesion_id, b.orden, b.bloque_tipo_id, b.bloque_subtipo_id, b.actividad_id,
                  b.nombre_actividad, b.resultado_aprendizaje, b.hora_inicio, b.hora_fin,
                  b.se_ejecuto, b.motivo_no_ejecucion, b.adaptacion, b.notas),
             )

@@ -42,19 +42,31 @@ window.FundApi = (() => {
         getSyncLogs:          (limit=20)          => get(`/sync/logs?limit=${limit}`),
 
         // Catálogos pedagógicos
+        getCatNiveles:        ()                  => get('/catalogos/niveles'),
         getCatDominios:       ()                  => get('/catalogos/dominios'),
         getCatCompetencias:   ()                  => get('/catalogos/competencias'),
         getCatBloqueTipos:    ()                  => get('/catalogos/bloque-tipos'),
         getCatClima:          ()                  => get('/catalogos/clima'),
+        getCatActividades:    (opts={}) => {
+            const qs = new URLSearchParams();
+            if (opts.q) qs.set('q', opts.q);
+            if (opts.bloqueTipoId != null) qs.set('bloque_tipo_id', opts.bloqueTipoId);
+            if (opts.bloqueSubtipoId != null) qs.set('bloque_subtipo_id', opts.bloqueSubtipoId);
+            if (opts.limit) qs.set('limit', opts.limit);
+            const q = qs.toString();
+            return get(`/catalogos/actividades${q ? `?${q}` : ''}`);
+        },
+        getPlanificacionOficial: (nivelId, fecha) => get(`/planificacion-oficial?nivel_id=${nivelId}&fecha=${fecha}`),
 
         // Sesiones pedagógicas
-        listSesiones:         (sedeId, desde, hasta) => {
+        listSesiones:         (sedeId, nivelId, desde, hasta) => {
             const qs = new URLSearchParams({ sede_id: sedeId });
+            if (nivelId != null) qs.set('nivel_id', nivelId);
             if (desde) qs.set('desde', desde);
             if (hasta) qs.set('hasta', hasta);
             return get(`/sesiones?${qs}`);
         },
-        getSesionByFecha:     (sedeId, fecha)     => get(`/sesiones/by-fecha?sede_id=${sedeId}&fecha=${fecha}`),
+        getSesionByFecha:     (sedeId, fecha, nivelId) => get(`/sesiones/by-fecha?sede_id=${sedeId}&fecha=${fecha}&nivel_id=${nivelId}`),
         getSesion:            (id)                => get(`/sesiones/${id}`),
         upsertSesion:         (data)              => window.fetchApi(`${base}/sesiones`, {
             method: 'PUT', headers: h, body: JSON.stringify(data), timeoutMs: 30000,

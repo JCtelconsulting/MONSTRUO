@@ -5,8 +5,12 @@
             <p id="plan-sede-subtitle" class="fund-pane-sub">Registro diario de bloques y clima por sede</p>
         </div>
         <div class="plan-actions">
-            <button id="plan-btn-sugerir" class="btn-secondary" title="Cargar plantilla de 6 bloques estándar">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Plantilla del día
+            <label class="plan-nivel-label">
+                <i class="fa-solid fa-layer-group"></i>
+                <select id="plan-nivel" class="input-dark"></select>
+            </label>
+            <button id="plan-btn-plan-oficial" class="btn-secondary" title="Cargar el plan oficial de este nivel para la fecha seleccionada">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Cargar plan oficial
             </button>
             <button id="plan-btn-guardar" class="btn-primary">
                 <i class="fa-solid fa-floppy-disk"></i> Guardar
@@ -142,11 +146,17 @@
                 </div>
             </div>
 
-            <!-- Actividad -->
-            <label class="plan-bloque-row">
-                <span class="plan-field-lbl">Actividad</span>
-                <input type="text" data-role="actividad" class="input-dark"
-                       placeholder='Ej: "Pelota de la amistad", "Just dance", "Mural de la felicidad"' />
+            <!-- Actividad (con autocomplete contra el catálogo) -->
+            <label class="plan-bloque-row plan-actividad-row">
+                <span class="plan-field-lbl">Actividad
+                    <span class="plan-actividad-fuente" data-role="actividad-fuente"></span>
+                </span>
+                <div class="plan-actividad-wrap">
+                    <input type="text" data-role="actividad" class="input-dark"
+                           autocomplete="off"
+                           placeholder='Empieza a escribir para buscar en el catálogo…' />
+                    <div class="plan-actividad-suggest" data-role="actividad-suggest" hidden></div>
+                </div>
             </label>
 
             <!-- Resultado de aprendizaje (solo bloques que permiten competencias) -->

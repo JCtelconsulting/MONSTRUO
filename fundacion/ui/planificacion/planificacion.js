@@ -1,6 +1,6 @@
 window.FundPlanificacion = (() => {
     let _ctx = null;
-    let _cat = { dominios: [], competencias: [], bloqueTipos: [], clima: [] };
+    let _cat = { niveles: [], dominios: [], competencias: [], bloqueTipos: [], clima: [] };
     let _compByDomain = [];
     let _bloques = [];
     let _sesionMeta = {
@@ -12,12 +12,13 @@ window.FundPlanificacion = (() => {
     let _catLoaded = false;
     let _saving = false;
     let _bloqueSeq = 0;
+    let _currentNivelId = null;
 
     // Estado del calendario
-    let _view = 'mes';            // 'mes' | 'semana' | 'dia'
-    let _cursor = new Date();     // fecha "ancla" del período visible
-    let _selected = new Date();   // día seleccionado para el editor
-    let _sesionesIdx = {};        // { 'YYYY-MM-DD': { bloques_total, bloques_ejecutados, clima_codigo, clima_nombre } }
+    let _view = 'mes';
+    let _cursor = new Date();
+    let _selected = new Date();
+    let _sesionesIdx = {};
 
     async function init(ctx) {
         _ctx = ctx;
@@ -26,6 +27,7 @@ window.FundPlanificacion = (() => {
         _initEventos();
         _renderHead();
         await _ensureCatalogos();
+        _renderNivelSelector();
         _renderClimaGrid();
         await _renderCalendar();
         await _refresh();
@@ -40,8 +42,9 @@ window.FundPlanificacion = (() => {
 
     function _initEventos() {
         document.getElementById('plan-btn-add-bloque')?.addEventListener('click', () => _agregarBloque({ open: true }));
-        document.getElementById('plan-btn-sugerir')?.addEventListener('click', _cargarPlantillaDelDia);
+        document.getElementById('plan-btn-plan-oficial')?.addEventListener('click', _cargarPlanOficial);
         document.getElementById('plan-btn-guardar')?.addEventListener('click', _guardar);
+        document.getElementById('plan-nivel')?.addEventListener('change', _onNivelChange);
         document.getElementById('plan-btn-collapse-all')?.addEventListener('click', () => _toggleAll(false));
         document.getElementById('plan-btn-expand-all')?.addEventListener('click', () => _toggleAll(true));
 
@@ -124,7 +127,7 @@ window.FundPlanificacion = (() => {
     async function _loadSesionesIdx() {
         const { desde, hasta } = _rangoVisible();
         try {
-            const data = await window.FundApi.listSesiones(_ctx.sede.id, _ymd(desde), _ymd(hasta));
+            const data = await window.FundApi.listSesiones(_ctx.sede.id, _currentNivelId, _ymd(desde), _ymd(hasta));
             _sesionesIdx = {};
             (data.items || []).forEach(s => {
                 _sesionesIdx[s.fecha] = s;
@@ -210,7 +213,7 @@ window.FundPlanificacion = (() => {
         for (const f of fechas) {
             const cont = body.querySelector(`[data-role="bloques-${f}"]`);
             if (!cont) continue;
-            window.FundApi.getSesionByFecha(_ctx.sede.id, f).then(data => {
+            window.FundApi.getSesionByFecha(_ctx.sede.id, f, _currentNivelId).then(data => {
                 const bloques = (data.bloques || []).slice(0, 4);
                 if (!bloques.length) { cont.innerHTML = '<div class="plan-cal-semana-empty">—</div>'; return; }
                 cont.innerHTML = bloques.map(b => `
@@ -233,7 +236,7 @@ window.FundPlanificacion = (() => {
         const ymd = _ymd(_cursor);
         body.innerHTML = '<div class="plan-cal-dia" id="plan-cal-dia-cont"><div class="plan-cal-dia-empty">Cargando…</div></div>';
         const cont = body.querySelector('#plan-cal-dia-cont');
-        window.FundApi.getSesionByFecha(_ctx.sede.id, ymd).then(data => {
+        window.FundApi.getSesionByFecha(_ctx.sede.id, ymd, _currentNivelId).then(data => {
             const bloques = data.bloques || [];
             if (!bloques.length) { cont.innerHTML = '<div class="plan-cal-dia-empty">Sin bloques registrados para este día.</div>'; return; }
             cont.innerHTML = bloques.map(b => {
@@ -321,27 +324,50 @@ window.FundPlanificacion = (() => {
     async function _ensureCatalogos() {
         if (_catLoaded) return;
         try {
-            const [dom, comp, bt, cli] = await Promise.all([
+            const [niv, dom, comp, bt, cli] = await Promise.all([
+                window.FundApi.getCatNiveles(),
                 window.FundApi.getCatDominios(),
                 window.FundApi.getCatCompetencias(),
                 window.FundApi.getCatBloqueTipos(),
                 window.FundApi.getCatClima(),
             ]);
+            _cat.niveles = niv.items || [];
             _cat.dominios = dom.items || [];
             _cat.competencias = comp.items || [];
             _cat.bloqueTipos = bt.items || [];
             _cat.clima = cli.items || [];
 
-            // agrupar competencias por dominio en el orden correcto
             _compByDomain = _cat.dominios.map(d => ({
                 dominio: d,
                 competencias: _cat.competencias.filter(c => c.dominio_id === d.id),
             }));
+
+            // Default al primer nivel (Prekinder-Kinder) si no hay uno seleccionado
+            if (_currentNivelId == null && _cat.niveles.length) {
+                const saved = localStorage.getItem('fund_plan_nivel_id');
+                const found = saved && _cat.niveles.find(n => n.id === Number(saved));
+                _currentNivelId = found ? Number(saved) : _cat.niveles[0].id;
+            }
             _catLoaded = true;
         } catch (e) {
             console.error('[Planificación] error cargando catálogos', e);
             window.showToast?.('No se pudieron cargar los catálogos pedagógicos', 'error');
         }
+    }
+
+    function _renderNivelSelector() {
+        const sel = document.getElementById('plan-nivel');
+        if (!sel) return;
+        sel.innerHTML = _cat.niveles.map(n =>
+            `<option value="${n.id}" ${n.id === _currentNivelId ? 'selected' : ''}>${_esc(n.nombre)}</option>`
+        ).join('');
+    }
+
+    async function _onNivelChange(ev) {
+        _currentNivelId = Number(ev.target.value);
+        localStorage.setItem('fund_plan_nivel_id', String(_currentNivelId));
+        await _renderCalendar();
+        await _refresh();
     }
 
     function _renderClimaGrid() {
@@ -372,7 +398,7 @@ window.FundPlanificacion = (() => {
     async function _refresh() {
         const fecha = _ymd(_selected);
         _updateEditorHeader();
-        if (!_ctx?.sede?.id) {
+        if (!_ctx?.sede?.id || !_currentNivelId) {
             _bloques = [];
             _resetMeta();
             _renderBloques();
@@ -380,7 +406,7 @@ window.FundPlanificacion = (() => {
         }
         await _ensureCatalogos();
         try {
-            const data = await window.FundApi.getSesionByFecha(_ctx.sede.id, fecha);
+            const data = await window.FundApi.getSesionByFecha(_ctx.sede.id, fecha, _currentNivelId);
             _sesionMeta.clima_opcion_id = data.clima_opcion_id || null;
             _sesionMeta.situaciones_relevantes = data.situaciones_relevantes || '';
             _sesionMeta.estrategias_aplicadas = data.estrategias_aplicadas || '';
@@ -420,10 +446,11 @@ window.FundPlanificacion = (() => {
     function _bloqueFromApi(b) {
         return {
             _idx: ++_bloqueSeq,
-            _open: false,  // los bloques existentes arrancan colapsados (legibilidad)
+            _open: false,
             orden: b.orden,
             bloque_tipo_id: b.bloque_tipo_id,
             bloque_subtipo_id: b.bloque_subtipo_id,
+            actividad_id: b.actividad_id || null,
             nombre_actividad: b.nombre_actividad || '',
             resultado_aprendizaje: b.resultado_aprendizaje || '',
             hora_inicio: b.hora_inicio || '',
@@ -450,6 +477,7 @@ window.FundPlanificacion = (() => {
             orden: _bloques.length + 1,
             bloque_tipo_id: preset?.bloque_tipo_id ?? (tipoDefault?.id || null),
             bloque_subtipo_id: preset?.bloque_subtipo_id ?? null,
+            actividad_id: preset?.actividad_id ?? null,
             nombre_actividad: preset?.nombre_actividad ?? '',
             resultado_aprendizaje: '',
             hora_inicio: preset?.hora_inicio ?? '',
@@ -464,32 +492,54 @@ window.FundPlanificacion = (() => {
         _renderBloques();
     }
 
-    function _cargarPlantillaDelDia() {
-        if (_bloques.length && !confirm('Esto va a reemplazar los bloques actuales por la plantilla estándar. ¿Continuar?')) return;
-        _bloques = [];
-        const tipo = (codigo) => _cat.bloqueTipos.find(t => t.codigo === codigo);
-        const subtipo = (tipoCodigo, subCodigo) => {
-            const t = tipo(tipoCodigo);
-            return t?.subtipos?.find(s => s.codigo === subCodigo)?.id || null;
-        };
-        const plantilla = [
-            { tipo: 'juegos_para_crecer',   sub: 'psicomotor', ini: '15:30', fin: '16:00' },
-            { tipo: 'taller_socioemocional',sub: null,         ini: '16:00', fin: '17:00' },
-            { tipo: 'colacion',             sub: null,         ini: '17:00', fin: '17:15' },
-            { tipo: 'glifing',              sub: null,         ini: '17:15', fin: '17:45' },
-            { tipo: 'juegos_para_crecer',   sub: 'sensorial',  ini: '17:45', fin: '18:15' },
-            { tipo: 'juego_libre',          sub: null,         ini: '18:15', fin: '18:30' },
-        ];
-        plantilla.forEach((p, i) => {
-            const t = tipo(p.tipo);
-            _agregarBloque({
-                bloque_tipo_id: t?.id || null,
-                bloque_subtipo_id: subtipo(p.tipo, p.sub),
-                hora_inicio: p.ini,
-                hora_fin: p.fin,
-                open: i === 0,  // solo el primero abierto
-            });
-        });
+    async function _cargarPlanOficial() {
+        if (!_currentNivelId) {
+            window.showToast?.('Selecciona un nivel primero', 'warn');
+            return;
+        }
+        if (_bloques.length && !confirm('Esto va a reemplazar los bloques actuales con el plan oficial. ¿Continuar?')) return;
+        const fecha = _ymd(_selected);
+        try {
+            const plan = await window.FundApi.getPlanificacionOficial(_currentNivelId, fecha);
+            _bloques = (plan.bloques || []).map((b, i) => ({
+                _idx: ++_bloqueSeq,
+                _open: i === 0,
+                orden: b.orden,
+                bloque_tipo_id: b.bloque_tipo_id,
+                bloque_subtipo_id: b.bloque_subtipo_id,
+                actividad_id: b.actividad_id || null,
+                nombre_actividad: b.nombre_actividad || '',
+                resultado_aprendizaje: b.resultado_aprendizaje || '',
+                hora_inicio: b.hora_inicio || _horaSugerida(i, true),
+                hora_fin:    b.hora_fin    || _horaSugerida(i, false),
+                se_ejecuto: true,
+                motivo_no_ejecucion: '',
+                adaptacion: '',
+                notas: '',
+                competencias: b.competencias_ids || [],
+                materiales: b.materiales_sugeridos ? [{
+                    product_id: null,
+                    nombre_libre: String(b.materiales_sugeridos).slice(0, 100),
+                    cantidad_solicitada: '',
+                    cantidad_usada: '',
+                }] : [],
+            }));
+            _renderBloques();
+            window.showToast?.(`Plan oficial cargado: ${plan.bloques?.length || 0} bloques`, 'success');
+        } catch (e) {
+            if (e?.status === 404 || /404|sin planificaci/i.test(e?.detail || e?.message || '')) {
+                window.showToast?.('No hay plan oficial para este día y nivel', 'warn');
+            } else {
+                console.error('[Planificación] error cargando plan oficial', e);
+                window.showToast?.('Error al cargar plan oficial', 'error');
+            }
+        }
+    }
+
+    function _horaSugerida(i, esInicio) {
+        const inicios = ['15:30', '16:00', '17:00', '17:15', '17:45', '18:15'];
+        const fines   = ['16:00', '17:00', '17:15', '17:45', '18:15', '18:30'];
+        return (esInicio ? inicios : fines)[i] || '';
     }
 
     function _toggleAll(open) {
@@ -594,10 +644,8 @@ window.FundPlanificacion = (() => {
             _renderBloques();
         });
 
-        // Actividad
-        const inputAct = node.querySelector('[data-role="actividad"]');
-        inputAct.value = b.nombre_actividad || '';
-        inputAct.addEventListener('input', e => { b.nombre_actividad = e.target.value; syncSummary(); });
+        // Actividad con autocomplete del catálogo
+        _bindActividadAutocomplete(node, b, syncSummary);
 
         // Resultado de aprendizaje
         const inputRes = node.querySelector('[data-role="resultado"]');
@@ -621,6 +669,134 @@ window.FundPlanificacion = (() => {
 
         syncSummary();
         return node;
+    }
+
+    function _bindActividadAutocomplete(node, b, syncSummary) {
+        const input = node.querySelector('[data-role="actividad"]');
+        const suggest = node.querySelector('[data-role="actividad-suggest"]');
+        const fuenteBadge = node.querySelector('[data-role="actividad-fuente"]');
+
+        input.value = b.nombre_actividad || '';
+        _toggleFuenteBadge(fuenteBadge, b.actividad_id);
+
+        let debounce = null;
+        let focusedIdx = -1;
+        let lastResults = [];
+
+        const close = () => { suggest.hidden = true; focusedIdx = -1; };
+        const render = (items) => {
+            if (!items.length) {
+                suggest.innerHTML = '<div class="plan-actividad-item plan-actividad-empty"><span class="plan-actividad-item-meta">Sin coincidencias en el catálogo</span></div>';
+                suggest.hidden = false;
+                return;
+            }
+            suggest.innerHTML = items.map((a, i) => `
+                <div class="plan-actividad-item ${i === focusedIdx ? 'is-focused' : ''}" data-idx="${i}">
+                    <div class="plan-actividad-item-title">${_esc(a.nombre)}</div>
+                    <div class="plan-actividad-item-meta">
+                        <span>${_esc(a.bloque_tipo_nombre || '')}</span>
+                        ${a.bloque_subtipo_nombre ? `<span>· ${_esc(a.bloque_subtipo_nombre)}</span>` : ''}
+                        ${(a.competencias_codigos || []).map(c => `<span class="plan-actividad-item-comp">${_esc(c)}</span>`).join('')}
+                        <span class="plan-actividad-item-uso">${a.veces_referenciada}×</span>
+                    </div>
+                </div>
+            `).join('');
+            suggest.hidden = false;
+            suggest.querySelectorAll('.plan-actividad-item[data-idx]').forEach(el => {
+                el.addEventListener('mousedown', (ev) => {
+                    ev.preventDefault();  // antes del blur del input
+                    _seleccionarActividad(b, lastResults[Number(el.dataset.idx)], input, fuenteBadge, syncSummary);
+                    close();
+                });
+            });
+        };
+
+        const search = async () => {
+            const q = input.value.trim();
+            if (q.length < 2) { close(); return; }
+            try {
+                const data = await window.FundApi.getCatActividades({
+                    q,
+                    bloqueTipoId: b.bloque_tipo_id || undefined,
+                    bloqueSubtipoId: b.bloque_subtipo_id || undefined,
+                    limit: 15,
+                });
+                lastResults = data.items || [];
+                focusedIdx = -1;
+                render(lastResults);
+            } catch (e) { /* silencioso */ }
+        };
+
+        input.addEventListener('input', () => {
+            b.nombre_actividad = input.value;
+            // Si el usuario cambia el texto, des-vincula del catálogo
+            b.actividad_id = null;
+            _toggleFuenteBadge(fuenteBadge, null);
+            syncSummary();
+            clearTimeout(debounce);
+            debounce = setTimeout(search, 180);
+        });
+        input.addEventListener('focus', () => {
+            if (input.value.trim().length >= 2) search();
+        });
+        input.addEventListener('blur', () => {
+            setTimeout(close, 150);  // permite click en sugerencia
+        });
+        input.addEventListener('keydown', (ev) => {
+            if (suggest.hidden) return;
+            if (ev.key === 'ArrowDown') {
+                ev.preventDefault();
+                focusedIdx = Math.min(focusedIdx + 1, lastResults.length - 1);
+                render(lastResults);
+            } else if (ev.key === 'ArrowUp') {
+                ev.preventDefault();
+                focusedIdx = Math.max(focusedIdx - 1, 0);
+                render(lastResults);
+            } else if (ev.key === 'Enter' && focusedIdx >= 0) {
+                ev.preventDefault();
+                _seleccionarActividad(b, lastResults[focusedIdx], input, fuenteBadge, syncSummary);
+                close();
+            } else if (ev.key === 'Escape') {
+                close();
+            }
+        });
+    }
+
+    function _seleccionarActividad(b, act, input, fuenteBadge, syncSummary) {
+        if (!act) return;
+        b.actividad_id = act.id;
+        b.nombre_actividad = act.nombre;
+        input.value = act.nombre;
+        // Si la actividad trae competencias, las sumamos (no reemplazamos lo que ya hay)
+        const compIds = act.competencias_ids || [];
+        for (const id of compIds) {
+            if (!b.competencias.includes(id)) b.competencias.push(id);
+        }
+        // Si el resultado de aprendizaje está vacío y la actividad tiene uno, lo prellenamos
+        if (!b.resultado_aprendizaje && act.resultado_aprendizaje) {
+            b.resultado_aprendizaje = act.resultado_aprendizaje;
+            const ta = document.querySelector(`.plan-bloque[data-bloque-idx="${b._idx}"] [data-role="resultado"]`);
+            if (ta) ta.value = act.resultado_aprendizaje;
+        }
+        _toggleFuenteBadge(fuenteBadge, b.actividad_id);
+        syncSummary();
+        // Re-renderizar competencias visualmente
+        const node = document.querySelector(`.plan-bloque[data-bloque-idx="${b._idx}"]`);
+        if (node) {
+            const tipo = _cat.bloqueTipos.find(t => t.id === b.bloque_tipo_id);
+            _refreshCompetencias(node, tipo, b);
+        }
+    }
+
+    function _toggleFuenteBadge(badge, actividadId) {
+        if (!badge) return;
+        if (actividadId) {
+            badge.textContent = '✓ del catálogo oficial';
+            badge.classList.add('is-visible');
+        } else {
+            badge.textContent = '';
+            badge.classList.remove('is-visible');
+        }
     }
 
     function _refreshSubtipo(node, tipo, b, onChange) {
@@ -748,6 +924,7 @@ window.FundPlanificacion = (() => {
 
         const payload = {
             sede_id: _ctx.sede.id,
+            nivel_id: _currentNivelId,
             fecha,
             clima_opcion_id: _sesionMeta.clima_opcion_id || null,
             situaciones_relevantes: _sesionMeta.situaciones_relevantes || null,
@@ -758,6 +935,7 @@ window.FundPlanificacion = (() => {
                 orden: b.orden,
                 bloque_tipo_id: b.bloque_tipo_id,
                 bloque_subtipo_id: b.bloque_subtipo_id || null,
+                actividad_id: b.actividad_id || null,
                 nombre_actividad: b.nombre_actividad || null,
                 resultado_aprendizaje: b.resultado_aprendizaje || null,
                 hora_inicio: b.hora_inicio || null,
