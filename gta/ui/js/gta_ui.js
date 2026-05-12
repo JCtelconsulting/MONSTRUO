@@ -117,6 +117,17 @@ window.GtaUi = (() => {
         } catch { return iso; }
     }
 
+    // Formato humano para SLA: hasta 24h muestra solo horas; a partir de
+    // 1 día completo agrega "N días (Mh)" para no perder precisión.
+    // Asume días de 24h (estándar de SLA de proceso, no jornada laboral).
+    function fmtSla(horas) {
+        const h = Number(horas || 0);
+        if (h <= 0) return '—';
+        if (h < 24) return `${h}h`;
+        const dias = Math.round(h / 24);
+        return `${dias} día${dias === 1 ? '' : 's'} (${h}h)`;
+    }
+
     function escHtml(s) {
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
@@ -125,5 +136,5 @@ window.GtaUi = (() => {
         return `<div class="gta-loading" style="padding:3rem;"><i class="fas fa-inbox" style="font-size:2rem;display:block;margin-bottom:12px;opacity:0.3;"></i>${msg}</div>`;
     }
 
-    return { AREAS, TIPO_QUIEBRE, areaLabel, areaIcon, semaforo, tiempoRestante, cardSolicitud, procesoCard, quiebreRow, estadoLabel, fmtFecha, escHtml, empty };
+    return { AREAS, TIPO_QUIEBRE, areaLabel, areaIcon, semaforo, tiempoRestante, cardSolicitud, procesoCard, quiebreRow, estadoLabel, fmtFecha, fmtSla, escHtml, empty };
 })();

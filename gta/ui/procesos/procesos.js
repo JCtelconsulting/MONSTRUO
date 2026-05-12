@@ -288,7 +288,7 @@ window.Procesos = (() => {
                             ${paso.descripcion ? `<p class="gta-pipe-desc">${_esc(paso.descripcion)}</p>` : ''}
                             <div class="gta-pipe-meta">
                                 <span><i class="fas fa-layer-group"></i> ${_esc(_areaLabel(paso.area_code || paso.area || '-'))}${paso.subarea_code ? ' / ' + _esc(_subareaLabel(paso.area_code || paso.area, paso.subarea_code)) : ''}</span>
-                                <span><i class="fas fa-clock"></i> ${paso.sla_horas || 0}h</span>
+                                <span><i class="fas fa-clock"></i> SLA: ${GtaUi.fmtSla(paso.sla_horas)}</span>
                                 ${(paso.depende_de || []).length ? `<span><i class="fas fa-link"></i> Depende de: ${paso.depende_de.join(', ')}</span>` : ''}
                             </div>
                         </div>
@@ -317,51 +317,19 @@ window.Procesos = (() => {
             </div>
         `).join('') : '<p class="gta-section-help">No se ha ejecutado todavía.</p>';
 
-        const quiebresHtml = quiebres.length ? quiebres.map(q => `
-            <div class="gta-doc-row" style="cursor:default;">
-                <div class="gta-doc-icon" style="background:rgba(255,51,51,0.1); color:var(--danger);"><i class="fas fa-flag"></i></div>
-                <div class="gta-doc-info">
-                    <div class="gta-doc-name">${_esc(q.descripcion).slice(0, 80)}</div>
-                    <div class="gta-doc-meta">
-                        <span class="gta-tarea-estado estado-${q.estado === 'abierto' ? 'vencida' : 'completada'}">${q.estado}</span>
-                        <span><i class="fas fa-layer-group"></i> ${_esc(_areaLabel(q.area))}</span>
-                        <span><i class="fas fa-user"></i> ${_esc(q.reportado_por)}</span>
-                    </div>
-                </div>
-            </div>
-        `).join('') : '<p class="gta-section-help">Sin quiebres registrados.</p>';
-
-        const comentariosHtml = comentarios.length ? comentarios.map(c => `
-            <div class="gta-evento-item">
-                <div class="gta-evento-icon"><i class="fas ${c.tipo === 'cambio' ? 'fa-pen' : c.tipo === 'decision' ? 'fa-gavel' : 'fa-comment'}"></i></div>
-                <div class="gta-evento-body">
-                    <div class="gta-evento-msg">${_esc(c.texto)}</div>
-                    <div class="gta-evento-meta">${_esc(c.autor)} · ${new Date(c.created_at).toLocaleString('es-CL')}</div>
-                </div>
-            </div>
-        `).join('') : '<p class="gta-section-help">Sin notas todavía.</p>';
-
         const iniciarBtn = pasos.length && p.estado === 'activo'
             ? `<button class="btn-primary" onclick="Procesos.iniciarFlujo(${p.id})"><i class="fas fa-rocket"></i> Iniciar flujo</button>`
             : '';
-
-        const guiaSection = p.archivo_path
-            ? `<div class="gta-guia-ref">
-                  <div class="gta-guia-ref-head">
-                    <span class="gta-guia-eyebrow"><i class="fas fa-paperclip"></i> Guía original</span>
-                    <span class="gta-section-help" style="font-size:0.78rem;">Documento de referencia que se usó para construir esta definición. <strong>No es la fuente de la verdad</strong> — los pasos lo son.</span>
-                  </div>
-                  <div class="gta-guia-ref-actions">
-                    <button class="btn-secondary" onclick="Procesos.abrirDocPreview('${_esc(p.archivo_path)}')">
-                        <i class="fas fa-eye"></i> Ver
-                    </button>
-                    <a href="/api/gta/catalogo/download?path=${encodeURIComponent(p.archivo_path)}" class="btn-secondary" download>
-                        <i class="fas fa-download"></i> Descargar
-                    </a>
-                  </div>
-                  <div class="gta-guia-path"><code>${_esc(p.archivo_path)}</code></div>
-              </div>`
-            : `<p class="gta-section-help">Sin guía de referencia adjunta.</p>`;
+        // Botón opcional al lado de Iniciar flujo: ver el documento original
+        // que sirvió para construir la definición. No es la fuente de verdad
+        // (los pasos lo son), pero ayuda a consultarlo si alguien lo necesita.
+        const verGuiaBtn = p.archivo_path
+            ? `<button class="btn-secondary"
+                       title="Ver el documento original que se usó para construir este proceso (PDF, Word, etc.). Los pasos son la fuente de la verdad."
+                       onclick="Procesos.abrirDocPreview('${_esc(p.archivo_path)}')">
+                  <i class="fas fa-file"></i> Ver guía original
+              </button>`
+            : '';
 
         const body = document.getElementById('proc-modal-body');
         body.innerHTML = `
@@ -370,7 +338,7 @@ window.Procesos = (() => {
                     ${estadoBadge}
                 </div>
                 <div><strong>${_esc(p.descripcion || 'Sin descripción')}</strong></div>
-                ${iniciarBtn ? `<div style="margin-top:10px;">${iniciarBtn}</div>` : ''}
+                ${iniciarBtn || verGuiaBtn ? `<div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">${iniciarBtn}${verGuiaBtn}</div>` : ''}
             </div>
 
             <h4 class="gta-section-subtitle" style="margin-top:18px;">
@@ -383,8 +351,8 @@ window.Procesos = (() => {
             </h4>
             <div class="gta-flujo-summary">
                 <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.85rem; color:var(--text-soft);">
-                    <span><i class="fas fa-clock"></i> SLA esperado: ${m.sla_horas_total || 0}h</span>
-                    <span><i class="fas fa-stopwatch"></i> Promedio real: ${m.prom_horas != null ? Math.round(m.prom_horas) + 'h' : '—'}</span>
+                    <span><i class="fas fa-clock"></i> SLA esperado: ${GtaUi.fmtSla(m.sla_horas_total)}</span>
+                    <span><i class="fas fa-stopwatch"></i> Promedio real: ${m.prom_horas != null ? GtaUi.fmtSla(Math.round(m.prom_horas)) : '—'}</span>
                     <span><i class="fas fa-list-check"></i> Flujos completados: ${m.flujos_completados || 0}</span>
                 </div>
             </div>
@@ -394,29 +362,6 @@ window.Procesos = (() => {
             </h4>
             <div>${flujosHtml}</div>
 
-            <h4 class="gta-section-subtitle" style="margin-top:24px;">
-                <i class="fas fa-flag"></i> Quiebres registrados (${quiebres.length})
-            </h4>
-            <div>${quiebresHtml}</div>
-            <button class="btn-secondary" style="margin-top:8px;" onclick="Procesos.abrirQuiebre(${p.id})">
-                <i class="fas fa-flag"></i> Reportar nuevo quiebre
-            </button>
-
-            <h4 class="gta-section-subtitle" style="margin-top:24px;">
-                <i class="fas fa-comments"></i> Notas y decisiones
-            </h4>
-            <div class="gta-flujo-timeline">${comentariosHtml}</div>
-            <div style="margin-top:10px; display:flex; gap:8px;">
-                <input type="text" id="proc-comentario-texto" class="input-dark" placeholder="Agregar nota...">
-                <button class="btn-secondary" onclick="Procesos.agregarNota()">
-                    <i class="fas fa-plus"></i> Agregar
-                </button>
-            </div>
-
-            <h4 class="gta-section-subtitle" style="margin-top:28px; opacity:0.75;">
-                <i class="fas fa-paperclip"></i> Guía de referencia
-            </h4>
-            ${guiaSection}
         `;
 
         const footer = document.getElementById('proc-modal-footer');
@@ -908,57 +853,6 @@ window.Procesos = (() => {
         }
     }
 
-    async function agregarNota() {
-        const inp = document.getElementById('proc-comentario-texto');
-        const texto = inp?.value.trim();
-        if (!texto || !_procActivo) return;
-        try {
-            await GtaApi.agregarComentarioProc(_procActivo.id, { texto, tipo: 'nota' });
-            inp.value = '';
-            await abrir(_procActivo.id);
-        } catch (e) {
-            alert('Error: ' + (e.message || e));
-        }
-    }
-
-    // ── Modal Quiebre ─────────────────────────────────────────────────
-    function abrirQuiebre(procId) {
-        document.getElementById('quiebre-proc-id').value = procId;
-        document.getElementById('quiebre-proc-desc').value = '';
-        const proc = _procActivo;
-        if (proc) {
-            document.getElementById('quiebre-proc-info').innerHTML =
-                `Proceso: <strong>${_esc(proc.nombre)}</strong>`;
-        }
-        const sel = document.getElementById('quiebre-proc-area');
-        sel.innerHTML = _areas.filter(a => a.activo)
-            .map(a => `<option value="${a.code}" ${proc?.area === a.code ? 'selected' : ''}>${_esc(a.label)}</option>`).join('');
-        document.getElementById('modal-quiebre-proc').classList.add('is-open');
-    }
-
-    function cerrarQuiebre() {
-        document.getElementById('modal-quiebre-proc')?.classList.remove('is-open');
-    }
-
-    async function guardarQuiebre() {
-        const procId = parseInt(document.getElementById('quiebre-proc-id').value, 10);
-        const descripcion = document.getElementById('quiebre-proc-desc').value.trim();
-        const area = document.getElementById('quiebre-proc-area').value;
-        const tipo = document.getElementById('quiebre-proc-tipo').value;
-        if (!descripcion || !area) {
-            alert('Completa descripción y área');
-            return;
-        }
-        try {
-            await GtaApi.reportarQuiebreProc(procId, { descripcion, area, tipo });
-            cerrarQuiebre();
-            await abrir(procId);
-            await cargar();
-        } catch (e) {
-            alert('Error: ' + (e.message || e));
-        }
-    }
-
     // ── Iniciar flujo desde proceso ───────────────────────────────────
     let _iniciarProcId = null;
 
@@ -1098,8 +992,7 @@ window.Procesos = (() => {
         _dragStart, _dragOver, _dragLeave, _drop, _dragEnd,
         _agregarCampoForm, _setCampoForm, _setCampoTipo, _setCampoOpciones,
         _setCampoDependeDe, _setCampoOpcionesPorValor, _quitarCampoForm,
-        abrirQuiebre, cerrarQuiebre, guardarQuiebre,
-        iniciarFlujo, cerrarIniciarFlujo, confirmarIniciarFlujo, agregarNota,
+        iniciarFlujo, cerrarIniciarFlujo, confirmarIniciarFlujo,
         abrirDocPreview, cerrarDocPreview,
     };
 })();

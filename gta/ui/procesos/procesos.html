@@ -69,38 +69,3 @@
     </div>
 </div>
 
-<!-- Modal: Reportar quiebre asociado a proceso -->
-<div class="modal-backdrop" id="modal-quiebre-proc">
-    <div class="modal-content" style="max-width:640px;">
-        <div class="modal-header">
-            <h2>Reportar quiebre</h2>
-            <button class="modal-close-btn" onclick="Procesos.cerrarQuiebre()">×</button>
-        </div>
-        <div class="modal-body">
-            <input type="hidden" id="quiebre-proc-id">
-            <p class="gta-section-help" id="quiebre-proc-info"></p>
-            <div class="field" style="margin-top:10px;">
-                <label>Descripción del problema *</label>
-                <textarea id="quiebre-proc-desc" class="input-dark" rows="3" placeholder="¿Qué pasó? ¿Qué no funciona del proceso?"></textarea>
-            </div>
-            <div class="field" style="margin-top:10px;">
-                <label>Área involucrada *</label>
-                <select id="quiebre-proc-area" class="input-dark"></select>
-            </div>
-            <div class="field" style="margin-top:10px;">
-                <label>Tipo</label>
-                <select id="quiebre-proc-tipo" class="input-dark">
-                    <option value="sin_proceso">Falta proceso definido</option>
-                    <option value="paso_bloqueado">Paso bloqueado</option>
-                    <option value="sla_vencido">SLA vencido</option>
-                </select>
-            </div>
-        </div>
-        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-            <button class="btn-secondary" onclick="Procesos.cerrarQuiebre()">Cancelar</button>
-            <button class="btn-primary" onclick="Procesos.guardarQuiebre()">
-                <i class="fas fa-flag"></i> Reportar
-            </button>
-        </div>
-    </div>
-</div>

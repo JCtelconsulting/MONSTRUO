@@ -263,7 +263,7 @@ window.Tablero = (() => {
         const dotColor = { rojo: 'gta-dot-red', amarillo: 'gta-dot-yellow', verde: 'gta-dot-green', neutral: 'gta-dot-gray' }[t.salud_sla] || 'gta-dot-gray';
         const slaPct = t.sla_pct != null ? Math.min(t.sla_pct, 100) : null;
         const slaLabel = (t.sla_horas
-            ? (slaPct != null ? `${slaPct}% del SLA (${t.sla_horas}h)` : `SLA: ${t.sla_horas}h`)
+            ? (slaPct != null ? `${slaPct}% del SLA (${GtaUi.fmtSla(t.sla_horas)})` : `SLA: ${GtaUi.fmtSla(t.sla_horas)}`)
             : 'Sin SLA');
 
         const due = t.sla_due_at ? new Date(t.sla_due_at).toLocaleString('es-CL') : '';
