@@ -447,3 +447,79 @@
 .gta-paso-edit-bloqueante input[type="checkbox"] {
     cursor: pointer;
 }
+
+/* ── Toggle de vista de pasos (Lista / Diagrama / Mermaid) ───────── */
+
+.gta-pasos-view-toggle {
+    display: inline-flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 4px;
+    margin: 8px 0 12px;
+}
+
+.gta-view-btn {
+    background: transparent;
+    border: 0;
+    color: var(--text-muted, #9aa0a6);
+    padding: 6px 12px;
+    border-radius: 7px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+
+.gta-view-btn:hover {
+    color: var(--text, #e6edf7);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.gta-view-btn.active {
+    background: rgba(0, 243, 255, 0.12);
+    color: var(--info, #00f3ff);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+}
+
+.gta-pasos-view-pane {
+    margin-top: 4px;
+}
+
+/* ── Diagrama de flujo (SVG swimlanes) ───────────────────────────── */
+
+.gta-flow-diagram {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 12px;
+    max-width: 100%;
+}
+
+.gta-flow-step rect {
+    transition: filter 0.15s;
+}
+
+.gta-flow-step:hover rect {
+    filter: drop-shadow(0 0 8px rgba(0, 243, 255, 0.6));
+}
+
+/* ── Mermaid host (lazy-loaded) ──────────────────────────────────── */
+
+.gta-mermaid-host {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 16px;
+    overflow-x: auto;
+    min-height: 200px;
+}
+
+.gta-mermaid-host svg {
+    max-width: 100%;
+    height: auto;
+}
