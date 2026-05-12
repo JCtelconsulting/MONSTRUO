@@ -124,6 +124,57 @@ window.Procesos = (() => {
     // Diagrama tipo swimlanes verticales: una columna por área, cada paso en
     // su carril, flechas SVG conectando según depende_de. SVG + CSS puro, sin
     // librerías. Diseñado para parecerse al ejemplo de Visio del usuario.
+    // Definición de los 4 anchors de cada caja con su dirección normal.
+    // La dirección apunta hacia afuera de la caja desde ese borde — se
+    // usa para hacer salir el "stub" de la flecha perpendicular al borde
+    // antes de doblar hacia el destino.
+    const ANCHOR_DIRS = {
+        top:    { dx:  0, dy: -1 },
+        right:  { dx:  1, dy:  0 },
+        bottom: { dx:  0, dy:  1 },
+        left:   { dx: -1, dy:  0 },
+    };
+
+    // Coordenadas absolutas de un anchor dado el rectángulo de la caja.
+    function _anchorPos(x, y, w, h, side) {
+        switch (side) {
+            case 'top':    return { x: x + w / 2, y: y       };
+            case 'right':  return { x: x + w,     y: y + h / 2 };
+            case 'bottom': return { x: x + w / 2, y: y + h   };
+            case 'left':   return { x: x,         y: y + h / 2 };
+            default:       return { x: x + w / 2, y: y + h / 2 };
+        }
+    }
+
+    // Dado un punto (px, py) y el rectángulo de una caja, devuelve el
+    // anchor (top/right/bottom/left) más cercano. Usado al soltar un
+    // drag de flecha sobre una caja para deducir el anchor destino.
+    function _anchorMasCercano(x, y, w, h, px, py) {
+        const cands = [
+            { side: 'top',    p: { x: x + w/2, y: y       } },
+            { side: 'right',  p: { x: x + w,   y: y + h/2 } },
+            { side: 'bottom', p: { x: x + w/2, y: y + h   } },
+            { side: 'left',   p: { x: x,       y: y + h/2 } },
+        ];
+        let best = cands[0], bestD = Infinity;
+        for (const c of cands) {
+            const dx = c.p.x - px, dy = c.p.y - py;
+            const d = dx*dx + dy*dy;
+            if (d < bestD) { bestD = d; best = c; }
+        }
+        return best.side;
+    }
+
+    // Path entre dos anchors con curva Bezier suave. Salida y entrada
+    // perpendiculares al borde.
+    function _pathEntreAnchors(p1, dir1, p2, dir2) {
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const stretch = Math.max(30, Math.min(150, dist / 2));
+        const cp1 = { x: p1.x + dir1.dx * stretch, y: p1.y + dir1.dy * stretch };
+        const cp2 = { x: p2.x + dir2.dx * stretch, y: p2.y + dir2.dy * stretch };
+        return `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${p2.x} ${p2.y}`;
+    }
+
     function _renderPasosDiagrama(pasos) {
         if (!pasos.length && !_modoEditDiag) return '';
         // Si estamos en modo edición y no hay pasos, igual mostramos las
@@ -208,16 +259,19 @@ window.Procesos = (() => {
                        <text x="${x + boxW - 8}" y="${y + 12}" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">×</text>
                    </g>`
                 : '';
-            // Handle de conexión: círculo en el borde inferior central. Drag
-            // desde acá crea una flecha (dependencia) hacia otra caja.
+            // 4 handles de conexión (top/right/bottom/left). Drag desde
+            // cualquiera de ellos crea una flecha que sale por ese lado.
             const connectHandle = _modoEditDiag
-                ? `<g class="gta-flow-connect-handle"
-                      onmousedown="event.stopPropagation(); Procesos._diagConectarStart(${p.orden}, evt)"
-                      style="cursor:crosshair;">
-                       <circle cx="${pos.cx}" cy="${y + boxH}" r="6" fill="rgba(0, 243, 255, 0.85)" stroke="#fff" stroke-width="1.5">
-                           <title>Arrastrá hasta otra caja para conectar</title>
-                       </circle>
-                   </g>`
+                ? ['top', 'right', 'bottom', 'left'].map(side => {
+                    const a = _anchorPos(x, y, boxW, boxH, side);
+                    return `<g class="gta-flow-connect-handle"
+                              onmousedown="event.stopPropagation(); Procesos._diagConectarStart(${p.orden}, '${side}', evt)"
+                              style="cursor:crosshair;">
+                              <circle cx="${a.x}" cy="${a.y}" r="6" fill="rgba(0, 243, 255, 0.85)" stroke="#fff" stroke-width="1.5">
+                                  <title>Arrastrá hasta otra caja para conectar (sale por ${side})</title>
+                              </circle>
+                          </g>`;
+                }).join('')
                 : '';
             return `
                 <g class="gta-flow-step" data-paso-orden="${p.orden}"
@@ -251,39 +305,53 @@ window.Procesos = (() => {
             `;
         }).join('') : '';
 
-        // Routing de flechas: salir por el lateral del origen y entrar por
-        // el lateral del destino, con la vertical pasando por el canal entre
-        // columnas. Evita cruzar cajas intermedias en filas adyacentes.
-        // (Si origen y destino están en la misma columna, sale por abajo y
-        // entra por arriba — línea recta vertical.)
+        // Routing de flechas. Si el paso tiene depende_de_detalle con info
+        // de anchors (lados) para esta dep, usar exactamente esos puntos
+        // (control del usuario). Si no, fallback al routing automático:
+        //   misma columna → línea recta vertical
+        //   distintas → canal entre columnas
         const flechas = sorted.flatMap(p => {
             const deps = p.depende_de || [];
+            const detalles = p.depende_de_detalle || [];
             return deps.map(depOrden => {
                 const desde = posPaso[depOrden];
                 const hasta = posPaso[p.orden];
                 if (!desde || !hasta) return '';
 
-                const desdeCol = areasOrden.indexOf(desde.paso.area_code || desde.paso.area || '-');
-                const hastaCol = areasOrden.indexOf(hasta.paso.area_code || hasta.paso.area || '-');
-                let pathD, sx, sy, ex, ey;
+                const detalle = detalles.find(d => d && d.orden === depOrden);
+                let pathD, sx, sy, ex, ey, fromSide, toSide;
 
-                if (desdeCol === hastaCol) {
-                    // Misma columna: línea vertical recta del bottom del origen al top del destino
-                    sx = desde.cx;
-                    sy = desde.cy + boxH / 2;
-                    ex = hasta.cx;
-                    ey = hasta.cy - boxH / 2;
-                    pathD = `M ${sx} ${sy} L ${ex} ${ey}`;
+                if (detalle && detalle.from && detalle.to) {
+                    // Usuario eligió los anchors — usarlos.
+                    fromSide = detalle.from;
+                    toSide   = detalle.to;
+                    const xo = desde.cx - boxW / 2;
+                    const yo = desde.cy - boxH / 2;
+                    const xd = hasta.cx - boxW / 2;
+                    const yd = hasta.cy - boxH / 2;
+                    const p1 = _anchorPos(xo, yo, boxW, boxH, fromSide);
+                    const p2 = _anchorPos(xd, yd, boxW, boxH, toSide);
+                    sx = p1.x; sy = p1.y; ex = p2.x; ey = p2.y;
+                    pathD = _pathEntreAnchors(p1, ANCHOR_DIRS[fromSide], p2, ANCHOR_DIRS[toSide]);
                 } else {
-                    // Columnas distintas: salida lateral del origen, vertical en el canal
-                    // entre columnas, llegada lateral al destino.
-                    const aDerecha = hastaCol > desdeCol;
-                    sx = desde.cx + (aDerecha ? boxW / 2 : -boxW / 2);
-                    sy = desde.cy;
-                    ex = hasta.cx + (aDerecha ? -boxW / 2 : boxW / 2);
-                    ey = hasta.cy;
-                    const midX = (desde.cx + hasta.cx) / 2;
-                    pathD = `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ey} L ${ex} ${ey}`;
+                    // Fallback automático (modelo viejo)
+                    const desdeCol = areasOrden.indexOf(desde.paso.area_code || desde.paso.area || '-');
+                    const hastaCol = areasOrden.indexOf(hasta.paso.area_code || hasta.paso.area || '-');
+                    if (desdeCol === hastaCol) {
+                        sx = desde.cx;
+                        sy = desde.cy + boxH / 2;
+                        ex = hasta.cx;
+                        ey = hasta.cy - boxH / 2;
+                        pathD = `M ${sx} ${sy} L ${ex} ${ey}`;
+                    } else {
+                        const aDerecha = hastaCol > desdeCol;
+                        sx = desde.cx + (aDerecha ? boxW / 2 : -boxW / 2);
+                        sy = desde.cy;
+                        ex = hasta.cx + (aDerecha ? -boxW / 2 : boxW / 2);
+                        ey = hasta.cy;
+                        const midX = (desde.cx + hasta.cx) / 2;
+                        pathD = `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ey} L ${ex} ${ey}`;
+                    }
                 }
                 // En modo edición: flecha clickeable (eliminar) + handles en los
                 // extremos para drag (reasignar origen/destino).
@@ -1302,6 +1370,10 @@ window.Procesos = (() => {
         _pasosEditDiag.forEach((p, i) => {
             p.orden = i + 1;
             p.depende_de = (p.depende_de || []).map(d => mapping[d]).filter(d => d != null);
+            // También mapear las referencias en depende_de_detalle
+            p.depende_de_detalle = (p.depende_de_detalle || [])
+                .map(d => d && mapping[d.orden] != null ? { ...d, orden: mapping[d.orden] } : null)
+                .filter(d => d);
         });
 
         _renderModal(_procActivo);
@@ -1309,15 +1381,14 @@ window.Procesos = (() => {
 
     // ── Drag de flechas (crear dependencia) y click para eliminar ─────
 
-    let _conectarState = null;  // { origenOrden, svg, linePreview }
+    let _conectarState = null;
 
-    function _diagConectarStart(origenOrden, evt) {
+    function _diagConectarStart(origenOrden, fromSide, evt) {
         if (!_modoEditDiag) return;
         evt.preventDefault();
         const svg = document.querySelector('.gta-flow-diagram svg');
         if (!svg) return;
 
-        // Crear path de preview que sigue al cursor (línea elástica)
         const start = _svgCoord(svg, evt.clientX, evt.clientY);
         const ns = 'http://www.w3.org/2000/svg';
         const linePreview = document.createElementNS(ns, 'path');
@@ -1329,7 +1400,7 @@ window.Procesos = (() => {
         linePreview.setAttribute('d', `M ${start.x} ${start.y} L ${start.x} ${start.y}`);
         svg.appendChild(linePreview);
 
-        _conectarState = { origenOrden, svg, linePreview, startX: start.x, startY: start.y };
+        _conectarState = { origenOrden, fromSide, svg, linePreview, startX: start.x, startY: start.y };
         document.addEventListener('mousemove', _diagConectarMove);
         document.addEventListener('mouseup', _diagConectarEnd);
     }
@@ -1350,10 +1421,8 @@ window.Procesos = (() => {
 
         const state = _conectarState;
         _conectarState = null;
-        // Quitar la línea de preview
         state.linePreview.remove();
 
-        // Detectar sobre qué caja se soltó
         const el = document.elementFromPoint(evt.clientX, evt.clientY);
         if (!el) return;
         const g = el.closest('.gta-flow-step');
@@ -1361,15 +1430,40 @@ window.Procesos = (() => {
         const destinoOrden = parseInt(g.getAttribute('data-paso-orden'), 10);
         if (!destinoOrden || destinoOrden === state.origenOrden) return;
 
-        // Agregar dependencia: destino depende de origen
+        // Detectar el anchor (lado) más cercano al cursor en la caja destino
+        const toSide = _detectarLadoCajaBajoCursor(g, evt.clientX, evt.clientY);
+
         const destino = _pasosEditDiag.find(p => p.orden === destinoOrden);
         if (!destino) return;
         destino.depende_de = destino.depende_de || [];
+        destino.depende_de_detalle = destino.depende_de_detalle || [];
         if (!destino.depende_de.includes(state.origenOrden)) {
             destino.depende_de.push(state.origenOrden);
             destino.depende_de.sort((a, b) => a - b);
-            _renderModal(_procActivo);
         }
+        // Guardar/actualizar detalle de la dep
+        const idx = destino.depende_de_detalle.findIndex(d => d && d.orden === state.origenOrden);
+        const entry = { orden: state.origenOrden, from: state.fromSide, to: toSide };
+        if (idx >= 0) destino.depende_de_detalle[idx] = entry;
+        else destino.depende_de_detalle.push(entry);
+        _renderModal(_procActivo);
+    }
+
+    // Devuelve 'top'|'right'|'bottom'|'left' del lado más cercano al
+    // cursor en la caja del SVG dada (el <g class="gta-flow-step">).
+    function _detectarLadoCajaBajoCursor(gEl, clientX, clientY) {
+        const svg = document.querySelector('.gta-flow-diagram svg');
+        if (!svg) return 'top';
+        const pt = _svgCoord(svg, clientX, clientY);
+        // Las coordenadas del SVG son las del viewBox; recuperar las de la
+        // caja desde sus atributos del <rect> primer hijo del <g>
+        const rect = gEl.querySelector('rect');
+        if (!rect) return 'top';
+        const x = parseFloat(rect.getAttribute('x'));
+        const y = parseFloat(rect.getAttribute('y'));
+        const w = parseFloat(rect.getAttribute('width'));
+        const h = parseFloat(rect.getAttribute('height'));
+        return _anchorMasCercano(x, y, w, h, pt.x, pt.y);
     }
 
     // Drag de los extremos de una flecha existente para reasignar
@@ -1427,30 +1521,48 @@ window.Procesos = (() => {
         const nuevoOrden = parseInt(g.getAttribute('data-paso-orden'), 10);
         if (!nuevoOrden) return;
 
+        // Detectar el anchor (lado) del cursor en la caja sobre la que se soltó
+        const nuevoSide = _detectarLadoCajaBajoCursor(g, evt.clientX, evt.clientY);
+
         if (state.which === 'end') {
-            // Cambiar destino de la flecha
-            if (nuevoOrden === state.destinoOrden) return;       // sin cambio
-            if (nuevoOrden === state.origenOrden) return;        // self-ref no permitido
+            // Cambiar destino de la flecha (puede ser el mismo paso con otro lado)
+            if (nuevoOrden === state.origenOrden) return;                  // self-ref no permitido
             const destinoActual = _pasosEditDiag.find(p => p.orden === state.destinoOrden);
             const destinoNuevo  = _pasosEditDiag.find(p => p.orden === nuevoOrden);
             if (!destinoActual || !destinoNuevo) return;
+            // Tomar el detalle viejo para preservar el "from" del origen
+            const detalleViejo = (destinoActual.depende_de_detalle || []).find(d => d && d.orden === state.origenOrden);
+            const fromSide = detalleViejo?.from || 'bottom';
+            // Quitar del destino actual
             destinoActual.depende_de = (destinoActual.depende_de || []).filter(d => d !== state.origenOrden);
+            destinoActual.depende_de_detalle = (destinoActual.depende_de_detalle || []).filter(d => d && d.orden !== state.origenOrden);
+            // Agregar al destino nuevo
             destinoNuevo.depende_de = destinoNuevo.depende_de || [];
             if (!destinoNuevo.depende_de.includes(state.origenOrden)) {
                 destinoNuevo.depende_de.push(state.origenOrden);
                 destinoNuevo.depende_de.sort((a, b) => a - b);
             }
+            destinoNuevo.depende_de_detalle = destinoNuevo.depende_de_detalle || [];
+            const idx = destinoNuevo.depende_de_detalle.findIndex(d => d && d.orden === state.origenOrden);
+            const entry = { orden: state.origenOrden, from: fromSide, to: nuevoSide };
+            if (idx >= 0) destinoNuevo.depende_de_detalle[idx] = entry;
+            else destinoNuevo.depende_de_detalle.push(entry);
         } else if (state.which === 'start') {
-            // Cambiar origen de la flecha (queda misma flecha pero apunta desde otro paso)
-            if (nuevoOrden === state.origenOrden) return;
-            if (nuevoOrden === state.destinoOrden) return;
+            // Cambiar origen de la flecha
+            if (nuevoOrden === state.destinoOrden) return;                 // self-ref no permitido
             const destino = _pasosEditDiag.find(p => p.orden === state.destinoOrden);
             if (!destino) return;
+            // Tomar el "to" viejo para preservarlo
+            const detalleViejo = (destino.depende_de_detalle || []).find(d => d && d.orden === state.origenOrden);
+            const toSide = detalleViejo?.to || 'top';
             destino.depende_de = (destino.depende_de || []).filter(d => d !== state.origenOrden);
+            destino.depende_de_detalle = (destino.depende_de_detalle || []).filter(d => d && d.orden !== state.origenOrden);
             if (!destino.depende_de.includes(nuevoOrden)) {
                 destino.depende_de.push(nuevoOrden);
                 destino.depende_de.sort((a, b) => a - b);
             }
+            destino.depende_de_detalle = destino.depende_de_detalle || [];
+            destino.depende_de_detalle.push({ orden: nuevoOrden, from: nuevoSide, to: toSide });
         }
 
         _renderModal(_procActivo);
@@ -1461,6 +1573,7 @@ window.Procesos = (() => {
         const destino = _pasosEditDiag.find(p => p.orden === destinoOrden);
         if (!destino) return;
         destino.depende_de = (destino.depende_de || []).filter(d => d !== origenOrden);
+        destino.depende_de_detalle = (destino.depende_de_detalle || []).filter(d => d && d.orden !== origenOrden);
         _renderModal(_procActivo);
     }
 
@@ -1488,10 +1601,10 @@ window.Procesos = (() => {
         const p = _pasosEditDiag.find(x => x.orden === pasoOrden);
         if (!p) return;
         if (!confirm(`¿Eliminar el paso "${p.titulo}"?`)) return;
-        // Quitar el paso y limpiar referencias en depende_de de los demás
         _pasosEditDiag = _pasosEditDiag.filter(x => x.orden !== pasoOrden);
         _pasosEditDiag.forEach(x => {
             x.depende_de = (x.depende_de || []).filter(d => d !== pasoOrden);
+            x.depende_de_detalle = (x.depende_de_detalle || []).filter(d => d && d.orden !== pasoOrden);
         });
         _renderModal(_procActivo);
     }
