@@ -117,15 +117,16 @@ window.GtaUi = (() => {
         } catch { return iso; }
     }
 
-    // Formato humano para SLA: hasta 24h muestra solo horas; a partir de
-    // 1 día completo agrega "N días (Mh)" para no perder precisión.
-    // Asume días de 24h (estándar de SLA de proceso, no jornada laboral).
+    // Formato humano para SLA en HORAS LABORALES.
+    //   Día laboral = 8 horas (jornada chilena estándar).
+    //   Semana laboral = 5 días = 40 horas (no se usa para no inflar).
+    // Hasta 1 día laboral muestra solo horas; arriba muestra "N días lab. (Mh)".
     function fmtSla(horas) {
         const h = Number(horas || 0);
         if (h <= 0) return '—';
-        if (h < 24) return `${h}h`;
-        const dias = Math.round(h / 24);
-        return `${dias} día${dias === 1 ? '' : 's'} (${h}h)`;
+        if (h < 8) return `${h}h`;
+        const dias = Math.round(h / 8);
+        return `${dias} día${dias === 1 ? '' : 's'} lab. (${h}h)`;
     }
 
     function escHtml(s) {

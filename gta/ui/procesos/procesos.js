@@ -108,31 +108,7 @@ window.Procesos = (() => {
         return s ? s.label : subCode;
     }
 
-    // ── Render de pasos: 3 vistas ──────────────────────────────────────
-
-    function _renderPasosLista(pasos) {
-        if (!pasos.length) return '';
-        return `
-            <div class="gta-pipeline" style="margin-top:8px;">
-                ${pasos.map((paso, idx) => `
-                    <div class="gta-pipe-tarea sla-cyan">
-                        <div class="gta-pipe-num">${paso.orden || (idx + 1)}</div>
-                        <div class="gta-pipe-body">
-                            <div class="gta-pipe-header">
-                                <h5>${_esc(paso.titulo || paso.nombre || 'Paso ' + (idx + 1))}</h5>
-                            </div>
-                            ${paso.descripcion ? `<p class="gta-pipe-desc">${_esc(paso.descripcion)}</p>` : ''}
-                            <div class="gta-pipe-meta">
-                                <span><i class="fas fa-layer-group"></i> ${_esc(_areaLabel(paso.area_code || paso.area || '-'))}${paso.subarea_code ? ' / ' + _esc(_subareaLabel(paso.area_code || paso.area, paso.subarea_code)) : ''}</span>
-                                <span><i class="fas fa-clock"></i> SLA: ${GtaUi.fmtSla(paso.sla_horas)}</span>
-                                ${(paso.depende_de || []).length ? `<span><i class="fas fa-link"></i> Depende de: ${paso.depende_de.join(', ')}</span>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
+    // ── Render de pasos: diagrama swimlanes ────────────────────────────
 
     // Diagrama tipo swimlanes verticales: una columna por área, cada paso en
     // su carril, flechas SVG conectando según depende_de. SVG + CSS puro, sin
@@ -250,90 +226,6 @@ window.Procesos = (() => {
                 </svg>
             </div>
         `;
-    }
-
-    // Mermaid: flowchart top-down con subgraphs por área. La librería se
-    // carga lazy del CDN solo cuando el usuario abre la vista por primera vez.
-    function _renderPasosMermaid(pasos) {
-        if (!pasos.length) return '';
-
-        // Agrupar pasos por área para subgraphs
-        const porArea = {};
-        for (const p of pasos) {
-            const a = p.area_code || p.area || '-';
-            (porArea[a] = porArea[a] || []).push(p);
-        }
-
-        const sanitize = (s) => String(s || '').replace(/[<>"'\[\]{}|]/g, ' ').slice(0, 40);
-
-        let mmd = 'flowchart TD\n';
-        // Subgraph por área
-        for (const [areaCode, lista] of Object.entries(porArea)) {
-            mmd += `    subgraph ${areaCode}["${sanitize(_areaLabel(areaCode))}"]\n`;
-            for (const p of lista) {
-                mmd += `        P${p.orden}["${p.orden}. ${sanitize(p.titulo)}"]\n`;
-            }
-            mmd += '    end\n';
-        }
-        // Flechas
-        for (const p of pasos) {
-            for (const d of (p.depende_de || [])) {
-                mmd += `    P${d} --> P${p.orden}\n`;
-            }
-        }
-
-        return `
-            <div class="gta-mermaid-host" data-mmd="${_esc(mmd)}">
-                <div class="gta-loading" style="padding:20px;"><i class="fas fa-spinner fa-spin"></i> Cargando diagrama…</div>
-            </div>
-        `;
-    }
-
-    // Switcher entre las 3 vistas. Botones marcan active, paneles muestran.
-    function _switchPasosView(view) {
-        document.querySelectorAll('.gta-view-btn').forEach(b => {
-            b.classList.toggle('active', b.getAttribute('data-view') === view);
-        });
-        document.querySelectorAll('.gta-pasos-view-pane').forEach(p => {
-            p.style.display = p.getAttribute('data-view') === view ? '' : 'none';
-        });
-        // Renderizado lazy de Mermaid (la librería se carga del CDN solo cuando se pide)
-        if (view === 'mermaid') {
-            _renderMermaidLazy();
-        }
-    }
-
-    let _mermaidLoaded = false;
-    function _renderMermaidLazy() {
-        const host = document.querySelector('.gta-mermaid-host');
-        if (!host) return;
-        const mmd = host.getAttribute('data-mmd') || '';
-        if (host.getAttribute('data-rendered')) return;
-
-        const doRender = () => {
-            try {
-                window.mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
-                window.mermaid.render('mmd-' + Date.now(), mmd).then(({ svg }) => {
-                    host.innerHTML = svg;
-                    host.setAttribute('data-rendered', '1');
-                }).catch(err => {
-                    host.innerHTML = `<div class="gta-empty">Error al renderizar Mermaid: ${_esc(err.message || err)}</div>`;
-                });
-            } catch (e) {
-                host.innerHTML = `<div class="gta-empty">Mermaid falló: ${_esc(e.message || e)}</div>`;
-            }
-        };
-
-        if (window.mermaid) { doRender(); return; }
-        if (_mermaidLoaded) { setTimeout(doRender, 200); return; }
-        _mermaidLoaded = true;
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
-        script.onload = doRender;
-        script.onerror = () => {
-            host.innerHTML = '<div class="gta-empty">No se pudo cargar Mermaid del CDN. Probá Diagrama o Lista.</div>';
-        };
-        document.head.appendChild(script);
     }
 
     function _areaLabel(code) {
@@ -504,26 +396,13 @@ window.Procesos = (() => {
 
         const estadoBadge = _estadoBadge(p.estado);
 
-        // Tres vistas distintas de los mismos pasos. Toggle al inicio.
-        const pasosLista = _renderPasosLista(pasos);
-        const pasosDiagrama = _renderPasosDiagrama(pasos);
-        const pasosMermaid = _renderPasosMermaid(pasos);
         const pasosHtml = !pasos.length
             ? `<div class="gta-empty-pasos">
                   <i class="fas fa-stream"></i>
                   <p><strong>Este proceso no tiene pasos definidos todavía.</strong></p>
                   <p class="gta-section-help">Apretá <em>Editar</em> para construir la fuente de la verdad.</p>
               </div>`
-            : `
-                <div class="gta-pasos-view-toggle">
-                    <button class="gta-view-btn active" data-view="diagrama" onclick="Procesos._switchPasosView('diagrama')"><i class="fas fa-diagram-project"></i> Diagrama</button>
-                    <button class="gta-view-btn" data-view="mermaid" onclick="Procesos._switchPasosView('mermaid')"><i class="fas fa-sitemap"></i> Mermaid</button>
-                    <button class="gta-view-btn" data-view="lista" onclick="Procesos._switchPasosView('lista')"><i class="fas fa-list"></i> Lista</button>
-                </div>
-                <div class="gta-pasos-view-pane" data-view="diagrama">${pasosDiagrama}</div>
-                <div class="gta-pasos-view-pane" data-view="mermaid" style="display:none;">${pasosMermaid}</div>
-                <div class="gta-pasos-view-pane" data-view="lista" style="display:none;">${pasosLista}</div>
-            `;
+            : _renderPasosDiagrama(pasos);
 
         const flujosHtml = flujos.length ? flujos.map(f => `
             <div class="gta-doc-row" style="cursor:default;">
@@ -1216,6 +1095,5 @@ window.Procesos = (() => {
         _setCampoDependeDe, _setCampoOpcionesPorValor, _quitarCampoForm,
         iniciarFlujo, cerrarIniciarFlujo, confirmarIniciarFlujo,
         abrirDocPreview, cerrarDocPreview,
-        _switchPasosView,
     };
 })();
