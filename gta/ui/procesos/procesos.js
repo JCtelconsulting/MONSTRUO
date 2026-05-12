@@ -210,10 +210,14 @@ window.Procesos = (() => {
             });
         }).join('');
 
+        // SVG con viewBox + width 100% para que ocupe todo el ancho del
+        // contenedor manteniendo proporciones. Las cajas crecen visualmente
+        // si la ventana es muy ancha (mejor legibilidad en pantallas grandes).
         return `
-            <div class="gta-flow-diagram" style="overflow-x:auto; margin-top:8px;">
-                <svg width="${totalW}" height="${totalH}" xmlns="http://www.w3.org/2000/svg"
-                     style="background:rgba(0,0,0,0.15); border-radius:8px;">
+            <div class="gta-flow-diagram" style="margin-top:8px;">
+                <svg viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg"
+                     preserveAspectRatio="xMidYMid meet"
+                     style="width:100%; height:auto; display:block; background:rgba(0,0,0,0.15); border-radius:8px;">
                     <defs>
                         <marker id="flowarrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                             <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(0, 243, 255, 0.7)"/>

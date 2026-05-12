@@ -10,7 +10,7 @@
    muestra pasos, campos del formulario y todo el contenido en simultáneo.
    Usamos min(px, vw) para que escale en pantallas grandes con un tope. */
 .gta-proc-modal {
-    max-width: min(1280px, 92vw) !important;
+    max-width: min(1500px, 95vw) !important;
 }
 
 /* ── Listado agrupado por área / subárea ─────────────────────────────── */
