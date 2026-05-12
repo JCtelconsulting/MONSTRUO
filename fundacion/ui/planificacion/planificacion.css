@@ -22,8 +22,8 @@
 }
 
 .plan-cal-title {
-    margin: 0 0.3rem;
-    font-size: 1rem;
+    margin: 0 0.5rem;
+    font-size: 1.2rem;
     font-weight: 700;
     color: #fff;
     text-transform: capitalize;
@@ -78,32 +78,32 @@
 }
 
 .plan-cal-mes-dow > div {
-    font-size: 0.7rem;
+    font-size: 0.78rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     color: var(--text-soft);
     text-align: center;
-    padding: 0.3rem 0;
+    padding: 0.45rem 0;
     font-weight: 700;
 }
 
 .plan-cal-mes-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    grid-auto-rows: minmax(70px, 1fr);
-    gap: 4px;
+    grid-auto-rows: minmax(135px, 1fr);
+    gap: 6px;
 }
 
 .plan-cal-day {
     background: rgba(0, 0, 0, 0.18);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.35rem 0.45rem;
+    border-radius: 10px;
+    padding: 0.5rem 0.6rem;
     cursor: pointer;
     transition: background 100ms ease, border-color 100ms ease;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.3rem;
     overflow: hidden;
 }
 
@@ -120,8 +120,8 @@
     background: rgba(79, 172, 254, 0.25);
     color: #fff;
     border-radius: 999px;
-    width: 1.6rem;
-    height: 1.6rem;
+    width: 1.9rem;
+    height: 1.9rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -141,7 +141,7 @@
 
 .plan-cal-day-num {
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 1rem;
     color: #fff;
 }
 
@@ -156,30 +156,30 @@
 /* Mini-eventos del día en vista MES */
 
 .plan-cal-day {
-    min-height: 95px;
+    min-height: 135px;
 }
 
 .plan-cal-day-eventos {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    margin-top: 2px;
+    gap: 3px;
+    margin-top: 3px;
     overflow: hidden;
 }
 
 .plan-cal-day-evento {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.4rem;
     background: rgba(255, 255, 255, 0.04);
     border-left: 3px solid #4facfe;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-size: 0.66rem;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 0.74rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.3;
+    line-height: 1.35;
 }
 
 .plan-cal-day-evento.is-plan {
@@ -194,7 +194,7 @@
 .plan-cal-day-evento-hora {
     color: var(--text-soft);
     font-variant-numeric: tabular-nums;
-    font-size: 0.62rem;
+    font-size: 0.7rem;
     flex-shrink: 0;
 }
 
@@ -207,9 +207,10 @@
 }
 
 .plan-cal-day-evento-mas {
-    font-size: 0.62rem;
+    font-size: 0.7rem;
     color: var(--text-soft);
-    padding: 0 5px;
+    padding: 0 6px;
+    margin-top: 2px;
 }
 
 .plan-cal-day-dot {
@@ -233,19 +234,19 @@
 .plan-cal-semana {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
+    gap: 6px;
 }
 
 .plan-cal-semana-col {
     background: rgba(0, 0, 0, 0.18);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.4rem 0.5rem 0.5rem 0.5rem;
+    border-radius: 10px;
+    padding: 0.6rem 0.65rem 0.75rem 0.65rem;
     cursor: pointer;
-    min-height: 130px;
+    min-height: 260px;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.4rem;
     transition: background 120ms ease, border-color 120ms ease;
 }
 
@@ -264,25 +265,25 @@
 }
 
 .plan-cal-semana-head {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--text-soft);
     font-weight: 700;
     text-align: center;
-    padding-bottom: 0.3rem;
+    padding-bottom: 0.4rem;
     border-bottom: 1px dashed var(--border);
 }
 
 .plan-cal-semana-bloque {
     background: rgba(255, 255, 255, 0.04);
     border-left: 3px solid var(--accent, #4facfe);
-    padding: 0.25rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.72rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 5px;
+    font-size: 0.78rem;
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0.15rem;
 }
 
 .plan-cal-semana-bloque.is-plan {
@@ -325,7 +326,7 @@
 .plan-cal-semana-hora {
     color: var(--text-soft);
     font-variant-numeric: tabular-nums;
-    font-size: 0.65rem;
+    font-size: 0.72rem;
 }
 
 .plan-cal-semana-titulo {
@@ -364,29 +365,36 @@
 
 .plan-cal-dia-bloque {
     display: grid;
-    grid-template-columns: 80px 1fr auto;
-    gap: 0.6rem;
+    grid-template-columns: 110px 1fr auto;
+    gap: 0.85rem;
     align-items: center;
-    padding: 0.4rem 0.6rem;
+    padding: 0.7rem 0.9rem;
     background: rgba(255, 255, 255, 0.03);
-    border-left: 3px solid var(--accent, #4facfe);
-    border-radius: 6px;
-    font-size: 0.85rem;
+    border-left: 4px solid var(--accent, #4facfe);
+    border-radius: 8px;
+    font-size: 0.95rem;
 }
 
 .plan-cal-dia-bloque-hora {
     color: var(--text-soft);
     font-variant-numeric: tabular-nums;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 600;
 }
 
 .plan-cal-dia-bloque-titulo {
     color: #fff;
 }
 
+.plan-cal-dia-bloque-titulo {
+    font-size: 1rem;
+    color: #fff;
+    font-weight: 600;
+}
+
 .plan-cal-dia-bloque-sub {
     color: var(--text-soft);
-    font-size: 0.75rem;
+    font-size: 0.82rem;
 }
 
 /* ── Header del editor (separador antes del clima y bloques) ─────────── */
