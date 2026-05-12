@@ -15,6 +15,12 @@ window.Procesos = (() => {
     let _modoEditDiag = false;
     let _pasosEditDiag = [];
 
+    // Estado del drag de cajas en el diagrama (modo edición)
+    let _dragState = null;
+    // Layout del último diagrama renderizado, lo necesitan los handlers de
+    // drag para mapear coordenadas de cursor a (columna, fila).
+    let _diagLayout = null;
+
     // ── Init ───────────────────────────────────────────────────────────
     async function init(sesion) {
         _sesion = sesion;
@@ -190,21 +196,24 @@ window.Procesos = (() => {
             const x = pos.cx - boxW / 2;
             const y = pos.cy - boxH / 2;
             const titulo = (p.titulo || 'Sin título');
-            const onclick = _modoEditDiag
-                ? `Procesos._editarPasoDiag(${p.orden})`
-                : `Procesos.abrirDetallePaso(${p.orden})`;
+            // En vista: click → detalle. En edición: mousedown empieza
+            // posible drag; si no hubo movimiento, _dragEnd ejecuta el editor.
+            const cursor = _modoEditDiag ? 'move' : 'pointer';
+            const onEvent = _modoEditDiag
+                ? `onmousedown="Procesos._diagDragStart(${p.orden}, evt)"`
+                : `onclick="Procesos.abrirDetallePaso(${p.orden})"`;
             const btnEliminar = _modoEditDiag
-                ? `<g class="gta-flow-step-del" onclick="event.stopPropagation(); Procesos._eliminarPasoDiag(${p.orden})" style="cursor:pointer;">
+                ? `<g class="gta-flow-step-del" onmousedown="event.stopPropagation();" onclick="event.stopPropagation(); Procesos._eliminarPasoDiag(${p.orden})" style="cursor:pointer;">
                        <circle cx="${x + boxW - 8}" cy="${y + 8}" r="10" fill="rgba(255, 51, 51, 0.85)"></circle>
                        <text x="${x + boxW - 8}" y="${y + 12}" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">×</text>
                    </g>`
                 : '';
             return `
                 <g class="gta-flow-step" data-paso-orden="${p.orden}"
-                   onclick="${onclick}" style="cursor:pointer;">
+                   ${onEvent} style="cursor:${cursor};">
                     <rect x="${x}" y="${y}" width="${boxW}" height="${boxH}"
                           rx="8" fill="rgba(0, 243, 255, 0.15)" stroke="rgba(0, 243, 255, 0.6)" stroke-width="1.5"></rect>
-                    <foreignObject x="${x + 6}" y="${y + 6}" width="${boxW - 12}" height="${boxH - 12}">
+                    <foreignObject x="${x + 6}" y="${y + 6}" width="${boxW - 12}" height="${boxH - 12}" pointer-events="none">
                         <div xmlns="http://www.w3.org/1999/xhtml"
                              style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;
                                     text-align:center; color:#e6edf7; font-size:11px; line-height:1.25;
@@ -268,6 +277,10 @@ window.Procesos = (() => {
                 return `<path d="${pathD}" stroke="rgba(0, 243, 255, 0.5)" stroke-width="1.5" fill="none" marker-end="url(#flowarrow)"></path>`;
             });
         }).join('');
+
+        // Guardar layout para que los handlers de drag sepan dónde está cada
+        // columna y fila en coordenadas del SVG.
+        _diagLayout = { colW, rowH, headerH, padTop, boxW, boxH, areasOrden, totalH };
 
         // SVG con viewBox + width 100% para que ocupe todo el ancho del
         // contenedor manteniendo proporciones. Las cajas crecen visualmente
@@ -1142,6 +1155,124 @@ window.Procesos = (() => {
         return orig !== edit;
     }
 
+    // ── Drag de cajas (mover entre columnas/filas) ─────────────────────
+
+    // Convierte coordenadas de cursor (clientX/Y) a coordenadas del SVG
+    // (las del viewBox, que es donde están las cajas).
+    function _svgCoord(svg, clientX, clientY) {
+        const pt = svg.createSVGPoint();
+        pt.x = clientX;
+        pt.y = clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return { x: 0, y: 0 };
+        const inv = ctm.inverse();
+        const r = pt.matrixTransform(inv);
+        return { x: r.x, y: r.y };
+    }
+
+    function _diagDragStart(pasoOrden, evt) {
+        if (!_modoEditDiag) return;
+        evt.preventDefault();
+        const svg = document.querySelector('.gta-flow-diagram svg');
+        if (!svg) return;
+        const start = _svgCoord(svg, evt.clientX, evt.clientY);
+        _dragState = {
+            pasoOrden,
+            svg,
+            startX: start.x,
+            startY: start.y,
+            offsetX: 0,
+            offsetY: 0,
+            moved: false,
+        };
+        document.addEventListener('mousemove', _diagDragMove);
+        document.addEventListener('mouseup', _diagDragEnd);
+    }
+
+    function _diagDragMove(evt) {
+        if (!_dragState) return;
+        const cur = _svgCoord(_dragState.svg, evt.clientX, evt.clientY);
+        const dx = cur.x - _dragState.startX;
+        const dy = cur.y - _dragState.startY;
+        if (!_dragState.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+        _dragState.moved = true;
+        _dragState.offsetX = dx;
+        _dragState.offsetY = dy;
+        // Mover el <g> con un transform translate (visual feedback)
+        const g = _dragState.svg.querySelector(`.gta-flow-step[data-paso-orden="${_dragState.pasoOrden}"]`);
+        if (g) {
+            g.setAttribute('transform', `translate(${dx}, ${dy})`);
+            g.style.opacity = '0.85';
+        }
+    }
+
+    function _diagDragEnd(evt) {
+        if (!_dragState) return;
+        document.removeEventListener('mousemove', _diagDragMove);
+        document.removeEventListener('mouseup', _diagDragEnd);
+
+        const state = _dragState;
+        _dragState = null;
+
+        if (!state.moved) {
+            // Sin movimiento → tratar como click: abrir editor del paso
+            _editarPasoDiag(state.pasoOrden);
+            return;
+        }
+
+        // Calcular drop: posición final del cursor en coords del SVG
+        const drop = _svgCoord(state.svg, evt.clientX, evt.clientY);
+        const layout = _diagLayout;
+        if (!layout) {
+            _renderModal(_procActivo);
+            return;
+        }
+
+        // Columna destino: por X
+        let colIdx = Math.floor(drop.x / layout.colW);
+        colIdx = Math.max(0, Math.min(layout.areasOrden.length - 1, colIdx));
+        const nuevaArea = layout.areasOrden[colIdx];
+
+        // Fila destino: por Y
+        const yRelativa = drop.y - layout.headerH - layout.padTop;
+        let rowIdx = Math.floor(yRelativa / layout.rowH);
+        // Acotar entre 0 y (cantidad de pasos - 1)
+        rowIdx = Math.max(0, Math.min(_pasosEditDiag.length - 1, rowIdx));
+
+        _diagMoverPaso(state.pasoOrden, nuevaArea, rowIdx);
+    }
+
+    // Mueve un paso: actualiza area_code y reordena la lista; renumera
+    // todos los pasos y actualiza las referencias depende_de.
+    function _diagMoverPaso(pasoOrden, nuevaArea, nuevaFila) {
+        const idxOrigen = _pasosEditDiag.findIndex(p => p.orden === pasoOrden);
+        if (idxOrigen < 0) {
+            _renderModal(_procActivo);
+            return;
+        }
+        // Ordenar por orden actual antes de mover
+        _pasosEditDiag.sort((a, b) => a.orden - b.orden);
+        const paso = _pasosEditDiag[idxOrigen];
+        paso.area_code = nuevaArea;
+
+        // Mover en la lista: sacarlo y reinsertarlo en nuevaFila
+        _pasosEditDiag.splice(idxOrigen, 1);
+        const target = Math.max(0, Math.min(_pasosEditDiag.length, nuevaFila));
+        _pasosEditDiag.splice(target, 0, paso);
+
+        // Renumerar a 1..N y construir mapping old→new para actualizar deps
+        const mapping = {};
+        _pasosEditDiag.forEach((p, i) => {
+            mapping[p.orden] = i + 1;
+        });
+        _pasosEditDiag.forEach((p, i) => {
+            p.orden = i + 1;
+            p.depende_de = (p.depende_de || []).map(d => mapping[d]).filter(d => d != null);
+        });
+
+        _renderModal(_procActivo);
+    }
+
     // Agrega un paso nuevo en el área dada. Por defecto sin deps y orden
     // = max(orden actual) + 1. El usuario edita los detalles después.
     function _agregarPasoDiag(areaCode) {
@@ -1417,5 +1548,6 @@ window.Procesos = (() => {
         abrirDetallePaso,
         _entrarEditDiagrama, _cancelarEditDiagrama, _guardarEditDiagrama,
         _agregarPasoDiag, _eliminarPasoDiag, _editarPasoDiag,
+        _diagDragStart,
     };
 })();
