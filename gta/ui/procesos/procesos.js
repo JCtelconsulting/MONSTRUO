@@ -1254,6 +1254,16 @@ window.Procesos = (() => {
                 ? p.depende_de_detalle.map(d => ({ ...d }))
                 : [],
             bloqueante: p.bloqueante !== false,
+            items: Array.isArray(p.items)
+                ? p.items.map(it => ({
+                    id: it.id,
+                    titulo: it.titulo || '',
+                    requerido_para_cerrar: it.requerido_para_cerrar !== false,
+                    desbloquea_pasos: Array.isArray(it.desbloquea_pasos)
+                        ? it.desbloquea_pasos.slice()
+                        : [],
+                }))
+                : [],
         }));
         _modoEditDiag = true;
         _renderModal(_procActivo);
@@ -1690,7 +1700,7 @@ window.Procesos = (() => {
                     </div>
                     <div class="field" style="margin-top:14px;">
                         <label>Depende de los pasos:</label>
-                        <div class="gta-deps-list">
+                        <div id="ep-deps-list" class="gta-deps-list">
                             ${otros.length ? otros.map(o => `
                                 <label class="gta-dep-check">
                                     <input type="checkbox" data-dep="${o.orden}" ${(p.depende_de||[]).includes(o.orden)?'checked':''}>
@@ -1698,6 +1708,21 @@ window.Procesos = (() => {
                                 </label>
                             `).join('') : '<p class="gta-section-help">No hay otros pasos para depender.</p>'}
                         </div>
+                    </div>
+
+                    <div class="field" style="margin-top:18px;">
+                        <label>
+                            Sub-tareas / checklist
+                            <span class="gta-section-help" style="font-weight:normal;">
+                                — sub-ítems tickeables dentro de este paso. Un ítem puede
+                                desbloquear directamente otros pasos al tickearse (útil
+                                cuando hay flujo paralelo).
+                            </span>
+                        </label>
+                        <div id="ep-items-list" class="gta-items-edit-list"></div>
+                        <button class="btn-secondary" id="ep-item-add" type="button" style="margin-top:8px;">
+                            <i class="fas fa-plus"></i> Agregar ítem
+                        </button>
                     </div>
                 </div>
                 <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
@@ -1720,21 +1745,130 @@ window.Procesos = (() => {
                 subs.map(s => `<option value="${s.code}">${_esc(s.label)}</option>`).join('');
         };
 
+        // ── Items (sub-tareas) del paso ──────────────────────────────────
+        // Copia local mutable mientras el modal está abierto
+        const itemsBuf = (p.items || []).map(it => ({
+            id: it.id || _itemNewId(),
+            titulo: it.titulo || '',
+            requerido_para_cerrar: it.requerido_para_cerrar !== false,
+            desbloquea_pasos: Array.isArray(it.desbloquea_pasos) ? [...it.desbloquea_pasos] : [],
+        }));
+
+        const renderItems = () => {
+            const cont = modal.querySelector('#ep-items-list');
+            if (!cont) return;
+            if (!itemsBuf.length) {
+                cont.innerHTML = '<p class="gta-section-help" style="margin:6px 0;">Sin sub-tareas. Es opcional — agregalas si este paso necesita un checklist.</p>';
+                return;
+            }
+            cont.innerHTML = itemsBuf.map((it, idx) => `
+                <div class="gta-item-edit-row" data-idx="${idx}">
+                    <div class="gta-item-edit-main">
+                        <input type="text" class="input-dark gta-item-edit-titulo"
+                               placeholder="Título del ítem (ej: «Equipos verificados»)"
+                               value="${_esc(it.titulo)}">
+                        <div class="gta-item-edit-meta">
+                            <label class="gta-checkbox-label" style="display:inline-flex; align-items:center; gap:6px;">
+                                <input type="checkbox" class="gta-item-edit-req" ${it.requerido_para_cerrar ? 'checked' : ''}>
+                                <span>Requerido para cerrar</span>
+                            </label>
+                            <div class="gta-item-edit-desb">
+                                <span style="font-size:0.8rem; color:var(--text-soft,#a5adb4);">Al tickear, desbloquea:</span>
+                                <div class="gta-deps-list" style="display:inline-flex; flex-wrap:wrap; gap:6px;">
+                                    ${otros.length ? otros.map(o => `
+                                        <label class="gta-dep-check" style="font-size:0.8rem;">
+                                            <input type="checkbox" class="gta-item-edit-desb-cb"
+                                                   data-paso="${o.orden}"
+                                                   ${it.desbloquea_pasos.includes(o.orden) ? 'checked' : ''}>
+                                            <span>${o.orden}. ${_esc(o.titulo)}</span>
+                                        </label>
+                                    `).join('') : '<em style="opacity:0.6;">no hay otros pasos</em>'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-icon btn-icon-danger gta-item-edit-del" type="button"
+                            title="Borrar este ítem">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+
+            // Wire-up de cada fila
+            cont.querySelectorAll('.gta-item-edit-row').forEach(row => {
+                const idx = parseInt(row.getAttribute('data-idx'), 10);
+                row.querySelector('.gta-item-edit-titulo').oninput = (e) => {
+                    itemsBuf[idx].titulo = e.target.value;
+                };
+                row.querySelector('.gta-item-edit-req').onchange = (e) => {
+                    itemsBuf[idx].requerido_para_cerrar = e.target.checked;
+                };
+                row.querySelectorAll('.gta-item-edit-desb-cb').forEach(cb => {
+                    cb.onchange = () => {
+                        const pasoOrd = parseInt(cb.getAttribute('data-paso'), 10);
+                        const arr = itemsBuf[idx].desbloquea_pasos;
+                        const i = arr.indexOf(pasoOrd);
+                        if (cb.checked && i < 0) arr.push(pasoOrd);
+                        else if (!cb.checked && i >= 0) arr.splice(i, 1);
+                        arr.sort((a, b) => a - b);
+                    };
+                });
+                row.querySelector('.gta-item-edit-del').onclick = () => {
+                    if (!confirm(`¿Borrar el ítem "${itemsBuf[idx].titulo || '(sin título)'}"?`)) return;
+                    itemsBuf.splice(idx, 1);
+                    renderItems();
+                };
+            });
+        };
+
+        renderItems();
+
+        modal.querySelector('#ep-item-add').onclick = () => {
+            itemsBuf.push({
+                id: _itemNewId(),
+                titulo: '',
+                requerido_para_cerrar: true,
+                desbloquea_pasos: [],
+            });
+            renderItems();
+        };
+
         modal.querySelector('#ep-ok').onclick = () => {
             const titulo = modal.querySelector('#ep-titulo').value.trim();
             if (!titulo) { alert('El título es obligatorio'); return; }
+            // Validar items: título no vacío
+            for (const it of itemsBuf) {
+                if (!it.titulo.trim()) {
+                    alert('Todos los ítems deben tener un título (o borralos).');
+                    return;
+                }
+            }
             p.titulo = titulo;
             p.descripcion = modal.querySelector('#ep-desc').value.trim();
             p.area_code = modal.querySelector('#ep-area').value;
             p.subarea_code = modal.querySelector('#ep-subarea').value || null;
             p.sla_horas = parseInt(modal.querySelector('#ep-sla').value, 10) || 0;
             p.bloqueante = modal.querySelector('#ep-bloq').checked;
-            p.depende_de = Array.from(modal.querySelectorAll('[data-dep]:checked'))
+            p.depende_de = Array.from(modal.querySelectorAll('#ep-deps-list [data-dep]:checked'))
                 .map(c => parseInt(c.getAttribute('data-dep'), 10))
                 .sort((a, b) => a - b);
+            // Persistir items (sin los items vacíos por seguridad)
+            p.items = itemsBuf
+                .filter(it => it.titulo.trim())
+                .map(it => ({
+                    id: it.id,
+                    titulo: it.titulo.trim(),
+                    requerido_para_cerrar: it.requerido_para_cerrar,
+                    desbloquea_pasos: [...it.desbloquea_pasos],
+                }));
             cleanup();
             _renderModal(_procActivo);
         };
+    }
+
+    // Genera un id corto y estable para un item nuevo
+    function _itemNewId() {
+        return 'i_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
     }
 
     async function _guardarEditDiagrama() {
@@ -1786,6 +1920,24 @@ window.Procesos = (() => {
                             <span><i class="fas fa-lock"></i> <strong>Bloqueante:</strong> ${paso.bloqueante !== false ? 'sí' : 'no'}</span>
                         </div>
                     </div>
+                    ${(paso.items || []).length ? `
+                        <div style="margin-top:16px;">
+                            <h4 style="margin:0 0 8px; font-size:0.92rem; color:var(--text-soft,#a5adb4);">
+                                Sub-tareas / checklist
+                            </h4>
+                            <ul class="gta-paso-detalle-items">
+                                ${(paso.items || []).map(it => {
+                                    const reqTxt = it.requerido_para_cerrar === false
+                                        ? '<span style="opacity:0.6;">(opcional)</span>'
+                                        : '<span style="color:#ff8b8b;">(requerido)</span>';
+                                    const desb = Array.isArray(it.desbloquea_pasos) && it.desbloquea_pasos.length
+                                        ? ` <em style="color:var(--accent,#4ea1ff);">→ desbloquea paso ${it.desbloquea_pasos.join(', ')}</em>`
+                                        : '';
+                                    return `<li>${_esc(it.titulo || it.id)} ${reqTxt}${desb}</li>`;
+                                }).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
                 </div>
                 <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                     <button class="btn-secondary" id="paso-det-close-2" type="button">Cerrar</button>

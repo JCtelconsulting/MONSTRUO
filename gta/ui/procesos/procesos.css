@@ -515,6 +515,68 @@
 
 .gta-dep-check input { cursor: pointer; }
 
+/* ── Editor de items (sub-tareas) dentro del modal de editar paso ── */
+.gta-items-edit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.gta-item-edit-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.gta-item-edit-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gta-item-edit-titulo {
+    width: 100%;
+}
+
+.gta-item-edit-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.85rem;
+}
+
+.gta-item-edit-desb {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gta-item-edit-desb .gta-deps-list {
+    max-height: 120px;
+    padding: 6px 10px;
+}
+
+.gta-item-edit-del {
+    align-self: flex-start;
+}
+
+/* Detalle (read-only) en el modal del paso */
+.gta-paso-detalle-items {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.88rem;
+}
+
 /* Botón × de eliminar y + de agregar — hover */
 .gta-flow-step-del:hover circle {
     fill: rgb(255, 80, 80);
