@@ -260,12 +260,12 @@ window.Tareas = (() => {
                     <div class="gta-tarea-card-head-left">
                         <i class="fas fa-chevron-right gta-card-chevron"></i>
                         <h3 class="gta-tarea-card-titulo">${_esc(t.titulo)}</h3>
-                        ${t.tiene_avisos_pendientes ? `<span class="gta-card-aviso-badge" title="Hubo cambios en pasos anteriores después de tu cierre">⚠ Revisar</span>` : ''}
+                        ${t.tiene_avisos_pendientes ? `<span class="gta-card-aviso-badge" title="Después de que cerraste tu paso, otro responsable modificó datos o adjuntos del flujo. Abrí la tarea para ver qué cambió y marcá como revisado si no afecta tu trabajo.">⚠ Revisar</span>` : ''}
                     </div>
                     <div class="gta-tarea-card-head-right">
-                        <span class="pill gta-prioridad-${t.prioridad}" title="Prioridad ${_esc(t.prioridad)}">${_esc(t.prioridad)}</span>
-                        <span class="pill gta-estado-${t.estado}" title="Estado">${_esc(t.estado.replace('_', ' '))}</span>
-                        <span class="gta-card-area" title="Área asignada"><i class="fas fa-folder"></i> ${_esc(t.area_label || '—')}${t.subarea_label ? ' / ' + _esc(t.subarea_label) : ''}</span>
+                        <span class="pill gta-prioridad-${t.prioridad}" title="Prioridad: ${_esc(t.prioridad)}">${_esc(t.prioridad)}</span>
+                        <span class="pill gta-estado-${t.estado}" title="${_estadoTooltip(t.estado)}">${_esc(t.estado.replace('_', ' '))}</span>
+                        <span class="gta-card-area" title="Área a la que está asignada esta tarea"><i class="fas fa-folder"></i> ${_esc(t.area_label || '—')}${t.subarea_label ? ' / ' + _esc(t.subarea_label) : ''}</span>
                         ${respHtml}
                         ${sla}
                     </div>
@@ -379,7 +379,7 @@ window.Tareas = (() => {
                     const hayDestinos = (t.paso_devolver_a_info || []).length > 0;
                     if (t.flujo_id && hayDestinos) {
                         acciones.push(`<button class="btn-danger"
-                            title="Devolver esta tarea a un paso anterior para que su responsable corrija"
+                            title="Pausar esta tarea y reabrir un paso anterior para que su responsable corrija algo. Los pasos cerrados intermedios NO se reabren, pero reciben un aviso de revisión si el responsable del destino modifica datos o adjuntos."
                             onclick="event.stopPropagation(); Tareas.devolver(${t.id})">
                             <i class="fas fa-undo-alt"></i> Devolver al paso…
                         </button>`);
@@ -406,6 +406,7 @@ window.Tareas = (() => {
                         <input type="file" id="adjunto-input-${t.id}" style="display:none;"
                                onchange="Tareas.subirAdjunto(${t.id}, this)">
                         <button class="btn-secondary"
+                                title="Subir un archivo al flujo (PTE, contratos, fotos, etc.). Visible para todos los responsables del flujo, no solo de esta tarea. Hasta 25 MB."
                                 onclick="event.stopPropagation(); document.getElementById('adjunto-input-${t.id}').click()">
                             <i class="fas fa-paperclip"></i> Subir archivo
                         </button>
@@ -677,6 +678,7 @@ window.Tareas = (() => {
                                     <span class="gta-aviso-meta"> · ${fecha}</span>
                                 </div>
                                 <button class="btn-sm btn-secondary"
+                                        title="Confirmar que viste el cambio y no afecta tu paso. Si sí afecta, mejor 'Devolver al paso' al modificado."
                                         onclick="event.stopPropagation(); Tareas.marcarAvisoRevisado(${tareaId}, ${a.id})">
                                     <i class="fas fa-check"></i> Marcar revisado
                                 </button>
@@ -1105,6 +1107,19 @@ window.Tareas = (() => {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────
+    // Tooltip humano por estado de tarea (para el hover de la pill de estado)
+    function _estadoTooltip(estado) {
+        const m = {
+            pendiente:  'Pendiente: en la bandeja de su área, esperando que alguien la tome',
+            en_curso:   'En curso: alguien la tomó como responsable y está trabajando',
+            bloqueada:  'Bloqueada: espera que se cierren las tareas de las que depende',
+            cerrada:    'Cerrada: terminada con éxito',
+            cancelada:  'Cancelada: terminada sin éxito (no aplica, no se hizo)',
+            devuelta:   'Devuelta: el responsable la rebotó a un paso anterior; espera que se vuelva a cerrar el paso destino',
+        };
+        return m[estado] || `Estado: ${estado}`;
+    }
+
     function _esc(s) {
         if (s == null) return '';
         return String(s)

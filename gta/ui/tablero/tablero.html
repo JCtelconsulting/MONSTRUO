@@ -1,29 +1,21 @@
 <div class="gta-tablero">
-    <!-- KPIs (3 por fila, orden: activos · por vencer · vencidos / completados · esperando · quiebres) -->
+    <!-- KPIs (4 columnas en una fila, orden: activos · por vencer · vencidos · completados) -->
     <div class="gta-kpi-row" id="tablero-kpis">
-        <div class="gta-kpi-card kpi-info">
+        <div class="gta-kpi-card kpi-info" title="Flujos del catálogo en ejecución (todavía no completados ni cancelados)">
             <div class="gta-kpi-val" id="kpi-flujos-activos">—</div>
             <div class="gta-kpi-lbl">Flujos activos</div>
         </div>
-        <div class="gta-kpi-card kpi-warning">
+        <div class="gta-kpi-card kpi-warning" title="Tareas que ya consumieron ≥70% de su SLA pero todavía no vencen — atención cercana">
             <div class="gta-kpi-val" id="kpi-por-vencer">—</div>
             <div class="gta-kpi-lbl">Por vencer</div>
         </div>
-        <div class="gta-kpi-card kpi-danger">
+        <div class="gta-kpi-card kpi-danger" title="Tareas con SLA ya vencido (fecha límite pasada y no cerradas)">
             <div class="gta-kpi-val" id="kpi-vencidas">—</div>
             <div class="gta-kpi-lbl">Tareas vencidas</div>
         </div>
-        <div class="gta-kpi-card kpi-ok">
+        <div class="gta-kpi-card kpi-ok" title="Flujos cuyas tareas están todas cerradas">
             <div class="gta-kpi-val" id="kpi-completados">—</div>
             <div class="gta-kpi-lbl">Completados</div>
-        </div>
-        <div class="gta-kpi-card kpi-pause">
-            <div class="gta-kpi-val" id="kpi-esperando-quiebre">—</div>
-            <div class="gta-kpi-lbl">Esperando otra área</div>
-        </div>
-        <div class="gta-kpi-card kpi-alert">
-            <div class="gta-kpi-val" id="kpi-quiebres">—</div>
-            <div class="gta-kpi-lbl">Quiebres abiertos</div>
         </div>
     </div>
 

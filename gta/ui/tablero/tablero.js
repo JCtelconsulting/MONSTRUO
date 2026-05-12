@@ -63,12 +63,10 @@ window.Tablero = (() => {
     function _actualizarKpis() {
         const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v ?? '0'); };
         const m = _metricas || {};
-        set('kpi-flujos-activos',     m.flujos_activos);
-        set('kpi-vencidas',           m.vencidas);
-        set('kpi-por-vencer',         m.por_vencer);
-        set('kpi-quiebres',           m.quiebres_abiertos);
-        set('kpi-esperando-quiebre',  m.esperando_quiebre);
-        set('kpi-completados',        m.flujos_completados);
+        set('kpi-flujos-activos', m.flujos_activos);
+        set('kpi-vencidas',       m.vencidas);
+        set('kpi-por-vencer',     m.por_vencer);
+        set('kpi-completados',    m.flujos_completados);
     }
 
     // ── Filtros ─────────────────────────────────────────────────────────
@@ -140,12 +138,11 @@ window.Tablero = (() => {
         const dotColor = { rojo: 'gta-dot-red', amarillo: 'gta-dot-yellow', verde: 'gta-dot-green' }[f.salud_sla] || 'gta-dot-gray';
         const expandida = _flujosExpandidos.has(f.flujo_id);
 
-        // Badges de alertas
+        // Badges de alertas del flujo
         const badges = [];
-        if (f.vencidas > 0) badges.push(`<span class="gta-badge-alert badge-danger" title="Tareas vencidas">🔥 ${f.vencidas}</span>`);
-        if (f.por_vencer > 0 && f.vencidas === 0) badges.push(`<span class="gta-badge-alert badge-warning" title="Por vencer">⏰ ${f.por_vencer}</span>`);
-        if (f.esperando_quiebre > 0) badges.push(`<span class="gta-badge-alert badge-info" title="Esperando otra área">⏸ ${f.esperando_quiebre}</span>`);
-        if (f.devueltas > 0) badges.push(`<span class="gta-badge-alert badge-warning" title="Devueltas">↩ ${f.devueltas}</span>`);
+        if (f.vencidas > 0) badges.push(`<span class="gta-badge-alert badge-danger" title="${f.vencidas} tarea(s) con SLA ya vencido">🔥 ${f.vencidas}</span>`);
+        if (f.por_vencer > 0 && f.vencidas === 0) badges.push(`<span class="gta-badge-alert badge-warning" title="${f.por_vencer} tarea(s) cerca de vencer (≥70% del SLA consumido)">⏰ ${f.por_vencer}</span>`);
+        if (f.devueltas > 0) badges.push(`<span class="gta-badge-alert badge-warning" title="${f.devueltas} tarea(s) devueltas esperando que el paso destino se vuelva a cerrar">↩ ${f.devueltas}</span>`);
 
         // Paso actual
         const pasoActual = f.paso_actual
@@ -159,7 +156,7 @@ window.Tablero = (() => {
         <div class="gta-flujo-card ${expandida ? 'is-open' : ''}" data-flujo-id="${f.flujo_id}">
             <div class="gta-flujo-card-head-clickable" onclick="Tablero.toggleFlujo('${f.flujo_id}')">
                 <div class="gta-flujo-card-head">
-                    <span class="gta-dot ${dotColor}" title="Salud SLA"></span>
+                    <span class="gta-dot ${dotColor}" title="Salud del SLA del flujo: verde = todo en plazo · amarillo = al menos una tarea cerca de vencer · rojo = al menos una vencida"></span>
                     <div class="gta-flujo-card-title">${_esc(f.titulo)}</div>
                     <i class="fas fa-chevron-${expandida ? 'up' : 'down'} gta-flujo-card-chevron"></i>
                 </div>
@@ -277,15 +274,14 @@ window.Tablero = (() => {
 
         // Badges chicos por tarea
         const badges = [];
-        if (t.quiebres_abiertos > 0) badges.push(`<span class="gta-badge-alert badge-warning" title="Quiebres abiertos">🚩 ${t.quiebres_abiertos}</span>`);
-        if (t.comentarios_count > 0) badges.push(`<span class="gta-badge-alert badge-info" title="Comentarios">💬 ${t.comentarios_count}</span>`);
+        if (t.comentarios_count > 0) badges.push(`<span class="gta-badge-alert badge-info" title="${t.comentarios_count} comentario(s) en el flujo">💬 ${t.comentarios_count}</span>`);
 
         return `
         <div class="gta-pipe-tarea sla-${t.salud_sla || 'neutral'}" data-tarea="${t.id}">
             <div class="gta-pipe-num">${t.paso_orden || '·'}</div>
             <div class="gta-pipe-body">
                 <div class="gta-pipe-header">
-                    <span class="gta-dot ${dotColor}" title="Salud SLA"></span>
+                    <span class="gta-dot ${dotColor}" title="Salud del SLA del flujo: verde = todo en plazo · amarillo = al menos una tarea cerca de vencer · rojo = al menos una vencida"></span>
                     <h5>${_esc(t.titulo)}</h5>
                     <span class="gta-tarea-estado estado-${t.estado}">${_estadoLabel(t.estado)}</span>
                 </div>

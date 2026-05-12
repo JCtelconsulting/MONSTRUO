@@ -185,10 +185,10 @@ window.Procesos = (() => {
                 <div class="gta-doc-info">
                     <div class="gta-doc-name">${_esc(p.nombre)}</div>
                     <div class="gta-doc-meta">
-                        ${tieneArchivo ? '<span class="gta-proc-badge has-file" title="Tiene archivo descriptivo"><i class="fas fa-file"></i> Doc</span>' : ''}
-                        ${tieneDef ? '<span class="gta-proc-badge has-def" title="Tiene definición ejecutable"><i class="fas fa-cogs"></i> Ejecutable</span>' : ''}
-                        ${quiebres ? `<span class="gta-proc-badge has-quiebre" title="${quiebres} quiebres abiertos"><i class="fas fa-flag"></i> ${quiebres}</span>` : ''}
-                        ${flujos ? `<span class="gta-proc-badge"><i class="fas fa-list-check"></i> ${flujos}</span>` : ''}
+                        ${tieneArchivo ? '<span class="gta-proc-badge has-file" title="Tiene archivo de referencia (PDF/Word) cargado por admin"><i class="fas fa-file"></i> Doc</span>' : ''}
+                        ${tieneDef ? '<span class="gta-proc-badge has-def" title="Tiene pasos definidos: se puede iniciar un flujo desde este proceso"><i class="fas fa-cogs"></i> Ejecutable</span>' : ''}
+                        ${quiebres ? `<span class="gta-proc-badge has-quiebre" title="${quiebres} quiebre(s) abierto(s) reportado(s) sobre este proceso"><i class="fas fa-flag"></i> ${quiebres}</span>` : ''}
+                        ${flujos ? `<span class="gta-proc-badge" title="${flujos} flujo(s) iniciados a partir de este proceso"><i class="fas fa-list-check"></i> ${flujos}</span>` : ''}
                         ${p.descripcion ? `<span class="gta-proc-desc">${_esc(p.descripcion).slice(0, 80)}${p.descripcion.length > 80 ? '…' : ''}</span>` : ''}
                     </div>
                 </div>
