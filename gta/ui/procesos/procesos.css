@@ -6,9 +6,11 @@
     gap: 14px;
 }
 
-/* Modal de detalle/edición de proceso — más ancho que el default 600px */
+/* Modal de detalle/edición de proceso — el más ancho de la app porque
+   muestra pasos, campos del formulario y todo el contenido en simultáneo.
+   Usamos min(px, vw) para que escale en pantallas grandes con un tope. */
 .gta-proc-modal {
-    max-width: 880px !important;
+    max-width: min(1280px, 92vw) !important;
 }
 
 /* ── Listado agrupado por área / subárea ─────────────────────────────── */
