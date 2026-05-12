@@ -165,14 +165,24 @@ window.Procesos = (() => {
         return best.side;
     }
 
-    // Path entre dos anchors con curva Bezier suave. Salida y entrada
-    // perpendiculares al borde.
+    // Path ortogonal entre dos anchors (líneas rectas con codos). Sale del
+    // anchor origen perpendicular al borde (stub), gira en escuadra, llega
+    // al anchor destino entrando perpendicular. Mismo look que las flechas
+    // automáticas del modelo viejo, consistente.
     function _pathEntreAnchors(p1, dir1, p2, dir2) {
-        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-        const stretch = Math.max(30, Math.min(150, dist / 2));
-        const cp1 = { x: p1.x + dir1.dx * stretch, y: p1.y + dir1.dy * stretch };
-        const cp2 = { x: p2.x + dir2.dx * stretch, y: p2.y + dir2.dy * stretch };
-        return `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${p2.x} ${p2.y}`;
+        const STUB = 20;
+        const p1Out = { x: p1.x + dir1.dx * STUB, y: p1.y + dir1.dy * STUB };
+        const p2In  = { x: p2.x + dir2.dx * STUB, y: p2.y + dir2.dy * STUB };
+        // El "codo" elige eje según la dirección de salida del origen.
+        // dir1 horizontal → primero vertical, después horizontal.
+        // dir1 vertical   → primero horizontal, después vertical.
+        let elbow;
+        if (Math.abs(dir1.dx) > 0) {
+            elbow = { x: p1Out.x, y: p2In.y };
+        } else {
+            elbow = { x: p2In.x, y: p1Out.y };
+        }
+        return `M ${p1.x} ${p1.y} L ${p1Out.x} ${p1Out.y} L ${elbow.x} ${elbow.y} L ${p2In.x} ${p2In.y} L ${p2.x} ${p2.y}`;
     }
 
     function _renderPasosDiagrama(pasos) {
@@ -1228,7 +1238,10 @@ window.Procesos = (() => {
 
     function _entrarEditDiagrama() {
         if (!_procActivo) return;
-        // Clonar profundo los pasos para no mutar el _procActivo cargado
+        // Clonar profundo los pasos para no mutar el _procActivo cargado.
+        // Importante incluir depende_de_detalle (anchors custom): si lo
+        // olvidamos, al re-entrar al editor las flechas vuelven al routing
+        // automático aunque el usuario haya guardado anchors específicos.
         _pasosEditDiag = (_procActivo.pasos_definicion || []).map(p => ({
             orden: p.orden,
             titulo: p.titulo || '',
@@ -1237,6 +1250,9 @@ window.Procesos = (() => {
             subarea_code: p.subarea_code || null,
             sla_horas: p.sla_horas || 24,
             depende_de: Array.isArray(p.depende_de) ? p.depende_de.slice() : [],
+            depende_de_detalle: Array.isArray(p.depende_de_detalle)
+                ? p.depende_de_detalle.map(d => ({ ...d }))
+                : [],
             bloqueante: p.bloqueante !== false,
         }));
         _modoEditDiag = true;
