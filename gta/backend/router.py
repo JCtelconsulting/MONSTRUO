@@ -22,6 +22,7 @@ from gta.backend.services import adjuntos as adjuntos_service
 from gta.backend.services import comentarios as comentarios_service
 from gta.backend.services import flujo_eventos as flujo_eventos_service
 from gta.backend.services import avisos as avisos_service
+from gta.backend.services import items as items_service
 
 router = APIRouter(prefix="/api/gta", tags=["gta"])
 
@@ -988,6 +989,33 @@ async def devolver_tarea(
             devuelto_por=uid,
             motivo=body.motivo,
             paso_destino=body.paso_destino,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tareas/{tarea_id}/items/{item_id}/tickear")
+@audit_action("GTA_TICKEAR_ITEM", severity="info")
+async def tickear_item(
+    tarea_id: int,
+    item_id: str,
+    body: dict,
+    request: Request,
+    user: dict = Depends(deps.require_permission("gta:write")),
+):
+    """Tickea o destickea un ítem del checklist del paso.
+
+    Body: { "tickeado": true|false }. Al tickear, si el ítem tiene
+    `desbloquea_pasos`, esos pasos del flujo se desbloquean directamente
+    (bloqueada → pendiente). Destickear NO re-bloquea.
+    """
+    try:
+        uid = tareas_service.usuario_id_de_username(user["username"])
+        return items_service.tickear_item(
+            tarea_id=tarea_id,
+            item_id=item_id,
+            tickeado=bool(body.get("tickeado", True)),
+            actor_id=uid,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

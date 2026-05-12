@@ -165,6 +165,17 @@ def cerrar_tarea(
             if not es_resp:
                 raise ValueError("Solo el responsable vigente de la tarea puede cerrarla")
 
+        # Validar items (checklist) requeridos para cerrar.
+        # Si el paso define items con requerido_para_cerrar=true, deben estar
+        # tickeados antes de permitir el cierre.
+        from gta.backend.services import items as items_service
+        pendientes_items = items_service.items_pendientes_requeridos(conn, tarea_id)
+        if pendientes_items:
+            raise ValueError(
+                "Faltan ítems por tickear antes de cerrar: "
+                + ", ".join(pendientes_items)
+            )
+
         es_paso_inicial = bool(
             ctx.get("flujo_id") and ctx.get("paso_orden") == 1
         )
@@ -786,6 +797,38 @@ def _attach_contexto_flujo(conn, tarea: Dict[str, Any]) -> Dict[str, Any]:
     # paso_tipo se mantiene por compatibilidad pero ya no controla la UI:
     # cualquier paso ≥ 2 muestra el botón "Devolver al paso..."
     tarea["paso_tipo"] = paso_def.get("tipo") or "ejecucion"
+
+    # Items / checklist del paso (definición + estado actual de tickeo).
+    # Solo se incluye si el paso define items.
+    items_def = paso_def.get("items") or []
+    if isinstance(items_def, list) and items_def:
+        raw_estado_items = tarea.get("items_estado")
+        try:
+            if isinstance(raw_estado_items, dict):
+                estado_items = raw_estado_items
+            elif isinstance(raw_estado_items, str):
+                estado_items = _json.loads(raw_estado_items or "{}") or {}
+            else:
+                estado_items = {}
+        except Exception:
+            estado_items = {}
+        items_out = []
+        for item in items_def:
+            if not isinstance(item, dict) or not item.get("id"):
+                continue
+            est = estado_items.get(item["id"]) or {}
+            items_out.append({
+                "id": item["id"],
+                "titulo": item.get("titulo") or item["id"],
+                "requerido_para_cerrar": item.get("requerido_para_cerrar") is not False,
+                "desbloquea_pasos": item.get("desbloquea_pasos") or [],
+                "tickeado": bool(est.get("tickeado")),
+                "tickeado_at": est.get("tickeado_at"),
+                "tickeado_por_id": est.get("tickeado_por_id"),
+            })
+        tarea["items"] = items_out
+    else:
+        tarea["items"] = []
     return tarea
 
 
