@@ -265,29 +265,28 @@ window.Procesos = (() => {
 
                 const desdeCol = areasOrden.indexOf(desde.paso.area_code || desde.paso.area || '-');
                 const hastaCol = areasOrden.indexOf(hasta.paso.area_code || hasta.paso.area || '-');
-                let pathD;
+                let pathD, sx, sy, ex, ey;
 
                 if (desdeCol === hastaCol) {
                     // Misma columna: línea vertical recta del bottom del origen al top del destino
-                    const x = desde.cx;
-                    const y1 = desde.cy + boxH / 2;
-                    const y2 = hasta.cy - boxH / 2;
-                    pathD = `M ${x} ${y1} L ${x} ${y2}`;
+                    sx = desde.cx;
+                    sy = desde.cy + boxH / 2;
+                    ex = hasta.cx;
+                    ey = hasta.cy - boxH / 2;
+                    pathD = `M ${sx} ${sy} L ${ex} ${ey}`;
                 } else {
                     // Columnas distintas: salida lateral del origen, vertical en el canal
                     // entre columnas, llegada lateral al destino.
                     const aDerecha = hastaCol > desdeCol;
-                    const x1 = desde.cx + (aDerecha ? boxW / 2 : -boxW / 2);
-                    const y1 = desde.cy;
-                    const x2 = hasta.cx + (aDerecha ? -boxW / 2 : boxW / 2);
-                    const y2 = hasta.cy;
-                    // Canal vertical: entre columnas, a 1/4 del ancho de columna del lado del origen
-                    // (suficiente para evitar tocar cajas adyacentes).
+                    sx = desde.cx + (aDerecha ? boxW / 2 : -boxW / 2);
+                    sy = desde.cy;
+                    ex = hasta.cx + (aDerecha ? -boxW / 2 : boxW / 2);
+                    ey = hasta.cy;
                     const midX = (desde.cx + hasta.cx) / 2;
-                    pathD = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+                    pathD = `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ey} L ${ex} ${ey}`;
                 }
-                // En modo edición, las flechas son clickeables para eliminarse.
-                // Ampliamos el área de hit con un path transparente más grueso encima.
+                // En modo edición: flecha clickeable (eliminar) + handles en los
+                // extremos para drag (reasignar origen/destino).
                 if (_modoEditDiag) {
                     return `
                         <path d="${pathD}" stroke="rgba(0, 243, 255, 0.5)" stroke-width="1.5" fill="none" marker-end="url(#flowarrow)"></path>
@@ -295,6 +294,18 @@ window.Procesos = (() => {
                               onclick="Procesos._diagEliminarDep(${depOrden}, ${p.orden})">
                             <title>Click para eliminar esta dependencia</title>
                         </path>
+                        <circle class="gta-flow-arrow-handle" cx="${sx}" cy="${sy}" r="5"
+                                fill="rgba(0, 255, 65, 0.85)" stroke="#fff" stroke-width="1"
+                                onmousedown="event.stopPropagation(); Procesos._diagFlechaDragStart(${depOrden}, ${p.orden}, 'start', evt)"
+                                style="cursor:move;">
+                            <title>Arrastrá para cambiar el origen</title>
+                        </circle>
+                        <circle class="gta-flow-arrow-handle" cx="${ex}" cy="${ey}" r="5"
+                                fill="rgba(255, 200, 80, 0.85)" stroke="#fff" stroke-width="1"
+                                onmousedown="event.stopPropagation(); Procesos._diagFlechaDragStart(${depOrden}, ${p.orden}, 'end', evt)"
+                                style="cursor:move;">
+                            <title>Arrastrá para cambiar el destino</title>
+                        </circle>
                     `;
                 }
                 return `<path d="${pathD}" stroke="rgba(0, 243, 255, 0.5)" stroke-width="1.5" fill="none" marker-end="url(#flowarrow)"></path>`;
@@ -498,17 +509,17 @@ window.Procesos = (() => {
         const estadoBadge = _estadoBadge(p.estado);
 
         // Si estamos en modo edición visual, renderizamos los pasos editados
-        // (no los originales), y mostramos toolbar con Guardar/Cancelar.
+        // (no los originales). El toolbar va DEBAJO del diagrama, pegado.
         const pasosParaRender = _modoEditDiag ? _pasosEditDiag : pasos;
-        const editorToolbar = _modoEditDiag
-            ? `<div class="gta-flow-editor-toolbar">
+        const toolbarBajo = _modoEditDiag
+            ? `<div class="gta-flow-editor-toolbar gta-flow-editor-toolbar-bottom">
                    <i class="fas fa-pen"></i>
                    <span>Editando diagrama (cambios pendientes de guardar)</span>
                    <button class="btn-sm btn-secondary" onclick="Procesos._cancelarEditDiagrama()">Cancelar</button>
                    <button class="btn-sm btn-primary" onclick="Procesos._guardarEditDiagrama()"><i class="fas fa-check"></i> Guardar cambios</button>
                </div>`
             : (pasos.length
-                ? `<div class="gta-flow-editor-toolbar">
+                ? `<div class="gta-flow-editor-toolbar gta-flow-editor-toolbar-bottom">
                        <button class="btn-sm btn-secondary" onclick="Procesos._entrarEditDiagrama()"><i class="fas fa-pen"></i> Editar diagrama</button>
                    </div>`
                 : '');
@@ -518,7 +529,7 @@ window.Procesos = (() => {
                   <p><strong>Este proceso no tiene pasos definidos todavía.</strong></p>
                   <p class="gta-section-help">Apretá <em>Editar</em> para construir la fuente de la verdad.</p>
               </div>`
-            : editorToolbar + _renderPasosDiagrama(pasosParaRender);
+            : _renderPasosDiagrama(pasosParaRender) + toolbarBajo;
 
         const flujosHtml = flujos.length ? flujos.map(f => `
             <div class="gta-doc-row" style="cursor:default;">
@@ -1361,6 +1372,90 @@ window.Procesos = (() => {
         }
     }
 
+    // Drag de los extremos de una flecha existente para reasignar
+    // origen ('start') o destino ('end').
+    let _modificarFlechaState = null;
+
+    function _diagFlechaDragStart(origenOrden, destinoOrden, which, evt) {
+        if (!_modoEditDiag) return;
+        evt.preventDefault();
+        const svg = document.querySelector('.gta-flow-diagram svg');
+        if (!svg) return;
+
+        const start = _svgCoord(svg, evt.clientX, evt.clientY);
+        const ns = 'http://www.w3.org/2000/svg';
+        const preview = document.createElementNS(ns, 'path');
+        preview.setAttribute('stroke', which === 'end' ? 'rgba(255, 200, 80, 0.9)' : 'rgba(0, 255, 65, 0.9)');
+        preview.setAttribute('stroke-width', '2');
+        preview.setAttribute('stroke-dasharray', '4 3');
+        preview.setAttribute('fill', 'none');
+        preview.setAttribute('pointer-events', 'none');
+        preview.setAttribute('d', `M ${start.x} ${start.y} L ${start.x} ${start.y}`);
+        svg.appendChild(preview);
+
+        _modificarFlechaState = {
+            origenOrden, destinoOrden, which, svg, preview,
+            startX: start.x, startY: start.y,
+        };
+        document.addEventListener('mousemove', _diagFlechaDragMove);
+        document.addEventListener('mouseup', _diagFlechaDragEnd);
+    }
+
+    function _diagFlechaDragMove(evt) {
+        if (!_modificarFlechaState) return;
+        const cur = _svgCoord(_modificarFlechaState.svg, evt.clientX, evt.clientY);
+        _modificarFlechaState.preview.setAttribute(
+            'd',
+            `M ${_modificarFlechaState.startX} ${_modificarFlechaState.startY} L ${cur.x} ${cur.y}`,
+        );
+    }
+
+    function _diagFlechaDragEnd(evt) {
+        if (!_modificarFlechaState) return;
+        document.removeEventListener('mousemove', _diagFlechaDragMove);
+        document.removeEventListener('mouseup', _diagFlechaDragEnd);
+
+        const state = _modificarFlechaState;
+        _modificarFlechaState = null;
+        state.preview.remove();
+
+        // Sobre qué caja se soltó
+        const el = document.elementFromPoint(evt.clientX, evt.clientY);
+        if (!el) return;
+        const g = el.closest('.gta-flow-step');
+        if (!g) return;
+        const nuevoOrden = parseInt(g.getAttribute('data-paso-orden'), 10);
+        if (!nuevoOrden) return;
+
+        if (state.which === 'end') {
+            // Cambiar destino de la flecha
+            if (nuevoOrden === state.destinoOrden) return;       // sin cambio
+            if (nuevoOrden === state.origenOrden) return;        // self-ref no permitido
+            const destinoActual = _pasosEditDiag.find(p => p.orden === state.destinoOrden);
+            const destinoNuevo  = _pasosEditDiag.find(p => p.orden === nuevoOrden);
+            if (!destinoActual || !destinoNuevo) return;
+            destinoActual.depende_de = (destinoActual.depende_de || []).filter(d => d !== state.origenOrden);
+            destinoNuevo.depende_de = destinoNuevo.depende_de || [];
+            if (!destinoNuevo.depende_de.includes(state.origenOrden)) {
+                destinoNuevo.depende_de.push(state.origenOrden);
+                destinoNuevo.depende_de.sort((a, b) => a - b);
+            }
+        } else if (state.which === 'start') {
+            // Cambiar origen de la flecha (queda misma flecha pero apunta desde otro paso)
+            if (nuevoOrden === state.origenOrden) return;
+            if (nuevoOrden === state.destinoOrden) return;
+            const destino = _pasosEditDiag.find(p => p.orden === state.destinoOrden);
+            if (!destino) return;
+            destino.depende_de = (destino.depende_de || []).filter(d => d !== state.origenOrden);
+            if (!destino.depende_de.includes(nuevoOrden)) {
+                destino.depende_de.push(nuevoOrden);
+                destino.depende_de.sort((a, b) => a - b);
+            }
+        }
+
+        _renderModal(_procActivo);
+    }
+
     function _diagEliminarDep(origenOrden, destinoOrden) {
         if (!confirm(`¿Eliminar la dependencia del paso ${destinoOrden} con respecto al paso ${origenOrden}?`)) return;
         const destino = _pasosEditDiag.find(p => p.orden === destinoOrden);
@@ -1645,5 +1740,6 @@ window.Procesos = (() => {
         _entrarEditDiagrama, _cancelarEditDiagrama, _guardarEditDiagrama,
         _agregarPasoDiag, _eliminarPasoDiag, _editarPasoDiag,
         _diagDragStart, _diagConectarStart, _diagEliminarDep,
+        _diagFlechaDragStart,
     };
 })();

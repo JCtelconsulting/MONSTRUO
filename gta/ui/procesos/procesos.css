@@ -531,3 +531,23 @@
     r: 8;
     fill: rgba(0, 255, 65, 0.95);
 }
+
+/* Toolbar del editor debajo del diagrama, "pegado" al SVG sin margen
+   superior (queda como una extensión natural del diagrama). */
+.gta-flow-editor-toolbar-bottom {
+    margin: 0 !important;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top: 0;
+}
+.gta-flow-diagram + .gta-flow-editor-toolbar-bottom {
+    margin-top: -1px !important;
+}
+
+/* Handles en los extremos de las flechas (drag para reasignar) */
+.gta-flow-arrow-handle {
+    transition: r 0.12s;
+}
+.gta-flow-arrow-handle:hover {
+    r: 7;
+}
