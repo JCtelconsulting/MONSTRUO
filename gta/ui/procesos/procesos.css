@@ -522,3 +522,12 @@
 .gta-flow-add:hover circle {
     fill: rgba(0, 255, 65, 0.35);
 }
+
+/* Handle de conexión (drag para crear flechas) */
+.gta-flow-connect-handle circle {
+    transition: r 0.12s, fill 0.12s;
+}
+.gta-flow-connect-handle:hover circle {
+    r: 8;
+    fill: rgba(0, 255, 65, 0.95);
+}

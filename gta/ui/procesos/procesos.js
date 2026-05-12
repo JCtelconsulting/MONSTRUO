@@ -208,6 +208,17 @@ window.Procesos = (() => {
                        <text x="${x + boxW - 8}" y="${y + 12}" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">×</text>
                    </g>`
                 : '';
+            // Handle de conexión: círculo en el borde inferior central. Drag
+            // desde acá crea una flecha (dependencia) hacia otra caja.
+            const connectHandle = _modoEditDiag
+                ? `<g class="gta-flow-connect-handle"
+                      onmousedown="event.stopPropagation(); Procesos._diagConectarStart(${p.orden}, evt)"
+                      style="cursor:crosshair;">
+                       <circle cx="${pos.cx}" cy="${y + boxH}" r="6" fill="rgba(0, 243, 255, 0.85)" stroke="#fff" stroke-width="1.5">
+                           <title>Arrastrá hasta otra caja para conectar</title>
+                       </circle>
+                   </g>`
+                : '';
             return `
                 <g class="gta-flow-step" data-paso-orden="${p.orden}"
                    ${onEvent} style="cursor:${cursor};">
@@ -222,6 +233,7 @@ window.Procesos = (() => {
                         </div>
                     </foreignObject>
                     ${btnEliminar}
+                    ${connectHandle}
                 </g>
             `;
         }).join('');
@@ -273,6 +285,17 @@ window.Procesos = (() => {
                     // (suficiente para evitar tocar cajas adyacentes).
                     const midX = (desde.cx + hasta.cx) / 2;
                     pathD = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+                }
+                // En modo edición, las flechas son clickeables para eliminarse.
+                // Ampliamos el área de hit con un path transparente más grueso encima.
+                if (_modoEditDiag) {
+                    return `
+                        <path d="${pathD}" stroke="rgba(0, 243, 255, 0.5)" stroke-width="1.5" fill="none" marker-end="url(#flowarrow)"></path>
+                        <path d="${pathD}" stroke="transparent" stroke-width="14" fill="none" style="cursor:pointer;"
+                              onclick="Procesos._diagEliminarDep(${depOrden}, ${p.orden})">
+                            <title>Click para eliminar esta dependencia</title>
+                        </path>
+                    `;
                 }
                 return `<path d="${pathD}" stroke="rgba(0, 243, 255, 0.5)" stroke-width="1.5" fill="none" marker-end="url(#flowarrow)"></path>`;
             });
@@ -1273,6 +1296,79 @@ window.Procesos = (() => {
         _renderModal(_procActivo);
     }
 
+    // ── Drag de flechas (crear dependencia) y click para eliminar ─────
+
+    let _conectarState = null;  // { origenOrden, svg, linePreview }
+
+    function _diagConectarStart(origenOrden, evt) {
+        if (!_modoEditDiag) return;
+        evt.preventDefault();
+        const svg = document.querySelector('.gta-flow-diagram svg');
+        if (!svg) return;
+
+        // Crear path de preview que sigue al cursor (línea elástica)
+        const start = _svgCoord(svg, evt.clientX, evt.clientY);
+        const ns = 'http://www.w3.org/2000/svg';
+        const linePreview = document.createElementNS(ns, 'path');
+        linePreview.setAttribute('stroke', 'rgba(0, 255, 65, 0.8)');
+        linePreview.setAttribute('stroke-width', '2');
+        linePreview.setAttribute('stroke-dasharray', '4 3');
+        linePreview.setAttribute('fill', 'none');
+        linePreview.setAttribute('pointer-events', 'none');
+        linePreview.setAttribute('d', `M ${start.x} ${start.y} L ${start.x} ${start.y}`);
+        svg.appendChild(linePreview);
+
+        _conectarState = { origenOrden, svg, linePreview, startX: start.x, startY: start.y };
+        document.addEventListener('mousemove', _diagConectarMove);
+        document.addEventListener('mouseup', _diagConectarEnd);
+    }
+
+    function _diagConectarMove(evt) {
+        if (!_conectarState) return;
+        const cur = _svgCoord(_conectarState.svg, evt.clientX, evt.clientY);
+        _conectarState.linePreview.setAttribute(
+            'd',
+            `M ${_conectarState.startX} ${_conectarState.startY} L ${cur.x} ${cur.y}`,
+        );
+    }
+
+    function _diagConectarEnd(evt) {
+        if (!_conectarState) return;
+        document.removeEventListener('mousemove', _diagConectarMove);
+        document.removeEventListener('mouseup', _diagConectarEnd);
+
+        const state = _conectarState;
+        _conectarState = null;
+        // Quitar la línea de preview
+        state.linePreview.remove();
+
+        // Detectar sobre qué caja se soltó
+        const el = document.elementFromPoint(evt.clientX, evt.clientY);
+        if (!el) return;
+        const g = el.closest('.gta-flow-step');
+        if (!g) return;
+        const destinoOrden = parseInt(g.getAttribute('data-paso-orden'), 10);
+        if (!destinoOrden || destinoOrden === state.origenOrden) return;
+
+        // Agregar dependencia: destino depende de origen
+        const destino = _pasosEditDiag.find(p => p.orden === destinoOrden);
+        if (!destino) return;
+        destino.depende_de = destino.depende_de || [];
+        if (!destino.depende_de.includes(state.origenOrden)) {
+            destino.depende_de.push(state.origenOrden);
+            destino.depende_de.sort((a, b) => a - b);
+            _renderModal(_procActivo);
+        }
+    }
+
+    function _diagEliminarDep(origenOrden, destinoOrden) {
+        if (!confirm(`¿Eliminar la dependencia del paso ${destinoOrden} con respecto al paso ${origenOrden}?`)) return;
+        const destino = _pasosEditDiag.find(p => p.orden === destinoOrden);
+        if (!destino) return;
+        destino.depende_de = (destino.depende_de || []).filter(d => d !== origenOrden);
+        _renderModal(_procActivo);
+    }
+
     // Agrega un paso nuevo en el área dada. Por defecto sin deps y orden
     // = max(orden actual) + 1. El usuario edita los detalles después.
     function _agregarPasoDiag(areaCode) {
@@ -1548,6 +1644,6 @@ window.Procesos = (() => {
         abrirDetallePaso,
         _entrarEditDiagrama, _cancelarEditDiagrama, _guardarEditDiagrama,
         _agregarPasoDiag, _eliminarPasoDiag, _editarPasoDiag,
-        _diagDragStart,
+        _diagDragStart, _diagConectarStart, _diagEliminarDep,
     };
 })();
