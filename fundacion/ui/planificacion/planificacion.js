@@ -125,6 +125,22 @@ window.FundPlanificacion = (() => {
         } else {
             t.textContent = fmtDia(_cursor);
         }
+        // Mostrar "Volver a hoy" solo si NO estamos en el período actual
+        const btn = document.getElementById('plan-cal-today');
+        if (btn) btn.hidden = _isPeriodoActual();
+    }
+
+    function _isPeriodoActual() {
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        if (_view === 'dia') {
+            return _sameDay(_cursor, hoy);
+        }
+        if (_view === 'semana') {
+            const { desde, hasta } = _rangoVisible();
+            return hoy >= desde && hoy <= hasta;
+        }
+        // mes
+        return _cursor.getFullYear() === hoy.getFullYear() && _cursor.getMonth() === hoy.getMonth();
     }
 
     async function _loadSesionesIdx() {
