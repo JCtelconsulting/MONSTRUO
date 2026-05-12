@@ -2693,6 +2693,38 @@ body:not(.login-shell) .tab-bar > .tab-btn.active::after {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   BOTONES — REGLA CANÓNICA. Modificá acá si necesitás cambiar el aspecto
+   global. NO override de padding / font-size / min-height inline en HTML
+   ni con clases puntuales: rompe la consistencia entre pantallas.
+   Para variantes (sm, danger, icon-only) usar las clases existentes.
+   ───────────────────────────────────────────────────────────────────── */
+body:not(.login-shell) .btn-primary,
+body:not(.login-shell) .btn-secondary,
+body:not(.login-shell) .btn-danger {
+  /* Tamaño y espaciado consistente entre los 3 tipos */
+  padding: 9px 18px !important;
+  min-height: 38px !important;
+  font-size: 0.85rem !important;
+  line-height: 1.1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+/* Variantes "small" para listados densos (cards, filas de tabla) */
+body:not(.login-shell) .btn-sm.btn-primary,
+body:not(.login-shell) .btn-sm.btn-secondary,
+body:not(.login-shell) .btn-sm.btn-danger {
+  padding: 6px 12px !important;
+  min-height: 30px !important;
+  font-size: 0.78rem !important;
+  gap: 6px !important;
+}
+
 body:not(.login-shell) .btn-primary {
   background: linear-gradient(135deg, rgba(0, 255, 65, 0.92), rgba(0, 214, 255, 0.8)) !important;
   color: #04110a !important;
