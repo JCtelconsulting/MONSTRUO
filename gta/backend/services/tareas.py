@@ -292,37 +292,15 @@ def cerrar_tarea(
                 (int(t["paso_orden"]) for t in esperando if t.get("paso_orden") is not None),
                 default=None,
             )
-            for t in esperando:
-                tiene_resp = conn.execute(
-                    """SELECT 1 FROM gta.tarea_participaciones
-                       WHERE tarea_id = %s AND rol = 'responsable' AND hasta IS NULL""",
-                    (t["id"],),
-                ).fetchone()
-                nuevo_estado = 'en_curso' if tiene_resp else 'pendiente'
-                conn.execute(
-                    """UPDATE gta.tareas
-                       SET estado = %s,
-                           espera_devolucion_paso = NULL,
-                           cerrado_por = NULL,
-                           cerrado_at = NULL,
-                           reporte_cierre = NULL,
-                           fecha_fin = NULL,
-                           updated_at = CURRENT_TIMESTAMP
-                       WHERE id = %s""",
-                    (nuevo_estado, t["id"]),
-                )
-                evt.registrar(
-                    conn, result["flujo_id"],
-                    tipo=evt.TAREA_REABIERTA,
-                    actor=actor,
-                    tarea_id=t["id"],
-                    mensaje=f"Reanudada tras cierre del paso {result['paso_orden']}",
-                    metadata={"reanudada_por_paso": result["paso_orden"]},
-                )
 
-            # Si esta tarea había sido reabierta antes (por devolución), comparamos
-            # datos del flujo y adjuntos antes/después; si hubo cambios, avisamos
-            # a los pasos cerrados posteriores que revisen.
+            # Si esta tarea había sido reabierta antes (por devolución),
+            # comparamos datos del flujo y adjuntos antes/después; si hubo
+            # cambios, avisamos a los pasos cerrados intermedios + origen.
+            # IMPORTANTE: hacemos esto ANTES de reanimar las tareas en
+            # espera, para que el paso origen aún esté en estado 'devuelta'
+            # cuando detectar_cambios_y_avisar busca afectadas en
+            # ('cerrada', 'devuelta'). Si reanimamos primero, el origen
+            # pasa a 'pendiente' y se pierde del filtro.
             if fue_reabierta:
                 datos_despues_row = conn.execute(
                     "SELECT datos_flujo FROM gta.tareas WHERE id = %s",
@@ -354,6 +332,35 @@ def cerrar_tarea(
                     datos_flujo_despues=datos_despues,
                     adjuntos_antes_count=adjuntos_antes,
                     adjuntos_despues_count=adjuntos_despues,
+                )
+
+            # Después de detectar cambios, reanimar las tareas en espera.
+            for t in esperando:
+                tiene_resp = conn.execute(
+                    """SELECT 1 FROM gta.tarea_participaciones
+                       WHERE tarea_id = %s AND rol = 'responsable' AND hasta IS NULL""",
+                    (t["id"],),
+                ).fetchone()
+                nuevo_estado = 'en_curso' if tiene_resp else 'pendiente'
+                conn.execute(
+                    """UPDATE gta.tareas
+                       SET estado = %s,
+                           espera_devolucion_paso = NULL,
+                           cerrado_por = NULL,
+                           cerrado_at = NULL,
+                           reporte_cierre = NULL,
+                           fecha_fin = NULL,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE id = %s""",
+                    (nuevo_estado, t["id"]),
+                )
+                evt.registrar(
+                    conn, result["flujo_id"],
+                    tipo=evt.TAREA_REABIERTA,
+                    actor=actor,
+                    tarea_id=t["id"],
+                    mensaje=f"Reanudada tras cierre del paso {result['paso_orden']}",
+                    metadata={"reanudada_por_paso": result["paso_orden"]},
                 )
 
             # Si todas las tareas del flujo están cerradas, registrar completado
