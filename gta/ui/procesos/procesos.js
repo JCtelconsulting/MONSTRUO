@@ -10,6 +10,11 @@ window.Procesos = (() => {
     let _sesion = null;
     let _esAdmin = false;
 
+    // Editor visual del diagrama (modo "Editar visual" — separado del modo
+    // "Editar" tradicional con lista). Estado independiente.
+    let _modoEditDiag = false;
+    let _pasosEditDiag = [];
+
     // ── Init ───────────────────────────────────────────────────────────
     async function init(sesion) {
         _sesion = sesion;
@@ -114,7 +119,10 @@ window.Procesos = (() => {
     // su carril, flechas SVG conectando según depende_de. SVG + CSS puro, sin
     // librerías. Diseñado para parecerse al ejemplo de Visio del usuario.
     function _renderPasosDiagrama(pasos) {
-        if (!pasos.length) return '';
+        if (!pasos.length && !_modoEditDiag) return '';
+        // Si estamos en modo edición y no hay pasos, igual mostramos las
+        // columnas de áreas disponibles (con botón "+") para que el usuario
+        // pueda agregar el primer paso desde acá.
 
         // Áreas únicas presentes en este proceso, ordenadas por el campo
         // 'orden' del catálogo gta.areas (no por aparición). Así el orden
@@ -240,8 +248,9 @@ window.Procesos = (() => {
         // SVG con viewBox + width 100% para que ocupe todo el ancho del
         // contenedor manteniendo proporciones. Las cajas crecen visualmente
         // si la ventana es muy ancha (mejor legibilidad en pantallas grandes).
+        const cls = _modoEditDiag ? 'gta-flow-diagram editing' : 'gta-flow-diagram';
         return `
-            <div class="gta-flow-diagram" style="margin-top:8px;">
+            <div class="${cls}" style="margin-top:8px;">
                 <svg viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg"
                      preserveAspectRatio="xMidYMid meet"
                      style="width:100%; height:auto; display:block; background:rgba(0,0,0,0.15); border-radius:8px;">
@@ -427,13 +436,28 @@ window.Procesos = (() => {
 
         const estadoBadge = _estadoBadge(p.estado);
 
-        const pasosHtml = !pasos.length
+        // Si estamos en modo edición visual, renderizamos los pasos editados
+        // (no los originales), y mostramos toolbar con Guardar/Cancelar.
+        const pasosParaRender = _modoEditDiag ? _pasosEditDiag : pasos;
+        const editorToolbar = _modoEditDiag
+            ? `<div class="gta-flow-editor-toolbar">
+                   <i class="fas fa-pen"></i>
+                   <span>Editando diagrama (cambios pendientes de guardar)</span>
+                   <button class="btn-sm btn-secondary" onclick="Procesos._cancelarEditDiagrama()">Cancelar</button>
+                   <button class="btn-sm btn-primary" onclick="Procesos._guardarEditDiagrama()"><i class="fas fa-check"></i> Guardar cambios</button>
+               </div>`
+            : (pasos.length
+                ? `<div class="gta-flow-editor-toolbar">
+                       <button class="btn-sm btn-secondary" onclick="Procesos._entrarEditDiagrama()"><i class="fas fa-pen"></i> Editar diagrama</button>
+                   </div>`
+                : '');
+        const pasosHtml = !pasosParaRender.length && !_modoEditDiag
             ? `<div class="gta-empty-pasos">
                   <i class="fas fa-stream"></i>
                   <p><strong>Este proceso no tiene pasos definidos todavía.</strong></p>
                   <p class="gta-section-help">Apretá <em>Editar</em> para construir la fuente de la verdad.</p>
               </div>`
-            : _renderPasosDiagrama(pasos);
+            : editorToolbar + _renderPasosDiagrama(pasosParaRender);
 
         const flujosHtml = flujos.length ? flujos.map(f => `
             <div class="gta-doc-row" style="cursor:default;">
@@ -1060,6 +1084,55 @@ window.Procesos = (() => {
     }
 
     // ── Preview de documento (guía del proceso) ─────────────────────────
+    // ── Editor visual del diagrama ─────────────────────────────────────
+
+    function _entrarEditDiagrama() {
+        if (!_procActivo) return;
+        // Clonar profundo los pasos para no mutar el _procActivo cargado
+        _pasosEditDiag = (_procActivo.pasos_definicion || []).map(p => ({
+            orden: p.orden,
+            titulo: p.titulo || '',
+            descripcion: p.descripcion || '',
+            area_code: p.area_code || p.area || '',
+            subarea_code: p.subarea_code || null,
+            sla_horas: p.sla_horas || 24,
+            depende_de: Array.isArray(p.depende_de) ? p.depende_de.slice() : [],
+            bloqueante: p.bloqueante !== false,
+        }));
+        _modoEditDiag = true;
+        _renderModal(_procActivo);
+    }
+
+    function _cancelarEditDiagrama() {
+        if (!_modoEditDiag) return;
+        if (_huboCambiosDiag() && !confirm('Hay cambios sin guardar. ¿Descartar?')) return;
+        _modoEditDiag = false;
+        _pasosEditDiag = [];
+        _renderModal(_procActivo);
+    }
+
+    function _huboCambiosDiag() {
+        const orig = JSON.stringify(_procActivo?.pasos_definicion || []);
+        const edit = JSON.stringify(_pasosEditDiag);
+        return orig !== edit;
+    }
+
+    async function _guardarEditDiagrama() {
+        if (!_procActivo) return;
+        try {
+            await GtaApi.actualizarProceso(_procActivo.id, {
+                pasos_definicion: JSON.stringify(_pasosEditDiag),
+            });
+            _modoEditDiag = false;
+            _pasosEditDiag = [];
+            // Recargar el proceso con los cambios guardados
+            await abrir(_procActivo.id);
+            await cargar();
+        } catch (e) {
+            alert('Error al guardar: ' + (e.detail || e.message || e));
+        }
+    }
+
     // ── Detalle de un paso (click en una caja del diagrama) ────────────
     function abrirDetallePaso(pasoOrden) {
         if (!_procActivo) return;
@@ -1173,5 +1246,6 @@ window.Procesos = (() => {
         iniciarFlujo, cerrarIniciarFlujo, confirmarIniciarFlujo,
         abrirDocPreview, cerrarDocPreview,
         abrirDetallePaso,
+        _entrarEditDiagrama, _cancelarEditDiagrama, _guardarEditDiagrama,
     };
 })();

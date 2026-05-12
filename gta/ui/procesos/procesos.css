@@ -465,3 +465,31 @@
 .gta-flow-step:hover rect {
     filter: drop-shadow(0 0 8px rgba(0, 243, 255, 0.6));
 }
+
+/* ── Editor visual del diagrama (toolbar) ─────────────────────────── */
+
+.gta-flow-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    margin: 8px 0;
+    background: rgba(0, 255, 65, 0.05);
+    border: 1px solid rgba(0, 255, 65, 0.2);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    color: var(--text);
+}
+
+.gta-flow-editor-toolbar > span {
+    flex: 1;
+}
+
+.gta-flow-editor-toolbar > i {
+    color: var(--neon);
+}
+
+/* Cuando el diagrama está en modo edición, las cajas tienen borde dashed */
+.gta-flow-diagram.editing svg .gta-flow-step rect {
+    stroke-dasharray: 6 4;
+}
