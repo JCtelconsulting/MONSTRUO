@@ -607,6 +607,17 @@
 
 .plan-clima-meta-full { grid-column: 1 / -1; }
 
+.plan-clima-meta textarea {
+    resize: none;
+    height: 80px;
+    width: 100%;
+    line-height: 1.4;
+}
+
+.plan-clima-meta-full textarea {
+    height: 60px;
+}
+
 /* ── Bloques ─────────────────────────────────────────────────────────── */
 
 .plan-bloques-lista {
