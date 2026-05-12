@@ -313,6 +313,41 @@
 
 .plan-editor-header h4 i { color: var(--accent, #4facfe); }
 
+.plan-editor-badge {
+    display: inline-block;
+    margin-left: 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+}
+
+.plan-editor-badge.is-borrador {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.plan-editor-badge.is-guardado {
+    background: rgba(16, 185, 129, 0.18);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.plan-cal-day-dot.is-plan {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px dashed rgba(255, 255, 255, 0.5);
+    width: 8px;
+    height: 8px;
+}
+
+.plan-cal-day-count.is-plan {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
 .plan-head {
     display: flex;
     justify-content: space-between;

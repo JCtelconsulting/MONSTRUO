@@ -57,6 +57,7 @@ window.FundApi = (() => {
             return get(`/catalogos/actividades${q ? `?${q}` : ''}`);
         },
         getPlanificacionOficial: (nivelId, fecha) => get(`/planificacion-oficial?nivel_id=${nivelId}&fecha=${fecha}`),
+        listPlanificaciones:    (nivelId, desde, hasta) => get(`/planificacion-oficial/listar?nivel_id=${nivelId}&desde=${desde}&hasta=${hasta}`),
 
         // Sesiones pedagógicas
         listSesiones:         (sedeId, nivelId, desde, hasta) => {

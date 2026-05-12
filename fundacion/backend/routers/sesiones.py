@@ -105,6 +105,33 @@ async def get_actividades(
         conn.close()
 
 
+@router.get("/planificacion-oficial/listar")
+async def listar_planificacion(
+    nivel_id: int,
+    desde: date_type,
+    hasta: date_type,
+    user: dict = Depends(deps.require_permission("fundacion:read")),
+):
+    """Lista resumida de días planificados en un rango (para marcar en calendario)."""
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """
+            SELECT pd.id, pd.fecha::text AS fecha, pd.numero_dia, pd.dia_semana,
+                   COUNT(pb.id) AS bloques
+            FROM fundacion.planificacion_dia pd
+            LEFT JOIN fundacion.planificacion_bloque pb ON pb.planificacion_dia_id = pd.id
+            WHERE pd.nivel_id = %s AND pd.fecha BETWEEN %s AND %s
+            GROUP BY pd.id
+            ORDER BY pd.fecha
+            """,
+            (nivel_id, desde, hasta),
+        ).fetchall()
+        return {"items": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
 @router.get("/planificacion-oficial")
 async def get_planificacion_oficial(
     nivel_id: int,

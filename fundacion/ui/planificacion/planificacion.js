@@ -13,12 +13,14 @@ window.FundPlanificacion = (() => {
     let _saving = false;
     let _bloqueSeq = 0;
     let _currentNivelId = null;
+    let _isBorrador = false;     // true cuando el editor muestra plan oficial NO guardado
 
     // Estado del calendario
     let _view = 'mes';
     let _cursor = new Date();
     let _selected = new Date();
-    let _sesionesIdx = {};
+    let _sesionesIdx = {};        // sesiones GUARDADAS
+    let _planificacionIdx = {};   // días con PLAN OFICIAL
 
     async function init(ctx) {
         _ctx = ctx;
@@ -127,14 +129,18 @@ window.FundPlanificacion = (() => {
     async function _loadSesionesIdx() {
         const { desde, hasta } = _rangoVisible();
         try {
-            const data = await window.FundApi.listSesiones(_ctx.sede.id, _currentNivelId, _ymd(desde), _ymd(hasta));
+            const [ses, plan] = await Promise.all([
+                window.FundApi.listSesiones(_ctx.sede.id, _currentNivelId, _ymd(desde), _ymd(hasta)),
+                _currentNivelId ? window.FundApi.listPlanificaciones(_currentNivelId, _ymd(desde), _ymd(hasta)) : Promise.resolve({ items: [] }),
+            ]);
             _sesionesIdx = {};
-            (data.items || []).forEach(s => {
-                _sesionesIdx[s.fecha] = s;
-            });
+            (ses.items || []).forEach(s => { _sesionesIdx[s.fecha] = s; });
+            _planificacionIdx = {};
+            (plan.items || []).forEach(p => { _planificacionIdx[p.fecha] = p; });
         } catch (e) {
-            console.error('[Planificación] error cargando índice de sesiones', e);
+            console.error('[Planificación] error cargando índice', e);
             _sesionesIdx = {};
+            _planificacionIdx = {};
         }
     }
 
@@ -166,9 +172,17 @@ window.FundPlanificacion = (() => {
             if (isOut) cls.push('is-out');
             if (isToday) cls.push('is-today');
             if (isSelected) cls.push('is-selected');
-            const dotColor = sesion?.clima_codigo ? _climaColor(sesion.clima_codigo) : null;
-            const dot = sesion ? `<span class="plan-cal-day-dot" style="background:${dotColor || '#4facfe'}" title="${_esc(sesion.clima_nombre || 'Sesión registrada')}"></span>` : '';
-            const count = sesion?.bloques_total ? `<span class="plan-cal-day-count">${sesion.bloques_ejecutados}/${sesion.bloques_total}</span>` : '';
+            const plan = _planificacionIdx[ymd];
+            let dot = '';
+            let count = '';
+            if (sesion) {
+                const dotColor = sesion.clima_codigo ? _climaColor(sesion.clima_codigo) : '#4facfe';
+                dot = `<span class="plan-cal-day-dot is-sesion" style="background:${dotColor}" title="${_esc(sesion.clima_nombre || 'Sesión guardada')}"></span>`;
+                if (sesion.bloques_total) count = `<span class="plan-cal-day-count">${sesion.bloques_ejecutados}/${sesion.bloques_total}</span>`;
+            } else if (plan) {
+                dot = `<span class="plan-cal-day-dot is-plan" title="Plan oficial: ${plan.bloques} bloques"></span>`;
+                count = `<span class="plan-cal-day-count is-plan">${plan.bloques}</span>`;
+            }
             html += `
               <div class="${cls.join(' ')}" data-fecha="${ymd}">
                 <div class="plan-cal-day-head">
@@ -397,6 +411,7 @@ window.FundPlanificacion = (() => {
 
     async function _refresh() {
         const fecha = _ymd(_selected);
+        _isBorrador = false;
         _updateEditorHeader();
         if (!_ctx?.sede?.id || !_currentNivelId) {
             _bloques = [];
@@ -406,18 +421,57 @@ window.FundPlanificacion = (() => {
         }
         await _ensureCatalogos();
         try {
+            // 1) Intentar cargar sesión guardada
             const data = await window.FundApi.getSesionByFecha(_ctx.sede.id, fecha, _currentNivelId);
             _sesionMeta.clima_opcion_id = data.clima_opcion_id || null;
             _sesionMeta.situaciones_relevantes = data.situaciones_relevantes || '';
             _sesionMeta.estrategias_aplicadas = data.estrategias_aplicadas || '';
             _sesionMeta.notas = data.notas || '';
             _bloques = (data.bloques || []).map(_bloqueFromApi);
+            _isBorrador = false;
         } catch (e) {
-            _bloques = [];
+            // 2) Sin sesión guardada → intentar cargar plan oficial como borrador
             _resetMeta();
+            _bloques = [];
+            try {
+                const plan = await window.FundApi.getPlanificacionOficial(_currentNivelId, fecha);
+                _bloques = (plan.bloques || []).map((b, i) => _bloqueFromPlan(b, i));
+                _isBorrador = true;
+            } catch (_) {
+                // Sin plan oficial tampoco → editor vacío
+                _bloques = [];
+                _isBorrador = false;
+            }
         }
         _hydrateMeta();
         _renderBloques();
+        _updateEditorHeader();
+    }
+
+    function _bloqueFromPlan(b, i) {
+        return {
+            _idx: ++_bloqueSeq,
+            _open: i === 0,
+            orden: b.orden,
+            bloque_tipo_id: b.bloque_tipo_id,
+            bloque_subtipo_id: b.bloque_subtipo_id,
+            actividad_id: b.actividad_id || null,
+            nombre_actividad: b.nombre_actividad || '',
+            resultado_aprendizaje: b.resultado_aprendizaje || '',
+            hora_inicio: b.hora_inicio || _horaSugerida(i, true),
+            hora_fin:    b.hora_fin    || _horaSugerida(i, false),
+            se_ejecuto: true,
+            motivo_no_ejecucion: '',
+            adaptacion: '',
+            notas: '',
+            competencias: b.competencias_ids || [],
+            materiales: b.materiales_sugeridos ? [{
+                product_id: null,
+                nombre_libre: String(b.materiales_sugeridos).slice(0, 100),
+                cantidad_solicitada: '',
+                cantidad_usada: '',
+            }] : [],
+        };
     }
 
     function _updateEditorHeader() {
@@ -426,6 +480,24 @@ window.FundPlanificacion = (() => {
             label.textContent = _selected.toLocaleDateString('es-CL', {
                 weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
             });
+        }
+        const header = document.getElementById('plan-editor-header');
+        if (!header) return;
+        let badge = header.querySelector('.plan-editor-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'plan-editor-badge';
+            header.querySelector('h4')?.appendChild(badge);
+        }
+        if (!_bloques.length) {
+            badge.textContent = '';
+            badge.className = 'plan-editor-badge';
+        } else if (_isBorrador) {
+            badge.textContent = 'Borrador del plan oficial (no guardado)';
+            badge.className = 'plan-editor-badge is-borrador';
+        } else {
+            badge.textContent = 'Sesión guardada';
+            badge.className = 'plan-editor-badge is-guardado';
         }
     }
 
