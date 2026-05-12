@@ -16,7 +16,7 @@ window.FundPlanificacion = (() => {
     let _isBorrador = false;     // true cuando el editor muestra plan oficial NO guardado
 
     // Estado del calendario
-    let _view = 'mes';
+    let _view = 'dia';
     let _cursor = new Date();
     let _selected = new Date();
     let _sesionesIdx = {};        // sesiones GUARDADAS (resumen para puntito/contador)
