@@ -515,7 +515,7 @@ window.FundPlanificacion = (() => {
     function _bloqueFromPlan(b, i) {
         return {
             _idx: ++_bloqueSeq,
-            _open: i === 0,
+            _open: false,
             orden: b.orden,
             bloque_tipo_id: b.bloque_tipo_id,
             bloque_subtipo_id: b.bloque_subtipo_id,
@@ -639,7 +639,7 @@ window.FundPlanificacion = (() => {
             const plan = await window.FundApi.getPlanificacionOficial(_currentNivelId, fecha);
             _bloques = (plan.bloques || []).map((b, i) => ({
                 _idx: ++_bloqueSeq,
-                _open: i === 0,
+                _open: false,
                 orden: b.orden,
                 bloque_tipo_id: b.bloque_tipo_id,
                 bloque_subtipo_id: b.bloque_subtipo_id,
