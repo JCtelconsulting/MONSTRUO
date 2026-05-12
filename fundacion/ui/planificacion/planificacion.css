@@ -729,6 +729,7 @@
 
 .plan-bloque-status {
     flex-shrink: 0;
+    margin-left: auto;
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
