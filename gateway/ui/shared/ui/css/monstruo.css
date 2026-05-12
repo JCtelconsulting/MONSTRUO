@@ -22,7 +22,10 @@
   --header-height: 60px;
   --sidebar-width: 260px;
   --max-content-width: 1180px;
-  --base-font-size: 12px;
+  /* Tipografía fluida: escala con el viewport sin saltos.
+     Como todo el CSS usa rem, basta con escalar este valor base.
+     Aprox: 1280px→12px, 1920px→14.5px, 2560px→17px, 3840px→18px (tope). */
+  --base-font-size: clamp(12px, 0.4vw + 6.5px, 18px);
   --font-main: 'Space Grotesk', 'Sora', sans-serif;
 }
 
