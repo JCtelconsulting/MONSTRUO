@@ -393,6 +393,47 @@ window.Tareas = (() => {
             }
         }
 
+        // Checklist / items del paso (cada uno tickeable; algunos desbloquean
+        // pasos del flujo al tickearse).
+        let itemsHtml = '';
+        const items = Array.isArray(t.items) ? t.items : [];
+        if (items.length) {
+            const tickeable = editable;
+            itemsHtml = `
+                <div class="gta-acc-section">
+                    <h4 class="gta-acc-h4">Sub-tareas del paso</h4>
+                    <div class="gta-items-box">
+                        ${items.map(it => {
+                            const checked = it.tickeado ? 'checked' : '';
+                            const disabled = tickeable ? '' : 'disabled';
+                            const reqBadge = it.requerido_para_cerrar
+                                ? '<span class="gta-item-badge-req" title="Requerido para cerrar la tarea">requerido</span>'
+                                : '<span class="gta-item-badge-opt" title="Opcional">opcional</span>';
+                            const desbloqueaBadge = (it.desbloquea_pasos || []).length
+                                ? `<span class="gta-item-badge-desb" title="Al tickear este ítem se desbloquean los pasos: ${(it.desbloquea_pasos || []).join(', ')}">
+                                       <i class="fas fa-unlock-alt"></i> desbloquea paso ${(it.desbloquea_pasos || []).join(', ')}
+                                   </span>`
+                                : '';
+                            const meta = it.tickeado && it.tickeado_at
+                                ? `<span class="gta-item-meta">${new Date(it.tickeado_at).toLocaleString()}</span>`
+                                : '';
+                            return `
+                                <label class="gta-item-row ${it.tickeado ? 'is-tickeado' : ''}">
+                                    <input type="checkbox" ${checked} ${disabled}
+                                           onclick="event.stopPropagation();"
+                                           onchange="Tareas.tickearItem(${t.id}, '${_esc(it.id)}', this.checked)">
+                                    <span class="gta-item-titulo">${_esc(it.titulo)}</span>
+                                    ${reqBadge}
+                                    ${desbloqueaBadge}
+                                    ${meta}
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
         // Adjuntos del flujo (sección colapsable, se rellena async tras render)
         const puedeSubir = t.flujo_id && !esCerrada;
         const adjuntosHtml = t.flujo_id ? `
@@ -442,6 +483,7 @@ window.Tareas = (() => {
             ${descHtml}
             ${datosHtml}
             ${formHtml}
+            ${itemsHtml}
             ${adjuntosHtml}
             ${comentariosHtml}
             ${acciones.length ? `<div class="gta-acc-actions">${acciones.join('')}</div>` : ''}
@@ -580,6 +622,24 @@ window.Tareas = (() => {
             await GtaApi.liberarTareaArea(id, null);
             await recargar();
         } catch (e) { alert(_humanizeErr(e)); }
+    }
+
+    // ── Items / checklist del paso ────────────────────────────────────
+    async function tickearItem(tareaId, itemId, tickeado) {
+        try {
+            const r = await GtaApi.tickearItem(tareaId, itemId, !!tickeado);
+            // Si tickear desbloqueó pasos, avisamos y recargamos todo (otros
+            // pasos del flujo pueden haber cambiado de estado). Si no, basta
+            // con recargar esta tarea para refrescar el estado del item.
+            if (r && Array.isArray(r.desbloqueadas) && r.desbloqueadas.length) {
+                _flashMensaje(tareaId, `Desbloqueado ${r.desbloqueadas.length} paso(s) del flujo.`, 'ok');
+            }
+            await recargar();
+        } catch (e) {
+            alert(_humanizeErr(e));
+            // Revertir el checkbox optimista si falló
+            await recargar();
+        }
     }
 
     // ── Guardar borrador (datos parciales del formulario) ─────────────
@@ -1166,6 +1226,7 @@ window.Tareas = (() => {
         // Acciones del acordeón
         toggleExpansion, toggleAsignar, _asignarA, _onCampoSelectChange,
         tomar, liberar, completar, guardarBorrador, devolver,
+        tickearItem,
         subirAdjunto, borrarAdjunto,
         agregarComentario, borrarComentario,
         marcarAvisoRevisado,

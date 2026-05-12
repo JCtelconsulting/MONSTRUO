@@ -76,6 +76,10 @@ window.GtaApi = (() => {
         listarAvisosTarea:    (id)             => get(`/tareas/${id}/avisos`),
         marcarAvisoRevisado:  (tareaId, avisoId) => post(`/tareas/${tareaId}/avisos/${avisoId}/revisar`, {}),
 
+        // Items (checklist) del paso de una tarea
+        tickearItem:          (tareaId, itemId, tickeado) =>
+            post(`/tareas/${tareaId}/items/${encodeURIComponent(itemId)}/tickear`, { tickeado: !!tickeado }),
+
         // Comentarios libres del flujo (visibles desde cualquier tarea)
         listarComentariosTarea: (id)               => get(`/tareas/${id}/comentarios`),
         crearComentarioTarea:   (id, texto)        => post(`/tareas/${id}/comentarios`, { texto: texto || '' }),
