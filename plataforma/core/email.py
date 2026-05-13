@@ -70,8 +70,11 @@ def send_email_advanced(
     password = conf.get("smtp_password")
     from_name = conf.get("smtp_from_name", "Cobranza Monstruo")
 
-    if settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE"):
-        logger.info(f"[EMAIL_MOCK] Would send to {to_email} subject '{subject}' (ENV={settings.ENV_TYPE})")
+    # MAIL_SANDBOX es kill-switch absoluto: bloquea siempre, sin importar
+    # EMAIL_FORCE_ENABLE u otros overrides. Pensado para impedir incidentes
+    # donde un entorno no productivo manda correos a clientes reales.
+    if settings.MAIL_SANDBOX or (settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE")):
+        logger.info(f"[EMAIL_MOCK] Would send to {to_email} subject '{subject}' (ENV={settings.ENV_TYPE}, SANDBOX={settings.MAIL_SANDBOX})")
         if attachments:
             logger.info(f"[EMAIL_MOCK] Attachments: {[a['filename'] for a in attachments]}")
         return {
@@ -144,9 +147,9 @@ def send_email_advanced(
             except Exception as e:
                 print(f"[EMAIL] Attachment error ({a.get('filename')}): {e}")
 
-    # Blindaje DEV/PROD (salvo override)
-    if settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE"):
-        print(f"[EMAIL_MOCK] Would send to {to_addr} subject '{subject}' (ENV={settings.ENV_TYPE})")
+    # Blindaje DEV/PROD: MAIL_SANDBOX como kill-switch absoluto.
+    if settings.MAIL_SANDBOX or (settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE")):
+        print(f"[EMAIL_MOCK] Would send to {to_addr} subject '{subject}' (ENV={settings.ENV_TYPE}, SANDBOX={settings.MAIL_SANDBOX})")
         # En DEV simulamos éxito pero no enviamos
         return {
             "ok": True,
