@@ -9135,13 +9135,19 @@ def schedule_auto_reply_for_ticket(
         "delay_minutes": delay_minutes,
     }
 
-def handle_incoming_email(msg: Dict[str, Any]) -> None:
+def handle_incoming_email(msg: Dict[str, Any]) -> Optional[int]:
     """
-    Procesa un mensaje de correo entrante.
+    Procesa un mensaje de correo entrante. Devuelve el ticket_id resultante
+    (sea reply a uno existente o ticket nuevo) o None si no se pudo procesar.
     Priorización:
     1) Match por hilo (In-Reply-To / References).
     2) Match por código en asunto (TK-DD-MM-YYYY-NNNN, legacy TK-YYYYMM-NNNN o TK-1234).
     3) Si no hay match, crea ticket nuevo.
+
+    Los matchers (header/subject) loggean su propio error y se sigue al
+    siguiente paso. Un fallo en el procesamiento real (reply o nuevo ticket)
+    se propaga al caller para que el poller pueda NO marcar Seen y
+    reintentar en el próximo ciclo.
     """
     subject = msg.get("subject", "")
     sender = msg.get("sender", "")
@@ -9154,21 +9160,23 @@ def handle_incoming_email(msg: Dict[str, Any]) -> None:
 
     try:
         ticket_id = _find_ticket_by_thread_headers(in_reply_to, references)
-        if ticket_id:
-            _process_reply_email(ticket_id, sender, subject, body, msg_id, in_reply_to, references, attachments, body_html=body_html)
-            return
     except Exception as e:
         logger.error(f"[EMAIL] Error matching by thread headers: {e}")
+        ticket_id = None
+    if ticket_id:
+        _process_reply_email(ticket_id, sender, subject, body, msg_id, in_reply_to, references, attachments, body_html=body_html)
+        return ticket_id
 
     try:
         ticket_id = _find_ticket_by_subject(subject)
-        if ticket_id:
-            _process_reply_email(ticket_id, sender, subject, body, msg_id, in_reply_to, references, attachments, body_html=body_html)
-            return
     except Exception as e:
         logger.error(f"[EMAIL] Error matching by subject: {e}")
+        ticket_id = None
+    if ticket_id:
+        _process_reply_email(ticket_id, sender, subject, body, msg_id, in_reply_to, references, attachments, body_html=body_html)
+        return ticket_id
 
-    _process_new_email_ticket(subject, sender, body, msg_id, in_reply_to, references, attachments, body_html=body_html)
+    return _process_new_email_ticket(subject, sender, body, msg_id, in_reply_to, references, attachments, body_html=body_html)
 
 def _process_reply_email(
     ticket_id: int,
@@ -9180,7 +9188,7 @@ def _process_reply_email(
     references: Optional[str] = None,
     attachments: Optional[List[Dict[str, Any]]] = None,
     body_html: Optional[str] = None,
-):
+) -> int:
     print(f"[EMAIL] Reply to Ticket #{ticket_id} from {sender}")
     conn = db.get_conn()
     try:
@@ -9232,6 +9240,7 @@ def _process_reply_email(
         conn.commit()
     finally:
         conn.close()
+    return int(ticket_id)
 
 def _process_new_email_ticket(
     subject: str,
@@ -9242,9 +9251,9 @@ def _process_new_email_ticket(
     references: Optional[str] = None,
     attachments: Optional[List[Dict[str, Any]]] = None,
     body_html: Optional[str] = None,
-):
+) -> Optional[int]:
     print(f"[EMAIL] New Ticket from {sender}")
-    
+
     # 1. Clasificación
     categoria = clasificar_ticket(subject, body)
     # 2. Triaje: por correo entrante se crea SIEMPRE sin asignación (cola manual)
@@ -9258,6 +9267,7 @@ def _process_new_email_ticket(
         cliente_nombre = origen_email
 
     conn = None
+    ticket_id: Optional[int] = None
     now = db.now_utc_iso()
     thread_id = _normalize_message_id(msg_id) or _normalize_message_id(in_reply_to)
     thread_refs = _merge_reference_chain(references, in_reply_to, msg_id)
@@ -9351,9 +9361,11 @@ def _process_new_email_ticket(
 
     except Exception as e:
         logger.error(f"[EMAIL] Error creating ticket: {e}")
+        raise
     finally:
         if conn:
             conn.close()
+    return ticket_id
 
 # ==========================================================================
 # CLIENT ASSOCIATION LOGIC
