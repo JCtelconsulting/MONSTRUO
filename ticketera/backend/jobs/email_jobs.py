@@ -41,7 +41,7 @@ def _write_imap_cursor(conn, uid: int) -> None:
     now = db.now_utc_iso()
     conn.execute(
         """INSERT INTO system_settings (key, value, group_name, is_sensitive, updated_at)
-           VALUES (?, ?, 'email', 0, ?)
+           VALUES (?, ?, 'email', FALSE, ?)
            ON CONFLICT (key) DO UPDATE
              SET value = EXCLUDED.value,
                  updated_at = EXCLUDED.updated_at""",

@@ -32,6 +32,7 @@ from ._crud import (  # noqa: PLC0415
     _persist_incoming_attachments,
     _build_incoming_email_body_html,
 )
+from ._classify import clasificar_ticket
 
 logger = logging.getLogger(__name__)
 
