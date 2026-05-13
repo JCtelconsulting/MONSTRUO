@@ -150,6 +150,96 @@ class EmailProcessor:
                 logger.error("[IMAP] Error fetching email %s: %s", e_id, e)
         return emails
 
+    def select_inbox(self, readonly: bool = False) -> None:
+        self._ensure_connected()
+        self.mail.select("inbox", readonly=readonly)
+
+    def get_uidnext(self) -> int:
+        """UIDNEXT actual del INBOX. Útil para inicializar el cursor sin
+        reprocesar historial."""
+        self._ensure_connected()
+        status, data = self.mail.status("inbox", "(UIDNEXT)")
+        if status != "OK" or not data:
+            raise RuntimeError(f"IMAP STATUS UIDNEXT failed: {status}")
+        raw = data[0] if isinstance(data, list) else data
+        text = raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else str(raw)
+        match = re.search(r"UIDNEXT\s+(\d+)", text)
+        if not match:
+            raise RuntimeError(f"IMAP STATUS UIDNEXT unparseable: {text!r}")
+        return int(match.group(1))
+
+    def fetch_new(self, last_uid: int) -> list[dict]:
+        """Devuelve correos con UID > last_uid usando BODY.PEEK (no marca Seen).
+
+        El cursor por UID es independiente del flag Seen, así que correos
+        marcados como Seen por otro cliente IMAP siguen siendo procesados.
+        Cada dict incluye `uid: int` para que el caller pueda marcar Seen
+        y avanzar el cursor selectivamente.
+        """
+        self._ensure_connected()
+        self.mail.select("inbox", readonly=False)
+        try:
+            cursor = int(last_uid)
+        except (TypeError, ValueError):
+            cursor = 0
+        cursor = max(cursor, 0)
+
+        status, messages = self.mail.uid("SEARCH", None, f"UID {cursor + 1}:*")
+        if status != "OK":
+            logger.warning("[IMAP] UID SEARCH failed: status=%s", status)
+            return []
+
+        raw_ids = messages[0].split() if messages and messages[0] else []
+        uids: list[int] = []
+        for raw in raw_ids:
+            try:
+                u = int(raw)
+            except (TypeError, ValueError):
+                continue
+            # IMAP "UID N:*" siempre devuelve al menos un resultado (el UID
+            # más alto), incluso si N supera UIDNEXT. Filtrar los <= cursor
+            # protege contra ese caso borde.
+            if u > cursor:
+                uids.append(u)
+        uids.sort()
+
+        emails: list[dict] = []
+        for uid in uids:
+            try:
+                # BODY.PEEK[] obtiene el contenido completo SIN marcar Seen.
+                # El cliente decide cuándo (y si) marcar Seen vía mark_seen().
+                res, data = self.mail.uid("FETCH", str(uid), "(BODY.PEEK[] UID)")
+                if res != "OK" or not data:
+                    logger.warning("[IMAP] UID FETCH %s failed: status=%s", uid, res)
+                    continue
+                raw_msg = None
+                for response in data:
+                    if isinstance(response, tuple) and len(response) >= 2:
+                        raw_msg = response[1]
+                        break
+                if not raw_msg:
+                    logger.warning("[IMAP] UID FETCH %s returned no payload", uid)
+                    continue
+                parsed = self.parse_email(email.message_from_bytes(raw_msg))
+                parsed["uid"] = uid
+                emails.append(parsed)
+            except Exception as e:
+                logger.error("[IMAP] Error fetching UID %s: %s", uid, e)
+        return emails
+
+    def mark_seen(self, uid: int) -> bool:
+        """Marca el correo con el UID dado como \\Seen. Devuelve True si OK."""
+        self._ensure_connected()
+        try:
+            status, _ = self.mail.uid("STORE", str(int(uid)), "+FLAGS", "(\\Seen)")
+            ok = status == "OK"
+            if not ok:
+                logger.warning("[IMAP] UID STORE \\Seen %s failed: status=%s", uid, status)
+            return ok
+        except Exception as e:
+            logger.error("[IMAP] Error marking UID %s as Seen: %s", uid, e)
+            return False
+
     def parse_email(self, msg) -> dict:
         raw_subject = msg.get("Subject", "") or ""
         subject = ""
