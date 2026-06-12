@@ -9036,18 +9036,10 @@ def _auto_reply_body(conn, ticket: Dict[str, Any], nombre: str, asignado_a: str)
     return "<p>" + html.escape(rendered).replace("\n", "<br>") + "</p>"
 
 def should_schedule_auto_reply(conn, ticket_id: int, to_email: str) -> tuple[bool, str, Optional[str]]:
-    # 1. Traer de settings de DB
-    row = conn.execute("SELECT value FROM system_settings WHERE key = 'ticket_auto_reply_enabled'").fetchone()
-    db_enabled = None
-    if row and row["value"]:
-        db_enabled = str(row["value"]).lower() in ["true", "1", "yes"]
-    
-    # 2. Fallback a .env
-    env_enabled = bool(getattr(app_settings, "TICKET_AUTO_REPLY_ENABLED", False))
-    
-    is_enabled = db_enabled if db_enabled is not None else env_enabled
-    if not is_enabled:
-        return False, "auto_reply_disabled", None
+    # Auto-respuesta SIEMPRE activa (decision de negocio 2026-06-12, Juan):
+    # se retiro el toggle de Configuracion porque el acuse de recibo al cliente
+    # no debe poder apagarse. El kill-switch real sigue siendo MAIL_SANDBOX
+    # (simula envios) y el allowlist/idempotencia de mas abajo.
 
     normalized = _normalize_email_address(to_email)
     allowed, reason = _auto_reply_sender_allowed(normalized)
