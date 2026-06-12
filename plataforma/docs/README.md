@@ -3,7 +3,7 @@
 ## Canónicos
 
 - [Proyecto Contexto](PROYECTO_CONTEXTO.md)
-- [Plan Maestro](PLAN_MAESTRO_MONSTRUO.md)
+- [Plan Maestro](GUIA_MAESTRA.md)
 - [Proxy Inverso](PROXY_INVERSO.md)
 - [Arquitectura](ARQUITECTURA.md)
 - [Contrato de Apps](CONTRATO_APPS.md)

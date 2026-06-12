@@ -1,5 +1,9 @@
 # Documentación del Flujo de Peticiones (Request Flow)
 
+> **AVISO (2026-06-12):** documento CONCEPTUAL. Los puertos/IPs/backends de hoy
+> están en [../PROXY_INVERSO.md](../PROXY_INVERSO.md) y [../ARQUITECTURA.md](../ARQUITECTURA.md);
+> los ejemplos de esta página pueden estar viejos.
+
 Este documento explica cómo una petición viaja desde el navegador del usuario hasta los servicios de backend en el entorno de desarrollo de Monstruo.
 
 ## Componentes Principales

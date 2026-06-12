@@ -48,7 +48,7 @@ docker compose -f terreneitor/docker-compose.yaml up -d --build
 | Qué buscas | Dónde |
 |---|---|
 | Estado actual y decisiones | [plataforma/docs/PROYECTO_CONTEXTO.md](plataforma/docs/PROYECTO_CONTEXTO.md) + `<modulo>/ESTADO.md` |
-| Prioridades de negocio (EPICs) | [plataforma/docs/PLAN_MAESTRO_MONSTRUO.md](plataforma/docs/PLAN_MAESTRO_MONSTRUO.md) |
+| Prioridades de negocio (EPICs) | [plataforma/docs/GUIA_MAESTRA.md](plataforma/docs/GUIA_MAESTRA.md) |
 | Arquitectura y red | [plataforma/docs/ARQUITECTURA.md](plataforma/docs/ARQUITECTURA.md) |
 | Proxy / dominios | [plataforma/docs/PROXY_INVERSO.md](plataforma/docs/PROXY_INVERSO.md) |
 | Línea visual + marca | [plataforma/docs/design.md](plataforma/docs/design.md) + [manual de marca](plataforma/docs/manual-marca-telconsulting.md) |
