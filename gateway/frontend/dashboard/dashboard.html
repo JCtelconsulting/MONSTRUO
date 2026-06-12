@@ -242,6 +242,52 @@
         font-size: 0.82rem;
       }
     }
+  
+    /* Lanzadera de modulos (dashboard en construccion: solo accesos) */
+    .launch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 20px;
+      margin-top: 8px;
+    }
+
+    .launch-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 26px 22px;
+      border-radius: 16px;
+      background: rgba(16, 16, 16, 0.92);
+      border: 1px solid rgba(212, 168, 67, 0.2);
+      border-top: 3px solid var(--neon);
+      color: var(--text);
+      text-decoration: none;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .launch-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(212, 168, 67, 0.22);
+    }
+
+    .launch-card > i {
+      font-size: 1.7rem;
+      color: var(--neon);
+      background: rgba(212, 168, 67, 0.1);
+      border: 1px solid rgba(212, 168, 67, 0.35);
+      border-radius: 12px;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .launch-card h3 { letter-spacing: 1px; font-size: 1.02rem; }
+    .launch-card p { color: var(--text-soft); font-size: 0.9rem; min-height: 2.4em; }
+    .launch-cta { color: var(--neon); font-weight: 700; font-size: 0.88rem; display: inline-flex; gap: 8px; align-items: center; }
+    .launch-empty { color: var(--text-soft); }
   </style>
 </head>
 
@@ -273,323 +319,62 @@
       <div class="section-header module-tabs-header module-shell-header">
         <div class="module-shell-title">
           <h2 class="module-page-title">Dashboard</h2>
-          <p class="module-shell-subtitle">Resumen Operativo Monstruo</p>
+          <p class="module-shell-subtitle">Ecosistema Telconsulting — elige un módulo</p>
         </div>
         <div class="module-shell-actions">
-          <p id="dashboard-status" class="dashboard-server-status">Cargando estado del servidor...</p>
         </div>
       </div>
 
       <section class="section-block module-shell-content" id="section-general">
-
-        <div class="dashboard-grid dashboard-grid--kpi" id="ops-kpi-grid">
-          <div class="card card-terreno dashboard-card" id="kpi-card-tickets">
-            <i class="fas fa-ticket-alt"></i>
-            <h2>Tickets</h2>
-            <p>Cargando...</p>
-          </div>
-          <div class="card card-supervisor dashboard-card" id="kpi-card-sales">
-            <i class="fas fa-file-invoice-dollar"></i>
-            <h2>Ventas</h2>
-            <p>Cargando...</p>
-          </div>
-          <div class="card card-gerencia dashboard-card" id="kpi-card-customers">
-            <i class="fas fa-users"></i>
-            <h2>Clientes</h2>
-            <p>Cargando...</p>
-          </div>
-        </div>
-
-        <div id="failures-container" class="dashboard-block"></div>
-
-        <div class="dashboard-block">
-          <h3 class="dashboard-block-title">Ticketera 360°</h3>
-          <div id="tks-widget-container" class="dashboard-grid dashboard-grid--two"></div>
+        <!-- Dashboard = lanzadera de modulos. Cada app tiene sus propios
+             reportes; los KPIs centralizados se retiraron mientras el
+             ecosistema esta en construccion (decision Juan 2026-06-12). -->
+        <div class="launch-grid" id="launch-grid">
+          <p class="launch-empty">Cargando módulos...</p>
         </div>
       </section>
-
-      <section class="section-block" id="section-style-guide">
-        <div class="section-header">
-          <h3>Guía Visual de la App</h3>
-          <p>Base oficial obligatoria: patrones PMO + ERP. Todo módulo nuevo o editado debe respetar esta línea visual, incluyendo contenedor principal sin cuadro de fondo.</p>
-        </div>
-
-        <div class="guide-grid demo-stagger">
-          <article class="guide-card" style="--i:0;">
-            <h4>Fuente Oficial PMO + ERP</h4>
-            <p class="guide-desc">PMO y ERP son la referencia canónica de UX para MONSTRUO. No se aceptan variantes visuales paralelas.</p>
-            <div class="guide-list">
-              <div class="guide-list-item"><span class="guide-token">Layout</span><span class="guide-value">`section-block` + `section-header` (sin cuadro base)</span></div>
-              <div class="guide-list-item"><span class="guide-token">Navegación</span><span class="guide-value">`tab-bar` + `tab-btn`</span></div>
-              <div class="guide-list-item"><span class="guide-token">Datos</span><span class="guide-value">`monstruo-table` / `erp-table`</span></div>
-              <div class="guide-list-item"><span class="guide-token">Acción</span><span class="guide-value">`btn-primary` neon + dark surface</span></div>
-            </div>
-          </article>
-
-          <article class="guide-card" style="--i:1;">
-            <h4>Contrato de Componentes</h4>
-            <p class="guide-desc">La composición visual mínima debe ser uniforme para que cualquier agente pueda intervenir sin romper consistencia.</p>
-            <div class="demo-row">
-              <span class="demo-chip demo-chip--ok">Panel principal</span>
-              <span class="demo-chip demo-chip--info">Subsecciones</span>
-              <span class="demo-chip">Acciones arriba</span>
-            </div>
-            <pre class="guide-code">div.main-inner.module-shell
-  div.section-header.module-tabs-header.module-shell-header
-  div.tab-bar (si aplica)
-  section.section-block.module-shell-content</pre>
-          </article>
-
-          <article class="guide-card" style="--i:2;">
-            <h4>Estados y Feedback</h4>
-            <p class="guide-desc">Toda pantalla debe comunicar estados de carga, éxito y error sin cajas blancas ni estilos del navegador.</p>
-            <div class="demo-stack">
-              <div class="demo-toast demo-toast--ok">Guardado correcto</div>
-              <div class="demo-toast demo-toast--info">Sin actividad reciente</div>
-              <div class="demo-skeleton"></div>
-            </div>
-          </article>
-
-          <article class="guide-card" style="--i:3;">
-            <h4>Checklist para Agentes</h4>
-            <p class="guide-desc">Checklist obligatorio antes de cerrar un cambio de UI en cualquier módulo.</p>
-            <div class="guide-list">
-              <div class="guide-list-item"><span class="guide-token">1.</span><span class="guide-value">Paleta PMO/ERP (`--neon`, `--info`, `--danger`)</span></div>
-              <div class="guide-list-item"><span class="guide-token">2.</span><span class="guide-value">Sin cajas blancas o inputs nativos sin tema</span></div>
-              <div class="guide-list-item"><span class="guide-token">3.</span><span class="guide-value">Contenedor principal sin cuadro (transparente)</span></div>
-              <div class="guide-list-item"><span class="guide-token">4.</span><span class="guide-value">Tablas/modales en superficie oscura consistente</span></div>
-              <div class="guide-list-item"><span class="guide-token">5.</span><span class="guide-value">Evitar inline style salvo excepción justificada</span></div>
-              <div class="guide-list-item"><span class="guide-token">6.</span><span class="guide-value">No romper contratos públicos del módulo</span></div>
-            </div>
-          </article>
-        </div>
-      </section>
+      <!-- Guía visual retirada del dashboard: ahora vive en plataforma/docs/design.md
+           (+ reglas de marca en plataforma/docs/manual-marca-telconsulting.md) -->
     </div>
   </main>
 
   <script src="../shared/js/utilidades.js?v=210"></script>
-  <script src="../shared/js/admin.js?v=5"></script>
   <script>
-    const DASHBOARD_REFRESH_MS = 30000;
-
-    function escapeHtml(value) {
-      return String(value || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    function asNumber(value, fallback = 0) {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : fallback;
-    }
-
-    function truncate(text, max = 48) {
-      const raw = String(text || '');
-      if (raw.length <= max) return raw;
-      return raw.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
-    }
-
-    function relativeHours(isoDate) {
-      const created = new Date(isoDate);
-      if (Number.isNaN(created.getTime())) return { label: '-', warn: false };
-      const diffHrs = Math.max(0, Math.round((Date.now() - created.getTime()) / 36e5));
-      if (diffHrs > 24) {
-        return { label: `${Math.round(diffHrs / 24)}d`, warn: true };
-      }
-      return { label: `${diffHrs}h`, warn: diffHrs > 4 };
-    }
-
-    function initDashboardInteractions() {
-      const tksContainer = document.getElementById('tks-widget-container');
-      if (!tksContainer) return;
-      tksContainer.addEventListener('click', (evt) => {
-        const row = evt.target.closest('tr[data-ticket-id]');
-        if (!row) return;
-        const ticketId = asNumber(row.dataset.ticketId, 0);
-        if (ticketId <= 0) return;
-        const isProdHost = window.location.hostname.endsWith('.telconsulting.cl');
-        const isDevPath = window.location.pathname.startsWith('/dev');
-        const targetBase = isProdHost
-          ? `https://ticketera.telconsulting.cl${isDevPath ? '/dev' : ''}/`
-          : `${window.location.protocol}//${window.location.hostname}:9005/`;
-        window.location.href = `${targetBase}?ticket_id=${ticketId}`;
-      });
-    }
-
-    function renderDashboardHeader(data) {
-      const statusNode = document.getElementById('dashboard-status');
-      if (!statusNode) return;
-      const systemStatus = String(data.system_status || 'unknown').toLowerCase();
-      const healthy = systemStatus === 'healthy';
-      const statusLabel = healthy ? 'HEALTHY' : systemStatus.toUpperCase();
-      const failures24h = asNumber(data.jobs_health && data.jobs_health.failures_24h, 0);
-      let html = `Estado: <span class="pill ${healthy ? 'pill-success' : 'pill-error'}">${escapeHtml(statusLabel)}</span>`;
-      if (failures24h > 0) {
-        html += ` • ${failures24h} fallas de jobs (24h)`;
-      }
-      statusNode.innerHTML = html;
-    }
-
-    function renderOpsCards(kpis) {
-      const ticketsOpen = asNumber(kpis.tickets_open, 0);
-      const ticketsCritical = asNumber(kpis.tickets_critical, 0);
-      const salesTodayAmount = asNumber(kpis.sales_today_amount, 0);
-      const salesTodayCount = asNumber(kpis.sales_today_count, 0);
-      const totalCustomers = asNumber(kpis.total_customers, 0);
-
-      const cardTickets = document.getElementById('kpi-card-tickets');
-      if (cardTickets) {
-        cardTickets.classList.toggle('is-critical', ticketsCritical > 0);
-        cardTickets.innerHTML = `
-          <i class="fas fa-ticket-alt"></i>
-          <h2>${ticketsOpen} Tickets</h2>
-          <p>${ticketsCritical} críticos</p>
-        `;
-      }
-
-      const cardSales = document.getElementById('kpi-card-sales');
-      if (cardSales) {
-        cardSales.innerHTML = `
-          <i class="fas fa-file-invoice-dollar"></i>
-          <h2>$${new Intl.NumberFormat('es-CL', { notation: 'compact' }).format(salesTodayAmount)}</h2>
-          <p>${salesTodayCount} ventas hoy</p>
-        `;
-      }
-
-      const cardCustomers = document.getElementById('kpi-card-customers');
-      if (cardCustomers) {
-        cardCustomers.innerHTML = `
-          <i class="fas fa-users"></i>
-          <h2>${totalCustomers}</h2>
-          <p>clientes activos</p>
-        `;
-      }
-    }
-
-    function renderRecentFailures(data) {
-      const failContainer = document.getElementById('failures-container');
-      if (!failContainer) return;
-      const failures = Array.isArray(data.recent_failures) ? data.recent_failures : [];
-
-      if (!failures.length) {
-        failContainer.innerHTML = `
-          <h4 class="dashboard-block-title">Alertas Recientes</h4>
-          <div class="dashboard-empty-ok"><i class="fas fa-check-circle"></i> Todos los sistemas operativos</div>
-        `;
-        return;
-      }
-
-      const rows = failures.map((f) => {
-        const jobType = escapeHtml(f.job_type || '-');
-        const err = escapeHtml(truncate(f.error_msg || f.last_error || '-', 70));
-        const startedAt = String(f.started_at || f.updated_at || '');
-        const hour = startedAt.length >= 16 ? escapeHtml(startedAt.substring(11, 16)) : '-';
-        return `<tr><td>${jobType}</td><td style="color:#ff8d8d">${err}</td><td>${hour}</td></tr>`;
-      }).join('');
-
-      failContainer.innerHTML = `
-        <h4 class="dashboard-block-title">⚠️ Alertas Recientes</h4>
-        <div class="table-scroll">
-          <table class="monstruo-table">
-            <thead><tr><th>Job</th><th>Error</th><th>Hora</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    function renderTicketeraWidgets(tksData) {
-      const tksContainer = document.getElementById('tks-widget-container');
-      if (!tksContainer) return;
-      const topClientes = Array.isArray(tksData.top_clientes) ? tksData.top_clientes : [];
-      const pendingEmails = Array.isArray(tksData.pending_emails) ? tksData.pending_emails : [];
-
-      const clientsRows = topClientes.length
-        ? topClientes.map((c) => `
-            <tr>
-              <td>${escapeHtml(c.cliente || '-')}</td>
-              <td><strong>${asNumber(c.total, 0)}</strong></td>
-            </tr>
-          `).join('')
-        : `<tr><td colspan="2" style="text-align:center; opacity:0.62;">Sin actividad reciente</td></tr>`;
-
-      const emailRows = pendingEmails.length
-        ? pendingEmails.map((email) => {
-          const ticketId = asNumber(email.id, 0);
-          const rowAttr = ticketId > 0 ? ` data-ticket-id="${ticketId}"` : '';
-          const subject = escapeHtml(truncate(email.titulo || 'Sin asunto', 30));
-          const customer = escapeHtml(email.customer_id || '-');
-          const age = relativeHours(email.created_at);
-          return `
-            <tr class="dash-link-row"${rowAttr}>
-              <td>${subject}</td>
-              <td>${customer}</td>
-              <td class="${age.warn ? 'dash-age-warn' : ''}">${escapeHtml(age.label)}</td>
-            </tr>
-          `;
-        }).join('')
-        : `<tr><td colspan="3" style="text-align:center; opacity:0.62;">Todo al día</td></tr>`;
-
-      tksContainer.innerHTML = `
-        <div class="card dashboard-widget-card">
-          <div class="dashboard-widget-head">
-            <h4><i class="fas fa-building"></i> Top Clientes</h4>
-          </div>
-          <div class="dashboard-widget-help">Clientes con mayor actividad abierta en ticketera.</div>
-          <div class="table-scroll">
-            <table class="monstruo-table">
-              <thead><tr><th>Cliente</th><th>Tickets</th></tr></thead>
-              <tbody>${clientsRows}</tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card dashboard-widget-card">
-          <div class="dashboard-widget-head">
-            <h4><i class="fas fa-envelope-open-text"></i> Correos Pendientes</h4>
-          </div>
-          <div class="dashboard-widget-help">Correos recibidos sin respuesta operativa reciente.</div>
-          <div class="table-scroll">
-            <table class="monstruo-table">
-              <thead><tr><th>Asunto</th><th>Cliente</th><th>Hace</th></tr></thead>
-              <tbody>${emailRows}</tbody>
-            </table>
-          </div>
-        </div>
-      `;
-    }
-
-    async function loadDashboard() {
+    // Lanzadera: tarjetas por modulo segun permisos (misma fuente que la barra)
+    (async () => {
+      const isProd = window.location.hostname.endsWith('.telconsulting.cl');
+      const pfx = window.getEnvPrefix ? window.getEnvPrefix() : '';
+      const local = (port, path = '/') => `${window.location.protocol}//${window.location.hostname}:${port}${path}`;
+      const MODS = [
+        { id: 'tks', label: 'Ticketera', desc: 'Mesa de ayuda y soporte', icon: 'fa-ticket-alt', url: isProd ? `https://ticketera.telconsulting.cl${pfx}/` : local(9005) },
+        { id: 'pmo', label: 'Proyectos (PMO)', desc: 'Oficina técnica', icon: 'fa-helmet-safety', url: isProd ? `https://pmo.telconsulting.cl${pfx}/` : local(9009) },
+        { id: 'erp', label: 'ERP & Finanzas', desc: 'Facturación y pagos', icon: 'fa-file-invoice-dollar', url: isProd ? `https://erp.telconsulting.cl${pfx}/` : local(9006) },
+        { id: 'crm', label: 'CRM', desc: 'Clientes y cuentas', icon: 'fa-id-card', url: isProd ? `https://crm.telconsulting.cl${pfx}/` : local(9008) },
+        { id: 'bodega', label: 'Bodega', desc: 'Inventario (WMS)', icon: 'fa-warehouse', url: isProd ? `https://bodega.telconsulting.cl${pfx}/` : local(9007) },
+        { id: 'terreneitor', label: 'Terreneitor', desc: 'Informes de terreno con fotos', icon: 'fa-camera', url: isProd ? `https://terreneitor.telconsulting.cl${pfx}/` : local(8005) },
+        { id: 'fundacion', label: 'Fundación', desc: 'Acompañando Pasos', icon: 'fa-hands-helping', url: isProd ? `https://login.telconsulting.cl${pfx}/fundacion` : local(9001, '/fundacion') },
+        { id: 'ia', label: 'IA (Ultron)', desc: 'Asistente inteligente', icon: 'fa-robot', url: isProd ? `https://ia.telconsulting.cl${pfx}/` : local(9010) },
+        { id: 'zabbix', label: 'Zabbix', desc: 'Monitoreo de red', icon: 'fa-signal', url: isProd ? `https://zabbix.telconsulting.cl${pfx}/` : local(9011) },
+        { id: 'config', label: 'Configuración', desc: 'Usuarios y parámetros', icon: 'fa-cog', url: isProd ? `https://config.telconsulting.cl${pfx}/` : local(9001, '/configuracion') },
+      ];
+      let allowed = [];
       try {
-        const data = await window.fetchApi('/api/ops/dashboard');
-        renderDashboardHeader(data || {});
-        renderOpsCards((data && data.kpis) || {});
-        renderRecentFailures(data || {});
-
-        try {
-          const tksData = await window.fetchApi('/api/tks/dashboard/kpi');
-          renderTicketeraWidgets(tksData || {});
-        } catch (ticketErr) {
-          console.warn('No se pudo cargar widget Ticketera/KPI:', ticketErr);
-          const tksContainer = document.getElementById('tks-widget-container');
-          if (tksContainer) {
-            tksContainer.innerHTML = '<div class="dashboard-empty-ok">No se pudo cargar Ticketera 360° en este momento.</div>';
-          }
-        }
-      } catch (err) {
-        console.error('Dashboard Error', err);
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      if (window.initLogout) window.initLogout();
-      initDashboardInteractions();
-      loadDashboard();
-      setInterval(loadDashboard, DASHBOARD_REFRESH_MS);
-    });
+        const ses = await window.fetchApi('/api/sesion');
+        if (ses && ses.ok) allowed = ses.allowed_modules || [];
+      } catch (e) { /* sin sesion: la pagina ya redirige */ }
+      const grid = document.getElementById('launch-grid');
+      if (!grid) return;
+      const items = MODS.filter(m => allowed.includes('*') || allowed.includes(m.id));
+      grid.innerHTML = items.length
+        ? items.map(m => `
+          <a class="launch-card" href="${m.url}">
+            <i class="fas ${m.icon}"></i>
+            <h3>${m.label}</h3>
+            <p>${m.desc}</p>
+            <span class="launch-cta">Entrar <i class="fas fa-arrow-right"></i></span>
+          </a>`).join('')
+        : '<p class="launch-empty">No tienes módulos asignados. Pide acceso en Configuración.</p>';
+    })();
   </script>
   <script src="../shared/js/sidebar.js?v=88"></script>
 </body>
