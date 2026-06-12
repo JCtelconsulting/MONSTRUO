@@ -748,7 +748,6 @@ const UsersUI = (() => {
                 window.fetchApi('/api/config/role-scopes').catch(() => null),
                 window.fetchApi('/api/sesion').catch(() => null),
             ]);
-            _currentUser = String(sesData?.user || '').toLowerCase();
 
             // /api/sesion devuelve {user, role, roles, ...}. Tomamos `user`
             // (legacy) o `username` (algunos consumidores), lo que esté.
