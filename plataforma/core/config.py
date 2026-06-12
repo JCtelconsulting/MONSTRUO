@@ -87,6 +87,7 @@ class Settings(BaseSettings):
         {"id": "ia", "label": "IA (Ultron)"},
         {"id": "zabbix", "label": "Zabbix"},
         {"id": "fundacion", "label": "Fundación"},
+        {"id": "terreneitor", "label": "Terreneitor"},
         {"id": "config", "label": "Configuracion"},
     ]
 
@@ -103,6 +104,7 @@ class Settings(BaseSettings):
         "ia": "ia",
         "zabbix": "zabbix",
         "fundacion": "fundacion",
+        "terreneitor": "terreneitor",
         "admin.settings": "config",
     }
     
