@@ -8,7 +8,9 @@ const UsersUI = (() => {
     let _roleScopes = new Map();
     let _roleScopeItems = [];
 
-    const PROTECTED_USER = 'juan.lopez@telconsulting.cl';
+    // Solo se oculta el eliminar para el usuario DE LA SESION (no puedes
+    // borrarte a ti mismo); el backend tambien lo bloquea (400).
+    let _currentUser = '';
 
     const ROLE_OPTIONS = [
         { id: 'admin', label: 'Admin' },
@@ -139,6 +141,7 @@ const UsersUI = (() => {
         { id: 'ia', label: 'IA (Ultron)' },
         { id: 'zabbix', label: 'Zabbix' },
         { id: 'fundacion', label: 'Fundación' },
+        { id: 'terreneitor', label: 'Terreneitor' },
         { id: 'config', label: 'Configuracion' }
     ];
 
@@ -162,6 +165,7 @@ const UsersUI = (() => {
         auditoria: 90,
         reportes: 100,
         fundacion: 105,
+        terreneitor: 107,
         configuracion_administrativa: 110,
     });
 
@@ -192,6 +196,7 @@ const UsersUI = (() => {
         'auditoria',
         'reportes',
         'fundacion',
+        'terreneitor',
         'configuracion_administrativa',
         'acceso_total_del_sistema',
     ]);
@@ -548,7 +553,7 @@ const UsersUI = (() => {
                                 <button class="btn-icon-sm" data-action="edit" data-username="${encodedUsername}" title="Editar usuario">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                ${username !== PROTECTED_USER
+                                ${username.toLowerCase() !== _currentUser
                         ? `<button class="btn-icon-sm btn-icon-danger" data-action="delete" data-username="${encodedUsername}" title="Eliminar usuario"><i class="fas fa-trash"></i></button>`
                         : ''}
                             </div>
@@ -565,10 +570,12 @@ const UsersUI = (() => {
         bindTableActions();
 
         try {
-            const [usersData, scopesDataRaw] = await Promise.all([
+            const [usersData, scopesDataRaw, sesData] = await Promise.all([
                 window.fetchApi('/api/admin/users'),
-                window.fetchApi('/api/config/role-scopes').catch(() => null)
+                window.fetchApi('/api/config/role-scopes').catch(() => null),
+                window.fetchApi('/api/sesion').catch(() => null)
             ]);
+            _currentUser = String(sesData?.user || '').toLowerCase();
 
             _users = Array.isArray(usersData?.items) ? usersData.items : [];
             const scopesItems = Array.isArray(scopesDataRaw?.items) && scopesDataRaw.items.length

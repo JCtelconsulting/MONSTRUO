@@ -841,6 +841,45 @@
                 grid-template-columns: 1fr;
             }
         }
+    
+        /* Acordeones compactos de permisos (2 cuadros chicos bajo usuarios) */
+        .cfg-collapse-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            align-items: start;
+            margin-top: 16px;
+        }
+
+        /* anular el margen de paneles adyacentes (.cfg-panel+.cfg-panel) que
+           desalineaba el segundo acordeon dentro de la grilla */
+        .cfg-collapse-grid > details.cfg-collapse {
+            margin: 0;
+        }
+
+        details.cfg-collapse > summary {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        details.cfg-collapse > summary::-webkit-details-marker { display: none; }
+        details.cfg-collapse > summary .cfg-subtitle { margin: 0; }
+
+        .cfg-chevron {
+            color: var(--text-soft, #a5adb4);
+            transition: transform 0.2s ease;
+        }
+
+        details.cfg-collapse[open] .cfg-chevron { transform: rotate(180deg); }
+        details.cfg-collapse > .cfg-panel-subtitle { margin-top: 12px; }
+
+        @media (max-width: 900px) {
+            .cfg-collapse-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 
@@ -969,14 +1008,6 @@
                             <input type="number" id="ticketAutoCloseTime" class="cfg-input input-dark" placeholder="72">
                         </div>
                     </div>
-                    <div class="cfg-active-row" style="margin-top: 15px;">
-                        <input type="checkbox" id="chkAutoReply" checked>
-                        <label for="chkAutoReply">Habilitar envío automático de acuse de recibo de cara al
-                            cliente</label>
-                    </div>
-                    <div class="cfg-form-note">
-                        Las plantillas y el enrutamiento por correo/dominio ahora se administran desde <strong>Ticketera &gt; Dominio/Plantillas</strong>.
-                    </div>
 
                     <div class="cfg-actions-end" style="margin-top:20px;">
                         <button class="btn-primary" id="btnSaveConfig">
@@ -1032,24 +1063,34 @@
                         </div>
                     </div>
 
-                    <div class="panel cfg-panel">
-                        <h4 class="cfg-subtitle"><i class="fas fa-user-shield"></i> Permisos Efectivos por Usuario</h4>
-                        <p class="cfg-panel-subtitle">Accesos finales por usuario considerando multi-rol.</p>
-                        <div class="cfg-role-guide">
-                            <div id="cfgUserScopesBody" class="cfg-user-scope-list">
-                                <div class="cfg-role-guide-empty">Cargando permisos por usuario...</div>
+                    <!-- Permisos como acordeones compactos: cerrados por defecto para
+                         que la pagina no sea eterna; clic = se despliegan hacia abajo. -->
+                    <div class="cfg-collapse-grid">
+                        <details class="panel cfg-panel cfg-collapse">
+                            <summary>
+                                <h4 class="cfg-subtitle"><i class="fas fa-user-shield"></i> Permisos Efectivos por Usuario</h4>
+                                <i class="fas fa-chevron-down cfg-chevron"></i>
+                            </summary>
+                            <p class="cfg-panel-subtitle">Accesos finales por usuario considerando multi-rol.</p>
+                            <div class="cfg-role-guide">
+                                <div id="cfgUserScopesBody" class="cfg-user-scope-list">
+                                    <div class="cfg-role-guide-empty">Cargando permisos por usuario...</div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        </details>
 
-                    <div class="panel cfg-panel">
-                        <h4 class="cfg-subtitle"><i class="fas fa-shield-alt"></i> Permisos por Rol</h4>
-                        <p class="cfg-panel-subtitle">Referencia de alcances para cada rol existente.</p>
-                        <div class="cfg-role-guide">
-                            <div id="cfgRoleGuideBody" class="cfg-role-guide-list">
-                                <div class="cfg-role-guide-empty">Cargando matriz de alcances...</div>
+                        <details class="panel cfg-panel cfg-collapse">
+                            <summary>
+                                <h4 class="cfg-subtitle"><i class="fas fa-shield-alt"></i> Permisos por Rol</h4>
+                                <i class="fas fa-chevron-down cfg-chevron"></i>
+                            </summary>
+                            <p class="cfg-panel-subtitle">Referencia de alcances para cada rol existente.</p>
+                            <div class="cfg-role-guide">
+                                <div id="cfgRoleGuideBody" class="cfg-role-guide-list">
+                                    <div class="cfg-role-guide-empty">Cargando matriz de alcances...</div>
+                                </div>
                             </div>
-                        </div>
+                        </details>
                     </div>
                 </section>
             </div> <!-- END pane-general -->
@@ -1130,7 +1171,6 @@
                     document.getElementById('ticketAutoReplyTime').value = smtpData.ticket_auto_reply_time || '';
                     document.getElementById('ticketAutoCloseTime').value = smtpData.ticket_auto_close_time || '';
 
-                    document.getElementById('chkAutoReply').checked = smtpData.ticket_auto_reply_enabled === 'true' || smtpData.ticket_auto_reply_enabled === '1' || smtpData.ticket_auto_reply_enabled === true;
                 }
             } catch (e) {
                 console.error("Error loading Ticketera config", e);
@@ -1155,8 +1195,7 @@
                 // AUTO
                 email_polling_interval: document.getElementById('emailPollingInterval').value.trim(),
                 ticket_auto_reply_time: document.getElementById('ticketAutoReplyTime').value.trim(),
-                ticket_auto_close_time: document.getElementById('ticketAutoCloseTime').value.trim(),
-                ticket_auto_reply_enabled: document.getElementById('chkAutoReply').checked ? 'true' : 'false'
+                ticket_auto_close_time: document.getElementById('ticketAutoCloseTime').value.trim()
             };
 
             try {
