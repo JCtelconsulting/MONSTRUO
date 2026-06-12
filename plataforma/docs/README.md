@@ -5,7 +5,7 @@
 - [Proyecto Contexto](PROYECTO_CONTEXTO.md)
 - [Plan Maestro](GUIA_MAESTRA.md)
 - [Proxy Inverso](PROXY_INVERSO.md)
-- [Arquitectura](ARQUITECTURA.md)
+- [Arquitectura](arquitectura/ARQUITECTURA.md)
 - [Contrato de Apps](CONTRATO_APPS.md)
 - [Estándares](ESTANDARES.md)
 - [Guía de diseño](design.md) — línea visual Premium Gold + checklist de UI

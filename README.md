@@ -54,3 +54,9 @@ docker compose -f terreneitor/docker-compose.yaml up -d --build
 | Línea visual + marca | [plataforma/docs/design.md](plataforma/docs/design.md) + [manual de marca](plataforma/docs/manual-marca-telconsulting.md) |
 | Reglas para apps nuevas | [plataforma/docs/CONTRATO_APPS.md](plataforma/docs/CONTRATO_APPS.md) |
 | Historia | [plataforma/docs/CHANGELOG.md](plataforma/docs/CHANGELOG.md) · viejo: `plataforma/docs/antiguo/` |
+
+## Documentación
+
+- Índice completo de docs: [plataforma/docs/README.md](plataforma/docs/README.md)
+- Arquitectura AS-IS: [plataforma/docs/arquitectura/ARQUITECTURA.md](plataforma/docs/arquitectura/ARQUITECTURA.md)
+- Bitácora por mes: [plataforma/docs/changelog/](plataforma/docs/changelog/)

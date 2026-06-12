@@ -264,6 +264,34 @@ services:
     restart: unless-stopped
     command: [ "uvicorn", "gta.backend.main:app", "--host", "0.0.0.0", "--port", "9012" ]
 
+  # Terreneitor: informes de terreno con evidencia fotografica. App con
+  # estructura propia (backend/frontend/data) migrada como modulo; usa su
+  # env_file dedicado (TERRENEITOR_* + Postgres central schema terreneitor
+  # + SSO del gateway). Puerto 8005: el proxy ya rutea ahi.
+  terreneitor:
+    build:
+      context: ./terreneitor
+      dockerfile: docker/Dockerfile
+    container_name: ${STACK_NAME:-monstruo-dev}-terreneitor
+    env_file:
+      - ./terreneitor/ops/environments/.env
+    ports:
+      - "${TERRENEITOR_PORT:-8005}:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENV=dev
+    volumes:
+      - ./terreneitor/backend:/app/backend
+      - ./terreneitor/frontend:/app/frontend
+      - ./terreneitor/data:/app/data
+      - ./terreneitor/logs:/app/logs
+    user: "1000:1000"
+    depends_on:
+      - db
+    mem_limit: 512m
+    mem_reservation: 128m
+    restart: unless-stopped
+
   zabbix:
     build:
       context: .
