@@ -3,22 +3,22 @@
    Theme: Neon Command
    ========================================= */
 :root {
-  --bg-deep: #070b11;
-  --bg-soft: #0e141d;
-  --panel: #121a24;
-  --panel-strong: #161f2b;
-  --neon: #00ff41;
+  --bg-deep: #050505;
+  --bg-soft: #0c0c0c;
+  --panel: #141414;
+  --panel-strong: #1b1b1b;
+  --neon: #D4A843;
   --danger: #ff3333;
   --warning: #ffcc00;
-  --info: #00f3ff;
-  --accent-color: #00f3ff;
+  --info: #D4A843;
+  --accent-color: #D4A843;
   --text: #f5f7f8;
   --text-soft: #a5adb4;
   --text-main: #f5f7f8;
   --text-muted: #a5adb4;
   --border: #1f2935;
-  --bg: #070b11;
-  --header-bg: #0c1119;
+  --bg: #050505;
+  --header-bg: #080808;
   --header-height: 60px;
   --sidebar-width: 260px;
   --max-content-width: 1180px;
@@ -45,11 +45,8 @@ html {
 
 body {
   background-color: var(--bg-deep);
-  background-image:
-    radial-gradient(circle at 12% 10%, rgba(0, 255, 65, 0.12), transparent 45%),
-    radial-gradient(circle at 88% 12%, rgba(0, 243, 255, 0.1), transparent 45%),
-    radial-gradient(circle at 90% 90%, rgba(255, 51, 51, 0.08), transparent 40%),
-    linear-gradient(180deg, rgba(7, 11, 17, 0.9), rgba(4, 7, 11, 0.98));
+  background-image: radial-gradient(circle at 50% -8%, rgba(212, 168, 67, 0.05), transparent 55%),
+    linear-gradient(180deg, #050505, #000000);
   color: var(--text);
   min-height: 100vh;
   overflow: hidden;
@@ -100,7 +97,7 @@ header h1::before {
   height: 12px;
   border-radius: 4px;
   background: var(--neon);
-  box-shadow: 0 0 12px rgba(0, 255, 65, 0.7);
+  box-shadow: 0 0 12px rgba(212, 168, 67, 0.7);
 }
 
 .header-actions {
@@ -158,7 +155,7 @@ header h1::before {
 }
 
 .env-prod {
-  border: 1px solid rgba(0, 255, 65, 0.4);
+  border: 1px solid rgba(212, 168, 67, 0.4);
   color: #1ecb6b;
 }
 
@@ -270,8 +267,8 @@ body.sidebar-collapsed #env-indicator .env-short {
 .side-link:hover,
 .side-link.active {
   color: #fff;
-  background: rgba(0, 255, 65, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 255, 65, 0.2);
+  background: rgba(212, 168, 67, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(212, 168, 67, 0.2);
 }
 
 /* BUTTONS FOOTER */
@@ -321,7 +318,7 @@ body.sidebar-collapsed #env-indicator .env-short {
 .btn-account:hover {
   background: var(--neon) !important;
   color: #000 !important;
-  box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+  box-shadow: 0 0 20px rgba(212, 168, 67, 0.4);
 }
 
 .btn-logout {
@@ -509,7 +506,7 @@ main .main-inner {
 
 main {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 255, 65, 0.45) rgba(12, 16, 22, 0.8);
+  scrollbar-color: rgba(212, 168, 67, 0.45) rgba(12, 16, 22, 0.8);
 }
 
 main::-webkit-scrollbar {
@@ -522,13 +519,13 @@ main::-webkit-scrollbar-track {
 }
 
 main::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(0, 255, 65, 0.55), rgba(0, 243, 255, 0.3));
+  background: linear-gradient(180deg, rgba(212, 168, 67, 0.55), rgba(212, 168, 67, 0.3));
   border-radius: 999px;
   border: 2px solid rgba(12, 16, 22, 0.8);
 }
 
 main::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(0, 255, 65, 0.75), rgba(0, 243, 255, 0.5));
+  background: linear-gradient(180deg, rgba(212, 168, 67, 0.75), rgba(212, 168, 67, 0.5));
 }
 
 /* INTRO */
@@ -569,7 +566,7 @@ main::-webkit-scrollbar-thumb:hover {
   gap: 12px;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(0, 255, 65, 0.3);
+  border: 1px solid rgba(212, 168, 67, 0.3);
   background: rgba(0, 0, 0, 0.6);
   min-width: 190px;
 }
@@ -579,7 +576,7 @@ main::-webkit-scrollbar-thumb:hover {
   height: 12px;
   border-radius: 50%;
   background: var(--neon);
-  box-shadow: 0 0 12px rgba(0, 255, 65, 0.8);
+  box-shadow: 0 0 12px rgba(212, 168, 67, 0.8);
   animation: pulse 1.6s ease-in-out infinite;
 }
 
@@ -677,7 +674,7 @@ main::-webkit-scrollbar-thumb:hover {
   right: -25%;
   width: 180px;
   height: 180px;
-  background: radial-gradient(circle, rgba(0, 255, 65, 0.12), transparent 70%);
+  background: radial-gradient(circle, rgba(212, 168, 67, 0.12), transparent 70%);
   opacity: 0.3;
 }
 
@@ -716,7 +713,7 @@ main::-webkit-scrollbar-thumb:hover {
 }
 
 .card:hover i {
-  text-shadow: 0 0 18px rgba(0, 255, 65, 0.45);
+  text-shadow: 0 0 18px rgba(212, 168, 67, 0.45);
 }
 
 .card-terreno {
@@ -733,7 +730,7 @@ main::-webkit-scrollbar-thumb:hover {
 
 /* ADMIN PANEL */
 #admin-panel {
-  border-color: rgba(0, 255, 65, 0.2);
+  border-color: rgba(212, 168, 67, 0.2);
 }
 
 .admin-tabs {
@@ -765,8 +762,8 @@ main::-webkit-scrollbar-thumb:hover {
 .tab-link:hover,
 .tab-link.active {
   color: var(--neon);
-  background: rgba(0, 255, 65, 0.14);
-  box-shadow: 0 0 12px rgba(0, 255, 65, 0.18);
+  background: rgba(212, 168, 67, 0.14);
+  box-shadow: 0 0 12px rgba(212, 168, 67, 0.18);
 }
 
 .tab-content {
@@ -856,7 +853,7 @@ form {
 .field input:focus,
 .field select:focus {
   border-color: var(--neon);
-  box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+  box-shadow: 0 0 15px rgba(212, 168, 67, 0.2);
 }
 
 /* TABLAS */
@@ -955,7 +952,7 @@ form {
 }
 
 .table-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, rgba(0, 255, 65, 0.55), rgba(0, 243, 255, 0.3));
+  background: linear-gradient(90deg, rgba(212, 168, 67, 0.55), rgba(212, 168, 67, 0.3));
   border-radius: 999px;
 }
 
@@ -992,21 +989,21 @@ form {
 }
 
 .filter-btn:hover {
-  border-color: rgba(0, 255, 65, 0.35);
+  border-color: rgba(212, 168, 67, 0.35);
   color: #fff;
 }
 
 .filter-btn.active {
   border-color: var(--neon);
   color: var(--neon);
-  box-shadow: 0 0 10px rgba(0, 255, 65, 0.25);
+  box-shadow: 0 0 10px rgba(212, 168, 67, 0.25);
 }
 
 .filter-popover {
   position: fixed;
   z-index: 3000;
   background: rgba(8, 12, 18, 0.98);
-  border: 1px solid rgba(0, 255, 65, 0.35);
+  border: 1px solid rgba(212, 168, 67, 0.35);
   border-radius: 12px;
   box-shadow: 0 18px 32px rgba(0, 0, 0, 0.65);
   padding: 12px;
@@ -1077,7 +1074,7 @@ form {
 
 .filter-clear:hover {
   color: #fff;
-  border-color: rgba(0, 255, 65, 0.35);
+  border-color: rgba(212, 168, 67, 0.35);
 }
 
 .filter-popover-list {
@@ -1710,7 +1707,7 @@ form {
 .btn-info:hover {
   background: var(--neon);
   color: #000;
-  box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
+  box-shadow: 0 0 15px rgba(212, 168, 67, 0.5);
 }
 
 .btn-info {
@@ -1721,7 +1718,7 @@ form {
 .btn-info:hover {
   background: var(--info);
   color: #000;
-  box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+  box-shadow: 0 0 15px rgba(212, 168, 67, 0.5);
 }
 
 .btn-peligro {
@@ -1907,12 +1904,12 @@ form {
 
 .demo-chip--ok {
   color: var(--neon);
-  border-color: rgba(0, 255, 65, 0.3);
+  border-color: rgba(212, 168, 67, 0.3);
 }
 
 .demo-chip--info {
   color: var(--info);
-  border-color: rgba(0, 243, 255, 0.3);
+  border-color: rgba(212, 168, 67, 0.3);
 }
 
 .demo-mini-card {
@@ -1994,12 +1991,12 @@ form {
 
 .demo-toast--info {
   color: var(--info);
-  border-color: rgba(0, 243, 255, 0.4);
+  border-color: rgba(212, 168, 67, 0.4);
 }
 
 .demo-toast--ok {
   color: var(--neon);
-  border-color: rgba(0, 255, 65, 0.4);
+  border-color: rgba(212, 168, 67, 0.4);
 }
 
 .demo-placeholder {
@@ -2343,7 +2340,7 @@ form {
 .header-tools select:focus,
 .header-tools input:focus {
   border-color: var(--neon);
-  box-shadow: 0 0 10px rgba(0, 255, 65, 0.15);
+  box-shadow: 0 0 10px rgba(212, 168, 67, 0.15);
   color: #fff;
 }
 
@@ -2591,7 +2588,7 @@ body:not(.login-shell) .module-tabs-header + .tab-bar::-webkit-scrollbar-track {
 }
 
 body:not(.login-shell) .module-tabs-header + .tab-bar::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 65, 0.35);
+  background: rgba(212, 168, 67, 0.35);
   border-radius: 999px;
 }
 
@@ -2646,13 +2643,13 @@ body:not(.login-shell) .tab-bar > .tab-btn i {
 
 body:not(.login-shell) .tab-bar > .tab-btn:hover {
   color: #ffffff !important;
-  border-color: rgba(0, 255, 65, 0.25) !important;
-  background: rgba(0, 255, 65, 0.1) !important;
+  border-color: rgba(212, 168, 67, 0.25) !important;
+  background: rgba(212, 168, 67, 0.1) !important;
 }
 
 body:not(.login-shell) .tab-bar > .tab-btn.active {
   color: var(--neon) !important;
-  border-color: rgba(0, 255, 65, 0.38) !important;
+  border-color: rgba(212, 168, 67, 0.38) !important;
   background: transparent !important;
   box-shadow: none !important;
 }
@@ -2683,9 +2680,9 @@ body:not(.login-shell) .tab-bar > .tab-btn.active::after {
 }
 
 body:not(.login-shell) .btn-primary {
-  background: linear-gradient(135deg, rgba(0, 255, 65, 0.92), rgba(0, 214, 255, 0.8)) !important;
+  background: linear-gradient(135deg, rgba(212, 168, 67, 0.92), rgba(0, 214, 255, 0.8)) !important;
   color: #04110a !important;
-  border: 1px solid rgba(0, 255, 65, 0.48) !important;
+  border: 1px solid rgba(212, 168, 67, 0.48) !important;
   border-radius: 10px !important;
   font-weight: 800 !important;
   letter-spacing: 0.3px !important;
@@ -2695,7 +2692,7 @@ body:not(.login-shell) .btn-primary {
 body:not(.login-shell) .btn-primary:hover {
   filter: brightness(1.03) !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 0 20px rgba(0, 255, 65, 0.33) !important;
+  box-shadow: 0 0 20px rgba(212, 168, 67, 0.33) !important;
 }
 
 body:not(.login-shell) .btn-secondary {
@@ -2707,8 +2704,8 @@ body:not(.login-shell) .btn-secondary {
 }
 
 body:not(.login-shell) .btn-secondary:hover {
-  border-color: rgba(0, 243, 255, 0.35) !important;
-  background: rgba(0, 243, 255, 0.1) !important;
+  border-color: rgba(212, 168, 67, 0.35) !important;
+  background: rgba(212, 168, 67, 0.1) !important;
 }
 
 body:not(.login-shell) .input-dark,
@@ -2733,8 +2730,8 @@ body:not(.login-shell) input.input-dark:focus,
 body:not(.login-shell) select.input-dark:focus,
 body:not(.login-shell) textarea.input-dark:focus {
   outline: none !important;
-  border-color: rgba(0, 255, 65, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(0, 255, 65, 0.12) !important;
+  border-color: rgba(212, 168, 67, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.12) !important;
 }
 
 body:not(.login-shell) .monstruo-table {
@@ -2785,4 +2782,15 @@ body:not(.login-shell) .tks-modal {
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 22px 44px rgba(0, 0, 0, 0.52) !important;
   border-radius: 16px !important;
+}
+
+/* Marca de agua: cubo Telconsulting de fondo en todos los módulos (marca) */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url('../img/telconsulting-isotipo-dorado.png') center / 46vmin no-repeat;
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
 }
