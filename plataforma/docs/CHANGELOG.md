@@ -2,6 +2,20 @@
 **Fecha de actualizacion:** 09 Abril 2026
 **Fuente de verdad:** `plataforma/docs/PLAN_MAESTRO_MONSTRUO.md`
 
+## HITO: 2026-06-12 - DEV: Terreneitor migrado como modulo de Monstruo (Fases 1-2)
+- **Solicitud ejecutada**:
+  - integrar la app Terreneitor dentro de Monstruo ("una sola app con hartos modulos"), por etapas reversibles, sin tocar PROD.
+- **Accion ejecutada**:
+  - `terreneitor/`: modulo nuevo (copia del repo `/srv/terreneitor_dev`; la historia git sigue alla). Untracked igual que `gta/` hasta que aterrice `hotfix/imap-robust`.
+  - `terreneitor/docker-compose.yaml`: contenedor `monstruo-dev-terreneitor` puerto `8005` (el proxy ya apuntaba a 60.8:8005 -> cero cambios nginx), red externa `monstruo-dev_default`.
+  - Datos: SQLite -> Postgres central `monstruo_dev`, schema `terreneitor` (`terreneitor/ops/scripts/migracion/sqlite_a_postgres.py`, verificacion PASS 10/10 tablas, secuencias ajustadas).
+  - Backend (commits `0a97d49` y `476dbc6` en el repo terreneitor): `TERRENEITOR_DATABASE_URL` (sin la var vuelve a SQLite = rollback), guard del PRAGMA a SQLite, psycopg2, y consultas de gerencia portables (strftime/date).
+- **Verificacion**:
+  - migracion: conteos origen/destino identicos (PASS).
+  - E2E navegador via proxy sobre Postgres: supervisor, terreno y gerencia con 0 errores 5xx/consola, 0 imagenes rotas; escritura verificada (INSERT con secuencia OK).
+- **Pendiente**: plegar el servicio al compose raiz + commitear el modulo; Fase 3 SSO gateway (diseno en `terreneitor/docs/MIGRACION_MONSTRUO.md`; colision cookie `access_token` en PROD); replica en PROD con ventana.
+
+
 ## HITO: 2026-04-09 - DEV: Login se recupera tras cambios Docker (bootstrap usuario + cookie secure por HTTPS real)
 - **Solicitud ejecutada**:
   - destrabar inicio de sesión en DEV después de cambios recientes en Docker/Compose que dejaron la base sin usuarios y el login en loop por cookie `Secure` en HTTP.

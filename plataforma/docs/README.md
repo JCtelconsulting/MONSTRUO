@@ -8,6 +8,8 @@
 - [Arquitectura](ARQUITECTURA.md)
 - [Contrato de Apps](CONTRATO_APPS.md)
 - [Estándares](ESTANDARES.md)
+- [Guía de diseño](design.md) — línea visual Premium Gold + checklist de UI
+- [Manual de marca](manual-marca-telconsulting.md) — reglas oficiales de marca Telconsulting
 - [Changelog](CHANGELOG.md)
 
 ## Operación y despliegue
