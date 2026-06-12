@@ -1,5 +1,15 @@
 # Proxy Inverso
 
+> **Actualización 2026-06-12 (Terreneitor):** el backend DEV de Terreneitor es
+> ahora `192.168.60.8:8005` (contenedor `monstruo-dev-terreneitor`, módulo del
+> ecosistema). La URL única es `terreneitor.telconsulting.cl`; los subdominios
+> portal/supervisor/gerencial/terreno **redirigen 307 desde la app** (el proxy
+> no necesitó cambios). En la copia versionada `terreneitor.conf`, la base
+> inyectada del host terreneitor apunta a `/modulos/hub/`; el proxy real puede
+> sincronizarse en la próxima ventana, no es urgente porque la app ya no sirve
+> HTML en la raíz. PROD de Terreneitor sigue legado en la 60.5 hasta su
+> migración (ver `terreneitor/docs/MIGRACION_MONSTRUO.md`).
+
 ## Estado actual
 
 La VM `192.168.60.6` quedó ordenada para funcionar como proxy inverso.

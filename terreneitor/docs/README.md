@@ -1,19 +1,31 @@
-# Documentación Terreneitor
+# Documentación Terreneitor — índice
 
-Esta carpeta contiene **EXCLUSIVAMENTE** dos archivos de "fuente de verdad" para la gestión del proyecto.
+> Estado actual del módulo: `terreneitor/ESTADO.md` en el repo Monstruo.
+> Actualizado 2026-06-12.
 
-> [!IMPORTANT]
-> **NO crear archivos adicionales en esta carpeta.**
-> Toda nueva información debe ser integrada en uno de los dos archivos maestros.
+## Para situarse
+- [MIGRACION_MONSTRUO.md](MIGRACION_MONSTRUO.md) — **el doc clave**: cómo
+  Terreneitor pasó a ser módulo de Monstruo (fases, rollback, SSO, pendientes PROD).
+- [PROYECTO_CONTEXTO.md](PROYECTO_CONTEXTO.md) + [PLAN_MAESTRO.md](PLAN_MAESTRO.md)
+  — gestión histórica del proyecto standalone (previa a la migración).
 
-## Archivos Maestros
+## Operación y calidad
+- [QA_EXHAUSTIVO.md](QA_EXHAUSTIVO.md) — metodología de QA con navegador
+  (Playwright en Docker, reusable en otros proyectos).
+- [PRUEBAS_NAVEGADOR.md](PRUEBAS_NAVEGADOR.md) — cómo correr las pruebas E2E.
+- [PROXY_INVERSO.md](PROXY_INVERSO.md) — ruteo público (ver también la versión
+  de plataforma en el repo Monstruo).
+- [guia-github-despliegue.md](guia-github-despliegue.md) — CI/CD.
+- [reglas/regla-git.md](reglas/regla-git.md) — convenciones git (rama de trabajo: dev).
 
-1. **`PLAN_MAESTRO.md`**
-   - Contiene el plan de ejecución del proyecto dividido por hitos.
-   - Es un documento vivo que se actualiza a medida que el proyecto avanza.
-   - Incluye roadmap futuro, implementaciones técnicas planeadas y estado de las fases.
+## Marca y diseño
+- [marca/manual-marca-telconsulting.md](marca/manual-marca-telconsulting.md) —
+  reglas oficiales (Premium Gold). La guía de aplicación a la app vive en el
+  repo Monstruo: `plataforma/docs/design.md`.
 
-2. **`PROYECTO_CONTEXTO.md`**
-   - Registro histórico del proyecto.
-   - Contiene los logs de interacción con la IA, decisiones tomadas y contexto técnico acumulado.
-   - Absorbe guías de configuración, políticas de agente y glosarios.
+## Funcional
+- [manuales/](manuales/) — manuales de usuario por rol (terreno, supervisor,
+  gerencia, portal).
+- [AUTOCOMPLETADOR_AUDIO.md](AUTOCOMPLETADOR_AUDIO.md) — diseño del
+  autocompletador por audio con IA (scaffold inerte, requiere claves/Ollama).
+- [HANDOVER_TECNICO.md](HANDOVER_TECNICO.md) — handover técnico histórico.
