@@ -12,7 +12,7 @@ Documentos relacionados:
 - [arquitectura/ARQUITECTURA.md](arquitectura/ARQUITECTURA.md) — flujo de red, componentes Docker, modelo de comunicación
 - [arquitectura/PROXY_INVERSO.md](arquitectura/PROXY_INVERSO.md) — detalle del proxy
 - [arquitectura/CONTRATO_APPS.md](arquitectura/CONTRATO_APPS.md) — contrato que toda app debe cumplir
-- [estandares/ESTANDARES.md](estandares/ESTANDARES.md) y [estandares/DESIGN_SYSTEM.md](estandares/DESIGN_SYSTEM.md)
+- [estandares/ESTANDARES.md](estandares/ESTANDARES.md) y [design.md](design.md)
 - [operacion/deploy/GUIA_DEPLOY.md](operacion/deploy/GUIA_DEPLOY.md) — cómo se despliega
 - [changelog/](changelog/) — bitácora completa del proyecto
 

@@ -4,6 +4,8 @@ Bitácora del proyecto, partida por mes-año. Cada archivo tiene los hitos del p
 
 ## Índice
 
+- [2026-06](2026-06.md) — junio 2026
+- [2026-05](2026-05.md) — mayo 2026
 - [2026-04](2026-04.md) — abril 2026
 - [2026-03](2026-03.md) — marzo 2026
 - [2026-02](2026-02.md) — febrero 2026

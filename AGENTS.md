@@ -92,7 +92,7 @@ Apps en mantención (no se abre trabajo nuevo salvo bug crítico):
 
 - Cambios de reglas/proceso: actualizar `plataforma/docs/GUIA_MAESTRA.md`.
 - Hitos ejecutados: registrar en `plataforma/docs/PROYECTO_CONTEXTO.md`.
-- Cambios de UI/estilos: respetar `plataforma/docs/estandares/DESIGN_SYSTEM.md`.
+- Cambios de UI/estilos: respetar `plataforma/docs/design.md`.
 
 ## 9) Git y Entrega
 
