@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Any
 
 from pathlib import Path
 
-from core.env_loader import load_runtime_env
+from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 

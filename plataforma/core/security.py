@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Any, List
 from jose import jwt
 from passlib.context import CryptContext
-from core.config import settings
+from plataforma.core.config import settings
 
 # Esquema compatible con Django y el nuevo (bcrypt)
 pwd_context = CryptContext(schemes=["bcrypt", "django_pbkdf2_sha256", "pbkdf2_sha256"], deprecated="auto")

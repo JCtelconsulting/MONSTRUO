@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mesa de Ayuda | Monstruo</title>
+    <meta name="description" content="Sistema profesional de Mesa de Ayuda - TelConsulting" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="shared/css/monstruo.css?v=ASSET_VERSION" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="static/css/tks.css?v=ASSET_VERSION" />
+</head>
+
+<body class="sidebar-collapsed" data-current-module="tks" data-enabled-modules="dashboard,tks,pmo,erp,crm,bodega,ia,zabbix,config,fundacion">
+    <header id="app-header">
+        <div class="header-top">
+            <h1>MONSTRUO</h1>
+            <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <nav id="dynamic-sidebar" class="side-nav">
+        </nav>
+        <div class="header-actions">
+            <span id="who" class="pill shell-who-pill">Usuario</span>
+            <div class="footer-buttons-container">
+                <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i> <span>Cuenta</span>
+                </button>
+                <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="main-inner module-shell">
+            <div class="section-header module-tabs-header module-shell-header">
+                <div class="module-shell-title">
+                    <h2 class="module-page-title">Mesa de Ayuda</h2>
+                    <p class="module-shell-subtitle">Gestión centralizada de tickets y operación de soporte</p>
+                </div>
+                <div class="module-shell-actions">
+                    <div class="tks-notif-bell" onclick="TksMain.loadTab('lista')" title="Notificaciones">
+                        <i class="fas fa-bell tks-notif-icon"></i>
+                        <span class="tks-notif-count" id="tks-notif-badge">0</span>
+                    </div>
+                    <button id="tks-create-btn" class="tks-btn tks-btn-primary" onclick="TksMain.openCreateModal()">
+                        <i class="fas fa-plus"></i> Nuevo Ticket
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB BAR -->
+            <div class="tab-bar tks-tab-bar">
+                <button class="tab-btn tks-tab-btn active" data-tab="dashboard">
+                    &#x1F4CA; Resumen
+                </button>
+                <button class="tab-btn tks-tab-btn" data-tab="lista">
+                    &#x1F4CB; Lista
+                </button>
+                <button class="tab-btn tks-tab-btn" data-tab="kanban">
+                    &#x1F5C2; Kanban
+                </button>
+                <button class="tab-btn tks-tab-btn" data-tab="messages">
+                    &#x2709; Plantillas y Enrutamiento
+                </button>
+                <button class="tab-btn tks-tab-btn" data-tab="reportes">
+                    &#x1F4C2; Archivados y Reportes
+                </button>
+                <button class="tab-btn tks-tab-btn" data-tab="ops">
+                    &#x1F6E1; Operación
+                </button>
+            </div>
+
+            <section class="section-block module-shell-content">
+                <!-- CONTENIDO DINÁMICO -->
+                <div class="tks-container" id="tks-content">
+                    <!-- Cargado dinámicamente por JS -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- MODAL CREAR TICKET (siempre en el DOM) -->
+    <div class="tks-modal-overlay" id="tks-create-modal">
+        <div class="tks-modal">
+            <div class="tks-modal-header">
+                <h3><i class="fas fa-plus-circle"></i> Nuevo Ticket</h3>
+                <button class="tks-modal-close" onclick="TksMain.closeCreateModal()">&times;</button>
+            </div>
+            <div class="tks-modal-body">
+                <div class="tks-form-group">
+                    <label>Título</label>
+                    <input type="text" class="tks-input" id="tks-new-titulo"
+                        placeholder="Describe el problema brevemente...">
+                </div>
+                <div class="tks-form-group">
+                    <label>Descripción</label>
+                    <textarea class="tks-textarea" id="tks-new-desc" rows="4"
+                        placeholder="Detalla el problema, síntomas, qué se intentó..."></textarea>
+                </div>
+                <div class="tks-form-row">
+                    <div class="tks-form-group">
+                        <label>Severidad</label>
+                        <select class="tks-select" id="tks-new-sev">
+                            <option value="baja">🟢 Baja</option>
+                            <option value="media" selected>🔵 Media</option>
+                            <option value="alta">🟠 Alta</option>
+                            <option value="critica">🔴 Crítica</option>
+                        </select>
+                    </div>
+                    <div class="tks-form-group">
+                        <label>Categoría</label>
+                        <select class="tks-select" id="tks-new-cat">
+                            <option value="">🤖 Auto-detectar</option>
+                            <option value="redes">🌐 Redes</option>
+                            <option value="sistemas">💻 Sistemas</option>
+                            <option value="ejecucion">🔧 Ejecución</option>
+                            <option value="admin">📋 Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="tks-form-row">
+                    <div class="tks-form-group">
+                        <label>Email Cliente (opcional)</label>
+                        <input type="email" class="tks-input" id="tks-new-email" placeholder="cliente@empresa.cl">
+                    </div>
+                    <div class="tks-form-group">
+                        <label>Nombre Cliente (opcional)</label>
+                        <input type="text" class="tks-input" id="tks-new-cliente" placeholder="Nombre del cliente">
+                    </div>
+                </div>
+            </div>
+            <div class="tks-modal-footer">
+                <button class="tks-btn tks-btn-ghost" onclick="TksMain.closeCreateModal()">Cancelar</button>
+                <button class="tks-btn tks-btn-primary" onclick="TksMain.submitCreate()">
+                    <i class="fas fa-ticket-alt"></i> Crear Ticket
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="shared/js/utilidades.js?v=ASSET_VERSION"></script>
+    <script src="shared/js/admin.js?v=ASSET_VERSION"></script>
+    <script src="static/js/tks_api.js?v=ASSET_VERSION"></script>
+    <script src="static/js/tks_ui.js?v=ASSET_VERSION"></script>
+    <script src="static/js/tks_main.js?v=ASSET_VERSION"></script>
+    <script src="shared/js/sidebar.js?v=ASSET_VERSION"></script>
+</body>
+
+</html>

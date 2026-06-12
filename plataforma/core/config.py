@@ -3,7 +3,7 @@ from typing import List, Dict
 import os
 from pathlib import Path
 
-from core.env_loader import load_runtime_env
+from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 
@@ -39,24 +39,13 @@ class Settings(BaseSettings):
     TICKET_RETENTION_INTERNAL_DAYS: int = 1095
     TICKET_RETENTION_RESTRICTED_DAYS: int = 1825
     CHANNELS_ENABLED: bool = False
-    WHATSAPP_ADAPTER_MODE: str = "disabled"  # disabled | dry_run | live
-    THREECX_ADAPTER_MODE: str = "disabled"  # disabled | dry_run | live
-    WHATSAPP_BASE_URL: str = ""
-    WHATSAPP_AUTH_TOKEN: str = ""
-    WHATSAPP_TIMEOUT_SECONDS: int = 10
-    THREECX_BASE_URL: str = ""
-    THREECX_AUTH_TOKEN: str = ""
-    THREECX_TIMEOUT_SECONDS: int = 10
+    GOOGLE_CHAT_ADAPTER_MODE: str = "disabled"  # disabled | dry_run | live
+    GOOGLE_CHAT_SPACE_WEBHOOK: str = ""
+    GOOGLE_CHAT_BOT_TOKEN: str = ""
+    GOOGLE_CHAT_TIMEOUT_SECONDS: int = 10
     CHANNELS_MAX_ATTEMPTS: int = 3
     CHANNELS_RETRY_BASE_SECONDS: int = 60
     CHANNELS_RETRY_MAX_SECONDS: int = 900
-    JIRA_BASE_URL: str = ""
-    JIRA_USER: str = ""
-    JIRA_API_TOKEN: str = ""
-    JIRA_PROJECT_KEYS: str = ""
-    JIRA_SYNC_ENABLED: bool = False
-    JIRA_SYNC_DAILY_HOUR: int = 3
-    JIRA_SYNC_TZ: str = "America/Santiago"
     TICKET_SLA_MODE: str = "24x7"  # 24x7 | business_hours
     TICKET_SLA_BUSINESS_TZ_OFFSET: str = "-03:00"  # Formato ±HH:MM
     TICKET_SLA_BUSINESS_DAYS: str = "0,1,2,3,4"  # 0=lunes ... 6=domingo
@@ -89,6 +78,7 @@ class Settings(BaseSettings):
         {"id": "fundacion", "label": "Fundación"},
         {"id": "terreneitor", "label": "Terreneitor"},
         {"id": "config", "label": "Configuracion"},
+        {"id": "gta", "label": "GTA"},
     ]
 
     # Mapeo de prefijo de permiso a módulo de UI.
@@ -106,6 +96,7 @@ class Settings(BaseSettings):
         "fundacion": "fundacion",
         "terreneitor": "terreneitor",
         "admin.settings": "config",
+        "gta": "gta",
     }
     
     # Roles permitidos: admin, encargado_mesa, ops, finance, warehouse
@@ -129,8 +120,10 @@ class Settings(BaseSettings):
             "crm:write",
             "audit:read",
             "admin.settings",
-            "zabbix:read", # Permiso añadido para consistencia
-            "ia:read",     # Permiso añadido para consistencia
+            "zabbix:read",
+            "ia:read",
+            "gta:read",
+            "gta:write",
         ],
         "finance": [
             "dashboard:read",
@@ -156,57 +149,40 @@ class Settings(BaseSettings):
             "audit:read",
             "reports:read"
         ],
-        # Fundación
-        "monitora": [
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-            "audit:read"
-        ],
-        "ejecutiva": [
-            "dashboard:read",
-            "fundacion:read"
-        ],
-        "fundacion": [
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-            "audit:read"
-        ],
-        "encargado_la_pintana": [
+        # Fundación — roles según organigrama 2026.
+        # El scope por sede vive en fundacion.sede_membresias (versionado),
+        # NO en el rol. Aquí solo definimos qué puede hacer cada rol.
+        "lider_educativo": [        # antes: encargado_sede / encargado_<sede>
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",
         ],
-        "encargado_maipu": [
+        "gestora_educativa": [      # antes: monitora
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",
+            "audit:read",
         ],
-        "encargado_llay_llay": [
+        # Roles de jefatura del organigrama. Operacionalmente equivalentes a
+        # admin para Fundación; los conservamos como roles separados para
+        # reflejar el organigrama y permitir afinar permisos en el futuro.
+        "directora_social": [
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",
+            "audit:read",
         ],
-        "encargado_huechuraba": [
+        "jefa_pedagogica": [
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",
+            "audit:read",
         ],
-        "encargado_renca": [
+        "coordinadora_territorial": [
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",
-        ],
-        "encargado_lo_espejo": [
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-        ],
-        "encargado_cerro_navia": [
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
+            "audit:read",
         ],
     }
 

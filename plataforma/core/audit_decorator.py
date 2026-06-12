@@ -1,7 +1,7 @@
 from functools import wraps
 from fastapi import Request, BackgroundTasks
 from typing import Callable, Optional
-from core import audit
+from plataforma.core import audit
 
 def audit_action(action_name: str, severity: str = "info", target_extractor: Optional[Callable] = None):
     """

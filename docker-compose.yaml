@@ -1,11 +1,23 @@
-# Contrato canónico DEV/PROD (AGENTS.md §4):
+# Contrato canónico DEV/PROD (plataforma/docs/AGENTS.md §4):
 # - DEV: STACK_NAME=monstruo-dev, POSTGRES_DB=monstruo_dev, ENV_FILE=plataforma/ops/env/.env.server.dev
 # - PROD: STACK_NAME=monstruo, POSTGRES_DB=monstruo, ENV_FILE=plataforma/ops/env/.env.server
 # Reglas no negociables:
 # - Postgres NUNCA publica 5432 al host (solo red interna docker).
 # - Gateway publica 9001, ticketera publica 9005 en ambos entornos.
-# - Adjuntos persisten en plataforma/data_runtime/{tickets,compliance} vía symlink desde data/.
+# - Adjuntos persisten en ticketera/data/{tickets,compliance} (bind mount directo, sin symlinks).
 # - Datos Postgres persisten como bind mount en plataforma/data/postgres (idéntico DEV/PROD).
+#
+# Tabla de puertos fijos:
+#   9001  gateway
+#   9005  ticketera
+#   9006  fundacion
+#   9007  bodega
+#   9008  crm
+#   9009  erp
+#   9010  pmo
+#   9011  ia
+#   9012  gta
+#   9013  zabbix
 
 # Nombre del proyecto fijo: evita que Docker derive el nombre del directorio
 # y cree una red diferente a la esperada (monstruo-dev_default vs monstruo_dev_default).
@@ -22,12 +34,18 @@ services:
     volumes:
       - ./plataforma/data/postgres:/var/lib/postgresql/data
     # NO exponer 5432 al host: la DB solo es accesible por la red interna docker.
+    # Postgres con margen para work_mem, vacuums y conexiones concurrentes.
+    mem_limit: 512m
+    mem_reservation: 128m
     restart: unless-stopped
 
   gateway:
     build:
       context: .
       dockerfile: ./gateway/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-gateway
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -35,13 +53,16 @@ services:
       - "${GATEWAY_PORT:-9001}:9001"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9001
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     volumes:
-      - ./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets
-      - ./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance
+      - ./ticketera/data/tickets:/app/ticketera/data/tickets
+      - ./ticketera/data/compliance:/app/ticketera/data/compliance
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "gateway.backend.main:app", "--host", "0.0.0.0", "--port", "9001" ]
 
@@ -49,6 +70,9 @@ services:
     build:
       context: .
       dockerfile: ./ticketera/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-ticketera
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -56,13 +80,16 @@ services:
       - "${TICKETERA_PORT:-9005}:9005"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9005
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     volumes:
-      - ./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets
-      - ./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance
+      - ./ticketera/data/tickets:/app/ticketera/data/tickets
+      - ./ticketera/data/compliance:/app/ticketera/data/compliance
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
     command: [ "uvicorn", "ticketera.backend.main:app", "--host", "0.0.0.0", "--port", "9005" ]
 
@@ -70,6 +97,9 @@ services:
     build:
       context: .
       dockerfile: ./fundacion/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-fundacion
     env_file:
       - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
@@ -77,9 +107,183 @@ services:
       - "${FUNDACION_PORT:-9006}:9006"
     environment:
       - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - PORT=9006
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+      - FUNDACION_DRIVE_SA_PATH=/run/secrets/monstruo-fundacion-drive.json
+    volumes:
+      - ./plataforma/ops/secrets:/run/secrets:ro
+    depends_on:
+      - db
+    mem_limit: 256m
+    mem_reservation: 96m
+    restart: unless-stopped
+    command: [ "uvicorn", "fundacion.backend.main:app", "--host", "0.0.0.0", "--port", "9006" ]
+
+  bodega:
+    build:
+      context: .
+      dockerfile: ./bodega/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: ${STACK_NAME:-monstruo-dev}-bodega
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${BODEGA_PORT:-9007}:9007"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
+      - PORT=9007
       - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
     depends_on:
       - db
+    mem_limit: 256m
+    mem_reservation: 96m
     restart: unless-stopped
-    command: [ "uvicorn", "fundacion.main:app", "--host", "0.0.0.0", "--port", "9006" ]
+    command: [ "uvicorn", "bodega.backend.main:app", "--host", "0.0.0.0", "--port", "9007" ]
+
+  crm:
+    build:
+      context: .
+      dockerfile: ./crm/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: ${STACK_NAME:-monstruo-dev}-crm
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${CRM_PORT:-9008}:9008"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
+      - PORT=9008
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    mem_limit: 256m
+    mem_reservation: 96m
+    restart: unless-stopped
+    command: [ "uvicorn", "crm.backend.main:app", "--host", "0.0.0.0", "--port", "9008" ]
+
+  erp:
+    build:
+      context: .
+      dockerfile: ./erp/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: ${STACK_NAME:-monstruo-dev}-erp
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${ERP_PORT:-9009}:9009"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
+      - PORT=9009
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    mem_limit: 256m
+    mem_reservation: 96m
+    restart: unless-stopped
+    command: [ "uvicorn", "erp.backend.main:app", "--host", "0.0.0.0", "--port", "9009" ]
+
+  pmo:
+    build:
+      context: .
+      dockerfile: ./pmo/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: ${STACK_NAME:-monstruo-dev}-pmo
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${PMO_PORT:-9010}:9010"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
+      - PORT=9010
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    mem_limit: 256m
+    mem_reservation: 96m
+    restart: unless-stopped
+    command: [ "uvicorn", "pmo.backend.main:app", "--host", "0.0.0.0", "--port", "9010" ]
+
+  ia:
+    build:
+      context: .
+      dockerfile: ./ia/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: ${STACK_NAME:-monstruo-dev}-ia
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${IA_PORT:-9011}:9011"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
+      - PORT=9011
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    mem_limit: 256m
+    mem_reservation: 96m
+    restart: unless-stopped
+    command: [ "uvicorn", "ia.backend.main:app", "--host", "0.0.0.0", "--port", "9011" ]
+
+  gta:
+    build:
+      context: .
+      dockerfile: ./gta/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: ${STACK_NAME:-monstruo-dev}-gta
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${GTA_PORT:-9012}:9012"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
+      - PORT=9012
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    mem_limit: 256m
+    mem_reservation: 96m
+    restart: unless-stopped
+    command: [ "uvicorn", "gta.backend.main:app", "--host", "0.0.0.0", "--port", "9012" ]
+
+  zabbix:
+    build:
+      context: .
+      dockerfile: ./zabbix/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: ${STACK_NAME:-monstruo-dev}-zabbix
+    env_file:
+      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
+    ports:
+      - "${ZABBIX_PORT:-9013}:9013"
+    environment:
+      - PYTHONPATH=/app:/app/plataforma
+      - ASSET_VERSION=${ASSET_VERSION:-}
+      - PORT=9013
+      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
+    depends_on:
+      - db
+    mem_limit: 256m
+    mem_reservation: 96m
+    restart: unless-stopped
+    command: [ "uvicorn", "zabbix.backend.main:app", "--host", "0.0.0.0", "--port", "9013" ]

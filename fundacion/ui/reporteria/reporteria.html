@@ -1,0 +1,178 @@
+<div class="fund-pane" data-pane="reporteria">
+    <div class="fund-pane-head reporteria-head">
+        <div>
+            <h3 id="rep-sede-title">Reportería</h3>
+            <p id="rep-sede-subtitle" class="fund-pane-sub">—</p>
+        </div>
+        <div class="reporteria-actions">
+            <span id="rep-ultimo-sync" class="reporteria-meta">Sin syncs todavía</span>
+            <button id="btn-sync-now" class="btn-primary">
+                <i class="fa-solid fa-rotate"></i> Sincronizar ahora
+            </button>
+        </div>
+    </div>
+
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-val" id="rep-kpi-alumnos">—</div>
+            <div class="kpi-lbl">Alumnos totales</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-val" id="rep-kpi-activos">—</div>
+            <div class="kpi-lbl">Matrícula activa</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-val" id="rep-kpi-asistencia">—</div>
+            <div class="kpi-lbl">% asistencia global</div>
+        </div>
+        <div class="kpi-card kpi-card-warn">
+            <div class="kpi-val" id="rep-kpi-riesgo-alto">—</div>
+            <div class="kpi-lbl">En riesgo alto</div>
+        </div>
+    </div>
+
+    <section class="reporteria-section">
+        <div class="reporteria-section-head">
+            <h4><i class="fa-solid fa-building-columns"></i> Sedes</h4>
+            <span class="reporteria-meta">Datos sincronizados desde las planillas de Drive</span>
+        </div>
+        <div class="reporteria-tabla-wrap">
+            <table class="reporteria-tabla">
+                <thead>
+                    <tr>
+                        <th>Sede</th>
+                        <th class="num">Alumnos</th>
+                        <th class="num">Activos</th>
+                        <th class="num">Cupos</th>
+                        <th class="num">Cobertura</th>
+                        <th class="num">% asistencia</th>
+                    </tr>
+                </thead>
+                <tbody id="rep-tabla-sedes">
+                    <tr><td colspan="6" class="empty-row">Cargando…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Reportes pedagógicos (rango de fechas) -->
+    <section class="reporteria-section">
+        <div class="reporteria-section-head">
+            <h4><i class="fa-solid fa-chart-pie"></i> Reportes pedagógicos</h4>
+            <div class="reporteria-section-actions ped-rango">
+                <label>Desde <input type="date" id="rep-ped-desde" class="input-dark" /></label>
+                <label>Hasta <input type="date" id="rep-ped-hasta" class="input-dark" /></label>
+                <button id="rep-ped-refresh" class="btn-secondary btn-sm">
+                    <i class="fa-solid fa-rotate"></i> Actualizar
+                </button>
+            </div>
+        </div>
+
+        <div class="ped-grid">
+            <details class="ped-card" data-rep="cobertura" open>
+                <summary><i class="fa-solid fa-dice"></i> Cobertura por dimensión</summary>
+                <div class="reporteria-tabla-wrap">
+                    <table class="reporteria-tabla">
+                        <thead>
+                            <tr><th>Bloque</th><th>Subtipo</th><th class="num">Ejecutados</th><th class="num">No ejecutados</th><th class="num">Planificados</th></tr>
+                        </thead>
+                        <tbody id="rep-ped-cobertura"><tr><td colspan="5" class="empty-row">Cargando…</td></tr></tbody>
+                    </table>
+                </div>
+            </details>
+
+            <details class="ped-card" data-rep="competencias">
+                <summary><i class="fa-solid fa-heart"></i> Competencias trabajadas</summary>
+                <div class="reporteria-tabla-wrap">
+                    <table class="reporteria-tabla">
+                        <thead>
+                            <tr><th>Dominio</th><th>Código</th><th>Descripción</th><th class="num">Veces trabajada</th><th class="num">No ejecutada</th></tr>
+                        </thead>
+                        <tbody id="rep-ped-competencias"><tr><td colspan="5" class="empty-row">Cargando…</td></tr></tbody>
+                    </table>
+                </div>
+            </details>
+
+            <details class="ped-card" data-rep="materiales">
+                <summary><i class="fa-solid fa-boxes-stacked"></i> Materiales solicitados vs usados</summary>
+                <div class="reporteria-tabla-wrap">
+                    <table class="reporteria-tabla">
+                        <thead>
+                            <tr><th>Material</th><th>SKU</th><th class="num">Solicitado</th><th class="num">Usado</th><th class="num">Diferencia</th><th class="num">Apariciones</th></tr>
+                        </thead>
+                        <tbody id="rep-ped-materiales"><tr><td colspan="6" class="empty-row">Cargando…</td></tr></tbody>
+                    </table>
+                </div>
+            </details>
+
+            <details class="ped-card" data-rep="adaptaciones">
+                <summary><i class="fa-solid fa-wand-magic-sparkles"></i> Adaptaciones realizadas</summary>
+                <div class="reporteria-tabla-wrap">
+                    <table class="reporteria-tabla">
+                        <thead>
+                            <tr><th>Fecha</th><th>Sede</th><th>Bloque</th><th>Actividad</th><th>Ejecutado</th><th>Detalle</th></tr>
+                        </thead>
+                        <tbody id="rep-ped-adaptaciones"><tr><td colspan="6" class="empty-row">Cargando…</td></tr></tbody>
+                    </table>
+                </div>
+            </details>
+
+            <details class="ped-card" data-rep="clima">
+                <summary><i class="fa-solid fa-cloud-sun"></i> Clima y convivencia</summary>
+                <div class="ped-clima-distrib" id="rep-ped-clima-distrib"></div>
+                <div class="reporteria-tabla-wrap">
+                    <table class="reporteria-tabla">
+                        <thead>
+                            <tr><th>Fecha</th><th>Sede</th><th>Clima</th><th>Situaciones</th><th>Estrategias</th></tr>
+                        </thead>
+                        <tbody id="rep-ped-clima"><tr><td colspan="5" class="empty-row">Cargando…</td></tr></tbody>
+                    </table>
+                </div>
+            </details>
+
+            <details class="ped-card" data-rep="actividad">
+                <summary><i class="fa-solid fa-chart-line"></i> Actividad por mes</summary>
+                <div class="reporteria-tabla-wrap">
+                    <table class="reporteria-tabla">
+                        <thead>
+                            <tr><th>Sede</th><th>Año</th><th>Mes</th><th class="num">Planificados</th><th class="num">Ejecutados</th><th class="num">% ejecución</th></tr>
+                        </thead>
+                        <tbody id="rep-ped-actividad"><tr><td colspan="6" class="empty-row">Cargando…</td></tr></tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+    </section>
+
+    <section class="reporteria-section">
+        <div class="reporteria-section-head">
+            <h4><i class="fa-solid fa-triangle-exclamation"></i> Alumnos por nivel de riesgo</h4>
+            <div class="reporteria-section-actions">
+                <select id="rep-filtro-riesgo" class="input-dark">
+                    <option value="alto" selected>Riesgo alto (&lt;50%)</option>
+                    <option value="medio">Riesgo medio (50–75%)</option>
+                    <option value="bajo">Riesgo bajo (≥75%)</option>
+                    <option value="sin_datos">Sin datos</option>
+                </select>
+            </div>
+        </div>
+        <div class="reporteria-tabla-wrap">
+            <table class="reporteria-tabla">
+                <thead>
+                    <tr>
+                        <th>Sede</th>
+                        <th>Alumno</th>
+                        <th>Curso</th>
+                        <th>Plan</th>
+                        <th>Gestora</th>
+                        <th class="num">% asist.</th>
+                        <th class="num">P / contables</th>
+                    </tr>
+                </thead>
+                <tbody id="rep-tabla-riesgo">
+                    <tr><td colspan="7" class="empty-row">Cargando…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

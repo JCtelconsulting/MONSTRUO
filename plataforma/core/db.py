@@ -1,3 +1,4 @@
+import logging
 import os
 import hmac
 import hashlib
@@ -8,15 +9,23 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 try:
     import psycopg
     from psycopg.rows import dict_row
-
     _HAVE_PSYCOPG3 = True
 except Exception:
     psycopg = None
     dict_row = None
     _HAVE_PSYCOPG3 = False
+
+try:
+    from psycopg_pool import ConnectionPool as _PsycopgPool
+    _HAVE_POOL = True
+except Exception:
+    _PsycopgPool = None
+    _HAVE_POOL = False
 
 try:
     import psycopg2
@@ -28,7 +37,9 @@ except Exception:
     RealDictCursor = None
     _HAVE_PSYCOPG2 = False
 
-from core.env_loader import load_runtime_env
+_pool: "object | None" = None  # ConnectionPool instance when available
+
+from plataforma.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 
@@ -82,9 +93,10 @@ def _convert_sql_for_postgres(sql: str) -> str:
 
 
 class PgConn:
-    def __init__(self, conn, use_psycopg3: bool):
+    def __init__(self, conn, use_psycopg3: bool, pool=None):
         self._conn = conn
         self._use_psycopg3 = use_psycopg3
+        self._pool = pool  # si viene del pool, close() lo devuelve en lugar de cerrarlo
 
     def execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None):
         sql = _convert_sql_for_postgres(sql)
@@ -94,6 +106,23 @@ class PgConn:
         cur.execute(sql, params or ())
         return cur
 
+    def execute_script(self, sql: str):
+        """Ejecuta SQL literal sin parsear placeholders.
+
+        Para archivos de migración con LIKE '%"x"%' o cualquier otro `%`
+        que no sea un placeholder real. psycopg3 al recibir un argumento
+        `params` (incluso `()`) parsea la query y aborta con `only '%s',
+        '%b', '%t' are allowed as placeholders, got '%"'`. Llamando a
+        `_conn.execute(sql)` SIN segundo argumento, psycopg3 trata el
+        SQL como literal y no toca los `%`.
+        """
+        sql = _convert_sql_for_postgres(sql)
+        if self._use_psycopg3:
+            return self._conn.execute(sql)
+        cur = self._conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(sql)
+        return cur
+
     def commit(self):
         self._conn.commit()
 
@@ -101,7 +130,43 @@ class PgConn:
         self._conn.rollback()
 
     def close(self):
-        self._conn.close()
+        if self._pool is not None:
+            self._pool.putconn(self._conn)
+        else:
+            self._conn.close()
+
+
+def init_pool() -> None:
+    """
+    Inicializa el connection pool global (psycopg3 + psycopg-pool).
+    Llamar una vez en el startup de la app. Sin pool, get_conn() abre
+    conexiones directas como antes — comportamiento degradado pero funcional.
+    """
+    global _pool
+    if not _HAVE_PSYCOPG3 or not _HAVE_POOL:
+        logger.warning("[DB] psycopg_pool no disponible — operando sin pool (conexiones directas)")
+        return
+    if _pool is not None:
+        return
+
+    db_url = os.getenv("DB_URL", "").strip()
+    if not (db_url.startswith("postgres://") or db_url.startswith("postgresql://")):
+        return
+
+    min_size = int(os.getenv("DB_POOL_MIN", "2"))
+    max_size = int(os.getenv("DB_POOL_MAX", "10"))
+    try:
+        _pool = _PsycopgPool(
+            db_url,
+            min_size=min_size,
+            max_size=max_size,
+            kwargs={"row_factory": dict_row},
+            open=True,
+        )
+        logger.info("[DB] Connection pool iniciado min=%d max=%d", min_size, max_size)
+    except Exception as e:
+        logger.error("[DB] No se pudo iniciar pool: %s — operando sin pool", e)
+        _pool = None
 
 
 def get_conn():
@@ -110,6 +175,13 @@ def get_conn():
         raise RuntimeError(
             f"CRITICAL: PostgreSQL is required. Check DB_URL environment variable ({'empty' if not db_url else 'invalid'}). SQLite fallback has been disabled for safety."
         )
+
+    # Usar pool si está disponible
+    if _pool is not None:
+        conn = _pool.getconn()
+        pg_conn = PgConn(conn, use_psycopg3=True, pool=_pool)
+        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, pmo, ia, ops, fundacion, public;")
+        return pg_conn
 
     if _HAVE_PSYCOPG3:
         conn = psycopg.connect(db_url, row_factory=dict_row)
@@ -240,10 +312,11 @@ def _run_guarded_pg_section(conn, section_name: str, fn) -> None:
             conn.execute(f"RELEASE SAVEPOINT {sp_name}")
         except Exception:
             pass
-        print(f"[DB-MIGRATION] WARN {section_name}: {e}")
+        logger.warning("[DB-MIGRATION] WARN %s: %s", section_name, e)
 
 
 def init_db() -> None:
+    init_pool()
     conn = get_conn()
     try:
         for schema_name in (
@@ -258,6 +331,7 @@ def init_db() -> None:
             "ia",
             "ops",
             "fundacion",
+            "gta",
         ):
             conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name};")
 
@@ -538,7 +612,7 @@ def init_db() -> None:
                 (now_jobs,),
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN prune duplicados sys_jobs: {_e}")
+            logger.warning("[DB-MIGRATION] WARN prune duplicados sys_jobs: %s", _e)
         # Dedupe fuerte para recurrentes de alta frecuencia.
         try:
             conn.execute(
@@ -554,7 +628,7 @@ def init_db() -> None:
                      AND status IN ('PENDING', 'RETRY')"""
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN índices únicos recurrentes sys_jobs: {_e}")
+            logger.warning("[DB-MIGRATION] WARN índices únicos recurrentes sys_jobs: %s", _e)
 
         # Ticketera (EPIC 11)
         conn.execute("""
@@ -629,7 +703,7 @@ def init_db() -> None:
         try:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_attach_sha256 ON tks.ticket_attachments(sha256);")
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN índice idx_attach_sha256: {_e}")
+            logger.warning("[DB-MIGRATION] WARN índice idx_attach_sha256: %s", _e)
 
         # --- Ticketera V3: Columnas extras en tickets (migración individual) ---
         _v3_columns = [
@@ -673,10 +747,10 @@ def init_db() -> None:
                     if is_critical:
                         # FAIL-FAST: Si es columna crítica para V3, no permitir arranque a medias
                         err_msg = f"[DB-MIGRATION] CRITICAL ERROR: No se pudo crear columna '{col_name}' necesaria para V3. Detalle: {_e}"
-                        print(err_msg)
+                        logger.error("%s", err_msg)
                         raise RuntimeError(err_msg) from _e
                     else:
-                        print(f"[DB-MIGRATION] WARN columna '{col_name}' ya existe o no se pudo crear: {_e}")
+                        logger.warning("[DB-MIGRATION] WARN columna '%s' ya existe o no se pudo crear: %s", col_name, _e)
 
         _run_guarded_pg_section(conn, "migrate_tickets_v3", _migrate_tickets_v3_section)
 
@@ -707,7 +781,7 @@ def init_db() -> None:
             try:
                 conn.execute(idx_sql)
             except Exception as _e:
-                print(f"[DB-MIGRATION] WARN índice: {_e}")
+                logger.warning("[DB-MIGRATION] WARN índice: %s", _e)
 
         # --- Backfill de columnas Workflow/SLA para registros existentes ---
         try:
@@ -762,7 +836,7 @@ def init_db() -> None:
                    WHERE frt_due_at IS NULL"""
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN backfill workflow/sla: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill workflow/sla: %s", _e)
 
         # --- Backfill papelera ---
         try:
@@ -773,7 +847,7 @@ def init_db() -> None:
                 "UPDATE tickets SET trash_reason = '' WHERE trash_reason IS NULL"
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN backfill papelera: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill papelera: %s", _e)
 
         # --- Backfill retención por clase de seguridad ---
         try:
@@ -800,7 +874,7 @@ def init_db() -> None:
                       AND retention_until IS NULL"""
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN backfill retention: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill retention: %s", _e)
 
         # --- Ticketera V3: Especialidades de Usuarios ---
         conn.execute("""
@@ -899,7 +973,7 @@ def init_db() -> None:
                     WHERE provider IS NULL OR attempt_count IS NULL"""
             )
         except Exception as _e:
-            print(f"[DB-MIGRATION] WARN backfill ticket_notifications: {_e}")
+            logger.warning("[DB-MIGRATION] WARN backfill ticket_notifications: %s", _e)
 
         # --- PMO (Proyectos y Bitacora) ---
         conn.execute("""
@@ -1325,7 +1399,7 @@ def init_db() -> None:
             audit_has_triggers = _has_append_only_triggers(conn, "audit_logs")
             audit_consistent = _chain_table_is_consistent(conn, "audit_logs", audit_payload_fields)
             if not audit_consistent:
-                print("[DB-MIGRATION] WARN audit_logs chain inconsistente; se forzará re-backfill.")
+                logger.warning("[DB-MIGRATION] WARN audit_logs chain inconsistente; se forzará re-backfill.")
                 if audit_has_triggers:
                     _drop_append_only_triggers(conn, "audit_logs")
                 _backfill_chain_table(
@@ -1334,7 +1408,7 @@ def init_db() -> None:
                     audit_payload_fields,
                 )
             elif audit_has_triggers:
-                print("[DB-MIGRATION] INFO skip hash-chain backfill audit_logs (append-only activo y consistente)")
+                logger.info("[DB-MIGRATION] INFO skip hash-chain backfill audit_logs (append-only activo y consistente)")
             else:
                 _backfill_chain_table(
                     conn,
@@ -1345,7 +1419,7 @@ def init_db() -> None:
             evidence_has_triggers = _has_append_only_triggers(conn, "evidence_events")
             evidence_consistent = _chain_table_is_consistent(conn, "evidence_events", evidence_payload_fields)
             if not evidence_consistent:
-                print("[DB-MIGRATION] WARN evidence_events chain inconsistente; se forzará re-backfill.")
+                logger.warning("[DB-MIGRATION] WARN evidence_events chain inconsistente; se forzará re-backfill.")
                 if evidence_has_triggers:
                     _drop_append_only_triggers(conn, "evidence_events")
                 _backfill_chain_table(
@@ -1354,7 +1428,7 @@ def init_db() -> None:
                     evidence_payload_fields,
                 )
             elif evidence_has_triggers:
-                print("[DB-MIGRATION] INFO skip hash-chain backfill evidence_events (append-only activo y consistente)")
+                logger.info("[DB-MIGRATION] INFO skip hash-chain backfill evidence_events (append-only activo y consistente)")
             else:
                 _backfill_chain_table(
                     conn,
@@ -1372,127 +1446,6 @@ def init_db() -> None:
                 _create_append_only_triggers(conn, "audit_logs"),
                 _create_append_only_triggers(conn, "evidence_events"),
             ),
-        )
-
-        # --- Importaciones Jira para trazabilidad de migración ---
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops.jira_import_runs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            imported_by TEXT NOT NULL,
-            payload_json TEXT NOT NULL DEFAULT '{}',
-            result_json TEXT NOT NULL DEFAULT '{}',
-            created_at TEXT NOT NULL
-        );
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_import_runs_created ON ops.jira_import_runs(created_at);"
-        )
-
-        # --- Paralelo Jira + MONSTRUO ---
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops.jira_issue_map (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            jira_issue_key TEXT NOT NULL UNIQUE,
-            jira_updated_at TEXT NOT NULL,
-            monstruo_ticket_id INTEGER NOT NULL,
-            sync_status TEXT NOT NULL DEFAULT 'synced',
-            last_sync_at TEXT NOT NULL,
-            last_error TEXT DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY(monstruo_ticket_id) REFERENCES tickets(id)
-        );
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_ticket ON ops.jira_issue_map(monstruo_ticket_id);"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_status ON ops.jira_issue_map(sync_status);"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_key_updated ON ops.jira_issue_map(jira_issue_key, jira_updated_at);"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_issue_map_sync_at ON ops.jira_issue_map(last_sync_at);"
-        )
-
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops.jira_sync_runs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            run_type TEXT NOT NULL, -- bootstrap | delta
-            actor TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'running', -- running | completed | failed | completed_with_errors
-            context_json TEXT NOT NULL DEFAULT '{}',
-            counts_json TEXT NOT NULL DEFAULT '{}',
-            error_summary TEXT DEFAULT '',
-            cursor_before TEXT DEFAULT '',
-            cursor_after TEXT DEFAULT '',
-            started_at TEXT NOT NULL,
-            ended_at TEXT,
-            created_at TEXT NOT NULL
-        );
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_type_started ON ops.jira_sync_runs(run_type, started_at);"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_status ON ops.jira_sync_runs(status);"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_sync_runs_created ON ops.jira_sync_runs(created_at);"
-        )
-
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops.jira_sync_cursor (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cursor_name TEXT NOT NULL UNIQUE,
-            cursor_value TEXT NOT NULL DEFAULT '',
-            updated_at TEXT NOT NULL
-        );
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jira_sync_cursor_name ON ops.jira_sync_cursor(cursor_name);"
-        )
-
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops.parallel_kpi_daily (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            snapshot_date TEXT NOT NULL UNIQUE,
-            source TEXT NOT NULL DEFAULT 'parallel_daily',
-            total_jira_open INTEGER NOT NULL DEFAULT 0,
-            total_monstruo_open INTEGER NOT NULL DEFAULT 0,
-            sev1_open INTEGER NOT NULL DEFAULT 0,
-            sla_compliance_pct REAL NOT NULL DEFAULT 0,
-            mismatch_count INTEGER NOT NULL DEFAULT 0,
-            duplicate_count INTEGER NOT NULL DEFAULT 0,
-            failed_sync_runs INTEGER NOT NULL DEFAULT 0,
-            details_json TEXT NOT NULL DEFAULT '{}',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        );
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_parallel_kpi_date ON ops.parallel_kpi_daily(snapshot_date);"
-        )
-
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS ops.parallel_decisions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            decision TEXT NOT NULL, -- go | no_go
-            decided_at TEXT NOT NULL,
-            decided_by TEXT NOT NULL,
-            signers_json TEXT NOT NULL DEFAULT '[]',
-            rationale TEXT NOT NULL DEFAULT '',
-            evidence_refs_json TEXT NOT NULL DEFAULT '[]',
-            metrics_json TEXT NOT NULL DEFAULT '{}',
-            created_at TEXT NOT NULL
-        );
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_parallel_decisions_at ON ops.parallel_decisions(decided_at);"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_parallel_decisions_decision ON ops.parallel_decisions(decision);"
         )
 
         # Sales ERP (EPIC 05)
@@ -2309,14 +2262,488 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_fundacion", _migrate_fundacion_section)
 
+        def _migrate_gta_section() -> None:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.tareas (
+                id          SERIAL PRIMARY KEY,
+                titulo      TEXT NOT NULL,
+                descripcion TEXT,
+                fecha_inicio TIMESTAMP NOT NULL,
+                fecha_fin    TIMESTAMP,
+                asignado_a   TEXT,
+                creado_by    TEXT,
+                prioridad    TEXT DEFAULT 'media',   -- baja, media, alta
+                tipo         TEXT,
+                estado       TEXT DEFAULT 'pendiente', -- pendiente, en_progreso, completado, bloqueado, cancelado
+                tags         TEXT DEFAULT '[]',
+                reporte      TEXT,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.comentarios (
+                id        SERIAL PRIMARY KEY,
+                tarea_id  INTEGER NOT NULL REFERENCES gta.tareas(id) ON DELETE CASCADE,
+                autor     TEXT NOT NULL,
+                texto     TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_tareas_estado    ON gta.tareas(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_tareas_asignado  ON gta.tareas(asignado_a);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_tareas_fecha     ON gta.tareas(fecha_inicio);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_comentarios_tarea ON gta.comentarios(tarea_id);")
+
+        _run_guarded_pg_section(conn, "migrate_gta", _migrate_gta_section)
+
+        def _migrate_gta_v2_section() -> None:
+            # Catálogo de procesos
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.procesos (
+                id                SERIAL PRIMARY KEY,
+                nombre            TEXT NOT NULL,
+                area              TEXT NOT NULL,
+                descripcion       TEXT,
+                sla_horas         INTEGER,
+                icono             TEXT,
+                pasos_definicion  TEXT DEFAULT '[]',   -- JSON: ["paso 1", "paso 2"]
+                campos_formulario TEXT DEFAULT '[]',   -- JSON: [{"key":"x","label":"X","type":"text"}]
+                estado            TEXT DEFAULT 'activo',
+                creado_por        TEXT,
+                created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Solicitudes enlazadas a procesos
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.solicitudes (
+                id           SERIAL PRIMARY KEY,
+                proceso_id   INTEGER REFERENCES gta.procesos(id) ON DELETE SET NULL,
+                titulo       TEXT NOT NULL,
+                descripcion  TEXT,
+                area         TEXT NOT NULL,
+                prioridad    TEXT DEFAULT 'media',      -- baja, media, alta
+                estado       TEXT DEFAULT 'pendiente',  -- pendiente, en_progreso, completado, bloqueado, cancelado
+                creado_por   TEXT,
+                asignado_a   TEXT,
+                pasos_estado TEXT DEFAULT '[]',         -- JSON: [{"completado":false,"bloqueado":false}]
+                campos_extra TEXT DEFAULT '{}',         -- JSON con valores de campos_formulario
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Quiebres de proceso
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.quiebres (
+                id               SERIAL PRIMARY KEY,
+                descripcion      TEXT NOT NULL,
+                area             TEXT NOT NULL,
+                tipo             TEXT DEFAULT 'sin_proceso',  -- sin_proceso, paso_bloqueado, sla_vencido
+                solicitud_id     INTEGER REFERENCES gta.solicitudes(id) ON DELETE SET NULL,
+                reportado_por    TEXT,
+                estado           TEXT DEFAULT 'abierto',      -- abierto, resuelto
+                nota_resolucion  TEXT,
+                resuelto_por     TEXT,
+                resuelto_at      TIMESTAMP,
+                created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Comentarios de solicitudes
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.comentarios_solicitudes (
+                id           SERIAL PRIMARY KEY,
+                solicitud_id INTEGER NOT NULL REFERENCES gta.solicitudes(id) ON DELETE CASCADE,
+                autor        TEXT NOT NULL,
+                texto        TEXT NOT NULL,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_procesos_area      ON gta.procesos(area);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_procesos_estado    ON gta.procesos(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_solicitudes_estado ON gta.solicitudes(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_solicitudes_area   ON gta.solicitudes(area);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_solicitudes_proc   ON gta.solicitudes(proceso_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_quiebres_estado    ON gta.quiebres(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_comentarios_sol    ON gta.comentarios_solicitudes(solicitud_id);")
+
+        _run_guarded_pg_section(conn, "migrate_gta_v2", _migrate_gta_v2_section)
+
+        def _migrate_gta_areas_section() -> None:
+            # Áreas (12 áreas operativas + contabilidad externa)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.areas (
+                id           SERIAL PRIMARY KEY,
+                code         TEXT NOT NULL UNIQUE,
+                label        TEXT NOT NULL,
+                lider_username TEXT DEFAULT '',
+                lider_nombre   TEXT DEFAULT '',
+                es_externa     BOOLEAN NOT NULL DEFAULT FALSE,
+                activo         BOOLEAN NOT NULL DEFAULT TRUE,
+                orden          INTEGER NOT NULL DEFAULT 99,
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Subáreas: una subárea apunta a un área padre. Mismo líder por defecto.
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.subareas (
+                id              SERIAL PRIMARY KEY,
+                area_code       TEXT NOT NULL REFERENCES gta.areas(code) ON UPDATE CASCADE ON DELETE CASCADE,
+                code            TEXT NOT NULL,
+                label           TEXT NOT NULL,
+                lider_username  TEXT DEFAULT '',
+                lider_nombre    TEXT DEFAULT '',
+                activo          BOOLEAN NOT NULL DEFAULT TRUE,
+                orden           INTEGER NOT NULL DEFAULT 99,
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(area_code, code)
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_areas_activo    ON gta.areas(activo);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_subareas_area   ON gta.subareas(area_code);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_subareas_activo ON gta.subareas(activo);")
+
+            # Seed de las áreas si la tabla está vacía
+            existing = conn.execute("SELECT COUNT(*) AS c FROM gta.areas").fetchone()
+            if int((existing or {}).get("c") or 0) == 0:
+                seed_areas = [
+                    ("comercial",         "Comercial",         "brayan.fuentes",   "Brayan Fuentes",   False, 10),
+                    ("preventa",          "Preventa",          "",                 "Elso",             False, 20),
+                    ("redes",             "Redes",             "fabian.correa",    "Fabián Correa",    False, 30),
+                    ("sistemas",          "Sistemas",          "lukas.moyano",     "Lukas Moyano",     False, 40),
+                    ("proveedores",       "Proveedores",       "",                 "Jonhson",          False, 50),
+                    ("finanzas",          "Finanzas",          "",                 "Tania",            False, 60),
+                    ("bodega",            "Bodega",            "",                 "",                 False, 70),
+                    ("capital_humano",    "Capital Humano",    "",                 "Cristian Peña",    False, 80),
+                    ("pmo",               "PMO",               "francisco.cea",    "Francisco Cea",    False, 90),
+                    ("prevencion_riesgos","Prevención de Riesgos", "",             "(externa)",        True,  100),
+                    ("contabilidad",      "Contabilidad",      "",                 "(externa)",        True,  110),
+                ]
+                for code, label, lider_user, lider_nombre, externa, orden in seed_areas:
+                    conn.execute(
+                        """INSERT INTO gta.areas
+                           (code, label, lider_username, lider_nombre, es_externa, activo, orden)
+                           VALUES (%s, %s, %s, %s, %s, TRUE, %s)
+                           ON CONFLICT (code) DO NOTHING""",
+                        (code, label, lider_user, lider_nombre, externa, orden),
+                    )
+
+                seed_subareas = [
+                    ("comercial",      "ventas",              "Ventas",                  10),
+                    ("comercial",      "postventa",           "Postventa",               20),
+                    ("redes",          "infraestructura",     "Infraestructura",         10),
+                    ("redes",          "acceso",              "Redes de Acceso",         20),
+                    ("redes",          "mesa_ayuda",          "Mesa de Ayuda",           30),
+                    ("redes",          "soporte",             "Soporte",                 40),
+                    ("redes",          "ciberseguridad",      "Ciberseguridad",          50),
+                    ("sistemas",       "ia",                  "IA",                      10),
+                    ("proveedores",    "compras",             "Compras",                 10),
+                    ("finanzas",       "facturacion",         "Facturación",             10),
+                    ("finanzas",       "cobranzas",           "Cobranzas",               20),
+                    ("capital_humano", "contratacion",        "Contratación",            10),
+                    ("capital_humano", "desvinculacion",      "Desvinculación",          20),
+                    ("pmo",            "proyectos",           "Gestión de Proyectos",    10),
+                    ("pmo",            "instalaciones",       "Instalaciones",           20),
+                    ("pmo",            "gestion_documental",  "Gestión Documental",      30),
+                ]
+                for area_code, code, label, orden in seed_subareas:
+                    conn.execute(
+                        """INSERT INTO gta.subareas
+                           (area_code, code, label, activo, orden)
+                           VALUES (%s, %s, %s, TRUE, %s)
+                           ON CONFLICT (area_code, code) DO NOTHING""",
+                        (area_code, code, label, orden),
+                    )
+
+        _run_guarded_pg_section(conn, "migrate_gta_areas", _migrate_gta_areas_section)
+
+        def _migrate_gta_procesos_fix_section() -> None:
+            # Asegura columnas faltantes en gta.procesos cuando la tabla
+            # se creó parcial en una migración anterior (CREATE IF NOT EXISTS
+            # no agrega columnas nuevas a una tabla preexistente).
+            for col_def in (
+                "descripcion       TEXT",
+                "sla_horas         INTEGER",
+                "icono             TEXT",
+                "pasos_definicion  TEXT DEFAULT '[]'",
+                "campos_formulario TEXT DEFAULT '[]'",
+                "creado_por        TEXT",
+                "updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            ):
+                conn.execute(
+                    f"ALTER TABLE gta.procesos ADD COLUMN IF NOT EXISTS {col_def}"
+                )
+
+        _run_guarded_pg_section(conn, "migrate_gta_procesos_fix", _migrate_gta_procesos_fix_section)
+
+        def _migrate_gta_flujos_section() -> None:
+            # Settings globales del GTA (jefe que recibe escalamientos, umbrales SLA, etc.)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.settings (
+                key        TEXT PRIMARY KEY,
+                value      TEXT NOT NULL DEFAULT '',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # Seed básico
+            for k, v in (
+                ("jefe_username", "diego@telconsulting.cl"),
+                ("sla_warn_pct", "70"),
+                ("sla_critical_pct", "85"),
+                ("sla_check_interval_min", "10"),
+            ):
+                conn.execute(
+                    "INSERT INTO gta.settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING",
+                    (k, v),
+                )
+
+            # Instancia de flujo (un cierre de negocio puntual, una solicitud activa)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.flujos (
+                id                 SERIAL PRIMARY KEY,
+                proceso_id         INTEGER REFERENCES gta.procesos(id) ON DELETE SET NULL,
+                titulo             TEXT NOT NULL,
+                descripcion        TEXT,
+                iniciado_por       TEXT NOT NULL,
+                estado             TEXT NOT NULL DEFAULT 'borrador',
+                datos_formulario   TEXT NOT NULL DEFAULT '{}',
+                sla_horas_total    INTEGER,
+                iniciado_at        TIMESTAMP,
+                completado_at      TIMESTAMP,
+                created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # estados válidos: borrador, activo, completado, cancelado, vencido
+
+            # Tareas dentro del flujo (una por área que participa)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.flujo_tareas (
+                id                       SERIAL PRIMARY KEY,
+                flujo_id                 INTEGER NOT NULL REFERENCES gta.flujos(id) ON DELETE CASCADE,
+                orden                    INTEGER NOT NULL DEFAULT 1,
+                area_code                TEXT NOT NULL,
+                subarea_code             TEXT,
+                asignado_a               TEXT,
+                titulo                   TEXT NOT NULL,
+                descripcion              TEXT,
+                campos_requeridos        TEXT NOT NULL DEFAULT '[]',
+                campos_completados       TEXT NOT NULL DEFAULT '{}',
+                depende_de               TEXT NOT NULL DEFAULT '[]',
+                sla_horas                INTEGER NOT NULL DEFAULT 24,
+                estado                   TEXT NOT NULL DEFAULT 'pendiente',
+                inicio_at                TIMESTAMP,
+                ejecutor_completo_at     TIMESTAMP,
+                ejecutor_completo_por    TEXT,
+                validado_at              TIMESTAMP,
+                validado_por             TEXT,
+                sla_paused_minutes       INTEGER NOT NULL DEFAULT 0,
+                sla_pause_started_at     TIMESTAMP,
+                last_sla_warn_pct        INTEGER NOT NULL DEFAULT 0,
+                created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # estados válidos: pendiente, lista, en_progreso, por_validar, completada,
+            # ayuda_pedida, vencida, cancelada
+
+            # Pedidos de ayuda entre áreas
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.flujo_ayudas (
+                id                 SERIAL PRIMARY KEY,
+                tarea_id           INTEGER NOT NULL REFERENCES gta.flujo_tareas(id) ON DELETE CASCADE,
+                pedido_por         TEXT NOT NULL,
+                pedido_a_area      TEXT NOT NULL,
+                pedido_a_user      TEXT,
+                mensaje            TEXT NOT NULL,
+                bloquea_sla        BOOLEAN NOT NULL DEFAULT FALSE,
+                estado             TEXT NOT NULL DEFAULT 'abierto',
+                respondido_por     TEXT,
+                respuesta          TEXT,
+                respondido_at      TIMESTAMP,
+                created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Timeline auditable de eventos del flujo
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.flujo_eventos (
+                id           SERIAL PRIMARY KEY,
+                flujo_id     INTEGER NOT NULL REFERENCES gta.flujos(id) ON DELETE CASCADE,
+                tarea_id     INTEGER REFERENCES gta.flujo_tareas(id) ON DELETE SET NULL,
+                tipo         TEXT NOT NULL,
+                actor        TEXT,
+                mensaje      TEXT,
+                metadata     TEXT NOT NULL DEFAULT '{}',
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Índices
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_flujos_estado       ON gta.flujos(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_flujos_iniciado_por ON gta.flujos(iniciado_por);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_flujos_proceso      ON gta.flujos(proceso_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_ftareas_flujo       ON gta.flujo_tareas(flujo_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_ftareas_estado      ON gta.flujo_tareas(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_ftareas_area        ON gta.flujo_tareas(area_code);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_ftareas_asignado    ON gta.flujo_tareas(asignado_a);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_fayudas_tarea       ON gta.flujo_ayudas(tarea_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_fayudas_estado      ON gta.flujo_ayudas(estado);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_feventos_flujo      ON gta.flujo_eventos(flujo_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_feventos_tarea      ON gta.flujo_eventos(tarea_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_feventos_tipo       ON gta.flujo_eventos(tipo);")
+
+        _run_guarded_pg_section(conn, "migrate_gta_flujos", _migrate_gta_flujos_section)
+
+        def _migrate_gta_procesos_unificacion_section() -> None:
+            # Columnas adicionales en gta.procesos para unificar con archivos descargados
+            for col_def in (
+                "archivo_path  TEXT",
+                "subarea_code  TEXT",
+                "version       INTEGER NOT NULL DEFAULT 1",
+            ):
+                conn.execute(f"ALTER TABLE gta.procesos ADD COLUMN IF NOT EXISTS {col_def}")
+
+            # Vincular quiebres a procesos (no solo a solicitudes/flujos)
+            conn.execute("ALTER TABLE gta.quiebres ADD COLUMN IF NOT EXISTS proceso_id INTEGER")
+
+            # Comentarios / decisiones / cambios sobre el proceso (audit trail)
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS gta.proceso_comentarios (
+                id          SERIAL PRIMARY KEY,
+                proceso_id  INTEGER NOT NULL REFERENCES gta.procesos(id) ON DELETE CASCADE,
+                autor       TEXT NOT NULL,
+                texto       TEXT NOT NULL,
+                tipo        TEXT NOT NULL DEFAULT 'nota',
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            # tipo: nota | cambio | decision
+
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_procesos_archivo  ON gta.procesos(archivo_path);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_quiebres_proceso  ON gta.quiebres(proceso_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_gta_pcomentarios_proc ON gta.proceso_comentarios(proceso_id);")
+
+        _run_guarded_pg_section(conn, "migrate_gta_procesos_unif", _migrate_gta_procesos_unificacion_section)
+
+        def _migrate_sys_notifications_section() -> None:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS core.sys_notifications (
+                id         SERIAL PRIMARY KEY,
+                user_id    TEXT NOT NULL,
+                message    TEXT NOT NULL,
+                severity   TEXT NOT NULL DEFAULT 'INFO',
+                read       BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TEXT NOT NULL DEFAULT ''
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sys_notif_user   ON core.sys_notifications(user_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sys_notif_read   ON core.sys_notifications(read);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sys_notif_ts     ON core.sys_notifications(created_at DESC);")
+
+        _run_guarded_pg_section(conn, "migrate_sys_notifications", _migrate_sys_notifications_section)
+
+        def _migrate_sys_role_permissions_section() -> None:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS core.sys_role_permissions (
+                id          SERIAL PRIMARY KEY,
+                role        TEXT NOT NULL,
+                permission  TEXT NOT NULL,
+                label       TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                updated_at  TEXT NOT NULL DEFAULT '',
+                UNIQUE(role, permission)
+            );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_role_perms_role ON core.sys_role_permissions(role);")
+            # Seed from config.py defaults if table is empty
+            count = conn.execute("SELECT COUNT(*) AS n FROM core.sys_role_permissions").fetchone()
+            if count and int(count["n"]) == 0:
+                try:
+                    from plataforma.core.config import settings as _s
+                    now = now_utc_iso()
+                    _PERM_LABELS = {
+                        "*": "Acceso total del sistema",
+                        "dashboard:read": "Dashboard: lectura",
+                        "tickets:read": "Ticketera: lectura",
+                        "tickets:write": "Ticketera: gestión operativa",
+                        "tickets:compliance": "Ticketera: compliance y evidencias",
+                        "audit:read": "Auditoría: lectura",
+                        "audit:export": "Auditoría: exportación",
+                        "invoice:read": "Facturación: lectura",
+                        "invoice:sync": "Facturación: sincronización",
+                        "invoice:write": "Facturación: edición",
+                        "invoice:void": "Facturación: anulación",
+                        "payment:write": "Pagos: gestión",
+                        "crm:read": "CRM: lectura",
+                        "crm:write": "CRM: edición",
+                        "bodega:read": "Bodega: lectura",
+                        "bodega:write": "Bodega: edición",
+                        "pmo:read": "PMO: lectura",
+                        "pmo:write": "PMO: edición",
+                        "finanzas:read": "Finanzas: lectura",
+                        "reports:read": "Reportes: lectura",
+                        "fundacion:read": "Fundación: lectura",
+                        "fundacion:write": "Fundación: escritura",
+                        "admin.settings": "Configuración administrativa",
+                        "zabbix:read": "Zabbix: lectura",
+                        "ia:read": "IA: lectura",
+                        "gta:read": "GTA: lectura",
+                        "gta:write": "GTA: gestión",
+                    }
+                    _ROLE_DESCS = {
+                        # Monstruo
+                        "admin": "Control total de plataforma, seguridad y configuración global.",
+                        "encargado_mesa": "Gestiona flujo de ticketera, asignación, seguimiento y cumplimiento.",
+                        "ops": "Operación técnica transversal para atención y despacho de tickets.",
+                        "redes": "Ejecución técnica en networking e incidencias de conectividad.",
+                        "sistemas": "Ejecución técnica en servidores, plataformas y sistemas.",
+                        "implementaciones": "Ejecución de despliegues/proyectos con alcance técnico.",
+                        "finance": "Gestión financiera y cobranza con foco contable.",
+                        "warehouse": "Gestión operativa de inventario y movimientos de bodega.",
+                        "gerencia": "Visión ejecutiva y lectura de indicadores/estado operacional.",
+                        # Fundación (organigrama 2026)
+                        "directora_social": "Dirección estratégica de la Fundación (super-scope a sedes).",
+                        "jefa_pedagogica": "Lidera la línea pedagógica de la Fundación (super-scope a sedes).",
+                        "coordinadora_territorial": "Coordina territorialmente las sedes (super-scope a sedes).",
+                        "lider_educativo": "Responsable de una o más sedes; el alcance lo define la membresía.",
+                        "gestora_educativa": "Operación educativa dentro de su sede asignada.",
+                    }
+                    for role, perms in _s.ROLE_PERMISSIONS.items():
+                        desc = _ROLE_DESCS.get(role, "Rol operativo de plataforma.")
+                        for perm in (perms or []):
+                            label = _PERM_LABELS.get(perm, perm)
+                            conn.execute(
+                                """INSERT INTO core.sys_role_permissions (role, permission, label, description, updated_at)
+                                   VALUES (%s, %s, %s, %s, %s)
+                                   ON CONFLICT (role, permission) DO NOTHING""",
+                                (role, perm, label, desc, now),
+                            )
+                except Exception as seed_err:
+                    logger.warning("[DB] Could not seed sys_role_permissions: %s", seed_err)
+
+        _run_guarded_pg_section(conn, "migrate_sys_role_permissions", _migrate_sys_role_permissions_section)
+
+        # Commitear TODO el trabajo inline antes de invocar el runner de
+        # migraciones automatizadas. El runner abre una conexión propia del
+        # pool; si dejamos la transacción de init_db abierta sobre auth.users,
+        # cualquier migración que pida lock sobre esa tabla (ej. FK a
+        # auth.users(id)) queda bloqueada esperando a init_db, que a su vez
+        # espera al runner → deadlock circular sin detección de Postgres
+        # (la primera conexión queda 'idle in transaction', no 'waiting').
+        # Síntoma: primer arranque sale OK porque las migraciones fallan
+        # rápido antes de pedir el lock; segundo arranque cuelga el lifespan
+        # y el container nunca queda healthy.
+        conn.commit()
+
         # Automated Migrations Engine
         try:
-            from core import migrations
+            from plataforma.core import migrations
             migrations.run_migrations()
         except Exception as e:
-            print(f"[DB] ERROR running automated migrations: {e}")
-
-        conn.commit()
+            logger.error("[DB] ERROR running automated migrations: %s", e)
     finally:
         conn.close()
 
@@ -2430,4 +2857,3 @@ def upsert_invoice(
         conn.close()
 
 
-# Auth logic moved to app.core.security and app.core.auth_service

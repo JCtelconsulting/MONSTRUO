@@ -3,9 +3,9 @@ from fastapi.responses import FileResponse
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from plataforma.core import deps
-from ticketera.backend import service as tickets_service
+from ticketera.backend.services import service as tickets_service
 from plataforma.core.audit_decorator import audit_action
-from ticketera.backend.tickets import roles as ticket_roles
+from ticketera.backend.services import roles as ticket_roles
 
 router = APIRouter(prefix="/api/tks", tags=["tickets"])
 legacy_router = APIRouter(prefix="/api", tags=["tickets-legacy"])
@@ -165,57 +165,6 @@ class AutomationRuleIn(BaseModel):
     is_active: bool = True
     match_json: dict = Field(default_factory=dict)
     action_json: dict = Field(default_factory=dict)
-
-
-class JiraCommentIn(BaseModel):
-    author: Optional[str] = "jira"
-    body: str
-
-
-class JiraIssueIn(BaseModel):
-    key: Optional[str] = None
-    summary: str
-    description: Optional[str] = ""
-    status: Optional[str] = "open"
-    updated_at: Optional[str] = None
-    updated: Optional[str] = None
-    priority: Optional[str] = "medium"
-    issue_type: Optional[str] = "incidencia"
-    categoria: Optional[str] = "general"
-    assignee: Optional[str] = None
-    reporter_email: Optional[str] = None
-    reporter_name: Optional[str] = None
-    ticket_security_class: Optional[str] = "internal"
-    comments: List[JiraCommentIn] = Field(default_factory=list)
-
-
-class JiraImportRequest(BaseModel):
-    dry_run: bool = False
-    issues: List[JiraIssueIn]
-
-
-class JiraBootstrapRunIn(BaseModel):
-    dry_run: bool = False
-    issues: List[JiraIssueIn] = Field(default_factory=list)
-    project_keys: List[str] = Field(default_factory=list)
-    limit: int = Field(default=200, ge=1, le=500)
-
-
-class JiraDeltaRunIn(BaseModel):
-    dry_run: bool = False
-    issues: List[JiraIssueIn] = Field(default_factory=list)
-    project_keys: List[str] = Field(default_factory=list)
-    limit: int = Field(default=200, ge=1, le=500)
-    since: Optional[str] = None
-
-
-class ParallelGoNoGoIn(BaseModel):
-    decision: str = Field(pattern="^(go|no_go)$")
-    signers: List[str] = Field(default_factory=list, min_length=1)
-    rationale: str
-    evidence_refs: List[str] = Field(default_factory=list)
-    metrics: dict = Field(default_factory=dict)
-    decided_at: Optional[str] = None
 
 
 class EvidenceEventCreate(BaseModel):
@@ -1197,115 +1146,6 @@ async def list_automation_rules(
     return {"items": tickets_service.list_automation_rules(only_active=only_active)}
 
 
-@router.post("/migration/jira/import", response_model=dict)
-async def import_jira_tickets(
-    body: JiraImportRequest,
-    sess: dict = Depends(deps.require_permission("admin.settings"))
-):
-    issues = [i.model_dump() for i in body.issues]
-    return tickets_service.import_jira_issues(
-        issues=issues,
-        imported_by=sess["username"],
-        dry_run=body.dry_run,
-    )
-
-
-@router.post("/migration/jira/bootstrap-open", response_model=dict)
-async def run_jira_bootstrap_open(
-    body: JiraBootstrapRunIn,
-    sess: dict = Depends(deps.require_permission("tickets:compliance"))
-):
-    try:
-        return tickets_service.run_jira_bootstrap_open(
-            actor=sess["username"],
-            dry_run=body.dry_run,
-            issues=[i.model_dump() for i in (body.issues or [])],
-            project_keys=body.project_keys or None,
-            limit=body.limit,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/migration/jira/delta-sync/run", response_model=dict)
-async def run_jira_delta_sync(
-    body: JiraDeltaRunIn,
-    sess: dict = Depends(deps.require_permission("tickets:compliance"))
-):
-    try:
-        return tickets_service.run_jira_delta_sync(
-            actor=sess["username"],
-            dry_run=body.dry_run,
-            issues=[i.model_dump() for i in (body.issues or [])],
-            project_keys=body.project_keys or None,
-            limit=body.limit,
-            since=body.since,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/migration/jira/runs", response_model=dict)
-async def list_jira_runs(
-    run_type: Optional[str] = Query(None, pattern="^(bootstrap|delta)?$"),
-    status: Optional[str] = Query(None, pattern="^(running|completed|failed|completed_with_errors)?$"),
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
-    sess: dict = Depends(deps.require_permission("tickets:compliance"))
-):
-    return tickets_service.list_jira_sync_runs(
-        run_type=run_type,
-        status=status,
-        limit=limit,
-        offset=offset,
-    )
-
-
-@router.get("/migration/jira/reconciliation/daily", response_model=dict)
-async def get_jira_reconciliation_daily(
-    snapshot_date: Optional[str] = Query(None),
-    sess: dict = Depends(deps.require_permission("tickets:compliance"))
-):
-    try:
-        return tickets_service.get_jira_reconciliation_daily(snapshot_date=snapshot_date)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/parallel/kpi/daily", response_model=dict)
-async def list_parallel_kpi_daily(
-    from_date: Optional[str] = Query(None, alias="from"),
-    to_date: Optional[str] = Query(None, alias="to"),
-    sess: dict = Depends(deps.require_permission("tickets:compliance"))
-):
-    try:
-        return tickets_service.list_parallel_kpi_daily(
-            date_from=from_date,
-            date_to=to_date,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/parallel/go-no-go", response_model=dict)
-async def register_parallel_go_no_go(
-    body: ParallelGoNoGoIn,
-    sess: dict = Depends(deps.require_permission("tickets:compliance"))
-):
-    try:
-        item = tickets_service.record_parallel_go_no_go_decision(
-            decision=body.decision,
-            decided_by=sess["username"],
-            signers=body.signers,
-            rationale=body.rationale,
-            evidence_refs=body.evidence_refs or [],
-            metrics=body.metrics or {},
-            decided_at=body.decided_at,
-        )
-        return {"item": item}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
 
 @router.post("/evidence/events", response_model=dict)
 async def create_evidence_event(
@@ -1522,7 +1362,7 @@ async def get_queue_health(
 @router.get("/channels/notifications", response_model=dict)
 async def list_channel_notifications(
     status: Optional[str] = Query(None, pattern="^(pending|dispatching|sent|failed|cancelled)?$"),
-    channel: Optional[str] = Query(None, pattern="^(whatsapp|3cx)?$"),
+    channel: Optional[str] = Query(None, pattern="^(google_chat)?$"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     sess: dict = Depends(deps.require_permission("tickets:compliance"))

@@ -5,8 +5,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.utils import make_msgid
 from typing import Optional
-from core import db
-from core.config import settings
+from plataforma.core import db
+from plataforma.core.config import settings
 import logging
 from datetime import datetime
 
@@ -72,7 +72,7 @@ def send_email_advanced(
 
     # MAIL_SANDBOX es kill-switch absoluto: bloquea siempre, sin importar
     # EMAIL_FORCE_ENABLE u otros overrides. Pensado para impedir incidentes
-    # donde un entorno no productivo manda correos a clientes reales.
+    # como el del 2026-05-13 donde DEV envió auto-replies reales.
     if settings.MAIL_SANDBOX or (settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE")):
         logger.info(f"[EMAIL_MOCK] Would send to {to_email} subject '{subject}' (ENV={settings.ENV_TYPE}, SANDBOX={settings.MAIL_SANDBOX})")
         if attachments:
@@ -138,19 +138,17 @@ def send_email_advanced(
     if attachments:
         for a in attachments:
             try:
-                # Soporte para dict {"filename": "x", "data": b"...", "content_type": "..."}
                 filename = a.get("filename") or "archivo"
                 data = a.get("data") or b""
                 part = MIMEApplication(data)
                 part.add_header("Content-Disposition", "attachment", filename=filename)
                 msg.attach(part)
             except Exception as e:
-                print(f"[EMAIL] Attachment error ({a.get('filename')}): {e}")
+                logger.warning("[EMAIL] Attachment error (%s): %s", a.get("filename"), e)
 
     # Blindaje DEV/PROD: MAIL_SANDBOX como kill-switch absoluto.
     if settings.MAIL_SANDBOX or (settings.ENV_TYPE != "prod" and not os.getenv("EMAIL_FORCE_ENABLE")):
-        print(f"[EMAIL_MOCK] Would send to {to_addr} subject '{subject}' (ENV={settings.ENV_TYPE}, SANDBOX={settings.MAIL_SANDBOX})")
-        # En DEV simulamos éxito pero no enviamos
+        logger.info("[EMAIL_MOCK] Would send to %s subject '%s' (ENV=%s, SANDBOX=%s)", to_addr, subject, settings.ENV_TYPE, settings.MAIL_SANDBOX)
         return {
             "ok": True,
             "to_email": to_addr,
@@ -161,7 +159,7 @@ def send_email_advanced(
             "mock": True
         }
 
-    print(f"[EMAIL] Connecting to {host}:{port} as {user}...")
+    logger.info("[EMAIL] Connecting to %s:%s as %s...", host, port, user)
     try:
         s = smtplib.SMTP(host, port)
         s.starttls()
@@ -169,7 +167,7 @@ def send_email_advanced(
         recipients = [to_addr] + cc_list + bcc_list
         s.sendmail(msg["From"], recipients, msg.as_string())
         s.quit()
-        print(f"[EMAIL] Sent to {to_addr}")
+        logger.info("[EMAIL] Sent to %s", to_addr)
         return {
             "ok": True,
             "to_email": to_addr,
@@ -179,7 +177,7 @@ def send_email_advanced(
             "message_id": generated_msg_id,
         }
     except Exception as e:
-        print(f"[EMAIL] Error: {e}")
+        logger.error("[EMAIL] Error: %s", e)
         raise e
 
 
@@ -205,7 +203,7 @@ def send_email_with_attachments(
 
     conf = get_smtp_config()
     if not conf:
-        print("[EMAIL] No SMTP config found")
+        logger.warning("[EMAIL] No SMTP config found")
         return False
 
     host = conf.get("smtp_host")
@@ -231,10 +229,10 @@ def send_email_with_attachments(
             part.add_header("Content-Disposition", "attachment", filename=filename)
             msg.attach(part)
         except Exception as e:
-            print(f"[EMAIL] Attachment error ({a.get('filename')}): {e}")
+            logger.warning("[EMAIL] Attachment error (%s): %s", a.get("filename"), e)
 
     recipients = to_emails + cc_emails
-    print(f"[EMAIL] Connecting to {host}:{port} as {user}... ({len(recipients)} recipients)")
+    logger.info("[EMAIL] Connecting to %s:%s as %s... (%s recipients)", host, port, user, len(recipients))
 
     try:
         s = smtplib.SMTP(host, port)
@@ -242,8 +240,8 @@ def send_email_with_attachments(
         s.login(user, password)
         s.sendmail(msg["From"], recipients, msg.as_string())
         s.quit()
-        print(f"[EMAIL] Sent to {', '.join(to_emails)}")
+        logger.info("[EMAIL] Sent to %s", ", ".join(to_emails))
         return True
     except Exception as e:
-        print(f"[EMAIL] Error: {e}")
+        logger.error("[EMAIL] Error: %s", e)
         raise e

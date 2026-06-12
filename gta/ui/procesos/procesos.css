@@ -1,0 +1,615 @@
+/* Procesos — estilos específicos del módulo */
+
+.gta-procs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Modal de detalle/edición de proceso — el más ancho de la app porque
+   muestra pasos, campos del formulario y todo el contenido en simultáneo.
+   Usamos min(px, vw) para que escale en pantallas grandes con un tope. */
+.gta-proc-modal {
+    max-width: min(1500px, 95vw) !important;
+}
+
+/* ── Listado agrupado por área / subárea ─────────────────────────────── */
+.gta-doc-area {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px 16px;
+    background: rgba(18, 26, 36, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.gta-doc-area-title {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--neon);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.gta-doc-area-title i { opacity: 0.8; }
+
+.gta-doc-subgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-doc-subgroup-title {
+    margin: 6px 0 2px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.gta-doc-subgroup-title i { opacity: 0.6; }
+
+.gta-doc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-doc-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(12, 18, 26, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gta-doc-row:hover {
+    border-color: rgba(0, 255, 65, 0.25);
+}
+
+.gta-doc-icon {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: rgba(0, 255, 65, 0.08);
+    border: 1px solid rgba(0, 255, 65, 0.18);
+    color: var(--neon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+}
+
+.gta-doc-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gta-doc-name {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gta-doc-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.74rem;
+    color: var(--text-soft);
+}
+.gta-doc-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+.gta-doc-meta i { opacity: 0.7; }
+
+/* Estado vacío y conteo de pills */
+.gta-empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--text-soft);
+    font-size: 0.88rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+
+.gta-pill-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 6px;
+    margin-left: 6px;
+    background: rgba(0, 255, 65, 0.12);
+    color: var(--neon);
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.gta-docs-counter {
+    color: var(--text-soft);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* Help / hints reutilizados en el drawer */
+.gta-section-help {
+    color: var(--text-soft);
+    font-size: 0.82rem;
+    margin: 6px 0;
+}
+.gta-section-help code {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 0.78rem;
+}
+
+/* Filas de pasos en edición (modal nuevo / editar) */
+.gta-flujo-tareas-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gta-tarea-edit-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    background: rgba(12, 18, 26, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+.gta-tarea-edit-num {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 255, 65, 0.1);
+    border-radius: 8px;
+    font-weight: 800;
+    color: var(--neon);
+    font-size: 0.78rem;
+}
+
+.gta-tarea-edit-fields {
+    flex: 1;
+    min-width: 0;
+}
+
+.gta-procs-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.gta-procs-content {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.gta-proc-row {
+    cursor: pointer;
+    padding-right: 14px;
+}
+.gta-proc-row:hover {
+    background: rgba(0, 255, 65, 0.04);
+}
+
+.gta-proc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 0.7rem;
+    color: var(--text-soft);
+}
+.gta-proc-badge.has-file {
+    background: rgba(0, 243, 255, 0.1);
+    color: var(--info);
+}
+.gta-proc-badge.has-def {
+    background: rgba(0, 255, 65, 0.1);
+    color: var(--neon);
+}
+.gta-proc-badge.has-quiebre {
+    background: rgba(255, 51, 51, 0.12);
+    color: var(--danger);
+}
+
+.gta-proc-desc {
+    color: var(--text-soft);
+    font-size: 0.72rem;
+    font-style: italic;
+}
+
+
+/* ── Edición de pasos: drag & drop + nuevos campos ─────────────────────── */
+
+.gta-paso-edit-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    margin-bottom: 8px;
+    transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.gta-paso-edit-row.is-dragging {
+    opacity: 0.4;
+    border-style: dashed;
+}
+
+.gta-paso-edit-row.is-drag-over {
+    border-color: var(--neon, #00ff41);
+    background: rgba(0, 255, 65, 0.04);
+}
+
+.gta-paso-edit-handle {
+    cursor: grab;
+    color: var(--text-soft, #a5adb4);
+    padding: 6px 4px;
+    user-select: none;
+    align-self: center;
+}
+.gta-paso-edit-handle:active {
+    cursor: grabbing;
+    color: var(--neon, #00ff41);
+}
+
+.gta-paso-edit-num {
+    font-weight: 700;
+    color: var(--neon, #00ff41);
+    min-width: 32px;
+    text-align: center;
+    padding-top: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.gta-paso-edit-fields {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.gta-paso-edit-fields > div {
+    align-items: center;
+}
+
+/* ── Vista de paso: descripción debajo del título ─────────────────────── */
+
+.gta-pipe-desc {
+    margin: 4px 0 6px 0;
+    color: var(--text-soft, #a5adb4);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+/* ── Empty state cuando un proceso no tiene pasos ─────────────────────── */
+
+.gta-empty-pasos {
+    text-align: center;
+    padding: 24px 16px;
+    border: 1px dashed var(--border, rgba(255,255,255,0.12));
+    border-radius: 10px;
+    color: var(--text-soft, #a5adb4);
+    margin: 8px 0;
+}
+.gta-empty-pasos i {
+    font-size: 32px;
+    opacity: 0.4;
+    display: block;
+    margin-bottom: 10px;
+}
+
+/* ── Guía de referencia (archivo) — discreto, abajo del modal ─────────── */
+
+.gta-guia-ref {
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.gta-guia-ref-head {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gta-guia-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--text-soft, #a5adb4);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gta-guia-ref-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.gta-guia-path {
+    width: 100%;
+    font-size: 0.75rem;
+    color: var(--text-soft, #a5adb4);
+    opacity: 0.7;
+    word-break: break-all;
+}
+
+/* ── Preview de documento (texto extraído) ────────────────────────────── */
+
+.gta-doc-preview-text {
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text, #f5f7f8);
+    padding: 16px;
+    border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 70vh;
+    overflow: auto;
+    margin: 0;
+}
+
+/* ── Editor de campos del formulario obligatorio ────────────────────────── */
+
+.gta-campos-form-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.gta-campo-form-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+}
+
+.gta-campo-form-num {
+    font-weight: 700;
+    color: var(--info, #00f3ff);
+    min-width: 32px;
+    text-align: center;
+    padding-top: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.gta-campo-form-fields {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+/* Toggle "bloqueante" / "obligatorio" */
+.gta-paso-edit-bloqueante {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: var(--text-soft, #a5adb4);
+    cursor: pointer;
+    user-select: none;
+}
+.gta-paso-edit-bloqueante input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* ── Diagrama de flujo (SVG swimlanes) ───────────────────────────── */
+
+.gta-flow-diagram {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 12px;
+    max-width: 100%;
+}
+
+.gta-flow-step rect {
+    transition: filter 0.15s;
+}
+
+.gta-flow-step:hover rect {
+    filter: drop-shadow(0 0 8px rgba(0, 243, 255, 0.6));
+}
+
+/* ── Editor visual del diagrama (toolbar) ─────────────────────────── */
+
+.gta-flow-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    margin: 8px 0;
+    background: rgba(0, 255, 65, 0.05);
+    border: 1px solid rgba(0, 255, 65, 0.2);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    color: var(--text);
+}
+
+.gta-flow-editor-toolbar > span {
+    flex: 1;
+}
+
+.gta-flow-editor-toolbar > i {
+    color: var(--neon);
+}
+
+/* Cuando el diagrama está en modo edición, las cajas tienen borde dashed */
+.gta-flow-diagram.editing svg .gta-flow-step rect {
+    stroke-dasharray: 6 4;
+}
+
+/* Lista de checkboxes de dependencias en el modal de editar paso */
+.gta-deps-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.gta-dep-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.gta-dep-check input { cursor: pointer; }
+
+/* ── Editor de items (sub-tareas) dentro del modal de editar paso ── */
+.gta-items-edit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.gta-item-edit-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.gta-item-edit-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gta-item-edit-titulo {
+    width: 100%;
+}
+
+.gta-item-edit-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.85rem;
+}
+
+.gta-item-edit-desb {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gta-item-edit-desb .gta-deps-list {
+    max-height: 120px;
+    padding: 6px 10px;
+}
+
+.gta-item-edit-del {
+    align-self: flex-start;
+}
+
+/* Detalle (read-only) en el modal del paso */
+.gta-paso-detalle-items {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.88rem;
+}
+
+/* Botón × de eliminar y + de agregar — hover */
+.gta-flow-step-del:hover circle {
+    fill: rgb(255, 80, 80);
+}
+.gta-flow-add:hover circle {
+    fill: rgba(0, 255, 65, 0.35);
+}
+
+/* Handle de conexión (drag para crear flechas) */
+.gta-flow-connect-handle circle {
+    transition: r 0.12s, fill 0.12s;
+}
+.gta-flow-connect-handle:hover circle {
+    r: 8;
+    fill: rgba(0, 255, 65, 0.95);
+}
+
+/* Toolbar del editor debajo del diagrama, "pegado" al SVG sin margen
+   superior (queda como una extensión natural del diagrama). */
+.gta-flow-editor-toolbar-bottom {
+    margin: 0 !important;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top: 0;
+}
+.gta-flow-diagram + .gta-flow-editor-toolbar-bottom {
+    margin-top: -1px !important;
+}
+
+/* Handles en los extremos de las flechas (drag para reasignar) */
+.gta-flow-arrow-handle {
+    transition: r 0.12s;
+}
+.gta-flow-arrow-handle:hover {
+    r: 7;
+}

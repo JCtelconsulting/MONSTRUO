@@ -1,15 +1,19 @@
 # Ticketera — Migraciones
 
-Archivos SQL versionados para el schema `tks` en PostgreSQL.
+Archivos SQL versionados para el schema `ticketera` en PostgreSQL.
 
-## Convención
+## Convención de nombres
 
-`NNN_descripcion_corta.sql` — `NNN` secuencial de 3 dígitos. Las migraciones
-se ejecutan en orden y una sola vez; no modificar archivos ya aplicados en
-producción, crear uno nuevo.
+```
+NNN_descripcion_corta.sql
+```
 
-## Aplicar (manual, mientras no haya runner)
+- `NNN`: número secuencial de 3 dígitos (`001`, `002`…)
+- Las migraciones se ejecutan **en orden** y **una sola vez**
+- Nunca modificar un archivo ya ejecutado en producción — crear uno nuevo
+
+## Cómo ejecutar (manual mientras no hay runner)
 
 ```bash
-docker exec -i <db-container> psql -U monstruo -d monstruo < ticketera/migrations/NNN_nombre.sql
+docker exec -i monstruo-dev-db psql -U monstruo -d monstruo_dev < ticketera/migrations/NNN_nombre.sql
 ```

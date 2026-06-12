@@ -1,5 +1,0 @@
-Set WshShell = CreateObject("WScript.Shell")
-' Launch BAT file silently (0 = hide window)
-' Note: Using standard WSL path format for access from Windows
-WshShell.Run chr(34) & "\\wsl.localhost\Ubuntu\srv\monstruo\ops\windows\monstruo_start.bat" & Chr(34), 0
-Set WshShell = Nothing

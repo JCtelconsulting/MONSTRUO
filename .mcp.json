@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "monstruo-postgres": {
+      "type": "stdio",
+      "command": "/srv/monstruo_dev/.claude/mcp/postgres-wrapper.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}

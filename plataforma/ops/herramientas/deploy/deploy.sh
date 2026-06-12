@@ -12,7 +12,7 @@ DEPLOY_STACK_NAME="${DEPLOY_STACK_NAME:-}"
 DEPLOY_SERVICE="${DEPLOY_SERVICE:-}"
 
 DEFAULT_COMPOSE_FILE="$APP_DIR/docker-compose.yaml"
-LEGACY_COMPOSE_FILE="$APP_DIR/plataforma/docs/deploy/docker-compose.yaml"
+LEGACY_COMPOSE_FILE="$APP_DIR/plataforma/docs/operacion/deploy/docker-compose.yaml"
 if [ -n "${COMPOSE_FILE:-}" ]; then
   COMPOSE_FILE="$COMPOSE_FILE"
 elif [ -f "$DEFAULT_COMPOSE_FILE" ]; then
@@ -178,7 +178,6 @@ if [ "$HAS_GIT_REPO" = "1" ]; then
     -e "data/" \
     -e "data/tickets/" \
     -e "plataforma/data/" \
-    -e "plataforma/data_runtime/" \
     -e "ticketera/data/" \
     -e "fundacion/data/" \
     -e "erp/data/" \

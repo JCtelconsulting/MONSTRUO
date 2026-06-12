@@ -18,4 +18,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app/
 
 # El CMD se define en el docker-compose por cada servicio
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Crear usuario no-root (UID/GID parametrizable para coincidir con bind mounts del host)
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd -g ${APP_GID} appuser \
+    && useradd -m -u ${APP_UID} -g ${APP_GID} appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -fsS http://localhost:9005/health || exit 1
+
+CMD ["uvicorn", "ticketera.backend.main:app", "--host", "0.0.0.0", "--port", "9005"]

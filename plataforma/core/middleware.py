@@ -1,7 +1,7 @@
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from core import security
+from plataforma.core import security
 
 class AuthIdentityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

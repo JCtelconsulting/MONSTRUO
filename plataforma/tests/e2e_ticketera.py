@@ -16,14 +16,13 @@ THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parents[1]
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
-CODE_ROOT = PROJECT_ROOT / "plataforma" / "legacy" / "code"
-if str(CODE_ROOT) not in sys.path:
-    sys.path.insert(0, str(CODE_ROOT))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 DEV_ENV_FILE = "plataforma/ops/env/.env.server.dev"
 
 from _helpers import as_json, build_session, env_str, guard_prod_target, require_credentials
-from app.core.security import create_access_token
+from plataforma.core.security import create_access_token
 
 
 def parse_args() -> argparse.Namespace:
@@ -194,7 +193,7 @@ def main() -> int:
     # ------------------------------------------------------------
     try:
         inner_ownership = f"""
-from app.core import tickets_service
+from ticketera.backend.services import service as tickets_service
 
 ticket = tickets_service.create_ticket(
     titulo="E2E Ownership Assigned",
@@ -590,7 +589,7 @@ print("SUCCESS")
 import sys
 import logging
 logging.basicConfig(level=logging.INFO)
-from app.core import tickets_service
+from ticketera.backend.services import service as tickets_service
 
 payload = {{
     'subject': 'Re: E2E Ticketera Reply',
@@ -679,8 +678,9 @@ except Exception as e:
     try:
         inner_auto_reply = f"""
 import asyncio
-from app.core import db, tickets_service, jobs_engine, email
-from app.core.config import settings
+from plataforma.core import db, jobs_engine, email
+from ticketera.backend.services import service as tickets_service
+from plataforma.core.config import settings
 
 backup = {{
     "enabled": settings.TICKET_AUTO_REPLY_ENABLED,
@@ -1034,9 +1034,10 @@ print("SUCCESS")
         inner_channels = f"""
 import asyncio
 import logging
-from app.core import db, tickets_service
-from app.workers import integrations_worker
-from app.core.config import settings
+from plataforma.core import db
+from ticketera.backend.services import service as tickets_service
+# integrations_worker migrado — pendiente reimplementar en ticketera.backend
+from plataforma.core.config import settings
 
 logging.basicConfig(level=logging.INFO)
 
@@ -1170,7 +1171,7 @@ print("SUCCESS")
         inner_queue_seed = f"""
 import asyncio
 from datetime import datetime, timedelta, timezone
-from app.core import db, jobs_engine
+from plataforma.core import db, jobs_engine
 
 conn = db.get_conn()
 try:
@@ -1232,7 +1233,7 @@ print(f"SUCCESS STALE_ID={{stale_id}}")
             return fail(f"Recover stale respondió sin ok=true: {recovered}")
 
         inner_check_stale = f"""
-from app.core import db
+from plataforma.core import db
 conn = db.get_conn()
 try:
     row = conn.execute("SELECT status FROM sys_jobs WHERE id = ?", ({stale_job_id},)).fetchone()
@@ -1256,97 +1257,6 @@ print("SUCCESS")
             return fail(f"Recover stale no movió job a RETRY: {check_proc.stdout} // {check_proc.stderr}")
 
         print("[OK] Cola jobs validada (queue-health + recover stale + dedupe recurrentes)")
-    except Exception as exc:
-        return fail(str(exc))
-
-    # ------------------------------------------------------------
-    # 9) Paralelo Jira + MONSTRUO (bootstrap/delta/runs/kpi/go-no-go)
-    # ------------------------------------------------------------
-    try:
-        jira_key = f"E2E-JIRA-{int(time.time())}"
-        jira_issue = {
-            "key": jira_key,
-            "summary": f"E2E Jira Parallel {jira_key}",
-            "description": "Validación técnica del paralelo Jira+MONSTRUO",
-            "status": "open",
-            "priority": "medium",
-            "issue_type": "incidencia",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "comments": [{"author": "jira", "body": "comentario e2e paralelo"}],
-        }
-
-        bootstrap = session.post(
-            f"{base_url}/api/tks/migration/jira/bootstrap-open",
-            json={
-                "dry_run": True,
-                "issues": [jira_issue],
-                "limit": 100,
-            },
-            timeout=max(args.timeout, 30),
-        )
-        ensure_status("Jira bootstrap-open dry_run", bootstrap.status_code, bootstrap.text, {200})
-
-        delta_1 = session.post(
-            f"{base_url}/api/tks/migration/jira/delta-sync/run",
-            json={
-                "dry_run": False,
-                "issues": [jira_issue],
-                "limit": 100,
-            },
-            timeout=max(args.timeout, 30),
-        )
-        ensure_status("Jira delta-sync run 1", delta_1.status_code, delta_1.text, {200})
-
-        delta_2 = session.post(
-            f"{base_url}/api/tks/migration/jira/delta-sync/run",
-            json={
-                "dry_run": False,
-                "issues": [jira_issue],
-                "limit": 100,
-            },
-            timeout=max(args.timeout, 30),
-        )
-        ensure_status("Jira delta-sync run 2", delta_2.status_code, delta_2.text, {200})
-        if int(as_json(delta_2).get("skipped") or 0) < 1:
-            return fail(f"Delta idempotente no reflejó skipped esperado: {delta_2.text}")
-
-        runs = session.get(f"{base_url}/api/tks/migration/jira/runs?limit=10", timeout=args.timeout)
-        ensure_status("Jira runs", runs.status_code, runs.text, {200})
-        if int(as_json(runs).get("total") or 0) < 1:
-            return fail(f"Sin historial de runs Jira: {runs.text}")
-
-        reconciliation = session.get(
-            f"{base_url}/api/tks/migration/jira/reconciliation/daily",
-            timeout=max(args.timeout, 30),
-        )
-        ensure_status("Jira reconciliation daily", reconciliation.status_code, reconciliation.text, {200})
-        rec_body = as_json(reconciliation)
-        if "snapshot_date" not in rec_body:
-            return fail(f"Reconciliation sin snapshot_date: {rec_body}")
-
-        kpi = session.get(
-            f"{base_url}/api/tks/parallel/kpi/daily?from=2026-01-01&to=2030-01-01",
-            timeout=max(args.timeout, 30),
-        )
-        ensure_status("Parallel KPI daily", kpi.status_code, kpi.text, {200})
-        if "items" not in as_json(kpi):
-            return fail(f"KPI daily sin items: {kpi.text}")
-
-        go_no_go = session.post(
-            f"{base_url}/api/tks/parallel/go-no-go",
-            json={
-                "decision": "no_go",
-                "signers": [args.user],
-                "rationale": "E2E técnico - pendiente ejecución real 8 semanas",
-                "evidence_refs": ["tests/e2e_ticketera.py"],
-            },
-            timeout=max(args.timeout, 30),
-        )
-        ensure_status("Parallel go-no-go", go_no_go.status_code, go_no_go.text, {200})
-        if not as_json(go_no_go).get("item", {}).get("id"):
-            return fail(f"Go/No-Go sin id: {go_no_go.text}")
-
-        print("[OK] Paralelo Jira+MONSTRUO técnico validado (bootstrap/delta/runs/kpi/go-no-go)")
     except Exception as exc:
         return fail(str(exc))
 

@@ -1,0 +1,11 @@
+[Unit]
+Description=MONSTRUO Fundación - Sync de planillas Google Sheets (oneshot)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/monstruo_dev
+ExecStart=/usr/bin/docker exec monstruo-dev-fundacion python -m fundacion.scripts.sync_sheets --trigger cron
+StandardOutput=journal
+StandardError=journal

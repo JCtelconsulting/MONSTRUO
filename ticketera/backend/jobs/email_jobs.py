@@ -5,14 +5,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from plataforma.core import db, email, email_integration, jobs_engine
-from ticketera.backend import service as tickets_service
+from ticketera.backend.services import service as tickets_service
 
 logger = logging.getLogger(__name__)
 
 _IMAP_CURSOR_KEY = "imap_last_uid"
 
 
-def _normalize_message_id_for_dedupe(raw):
+def _normalize_message_id_for_dedupe(raw: Optional[str]) -> str:
     """Normaliza un Message-ID para usarlo como clave estable de dedupe:
     sin angle brackets, lowercase, trim. Devuelve '' si no hay valor útil."""
     if not raw:
@@ -23,7 +23,7 @@ def _normalize_message_id_for_dedupe(raw):
     return value.strip("<>").strip().lower()
 
 
-def _read_imap_cursor(conn):
+def _read_imap_cursor(conn) -> Optional[int]:
     row = conn.execute(
         "SELECT value FROM system_settings WHERE key = ?",
         (_IMAP_CURSOR_KEY,),
@@ -37,7 +37,7 @@ def _read_imap_cursor(conn):
         return None
 
 
-def _write_imap_cursor(conn, uid):
+def _write_imap_cursor(conn, uid: int) -> None:
     now = db.now_utc_iso()
     conn.execute(
         """INSERT INTO system_settings (key, value, group_name, is_sensitive, updated_at)
@@ -50,7 +50,7 @@ def _write_imap_cursor(conn, uid):
     conn.commit()
 
 
-def _is_message_id_processed(conn, message_id):
+def _is_message_id_processed(conn, message_id: str) -> bool:
     row = conn.execute(
         "SELECT 1 FROM tks.processed_email_messages WHERE message_id = ?",
         (message_id,),
@@ -58,7 +58,7 @@ def _is_message_id_processed(conn, message_id):
     return row is not None
 
 
-def _record_processed_message(conn, message_id, ticket_id, uid):
+def _record_processed_message(conn, message_id: str, ticket_id: Optional[int], uid: Optional[int]) -> None:
     conn.execute(
         """INSERT INTO tks.processed_email_messages (message_id, ticket_id, uid, processed_at)
            VALUES (?, ?, ?, now())
@@ -69,7 +69,7 @@ def _record_processed_message(conn, message_id, ticket_id, uid):
 
 
 async def poll_email_job(payload: dict):
-    print("[JobEngine] Polling emails...")
+    logger.info("[JobEngine] Polling emails...")
     payload = payload or {}
     interval = 120
 
@@ -89,18 +89,18 @@ async def poll_email_job(payload: dict):
                     try:
                         uidnext = processor.get_uidnext()
                     except Exception as e:
-                        print(f"[EMAIL] No se pudo leer UIDNEXT, asumiendo 0: {e}")
+                        logger.error("[EMAIL] No se pudo leer UIDNEXT, asumiendo 0: %s", e)
                         uidnext = 1
                     last_uid = max(0, uidnext - 1)
                     _write_imap_cursor(conn, last_uid)
-                    print(f"[EMAIL] Cursor IMAP inicializado en UID={last_uid}")
+                    logger.info("[EMAIL] Cursor IMAP inicializado en UID=%s", last_uid)
             finally:
                 conn.close()
 
             # 2) Fetch correos por UID > last_uid usando BODY.PEEK (no marca Seen).
             emails = processor.fetch_new(last_uid)
             if emails:
-                print(f"[JobEngine] Found {len(emails)} new emails (uid>{last_uid}).")
+                logger.info("[JobEngine] Found %d new emails (uid>%s).", len(emails), last_uid)
 
             # 3) Procesar en orden ascendente de UID. Mantener cursor contiguo:
             #    solo avanza mientras no haya huecos por excepción.
@@ -112,12 +112,15 @@ async def poll_email_job(payload: dict):
                 mid = _normalize_message_id_for_dedupe(raw_mid)
 
                 if not mid:
-                    print(f"[EMAIL] mensaje sin Message-ID válido (uid={uid}) — se procesa sin dedupe persistente")
+                    logger.warning(
+                        "[EMAIL] mensaje sin Message-ID válido (uid=%s) — se procesa sin dedupe persistente",
+                        uid,
+                    )
 
                 conn = db.get_conn()
                 try:
                     if mid and _is_message_id_processed(conn, mid):
-                        print(f"[EMAIL] duplicate skipped mid={mid} uid={uid}")
+                        logger.info("[EMAIL] duplicate skipped mid=%s uid=%s", mid, uid)
                         if uid is not None:
                             processor.mark_seen(uid)
                         if not broken and uid is not None and uid == commit_up_to + 1:
@@ -129,7 +132,10 @@ async def poll_email_job(payload: dict):
                 try:
                     ticket_id = tickets_service.handle_incoming_email(email_data)
                 except Exception as e:
-                    print(f"[JobEngine] Error handling email uid={uid} mid={mid or '(empty)'}: {e} — se reintentará en próximo ciclo")
+                    logger.error(
+                        "[JobEngine] Error handling email uid=%s mid=%s: %s — se reintentará en próximo ciclo",
+                        uid, mid or "(empty)", e,
+                    )
                     broken = True
                     continue
 
@@ -143,7 +149,10 @@ async def poll_email_job(payload: dict):
                         finally:
                             conn.close()
                     except Exception as e:
-                        print(f"[EMAIL] Falló registro processed_email_messages mid={mid} uid={uid}: {e}")
+                        logger.error(
+                            "[EMAIL] Falló registro processed_email_messages mid=%s uid=%s: %s",
+                            mid, uid, e,
+                        )
 
                 if uid is not None:
                     processor.mark_seen(uid)
@@ -158,11 +167,11 @@ async def poll_email_job(payload: dict):
                         _write_imap_cursor(conn, commit_up_to)
                     finally:
                         conn.close()
-                    print(f"[EMAIL] Cursor IMAP avanzado {last_uid} → {commit_up_to}")
+                    logger.info("[EMAIL] Cursor IMAP avanzado %s → %s", last_uid, commit_up_to)
                 except Exception as e:
-                    print(f"[EMAIL] No se pudo persistir cursor IMAP {commit_up_to}: {e}")
+                    logger.error("[EMAIL] No se pudo persistir cursor IMAP %s: %s", commit_up_to, e)
         except Exception as e:
-            print(f"[JobEngine] Email polling error: {e}")
+            logger.error("[JobEngine] Email polling error: %s", e)
         finally:
             processor.close()
             try:

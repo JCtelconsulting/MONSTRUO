@@ -1,0 +1,43 @@
+<div class="gta-tablero">
+    <!-- KPIs (4 columnas en una fila, orden: activos · por vencer · vencidos · completados) -->
+    <div class="gta-kpi-row" id="tablero-kpis">
+        <div class="gta-kpi-card kpi-info" title="Flujos del catálogo en ejecución (todavía no completados ni cancelados)">
+            <div class="gta-kpi-val" id="kpi-flujos-activos">—</div>
+            <div class="gta-kpi-lbl">Flujos activos</div>
+        </div>
+        <div class="gta-kpi-card kpi-warning" title="Tareas que ya consumieron ≥70% de su SLA pero todavía no vencen — atención cercana">
+            <div class="gta-kpi-val" id="kpi-por-vencer">—</div>
+            <div class="gta-kpi-lbl">Por vencer</div>
+        </div>
+        <div class="gta-kpi-card kpi-danger" title="Tareas con SLA ya vencido (fecha límite pasada y no cerradas)">
+            <div class="gta-kpi-val" id="kpi-vencidas">—</div>
+            <div class="gta-kpi-lbl">Tareas vencidas</div>
+        </div>
+        <div class="gta-kpi-card kpi-ok" title="Flujos cuyas tareas están todas cerradas">
+            <div class="gta-kpi-val" id="kpi-completados">—</div>
+            <div class="gta-kpi-lbl">Completados</div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="gta-tablero-filters">
+        <select id="filtro-area" class="input-dark" onchange="Tablero.filtrar()" style="min-width:160px;">
+            <option value="">Todas las áreas</option>
+        </select>
+        <select id="filtro-estado" class="input-dark" onchange="Tablero.filtrar()" style="min-width:160px;">
+            <option value="">Todos los estados</option>
+            <option value="activo">Activos</option>
+            <option value="completado">Completados</option>
+            <option value="cancelado">Cancelados</option>
+        </select>
+        <input type="text" id="filtro-busqueda" class="input-dark" placeholder="🔍 Buscar..." oninput="Tablero.filtrar()" style="min-width:200px;">
+        <button class="btn-secondary" onclick="Tablero.cargar()" title="Refrescar">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+    </div>
+
+    <!-- Kanban por estado del flujo (acordeón inline al expandir cada card) -->
+    <div class="gta-flujos-kanban" id="tablero-kanban">
+        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando flujos...</div>
+    </div>
+</div>

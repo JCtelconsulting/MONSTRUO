@@ -1,9 +1,0 @@
-$TargetFile = "C:\Users\juane\OneDrive\Escritorio\Enviados\Monstruo.lnk"
-$WshShell = New-Object -ComObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut($TargetFile)
-$Shortcut.TargetPath = "wscript.exe"
-$Shortcut.Arguments = """\\wsl.localhost\Ubuntu\srv\monstruo\ops\windows\monstruo_silent.vbs"""
-$Shortcut.IconLocation = "C:\Windows\System32\shell32.dll,27"
-$Shortcut.Description = "Iniciar Monstruo ERP (Silencioso)"
-$Shortcut.Save()
-Write-Host "Acceso directo creado en: $TargetFile"

@@ -9,6 +9,8 @@ click==8.3.1
 cryptography==46.0.4
 ecdsa==0.19.1
 fastapi==0.128.0
+google-auth==2.52.0
+gspread==6.2.1
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
@@ -16,7 +18,7 @@ idna==3.11
 passlib==1.7.4
 psycopg==3.3.2
 psycopg-binary==3.3.2
-psycopg2-binary==2.9.11
+psycopg-pool==3.2.6
 pyasn1==0.6.2
 pycparser==3.0
 pydantic==2.12.5

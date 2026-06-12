@@ -1,0 +1,1000 @@
+/* GTA — Tab Tareas */
+
+.gta-tareas {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.gta-tareas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.gta-tareas-subtabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.gta-subtab {
+    background: transparent;
+    color: var(--text-muted, #9aa0a6);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s ease;
+}
+
+.gta-subtab:hover {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-primary, #e8eaed);
+}
+
+.gta-subtab.active {
+    background: var(--accent-soft, rgba(100,150,255,0.12));
+    color: var(--accent, #8ab4f8);
+    border-color: var(--accent, #8ab4f8);
+}
+
+.gta-subtab-count {
+    display: inline-block;
+    min-width: 22px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.08);
+    color: inherit;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.gta-subtab.active .gta-subtab-count {
+    background: var(--accent, #8ab4f8);
+    color: #0b1220;
+}
+
+.gta-tareas-filters {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-muted, #9aa0a6);
+}
+
+.gta-filter-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.gta-tareas-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 200px;
+}
+
+/* ── Cards de tarea ──────────────────────────────────────────────────── */
+
+.gta-tarea-card {
+    background: var(--surface-1, #1a1f2e);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.gta-tarea-card:hover {
+    border-color: rgba(138,180,248,0.4);
+    transform: translateY(-1px);
+}
+
+.gta-tarea-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.gta-tarea-card-titulo {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #e8eaed);
+    margin: 0;
+    flex: 1;
+}
+
+.gta-tarea-card-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: var(--text-muted, #9aa0a6);
+    align-items: center;
+}
+
+.gta-tarea-card-meta .pill {
+    background: rgba(255,255,255,0.06);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.gta-prioridad-baja     { background: rgba(120,140,160,0.15); color: #9aa0a6; }
+.gta-prioridad-media    { background: rgba(138,180,248,0.15); color: #8ab4f8; }
+.gta-prioridad-alta     { background: rgba(255,200,80,0.15);  color: #ffd166; }
+.gta-prioridad-urgente  { background: rgba(255,90,90,0.18);   color: #ff6b6b; }
+
+.gta-estado-pendiente   { background: rgba(255,200,80,0.12);  color: #ffd166; }
+.gta-estado-en_curso    { background: rgba(138,180,248,0.15); color: #8ab4f8; }
+.gta-estado-bloqueada   { background: rgba(255,90,90,0.15);   color: #ff6b6b; }
+.gta-estado-cerrada     { background: rgba(120,200,140,0.15); color: #8fdca8; }
+.gta-estado-cancelada   { background: rgba(120,140,160,0.12); color: #9aa0a6; }
+
+.gta-tarea-card-desc {
+    color: var(--text-muted, #9aa0a6);
+    font-size: 12px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.gta-tarea-card-foot {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-muted, #9aa0a6);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.gta-tarea-card-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.gta-tarea-card-actions button {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    color: var(--text-primary, #e8eaed);
+    cursor: pointer;
+}
+
+.gta-tarea-card-actions button:hover {
+    border-color: var(--accent, #8ab4f8);
+    color: var(--accent, #8ab4f8);
+}
+
+.gta-tarea-card-actions .btn-tomar {
+    background: var(--accent, #8ab4f8);
+    color: #0b1220;
+    border-color: var(--accent, #8ab4f8);
+    font-weight: 600;
+}
+
+.gta-tarea-card-actions .btn-tomar:hover {
+    filter: brightness(1.1);
+    color: #0b1220;
+}
+
+.gta-empty-state {
+    text-align: center;
+    color: var(--text-muted, #9aa0a6);
+    padding: 30px 10px;
+    font-size: 13px;
+}
+
+.gta-empty-state i {
+    font-size: 32px;
+    opacity: 0.4;
+    margin-bottom: 10px;
+    display: block;
+}
+
+/* ── Modal de detalle ───────────────────────────────────────────────── */
+
+.gta-tarea-modal {
+    max-width: 720px;
+    width: 92vw;
+}
+
+.gta-tarea-section {
+    margin-top: 16px;
+}
+
+.gta-tarea-section h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #9aa0a6);
+    margin: 0 0 8px 0;
+    font-weight: 600;
+}
+
+.gta-tarea-participantes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-tarea-participante {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.gta-tarea-participante .pill {
+    font-size: 11px;
+}
+
+.gta-tarea-card.sin-responsable {
+    border-left: 3px solid var(--accent, #8ab4f8);
+}
+
+/* ── Datos del flujo dentro del detalle de una tarea ──────────────────── */
+
+.gta-flujo-datos-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-flujo-dato {
+    display: flex;
+    gap: 8px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.gta-flujo-dato-label {
+    color: var(--text-soft, #a5adb4);
+    font-weight: 600;
+    min-width: 140px;
+}
+
+.gta-flujo-dato-valor {
+    color: var(--text, #f5f7f8);
+    flex: 1;
+    word-break: break-word;
+}
+
+/* ── Acordeón inline (reemplaza modal de detalle) ─────────────────────── */
+
+.gta-tarea-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.gta-tarea-card-head-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 50%;
+    min-width: 0;
+}
+
+.gta-tarea-card-head-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    font-size: 11px;
+}
+
+.gta-card-chevron {
+    color: var(--text-muted, #9aa0a6);
+    transition: transform 0.18s ease;
+    font-size: 11px;
+}
+
+.gta-tarea-card.is-open .gta-card-chevron {
+    transform: rotate(90deg);
+    color: var(--accent, #8ab4f8);
+}
+
+.gta-tarea-card-head .gta-tarea-card-titulo {
+    font-size: 13px;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gta-card-area {
+    color: var(--text-muted, #9aa0a6);
+    white-space: nowrap;
+}
+
+.gta-card-resp {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.05);
+    color: var(--text-primary, #e8eaed);
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.gta-card-resp.es-clickeable {
+    cursor: pointer;
+}
+.gta-card-resp.es-clickeable:hover {
+    background: rgba(138,180,248,0.18);
+    color: var(--accent, #8ab4f8);
+}
+
+.gta-resp-vacio {
+    font-style: italic;
+    color: var(--text-muted, #9aa0a6);
+    border: 1px dashed rgba(255,255,255,0.12);
+    background: transparent;
+}
+
+.gta-card-sla {
+    color: var(--text-muted, #9aa0a6);
+    white-space: nowrap;
+}
+
+/* Cuerpo del acordeón */
+.gta-tarea-card-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.2s ease, padding 0.2s ease;
+    padding: 0 14px;
+}
+
+.gta-tarea-card.is-open .gta-tarea-card-body {
+    max-height: 4000px;
+    padding: 0 14px 14px 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Secciones del acordeón */
+.gta-acc-section {
+    margin-top: 14px;
+}
+
+.gta-acc-h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #9aa0a6);
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gta-acc-tag-editable {
+    background: rgba(120,200,140,0.15);
+    color: #8fdca8;
+    text-transform: none;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0;
+    font-weight: 500;
+}
+
+.gta-acc-tag-readonly {
+    background: rgba(138,180,248,0.12);
+    color: #8ab4f8;
+    text-transform: none;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0;
+    font-weight: 500;
+}
+
+.gta-acc-body {
+    color: var(--text-primary, #e8eaed);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* Formulario en una sola columna: cada campo en su propia línea para
+   facilitar la lectura cuando hay muchos campos. */
+.gta-acc-form-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.gta-acc-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.gta-acc-campo label {
+    font-size: 12px;
+    color: var(--text-soft, #a5adb4);
+    font-weight: 600;
+}
+
+.gta-req {
+    color: var(--danger, #ff6b6b);
+    font-weight: 700;
+}
+
+/* Banner de tarea bloqueada */
+.gta-banner-bloqueada {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,200,80,0.12);
+    color: #ffd166;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.gta-banner-bloqueada i {
+    font-size: 16px;
+}
+
+/* Acciones del acordeón */
+.gta-acc-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    justify-content: flex-end;
+}
+
+.gta-acc-actions button {
+    padding: 7px 14px;
+    font-size: 12px;
+}
+
+.gta-btn-tomar {
+    background: var(--accent, #8ab4f8);
+    color: #0b1220;
+    border-color: var(--accent, #8ab4f8);
+    font-weight: 600;
+}
+.gta-btn-tomar:hover {
+    filter: brightness(1.1);
+}
+
+/* Popover de asignación */
+.gta-asignar-popover {
+    position: absolute;
+    background: rgba(12,16,22,0.97);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    z-index: 3000;
+    min-width: 220px;
+    padding: 6px;
+    backdrop-filter: blur(8px);
+}
+
+.gta-pop-opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-primary, #e8eaed);
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+}
+
+.gta-pop-opt:hover {
+    background: rgba(138,180,248,0.12);
+    color: var(--accent, #8ab4f8);
+}
+
+.gta-pop-yo {
+    background: rgba(120,200,140,0.10);
+    color: #8fdca8;
+    margin-bottom: 4px;
+}
+.gta-pop-yo:hover {
+    background: rgba(120,200,140,0.20);
+    color: #8fdca8;
+}
+
+.gta-pop-divider {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #9aa0a6);
+    padding: 8px 10px 4px 10px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin-top: 4px;
+}
+
+/* Flash de mensaje al guardar borrador */
+.gta-flash {
+    position: absolute;
+    bottom: 14px;
+    right: 14px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    z-index: 100;
+    animation: gtaFlashIn 0.2s ease;
+}
+
+.gta-flash-ok {
+    background: rgba(120,200,140,0.18);
+    color: #8fdca8;
+    border: 1px solid rgba(120,200,140,0.35);
+}
+
+@keyframes gtaFlashIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.gta-tarea-card {
+    position: relative;
+    padding: 0;
+}
+
+/* ── Adjuntos del flujo ─────────────────────────────────────────────── */
+
+.gta-adjuntos-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 32px;
+}
+
+.gta-adjunto-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 0.88rem;
+}
+
+.gta-adjunto-item a {
+    color: var(--accent, #4ea1ff);
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.gta-adjunto-item a:hover {
+    text-decoration: underline;
+}
+
+.gta-adjunto-meta {
+    color: var(--text-soft, #a5adb4);
+    font-size: 0.78rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gta-adjuntos-upload {
+    margin-top: 8px;
+}
+
+/* ── Items / checklist del paso ─────────────────────────────────── */
+.gta-items-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gta-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 6px;
+    border-radius: 6px;
+    font-size: 0.92rem;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.gta-item-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.gta-item-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--accent, #4ea1ff);
+}
+
+.gta-item-row input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.gta-item-row.is-tickeado .gta-item-titulo {
+    text-decoration: line-through;
+    color: var(--text-soft, #a5adb4);
+}
+
+.gta-item-titulo {
+    flex: 1;
+    min-width: 0;
+}
+
+.gta-item-badge-req,
+.gta-item-badge-opt,
+.gta-item-badge-desb {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.gta-item-badge-req {
+    background: rgba(255, 107, 107, 0.16);
+    color: #ff8b8b;
+    border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.gta-item-badge-opt {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-soft, #a5adb4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gta-item-badge-desb {
+    background: rgba(78, 161, 255, 0.14);
+    color: var(--accent, #4ea1ff);
+    border: 1px solid rgba(78, 161, 255, 0.3);
+}
+
+.gta-item-meta {
+    font-size: 0.74rem;
+    color: var(--text-soft, #a5adb4);
+    flex-shrink: 0;
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    color: var(--text-soft, #a5adb4);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+
+.btn-icon-danger:hover {
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.1);
+}
+
+/* ── Banner: tarea esperando que otra área resuelva un quiebre ─────── */
+
+.gta-banner-quiebre {
+    background: rgba(255, 165, 0, 0.12);
+    border: 1px solid rgba(255, 165, 0, 0.35);
+    color: #ffb84d;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+}
+
+.gta-banner-quiebre i {
+    color: #ffa500;
+    font-size: 1.1rem;
+}
+
+/* ── Quiebres dentro del acordeón de la tarea (lectura) ────────────── */
+
+.gta-quiebres-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 32px;
+}
+
+.gta-quiebre-item {
+    border-left: 3px solid rgba(255, 165, 0, 0.5);
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+.gta-quiebre-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.gta-quiebre-area {
+    font-weight: 600;
+    color: #ffb84d;
+    font-size: 0.88rem;
+}
+
+.gta-quiebre-meta {
+    color: var(--text-soft, #a5adb4);
+    font-size: 0.78rem;
+}
+
+.gta-quiebre-desc {
+    font-size: 0.88rem;
+    line-height: 1.4;
+    color: #d8dde3;
+}
+
+.gta-quiebre-nota {
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: rgba(76, 175, 80, 0.12);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #c8e6c9;
+}
+
+.gta-quiebre-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.gta-quiebre-badge-open  { background: rgba(255, 165, 0, 0.18); color: #ffb84d; }
+.gta-quiebre-badge-ok    { background: rgba(76, 175, 80, 0.18); color: #81c784; }
+
+/* ── Vista "Quiebres a mi área" (cards principales) ────────────────── */
+
+.gta-subtab-quiebres { color: #ffb84d; }
+
+.gta-quiebre-card {
+    background: var(--surface, #1f2429);
+    border: 1px solid rgba(255, 165, 0, 0.25);
+    border-left: 4px solid #ffa500;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gta-quiebre-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: baseline;
+}
+
+.gta-quiebre-area-badge {
+    background: rgba(255, 165, 0, 0.18);
+    color: #ffb84d;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.gta-quiebre-card-meta {
+    color: var(--text-soft, #a5adb4);
+    font-size: 0.85rem;
+}
+
+.gta-quiebre-card-flujo {
+    color: var(--text-soft, #a5adb4);
+    font-size: 0.82rem;
+}
+
+.gta-quiebre-card-desc {
+    background: rgba(0, 0, 0, 0.25);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+.gta-quiebre-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ── Comentarios libres del flujo ──────────────────────────────────── */
+
+.gta-comentarios-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 32px;
+}
+
+.gta-comentario-item {
+    border-left: 3px solid rgba(78, 161, 255, 0.4);
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+.gta-comentario-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+}
+
+.gta-comentario-head strong {
+    color: var(--accent, #4ea1ff);
+    font-weight: 600;
+}
+
+.gta-comentario-meta {
+    color: var(--text-soft, #a5adb4);
+    font-size: 0.78rem;
+    flex: 1;
+}
+
+.gta-comentario-texto {
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: #d8dde3;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.gta-comentario-form {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-comentario-form textarea {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e6e9ed;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+}
+
+.gta-comentario-form button {
+    align-self: flex-end;
+}
+
+/* ── Avisos de revisión (cambios post-cierre en pasos anteriores) ──── */
+
+.gta-card-aviso-badge {
+    background: rgba(255, 204, 0, 0.18);
+    color: #ffcc00;
+    border: 1px solid rgba(255, 204, 0, 0.4);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.gta-banner-aviso {
+    background: rgba(255, 204, 0, 0.08);
+    border: 1px solid rgba(255, 204, 0, 0.35);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+}
+
+.gta-banner-aviso-head {
+    color: #ffcc00;
+    font-size: 0.92rem;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gta-banner-aviso-head i { color: #ffcc00; }
+
+.gta-banner-aviso-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gta-aviso-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255, 204, 0, 0.15);
+    font-size: 0.88rem;
+}
+
+.gta-aviso-item:first-child {
+    border-top: 0;
+}
+
+.gta-aviso-msg { flex: 1; line-height: 1.4; color: #e0e4e8; }
+
+.gta-aviso-meta { color: var(--text-soft, #a5adb4); font-size: 0.78rem; }

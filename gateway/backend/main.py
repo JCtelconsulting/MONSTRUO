@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlsplit
@@ -16,10 +18,13 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Re
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response as FastAPIResponse
 from pydantic import BaseModel
 
-from .api.routers import admin_users, config_router, ops
+logger = logging.getLogger(__name__)
+
+from gateway.backend.routers import admin_users, config_router, gta_areas, ops
 from plataforma.core import auth_service, db, deps, security
 from plataforma.core.config import settings as app_settings
 from plataforma.core.middleware import AuthIdentityMiddleware
+from plataforma.core.version import inject_asset_version
 from plataforma.core.web import build_login_redirect_url
 
 ROOT_PATH = os.getenv("ROOT_PATH", "").strip()
@@ -30,16 +35,30 @@ _WEAK_SECRET_MARKERS = {
     "dev_only_change_me",
 }
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
+    if _is_weak_secret(getattr(app_settings, "SECRET_KEY", "")):
+        if env_type == "prod":
+            raise RuntimeError("CRITICAL: SECRET_KEY inseguro en PROD.")
+        app_settings.SECRET_KEY = secrets.token_urlsafe(64)
+        logger.warning("[SECURITY] SECRET_KEY inseguro/ausente. Se generó una clave efímera.")
+    db.init_db()
+    yield
+
+
 app = FastAPI(
     title="Monstruo OS - Gateway Perimetral",
     version="4.0",
     root_path=ROOT_PATH,
+    lifespan=lifespan,
 )
 app.add_middleware(AuthIdentityMiddleware)
 
-ui_dir = Path(__file__).parent.parent / "frontend"
+ui_dir = Path(__file__).parent.parent / "ui"
 repo_root = Path(__file__).resolve().parents[2]
 fundacion_ui_dir = repo_root / "fundacion" / "ui"
+gta_ui_dir = repo_root / "gta" / "ui"
 
 
 def _public_prefix(request: Request) -> str:
@@ -84,7 +103,7 @@ def _serve_module_html(request: Request, module_path: str, fallback_path: str = 
             html = html.replace("<head>", f"<head>\n    {base_tag}", 1)
         else:
             html = base_tag + html
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=inject_asset_version(html))
 
     fallback_relative_path = fallback_path.lstrip("/")
     for root in search_roots:
@@ -108,7 +127,7 @@ def _serve_module_html(request: Request, module_path: str, fallback_path: str = 
             html = html.replace("<head>", f"<head>\n    {base_tag}", 1)
         else:
             html = base_tag + html
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=inject_asset_version(html))
 
     raise HTTPException(status_code=404, detail="module_not_found")
 
@@ -242,18 +261,20 @@ class ChangePasswordIn(BaseModel):
 
 app.include_router(admin_users.router)
 app.include_router(config_router.router)
+app.include_router(gta_areas.router)
 app.include_router(ops.router)
 
 SERVICES_MAP = {
     "ticketera": f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
-    "tks": f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
-    "erp": "http://erp:8000",
-    "bodega": "http://bodega:8000",
-    "crm": "http://crm:8000",
-    "pmo": "http://pmo:8000",
-    "ia": "http://ia:8000",
-    "zabbix": "http://zabbix:8000",
+    "tks":       f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
     "fundacion": f"http://fundacion:{os.getenv('FUNDACION_PORT', '9006')}",
+    "bodega":    f"http://bodega:{os.getenv('BODEGA_PORT', '9007')}",
+    "crm":       f"http://crm:{os.getenv('CRM_PORT', '9008')}",
+    "erp":       f"http://erp:{os.getenv('ERP_PORT', '9009')}",
+    "pmo":       f"http://pmo:{os.getenv('PMO_PORT', '9010')}",
+    "ia":        f"http://ia:{os.getenv('IA_PORT', '9011')}",
+    "gta":       f"http://gta:{os.getenv('GTA_PORT', '9012')}",
+    "zabbix":    f"http://zabbix:{os.getenv('ZABBIX_PORT', '9013')}",
 }
 
 SERVICE_API_PREFIX = {
@@ -266,6 +287,7 @@ SERVICE_API_PREFIX = {
     "ia": "ultron",
     "zabbix": "zabbix",
     "fundacion": "fundacion",
+    "gta": "gta",
 }
 
 
@@ -313,16 +335,6 @@ async def _proxy_to_target(target_url: str, request: Request) -> FastAPIResponse
         )
 
 
-@app.on_event("startup")
-async def startup() -> None:
-    env_type = str(getattr(app_settings, "ENV_TYPE", "dev") or "dev").strip().lower()
-    if _is_weak_secret(getattr(app_settings, "SECRET_KEY", "")):
-        if env_type == "prod":
-            raise RuntimeError("CRITICAL: SECRET_KEY inseguro en PROD.")
-        app_settings.SECRET_KEY = secrets.token_urlsafe(64)
-        print("[SECURITY] WARN: SECRET_KEY inseguro/ausente. Se genero una clave efimera.")
-
-    db.init_db()
 
 
 @app.post("/api/auth/login")
@@ -532,7 +544,7 @@ async def fundacion_root_slash():
     index_path = fundacion_ui_dir / "fundacion.html"
     if not index_path.exists():
         raise HTTPException(status_code=404, detail="fundacion_ui_not_found")
-    return HTMLResponse(index_path.read_text(encoding="utf-8"))
+    return HTMLResponse(inject_asset_version(index_path.read_text(encoding="utf-8")))
 
 
 @app.get("/fundacion/fundacion.html")
@@ -540,9 +552,34 @@ async def fundacion_canonical_redirect(request: Request):
     return RedirectResponse(_prefixed_path(request, "/fundacion/"), status_code=302)
 
 
+@app.get("/gta")
+async def gta_root(request: Request):
+    return RedirectResponse(_prefixed_path(request, "/gta/"), status_code=302)
+
+
+@app.get("/gta/")
+async def gta_root_slash():
+    index_path = gta_ui_dir / "gta.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="gta_ui_not_found")
+    return HTMLResponse(inject_asset_version(index_path.read_text(encoding="utf-8")))
+
+
+@app.get("/gta/gta.html")
+async def gta_canonical_redirect(request: Request):
+    return RedirectResponse(_prefixed_path(request, "/gta/"), status_code=302)
+
+
 @app.get("/fundacion/{asset_path:path}")
 async def fundacion_static(asset_path: str):
     return _serve_static_file(fundacion_ui_dir, asset_path)
+
+
+@app.get("/gta/{asset_path:path}")
+async def gta_static(asset_path: str):
+    if asset_path.startswith("shared/"):
+        return _serve_static_file(ui_dir / "shared" / "ui", asset_path[len("shared/"):])
+    return _serve_static_file(gta_ui_dir, asset_path)
 
 
 @app.get("/health")

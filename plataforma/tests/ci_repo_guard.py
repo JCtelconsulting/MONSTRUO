@@ -25,14 +25,15 @@ def main() -> int:
 
     required_docs = [
         "README.md",
+        "CLAUDE.md",
         "AGENTS.md",
         "plataforma/docs/README.md",
-        "plataforma/docs/PLAN_MAESTRO_MONSTRUO.md",
         "plataforma/docs/PROYECTO_CONTEXTO.md",
-        "plataforma/docs/PROXY_INVERSO.md",
-        "plataforma/docs/ARQUITECTURA.md",
-        "plataforma/docs/CHANGELOG.md",
-        "plataforma/docs/CONTRATO_APPS.md",
+        "plataforma/docs/GUIA_MAESTRA.md",
+        "plataforma/docs/arquitectura/PROXY_INVERSO.md",
+        "plataforma/docs/arquitectura/ARQUITECTURA.md",
+        "plataforma/docs/arquitectura/CONTRATO_APPS.md",
+        "plataforma/docs/changelog/README.md",
     ]
     for rel in required_docs:
         expect_exists(rel, errors)
@@ -50,6 +51,10 @@ def main() -> int:
         "ARQUITECTURA.md",
         "CHANGELOG.md",
         "PLAN_DE_SANEAMIENTO.md",
+        "plataforma/docs/AGENTS.md",  # ahora vive en raíz, no debe duplicarse en docs
+        "plataforma/docs/PLAN_MAESTRO_MONSTRUO.md",
+        "plataforma/docs/DESIGN.md",
+        "plataforma/docs/PROMPT_CHAT_UNIVERSAL.md",
     ]
     for rel in old_root_docs:
         expect_missing(rel, errors)
@@ -65,13 +70,20 @@ def main() -> int:
     for rel in legacy_structure_paths:
         expect_missing(rel, errors)
 
+    # Contrato canónico: cada app tiene README.md + Dockerfile en raíz y
+    # backend/main.py + backend/router.py adentro. Gateway es la excepción
+    # porque tiene routers/ múltiples en vez de router.py único.
     app_contract = {
-        "bodega": ["README.md", "Dockerfile", "main.py", "router.py", "service.py"],
-        "crm": ["README.md", "Dockerfile", "main.py", "router.py", "service.py"],
-        "erp": ["README.md", "Dockerfile", "main.py", "router.py", "service.py"],
-        "fundacion": ["README.md", "Dockerfile", "main.py", "router.py"],
-        "gateway": ["README.md", "Dockerfile", "backend/main.py"],
-        "ticketera": ["README.md", "Dockerfile", "backend/main.py", "backend/router.py", "backend/service.py"],
+        "gateway":   ["README.md", "Dockerfile", "backend/main.py"],
+        "ticketera": ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "gta":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "fundacion": ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "bodega":    ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "crm":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "erp":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "pmo":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "ia":        ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
+        "zabbix":    ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
     }
     for app, files in app_contract.items():
         for rel in files:
@@ -80,11 +92,11 @@ def main() -> int:
     readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
     for ref in (
         "plataforma/docs/README.md",
-        "plataforma/docs/PLAN_MAESTRO_MONSTRUO.md",
+        "AGENTS.md",
         "plataforma/docs/PROYECTO_CONTEXTO.md",
-        "plataforma/docs/PROXY_INVERSO.md",
-        "plataforma/docs/ARQUITECTURA.md",
-        "plataforma/docs/CHANGELOG.md",
+        "plataforma/docs/GUIA_MAESTRA.md",
+        "plataforma/docs/arquitectura/ARQUITECTURA.md",
+        "plataforma/docs/changelog/",
     ):
         if ref not in readme_text:
             errors.append(f"README.md no referencia {ref}")
@@ -119,10 +131,10 @@ def main() -> int:
                 "docker-compose.yaml: db debe usar bind ./plataforma/data/postgres:/var/lib/postgresql/data"
             )
 
-        # 4) Mounts críticos data_runtime/{tickets,compliance} en gateway y ticketera.
+        # 4) Mounts críticos ticketera/data/{tickets,compliance} en gateway y ticketera.
         required_mounts = (
-            "./plataforma/data_runtime/tickets:/app/plataforma/data_runtime/tickets",
-            "./plataforma/data_runtime/compliance:/app/plataforma/data_runtime/compliance",
+            "./ticketera/data/tickets:/app/ticketera/data/tickets",
+            "./ticketera/data/compliance:/app/ticketera/data/compliance",
         )
         for mount in required_mounts:
             if compose_text.count(mount) < 2:

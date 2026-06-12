@@ -1,0 +1,118 @@
+<div class="gta-tareas">
+    <div class="gta-area-pills" id="tareas-areas-pills" style="margin-bottom:12px;"></div>
+    <div class="gta-tareas-header">
+        <div class="gta-tareas-subtabs">
+            <button class="gta-subtab active" data-view="bandeja" onclick="Tareas.cambiarVista('bandeja', this)">
+                <i class="fas fa-inbox"></i> Bandeja de mi área
+                <span class="gta-subtab-count" id="count-bandeja">—</span>
+            </button>
+            <button class="gta-subtab" data-view="mias" onclick="Tareas.cambiarVista('mias', this)">
+                <i class="fas fa-user-check"></i> Mis tareas
+                <span class="gta-subtab-count" id="count-mias">—</span>
+            </button>
+            <button class="gta-subtab" data-view="colaboro" onclick="Tareas.cambiarVista('colaboro', this)">
+                <i class="fas fa-handshake"></i> Donde colaboro
+                <span class="gta-subtab-count" id="count-colaboro">—</span>
+            </button>
+        </div>
+        <div class="gta-tareas-actions">
+            <button class="btn-primary" onclick="Tareas.abrirNueva()">
+                <i class="fas fa-plus"></i> Nueva tarea
+            </button>
+        </div>
+    </div>
+
+    <div class="gta-tareas-filters" id="tareas-filters">
+        <label class="gta-filter-check">
+            <input type="checkbox" id="incluir-cerradas" onchange="Tareas.recargar()">
+            Incluir cerradas
+        </label>
+    </div>
+
+    <div class="gta-tareas-content" id="tareas-content">
+        <div class="gta-loading"><i class="fas fa-spinner fa-spin"></i> Cargando tareas...</div>
+    </div>
+</div>
+
+
+
+
+<!-- Modal: Nueva tarea -->
+<div class="modal-backdrop" id="modal-nueva-tarea">
+    <div class="modal-content" style="max-width:640px;">
+        <div class="modal-header">
+            <h2>Nueva tarea</h2>
+            <button class="modal-close-btn" onclick="Tareas.cerrarNueva()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label>Subárea *</label>
+                <select id="nueva-tarea-subarea" class="input-dark"></select>
+                <small class="gta-section-help">La tarea queda en la bandeja de la subárea hasta que alguien la tome.</small>
+            </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Título *</label>
+                <input type="text" id="nueva-tarea-titulo" class="input-dark" placeholder="Resumen breve">
+            </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Descripción</label>
+                <textarea id="nueva-tarea-desc" class="input-dark" rows="3" placeholder="Detalle, contexto, links…"></textarea>
+            </div>
+            <div class="field-row" style="display:flex; gap:10px; margin-top:10px;">
+                <div class="field" style="flex:1;">
+                    <label>Prioridad</label>
+                    <select id="nueva-tarea-prioridad" class="input-dark">
+                        <option value="baja">Baja</option>
+                        <option value="media" selected>Media</option>
+                        <option value="alta">Alta</option>
+                        <option value="urgente">Urgente</option>
+                    </select>
+                </div>
+                <div class="field" style="flex:1;">
+                    <label>SLA (horas)</label>
+                    <input type="number" id="nueva-tarea-sla" class="input-dark" min="0" placeholder="—">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn-secondary" onclick="Tareas.cerrarNueva()">Cancelar</button>
+            <button class="btn-primary" onclick="Tareas.guardarNueva()">Crear</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- Modal: Agregar colaborador -->
+<div class="modal-backdrop" id="modal-colab">
+    <div class="modal-content" style="max-width:600px;">
+        <div class="modal-header">
+            <h2>Agregar colaborador</h2>
+            <button class="modal-close-btn" onclick="Tareas.cerrarColab()">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="colab-tarea-id">
+            <div class="field">
+                <label>Usuario *</label>
+                <input type="text" id="colab-username" class="input-dark" placeholder="usuario@dominio">
+                <small class="gta-section-help">Correo del colaborador (ej: juan.lopez@telconsulting.cl)</small>
+            </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Rol</label>
+                <select id="colab-rol" class="input-dark">
+                    <option value="ayuda">Ayuda</option>
+                    <option value="co_responsable">Co-responsable</option>
+                </select>
+            </div>
+            <div class="field" style="margin-top:10px;">
+                <label>Motivo</label>
+                <input type="text" id="colab-motivo" class="input-dark" placeholder="Opcional">
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn-secondary" onclick="Tareas.cerrarColab()">Cancelar</button>
+            <button class="btn-primary" onclick="Tareas.guardarColab()">Agregar</button>
+        </div>
+    </div>
+</div>
+
+
