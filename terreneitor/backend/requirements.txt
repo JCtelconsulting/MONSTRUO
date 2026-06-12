@@ -1,0 +1,55 @@
+# Framework Web
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+aiofiles==23.2.1
+
+# Base de Datos
+sqlalchemy>=2.0.31
+# drivers (sqlite integrado; psycopg2 para el Postgres central de Monstruo)
+psycopg2-binary>=2.9.9
+
+# Procesamiento de Imagenes
+Pillow==12.1.0
+piexif==1.1.3
+
+# Reportes
+python-docx==1.1.0
+
+# Seguridad y Autenticacion
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+slowapi==0.1.9
+
+# Utilidades
+requests==2.31.0
+pytz==2024.1
+python-dotenv==1.0.1
+email-validator==2.2.0
+
+# Desarrollo y Calidad (QA)
+pre-commit==3.6.0
+black==24.1.1
+ruff==0.1.15
+mypy==1.8.0
+types-requests
+
+# Testing
+pytest==8.0.0
+pytest-asyncio==0.23.5
+httpx==0.26.0
+
+# Monitoring
+sentry-sdk[fastapi]==1.40.0
+
+# Security
+
+# AI Engine / RAG
+chromadb==0.4.18
+pillow-heif>=0.18.0
+numpy<2.0.0
+
+# AI Providers
+google-generativeai>=0.8.0
+openai>=1.54.0
+anthropic>=0.40.0

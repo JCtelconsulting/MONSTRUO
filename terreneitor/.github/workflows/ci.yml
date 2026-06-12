@@ -1,0 +1,53 @@
+name: CI - Tests y Linting
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "backend/requirements.txt"
+
+      - name: Cache pre-commit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+          python -m pip install pre-commit pytest-cov
+
+      - name: Ejecutar pre-commit hooks
+        run: pre-commit run --all-files
+
+      - name: Ejecutar tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          TERRENEITOR_TEST_MODE: "1"
+        run: pytest backend/tests/ -v --cov=backend --cov-report=term --cov-report=xml
+
+      - name: Subir coverage.xml como artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: coverage-xml
+          path: ./coverage.xml
+          if-no-files-found: warn

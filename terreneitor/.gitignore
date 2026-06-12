@@ -1,0 +1,77 @@
+# --- Python ---
+__pycache__/
+*.pyc
+venv/
+.env
+
+# --- Caches y Temporales Desarrollo ---
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Seguridad (CRÍTICO) ---
+secure/
+*.key
+*.pem
+*.json
+!code/static/manifest.json
+!static/manifest.json
+rclone.conf
+id_rsa
+id_rsa.pub
+
+# --- Sistema / IDE ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Logs y Temporales ---
+logs/
+*.log
+temp/
+tmp/
+*.bak
+*.bak_*
+*.bak.*
+*.old
+
+# --- Datos Terreneitor ---
+# Ignoramos las bases de datos locales
+data/db/*.db
+data/db/*.db-journal
+data/db/*.db-wal
+data/db/*.db-shm
+data/db/*.bak*
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+audit_*.txt
+data/locks/
+data/.recycle/
+
+# Ignoramos las evidencias (fotos), pero mantenemos la carpeta
+data/files/*
+!data/files/.gitkeep
+data/backups/
+data/reportes/
+node_modules/
+github-runner/
+
+# Papelera local del refactor (no se sube al repo)
+_papelera_refactor/
+
+# Estado local de Claude Code (locks de scheduled tasks, etc.)
+.claude/
+
+# Screenshots de pruebas de navegador (artefactos)
+e2e/shots/
+data/cache/
+
+# --- Modulo Monstruo: datos runtime fuera del repo (AGENTS.md regla 9) ---
+data/
+logs/
+e2e/shots/

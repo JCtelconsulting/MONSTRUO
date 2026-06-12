@@ -1,0 +1,27 @@
+version: '3.8'
+
+# Entorno de DESARROLLO en la VM 60.8.
+# Espejo de prod (mismo Dockerfile/código) pero aislado:
+#  - puerto host 8005 -> 8000 contenedor (el proxy /dev apunta a 60.8:8005)
+#  - ENV=dev, SECRET_KEY propia y cookie access_token_dev (ver ops/environments/.env)
+#  - corre como juan (1000:1000) para permisos de los volúmenes montados
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: terreneitor-app-dev
+    ports:
+      - "8005:8000"
+    volumes:
+      - ../backend:/app/backend
+      - ../frontend:/app/frontend
+      - ../data:/app/data
+      - ../logs:/app/logs
+    env_file:
+      - ../ops/environments/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENV=dev
+    user: "1000:1000"
+    restart: unless-stopped

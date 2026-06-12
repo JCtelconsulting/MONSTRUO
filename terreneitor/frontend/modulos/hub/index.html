@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terreneitor | Telconsulting</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Dosis:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Barra IDÉNTICA de Monstruo: assets reales del gateway (vía /shared proxy) -->
+    <link rel="stylesheet" href="../../shared/css/monstruo.css" />
+    <link rel="stylesheet" href="css/hub.css?v=2.1" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      href="../_compartido/img/logo/telconsulting-isotipo-dorado.png"
+    />
+  </head>
+
+  <body class="sidebar-collapsed hub-page" data-current-module="terreneitor">
+    <!-- Esqueleto idéntico a las páginas del gateway: sidebar.js lo puebla -->
+    <header id="app-header">
+      <div class="header-top">
+        <h1>MONSTRUO</h1>
+        <button id="sidebar-toggle" class="btn-icon" title="Colapsar menú">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+
+      <nav id="dynamic-sidebar" class="side-nav"></nav>
+      <div class="header-actions">
+        <span id="who" class="pill shell-who-pill">Usuario</span>
+        <div class="footer-buttons-container">
+          <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+            <i class="fas fa-key"></i> <span>Cuenta</span>
+          </button>
+          <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+            <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hub-hero">
+        <h2>¿Dónde quieres entrar?</h2>
+        <p class="hub-sub">Informes de terreno con evidencia fotográfica</p>
+      </section>
+      <section class="hub-cards" id="hub-cards">
+        <a class="hub-card" data-rol="TERRENO,SUPERVISOR,ADMIN" data-path="/modulos/terreno/">
+          <i class="fas fa-hard-hat"></i>
+          <h3>TERRENO</h3>
+          <p>Ejecución y captura de fotos</p>
+          <span class="hub-cta">Entrar <i class="fas fa-arrow-right"></i></span>
+        </a>
+        <a class="hub-card" data-rol="SUPERVISOR,ADMIN" data-path="/modulos/supervisor/">
+          <i class="fas fa-user-check"></i>
+          <h3>SUPERVISIÓN</h3>
+          <p>Planificación, validación y control</p>
+          <span class="hub-cta">Entrar <i class="fas fa-arrow-right"></i></span>
+        </a>
+        <a class="hub-card" data-rol="GERENCIA,ADMIN" data-path="/modulos/gerencia/">
+          <i class="fas fa-chart-line"></i>
+          <h3>GERENCIA</h3>
+          <p>Indicadores en tiempo real</p>
+          <span class="hub-cta">Entrar <i class="fas fa-arrow-right"></i></span>
+        </a>
+        <a class="hub-card" data-rol="ADMIN" data-path="/modulos/portal/">
+          <i class="fas fa-screwdriver-wrench"></i>
+          <h3>ADMINISTRACIÓN</h3>
+          <p>Usuarios, proyectos y sistema</p>
+          <span class="hub-cta">Entrar <i class="fas fa-arrow-right"></i></span>
+        </a>
+      </section>
+    </main>
+
+    <!-- JS reales del gateway: fetchApi/initLogout/initModal + sidebar dinámico -->
+    <script src="../../shared/js/utilidades.js"></script>
+    <script src="../../shared/js/sidebar.js"></script>
+    <script src="js/hub.js?v=2.0"></script>
+  </body>
+</html>

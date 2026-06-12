@@ -1,0 +1,1062 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Supervisor | ULTRON</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Dosis:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="css/supervisor.css?v=69.0" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#070b11" />
+
+    <style>
+      /* CRITICAL FIX: Inline styles to bypass cache - Final Calibration */
+      #modal-change-password .field input,
+      #modal-change-password .field select {
+        background: rgba(8, 12, 18, 0.9) !important;
+        border: 1px solid #263140 !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        box-shadow: none !important;
+      }
+    </style>
+    <link
+      rel="icon"
+      type="image/png"
+      href="../_compartido/img/logo/telconsulting-isotipo-dorado.png"
+    />
+  </head>
+
+  <body class="sidebar-collapsed">
+    <header id="app-header">
+      <img
+        src="../_compartido/img/logo/telconsulting-isotipo-dorado.svg"
+        alt=""
+        class="brand-cube"
+      />
+      <div class="header-top">
+        <h1>SUPERVISION</h1>
+        <button id="sidebar-toggle" class="btn-icon" title="Menu">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+      <nav class="side-nav">
+        <button
+          class="side-link tab-link active"
+          data-tab="tab-planificar"
+          title="Planificar Trabajos"
+        >
+          <i class="fas fa-calendar"></i> <span>Planificar Trabajos</span>
+        </button>
+        <button class="side-link tab-link" data-tab="tab-activos" title="Proyectos en Curso">
+          <i class="fas fa-rocket"></i> <span>Proyectos en Curso</span>
+        </button>
+        <button class="side-link tab-link" data-tab="tab-validar" title="Validar Evidencia">
+          <i class="fas fa-check"></i> <span>Validar Evidencia</span>
+        </button>
+        <button class="side-link tab-link" data-tab="tab-listos" title="Proyectos Listos">
+          <i class="fas fa-folder-open"></i> <span>Proyectos Listos</span>
+        </button>
+        <button class="side-link tab-link" data-tab="tab-reportes" title="Reportes Internos">
+          <i class="fas fa-chart-column"></i> <span>Reportes Internos</span>
+        </button>
+        <a
+          class="side-link"
+          href="https://login.telconsulting.cl/dashboard"
+          onclick="this.href='https://login.telconsulting.cl'+(location.pathname.startsWith('/dev')?'/dev':'')+'/dashboard'"
+          title="Volver al ecosistema Monstruo"
+        >
+          <i class="fas fa-cubes"></i> <span>Monstruo</span>
+        </a>
+      </nav>
+      <div class="header-actions">
+        <span
+          id="who"
+          class="pill"
+          style="display: block; margin-bottom: 10px; font-size: 0.8rem; opacity: 0.7"
+          >Usuario</span
+        >
+        <div class="footer-buttons-container">
+          <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+            <i class="fas fa-key"></i> <span>Cuenta</span>
+          </button>
+          <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+            <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="tab-content">
+        <div id="tab-planificar" class="tab-pane active">
+          <!-- TOP: INSTRUCTIONS -->
+          <div class="panel-container instructions-panel">
+            <h4 class="section-title">INSTRUCCIONES DE PLANIFICACION</h4>
+            <p class="helper-text">
+              Selecciona proyectos activos, elige tareas de la lista y crea nuevas asignaciones para
+              las cuadrillas. Utiliza el analizador para importar tareas desde correos.
+            </p>
+          </div>
+          <!-- MIDDLE: SMART PLANNER -->
+          <div class="smart-planner-container">
+            <div class="planner-left" id="planner-config-left">
+              <h4 class="box-title">CONFIGURACIÓN DEL PLAN</h4>
+              <div class="form-group">
+                <label class="helper-text">Tipo de trabajo:</label>
+                <select id="plan-tipo" class="planner-name-input">
+                  <option value="">— Selecciona —</option>
+                  <option>Instalación</option>
+                  <option>Retiro</option>
+                  <option>Traslado</option>
+                  <option>Despacho</option>
+                  <option>Reportabilidad EPP</option>
+                  <option>Avance del día</option>
+                  <option>Visita / Preventa</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="helper-text">Cliente:</label>
+                <div style="display: flex; gap: 8px">
+                  <select id="plan-cliente" class="planner-name-input" style="flex: 1">
+                    <option value="">— Selecciona —</option>
+                  </select>
+                  <button
+                    id="btn-nuevo-cliente"
+                    type="button"
+                    class="btn-account"
+                    title="Agregar cliente nuevo"
+                  >
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="helper-text">N° (correlativo del cliente):</label>
+                <input
+                  type="number"
+                  id="plan-numero"
+                  class="planner-name-input"
+                  placeholder="Se asigna solo"
+                  min="1"
+                />
+              </div>
+              <div class="form-group">
+                <label class="helper-text">Fecha:</label>
+                <input type="date" id="plan-fecha" class="planner-name-input" />
+              </div>
+              <!-- Nombre final (se arma solo con los campos de arriba) -->
+              <input type="hidden" id="plan-descripcion" />
+              <div
+                id="plan-preview"
+                class="helper-text"
+                style="opacity: 0.8; min-height: 1em"
+              ></div>
+              <div class="planner-actions" style="margin-top: 15px">
+                <button id="btn-crear-plan" class="btn-principal" disabled>
+                  CONFIRMAR Y CREAR
+                </button>
+              </div>
+            </div>
+
+            <div class="planner-center">
+              <div class="arrow-indicator">
+                <i class="fas fa-arrow-right"></i>
+              </div>
+            </div>
+
+            <div class="planner-right" id="planner-selection-right">
+              <h4 class="box-title">RESPONSABLE / CUADRILLA</h4>
+              <div class="form-group" style="margin-top: 10px">
+                <p class="helper-text" style="margin-bottom: 8px">
+                  Asigne uno o más responsables (Cuadrilla):
+                </p>
+                <div id="especialistas-grid" class="user-grid">
+                  <p class="loading">Cargando especialistas...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Hidden Results Container (Processed by JS) -->
+          <div id="email-results" class="email-results" style="display: none"></div>
+          <div style="display: none">
+            <!-- Preserve IDs for JS compatibility -->
+            <button id="btn-email-clear"></button>
+            <button id="btn-email-apply"></button>
+          </div>
+
+          <!-- BOTTOM: WORKSPACE -->
+          <div class="panel-container cols-2">
+            <div class="left-col" style="display: flex; flex-direction: column; height: 100%">
+              <!-- HEADER BLOCK -->
+              <div class="plan-header-block" style="margin-bottom: 10px">
+                <h4 class="section-title" style="margin-bottom: 0">PROYECTOS ACTIVOS</h4>
+                <!-- Barra de búsqueda removida de aquí -->
+                <p class="helper-text" style="font-size: 0.75rem; margin-top: 2px; opacity: 0.7">
+                  Creacion, filtros y edicion de proyectos.
+                </p>
+              </div>
+
+              <!-- FILTER BLOCK -->
+              <div
+                class="plan-filter-block"
+                style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px"
+              >
+                <select
+                  id="filter-sort"
+                  class="input-dark"
+                  style="flex: 1; padding: 6px 10px; min-height: 32px; font-size: 0.8rem"
+                >
+                  <option value="activos">Estado (Activos primero)</option>
+                  <option value="nombre">Nombre (A-Z)</option>
+                </select>
+                <select
+                  id="filter-cliente"
+                  class="input-dark"
+                  style="flex: 1; padding: 6px 10px; min-height: 32px; font-size: 0.8rem"
+                >
+                  <option value="">Todo Cliente</option>
+                </select>
+                <select
+                  id="filter-zona-id"
+                  class="input-dark"
+                  style="flex: 1; padding: 6px 10px; min-height: 32px; font-size: 0.8rem"
+                >
+                  <option value="">ID o Comuna</option>
+                </select>
+              </div>
+
+              <!-- PROJECT LIST BOX (Unified Height) -->
+              <div
+                class="project-list-box glass-panel"
+                style="
+                  flex: 1;
+                  display: flex;
+                  flex-direction: column;
+                  overflow: hidden;
+                  padding: 0;
+                  border: 1px solid rgba(255, 255, 255, 0.08);
+                  background: rgba(0, 0, 0, 0.2);
+                  border-radius: 8px;
+                "
+              >
+                <!-- BUSQUEDA INSTANTANEA -->
+                <div
+                  class="project-search-bar"
+                  style="
+                    padding: 10px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                    background: rgba(0, 0, 0, 0.15);
+                  "
+                >
+                  <input
+                    type="text"
+                    id="search-projects"
+                    class="input-dark"
+                    placeholder="Escriba para buscar proyectos altiro..."
+                    style="width: 100%; padding: 8px 12px; font-size: 0.9rem; border-radius: 6px"
+                  />
+                </div>
+                <!-- Meta hidden or repurposed -->
+                <div class="plan-list-meta" style="display: none">
+                  <span id="project-count" class="pill-outline">0</span>
+                  <button id="btn-project-more" class="btn-tiny blue" type="button">
+                    MOSTRAR MAS
+                  </button>
+                </div>
+
+                <ul
+                  id="project-list"
+                  class="list-group"
+                  style="flex: 1; overflow-y: auto; padding: 10px"
+                ></ul>
+
+                <div
+                  class="plan-list-footer"
+                  id="project-pagination"
+                  style="padding: 10px; border-top: 1px solid rgba(255, 255, 255, 0.05)"
+                >
+                  <!-- Pagination injected by JS -->
+                </div>
+              </div>
+            </div>
+            <div
+              class="right-col flex-col"
+              style="height: 100%; display: flex; flex-direction: column"
+            >
+              <!-- Header aligned with Left Side -->
+              <div
+                class="queue-header"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: flex-end;
+                  margin-bottom: 10px;
+                  height: 32px;
+                "
+              >
+                <!-- Height matches compacted filters approx -->
+              </div>
+
+              <div class="selection-queue">
+                <h4 class="box-title"><i class="fas fa-check-circle"></i> TAREAS SELECCIONADAS</h4>
+                <div class="queue-body">
+                  <ul id="selected-items-list" class="mini-list"></ul>
+                </div>
+              </div>
+              <div
+                class="section-header"
+                style="
+                  margin-top: 10px;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: stretch;
+                  gap: 8px;
+                "
+              >
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                  <h3 class="section-title" style="margin-bottom: 0">TAREAS DEL PROYECTO</h3>
+                  <div class="section-meta">
+                    <span id="active-project-name" class="ghost-pill">Sin proyecto</span>
+                    <span id="item-count" class="ghost-pill">0 tareas</span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="project-list-box glass-panel"
+                style="
+                  flex: 1;
+                  display: flex;
+                  flex-direction: column;
+                  overflow: hidden;
+                  padding: 0;
+                  border: 1px solid rgba(255, 255, 255, 0.08);
+                  background: rgba(0, 0, 0, 0.2);
+                  border-radius: 8px;
+                  margin-top: 5px;
+                "
+              >
+                <div
+                  class="task-search-bar"
+                  style="
+                    padding: 10px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                    background: rgba(0, 0, 0, 0.15);
+                  "
+                >
+                  <input
+                    type="text"
+                    id="search-tasks"
+                    class="input-dark"
+                    placeholder="Escriba para buscar tareas altiro..."
+                    style="
+                      width: 100%;
+                      padding: 8px 12px;
+                      font-size: 0.85rem;
+                      border: none;
+                      background: transparent;
+                      color: #fff;
+                      outline: none;
+                    "
+                  />
+                </div>
+                <div
+                  id="item-list"
+                  class="project-list-container scroll-box"
+                  style="flex: 1; padding: 10px; border: none; background: transparent"
+                >
+                  <p class="empty-msg">Seleccione un proyecto a la izquierda.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-activos" class="tab-pane">
+          <div class="panel-container flex-col">
+            <div class="flex-col">
+              <h3 class="section-title">PROYECTOS EN CURSO</h3>
+              <div id="planes-activos-container" class="scroll-box"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-validar" class="tab-pane">
+          <div class="cols-2">
+            <div class="panel-container flex-col">
+              <div
+                class="panel-header"
+                style="justify-content: space-between; display: flex; align-items: center"
+              >
+                <h3 class="section-title" style="margin-bottom: 0">VALIDAR EVIDENCIA</h3>
+                <div class="header-actions-inline" style="display: flex; gap: 5px">
+                  <button class="btn-tiny blue" onclick="window.expandirValidar()">EXPANDIR</button>
+                  <button class="btn-tiny red" onclick="window.colapsarValidar()">COLAPSAR</button>
+                </div>
+              </div>
+              <div id="por-validar-container" class="scroll-box"></div>
+            </div>
+            <div class="panel-container danger-border flex-col">
+              <div class="panel-header">
+                <h3 class="section-title danger-text">CUARENTENA (SIN EXIF)</h3>
+              </div>
+              <div id="exif-container" class="scroll-box"></div>
+            </div>
+          </div>
+        </div>
+        <div id="tab-listos" class="tab-pane">
+          <div class="panel-container flex-col">
+            <h3 class="section-title neon-text">PROYECTOS LISTOS</h3>
+            <div id="planes-listos-container" class="scroll-box"></div>
+          </div>
+        </div>
+
+        <div id="tab-reportes" class="tab-pane">
+          <div class="panel-container center-content">
+            <div class="report-selection-grid">
+              <!-- Card: Diario -->
+              <div class="report-type-card" onclick="window.selectReportType('diario', this)">
+                <i class="fas fa-sun"></i>
+                <h3>Diario</h3>
+                <p>Informe detallado de avance por día.</p>
+              </div>
+              <!-- Card: Semanal -->
+              <div class="report-type-card" onclick="window.selectReportType('semanal', this)">
+                <i class="fas fa-calendar-week"></i>
+                <h3>Semanal</h3>
+                <p>Resumen consolidado de la semana.</p>
+              </div>
+              <!-- Card: Mensual -->
+              <div class="report-type-card" onclick="window.selectReportType('mensual', this)">
+                <i class="fas fa-calendar-alt"></i>
+                <h3>Mensual</h3>
+                <p>Reporte global de cierre de mes.</p>
+              </div>
+              <!-- Card: Personalizado -->
+              <div
+                class="report-type-card"
+                onclick="window.selectReportType('personalizado', this)"
+              >
+                <i class="fas fa-sliders-h"></i>
+                <h3>Personalizado</h3>
+                <p>Rango de fechas específico.</p>
+              </div>
+            </div>
+
+            <!-- Configuration Panel (Appears on selection) -->
+            <div id="report-config-panel" class="report-config-panel" style="display: none">
+              <input type="hidden" id="reporte-tipo" value="" />
+
+              <div id="div-fecha-diario" class="report-input-group" style="display: none">
+                <label>Fecha del Reporte</label>
+                <input type="date" id="reporte-fecha-diario" class="input-dark" />
+              </div>
+
+              <div id="div-fecha-semana" class="report-input-group" style="display: none">
+                <label>Semana (Periodo completo)</label>
+                <input type="date" id="reporte-fecha-semana" class="input-dark" />
+                <p
+                  id="label-rango-semana"
+                  class="helper-text"
+                  style="color: var(--neon); margin-top: 5px; font-weight: 600; display: none"
+                ></p>
+              </div>
+
+              <div id="div-fecha-mes" class="report-input-group" style="display: none">
+                <label>Mes Completo</label>
+                <input type="date" id="reporte-fecha-mes" class="input-dark" />
+                <p
+                  id="label-rango-mes"
+                  class="helper-text"
+                  style="color: var(--neon); margin-top: 5px; font-weight: 600; display: none"
+                ></p>
+              </div>
+
+              <div id="div-fecha-rango" class="report-input-group" style="display: none">
+                <label>Desde</label>
+                <input
+                  type="date"
+                  id="reporte-fecha-inicio"
+                  class="input-dark"
+                  style="margin-bottom: 8px"
+                />
+                <label>Hasta</label>
+                <input type="date" id="reporte-fecha-fin" class="input-dark" />
+              </div>
+
+              <!-- Barra de Progreso Global -->
+              <div
+                id="global-report-progress-container"
+                style="display: none; margin-top: 15px; margin-bottom: 15px; width: 100%"
+              >
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px">
+                  <span
+                    id="global-report-progress-status"
+                    style="font-size: 0.8rem; color: var(--info)"
+                    >Preparando reporte...</span
+                  >
+                  <span id="global-report-progress-percent" style="font-size: 0.8rem; color: #fff"
+                    >0%</span
+                  >
+                </div>
+                <div
+                  style="
+                    width: 100%;
+                    height: 8px;
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 4px;
+                    overflow: hidden;
+                  "
+                >
+                  <div
+                    id="global-report-progress-bar"
+                    style="
+                      width: 0%;
+                      height: 100%;
+                      background: linear-gradient(90deg, var(--info), var(--neon));
+                      transition: width 0.3s ease;
+                    "
+                  ></div>
+                </div>
+              </div>
+
+              <div class="report-actions">
+                <button id="btn-generar-reporte" class="btn-principal" style="min-width: 200px">
+                  <i class="fas fa-file-download" style="margin-right: 8px"></i> GENERAR REPORTE
+                </button>
+              </div>
+            </div>
+            <!-- End report-config-panel -->
+          </div>
+          <!-- End panel-container -->
+        </div>
+        <!-- End tab-reportes -->
+      </div>
+    </main>
+
+    <!-- MODAL CAMBIO DE CONTRASEÑA -->
+    <div id="modal-change-password" class="modal-backdrop" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>CAMBIAR CONTRASEÑA</h2>
+          <button class="modal-close-btn">&times;</button>
+        </div>
+        <form id="form-change-password">
+          <div class="modal-body">
+            <div class="field">
+              <label>ACTUAL</label>
+              <input type="password" id="modal-old-pass" required />
+            </div>
+            <div class="field">
+              <label>NUEVA</label>
+              <input type="password" id="modal-new-pass" required />
+            </div>
+          </div>
+          <div id="modal-status-msg" class="modal-status"></div>
+          <div class="modal-footer">
+            <button type="submit" class="btn-principal">ACTUALIZAR</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL EXIF RESOLVER -->
+    <!-- MODAL EXIF RESOLVER -->
+    <div id="modal-exif-resolver" class="modal-overlay" style="display: none">
+      <div class="modal-content glass-panel">
+        <div class="modal-header">
+          <h3 class="section-title">RESOLVER EXIF FALTANTE</h3>
+          <button
+            class="btn-icon"
+            onclick="document.getElementById('modal-exif-resolver').style.display='none'"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div style="text-align: center; background: #000; padding: 10px; border-radius: 8px">
+            <img
+              id="exif-img-preview"
+              src=""
+              style="max-width: 100%; max-height: 250px; object-fit: contain"
+            />
+          </div>
+          <p
+            id="exif-foto-nombre"
+            class="helper-text"
+            style="text-align: center; margin: 0; word-break: break-all; margin-top: 10px"
+          ></p>
+
+          <div class="form-group" style="margin-top: 15px">
+            <div style="display: flex; gap: 10px; position: relative">
+              <input type="date" id="exif-manual-date-only" class="input-dark" style="flex: 1" />
+              <div style="flex: 1; position: relative">
+                <input
+                  type="text"
+                  id="exif-manual-time-only"
+                  class="input-dark"
+                  style="width: 100%; cursor: pointer; text-align: center"
+                  readonly
+                  placeholder="HH:MM"
+                />
+              </div>
+            </div>
+            <p class="helper-text" style="font-size: 0.75rem; margin-top: 5px">
+              Se insertará esta fecha en los metadatos y se moverá a validación.
+            </p>
+          </div>
+        </div>
+        <div
+          class="modal-footer"
+          style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px"
+        >
+          <button id="btn-exif-delete" class="btn-mid red">
+            <i class="fas fa-trash"></i> ELIMINAR
+          </button>
+          <button id="btn-exif-manual" class="btn-mid green">
+            <i class="fas fa-save"></i> GUARDAR
+          </button>
+        </div>
+      </div>
+
+      <!-- SUB-PANEL SELECTOR DE HORA (FONDO SÓLIDO PARA MÁXIMA LEGIBILIDAD) -->
+      <div
+        id="tp-integrated-panel"
+        style="
+          display: none;
+          position: fixed;
+          z-index: 99999;
+          width: 280px;
+          background: #1a1a1a;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 1);
+          border: 2px solid var(--accent-color);
+          padding: 10px;
+          border-radius: 12px;
+        "
+      >
+        <div style="display: flex; gap: 10px; height: 210px">
+          <!-- COLUMNA HORAS -->
+          <div style="flex: 1; display: flex; flex-direction: column">
+            <span style="font-size: 0.7rem; color: #888; margin-bottom: 5px; text-align: center"
+              >HORA (24H)</span
+            >
+            <div
+              id="tp-hours-grid"
+              style="
+                flex: 1;
+                overflow-y: auto;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 4px;
+                padding-right: 4px;
+              "
+            >
+              <!-- Inyectado por JS -->
+            </div>
+          </div>
+          <!-- COLUMNA MINUTOS -->
+          <div
+            style="
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              border-left: 1px solid rgba(255, 255, 255, 0.1);
+              padding-left: 5px;
+            "
+          >
+            <span style="font-size: 0.7rem; color: #888; margin-bottom: 5px; text-align: center"
+              >MINUTOS</span
+            >
+            <div
+              id="tp-mins-grid"
+              style="
+                flex: 1;
+                overflow-y: auto;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 4px;
+                padding-right: 4px;
+              "
+            >
+              <!-- Inyectado por JS -->
+            </div>
+          </div>
+        </div>
+        <div
+          style="
+            margin-top: 10px;
+            border-top: 2px solid rgba(255, 255, 255, 0.2);
+            padding-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          "
+        >
+          <span
+            id="tp-current-sel"
+            style="font-weight: bold; color: var(--accent-color); font-size: 1.2rem"
+            >00:00</span
+          >
+          <button
+            class="btn-tiny green"
+            onclick="window.confirmTimePicker()"
+            style="padding: 8px 20px"
+          >
+            CONFIRMAR
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIGHTBOX MODAL -->
+    <div
+      id="lightbox-modal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10000;
+        background: rgba(0, 0, 0, 0.95);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <button class="lb-close-btn" onclick="window.lb_close()">
+        <i class="fas fa-times"></i>
+      </button>
+
+      <div
+        style="
+          flex: 1;
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+        "
+      >
+        <button class="lightbox-nav-btn lb-prev" onclick="window.moveLightbox(-1)">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+
+        <div
+          style="
+            max-width: 90%;
+            max-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <img
+            id="lightbox-img"
+            src=""
+            style="
+              max-width: 100%;
+              max-height: 80vh;
+              object-fit: contain;
+              display: none;
+              border: 1px solid #333;
+              border-radius: 4px;
+            "
+          />
+          <video
+            id="lightbox-video"
+            controls
+            style="max-width: 100%; max-height: 80vh; display: none"
+          ></video>
+        </div>
+
+        <button class="lightbox-nav-btn lb-next" onclick="window.moveLightbox(1)">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+
+      <div
+        class="lightbox-footer"
+        style="
+          padding: 20px;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 15px;
+        "
+      >
+        <div style="display: flex; gap: 20px">
+          <button class="btn-mid red" onclick="window.lb_reject()">
+            <i class="fas fa-times"></i> RECHAZAR
+          </button>
+          <button class="btn-mid green" onclick="window.lb_approve()">
+            <i class="fas fa-check"></i> ACEPTAR
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL REPORT SELECT -->
+    <div
+      id="modal-report-select"
+      class="modal-overlay"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        class="modal-content glass-panel"
+        style="
+          width: 90%;
+          max-width: 800px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+        "
+      >
+        <div class="modal-header">
+          <h3 class="section-title">SELECCIONAR FOTOS PARA INFORME</h3>
+          <button class="btn-icon" onclick="window.closeReportModal()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div
+          id="report-select-container"
+          style="
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 20px;
+          "
+        >
+          <!-- Filled dynamically by JS -->
+        </div>
+
+        <div
+          class="modal-footer"
+          style="
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 15px;
+          "
+        >
+          <!-- Progress Bar (Hidden by default) -->
+          <div id="report-progress-container" style="display: none; width: 100%">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px">
+              <span id="report-progress-status" style="font-size: 0.8rem; color: var(--info)"
+                >Generando informe...</span
+              >
+              <span id="report-progress-percent" style="font-size: 0.8rem; color: #fff">0%</span>
+            </div>
+            <div
+              style="
+                width: 100%;
+                height: 8px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                overflow: hidden;
+              "
+            >
+              <div
+                id="report-progress-bar"
+                style="
+                  width: 0%;
+                  height: 100%;
+                  background: linear-gradient(90deg, var(--info), var(--neon));
+                  transition: width 0.3s ease;
+                "
+              ></div>
+            </div>
+          </div>
+
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%"
+          >
+            <div style="display: flex; align-items: center; gap: 10px">
+              <label
+                style="display: flex; align-items: center; gap: 5px; color: #aaa; cursor: pointer"
+              >
+                <input
+                  type="checkbox"
+                  onchange="window.toggleAllReportPhotos(this)"
+                  checked
+                  style="accent-color: var(--neon)"
+                />
+                Seleccionar Todo
+              </label>
+              <span id="report-count-msg" class="pill-outline" style="font-size: 0.8rem"
+                >0 sel</span
+              >
+            </div>
+            <button id="btn-generate-final-report" class="btn-principal">
+              <i class="fas fa-file-word"></i> GENERAR INFORME
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!--===============================================================================================
+      MODALS
+      ================================================================================================-->
+    <!-- Modal: Agregar Items a Plan Activo -->
+    <div
+      id="modal-add-items"
+      class="modal-overlay"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 9000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        class="modal-content glass-panel"
+        style="
+          width: 90%;
+          max-width: 800px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          padding: 20px;
+        "
+      >
+        <div
+          class="modal-header"
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+          "
+        >
+          <h3 class="section-title" id="add-items-title">AGREGAR TAREAS AL PLAN</h3>
+          <button
+            class="btn-icon"
+            onclick="document.getElementById('modal-add-items').style.display='none'"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div style="flex: 1; display: flex; gap: 20px; min-height: 400px; overflow: hidden">
+          <!-- Left: Project Selection -->
+          <div
+            style="
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+              border-right: 1px solid rgba(255, 255, 255, 0.1);
+              padding-right: 20px;
+            "
+          >
+            <h4 class="box-title">PROYECTO ORIGEN</h4>
+            <input
+              type="text"
+              id="add-items-search-project"
+              class="input-dark"
+              placeholder="Buscar proyecto..."
+              style="margin-bottom: 10px"
+            />
+            <div
+              id="add-items-project-list"
+              class="scroll-box"
+              style="
+                flex: 1;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 5px;
+              "
+            >
+              <!-- Lista de proyectos activa -->
+            </div>
+          </div>
+
+          <!-- Right: Task Selection -->
+          <div style="flex: 2; display: flex; flex-direction: column; gap: 10px">
+            <h4 class="box-title">SELECCIONAR TAREAS</h4>
+            <div
+              id="add-items-list-container"
+              class="scroll-box"
+              style="
+                flex: 1;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 10px;
+              "
+            >
+              <p class="empty-msg" style="text-align: center; padding: 20px">
+                Selecciona un proyecto de la izquierda.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="modal-footer"
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 15px;
+          "
+        >
+          <span id="add-items-status" class="pill-outline">0 sel</span>
+          <button id="btn-confirm-add-items" class="btn-principal">
+            <i class="fas fa-plus"></i> AGREGAR AL PLAN
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loader Global -->
+    <div id="global-loader">
+      <div class="loader-spinner"></div>
+      <h3 style="margin-top: 20px; font-weight: 800; letter-spacing: 2px">PROCESANDO...</h3>
+    </div>
+
+    <script src="../_compartido/js/utilidades.js?v=431"></script>
+    <script src="../_compartido/js/guarda_rol.js?v=560"></script>
+    <script type="module" src="js/main.js?v=1.0.9"></script>
+  </body>
+</html>

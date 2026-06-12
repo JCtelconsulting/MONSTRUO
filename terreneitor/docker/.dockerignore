@@ -1,0 +1,29 @@
+# Datos (No meter gigas de fotos a la imagen)
+data/files/
+data/db/*.db
+data/db/*.bak*
+data/reportes/
+data/locks/
+data/.recycle/
+
+# Secretos (Se inyectan, no se copian)
+secure/
+*.env
+*.key
+*.pem
+rclone.conf
+oauth_client.json
+
+# Git
+.git/
+.gitignore
+
+# Python / IDE
+__pycache__/
+*.pyc
+venv/
+.vscode/
+.idea/
+logs/
+temp/
+tmp/

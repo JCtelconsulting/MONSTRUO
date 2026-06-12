@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gerencia | ULTRON</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Dosis:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="css/gerencia.css?v=73.0" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#070b11" />
+    <link
+      rel="icon"
+      type="image/png"
+      href="../_compartido/img/logo/telconsulting-isotipo-dorado.png"
+    />
+  </head>
+
+  <body class="sidebar-collapsed">
+    <header id="app-header">
+      <img
+        src="../_compartido/img/logo/telconsulting-isotipo-dorado.svg"
+        alt=""
+        class="brand-cube"
+      />
+      <div class="header-top">
+        <h1>GERENCIA</h1>
+        <button id="sidebar-toggle" class="btn-icon" title="Menu">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+      <nav class="side-nav">
+        <!-- Internal Tabs Only -->
+        <button class="side-link active" type="button" data-target="section-intro">
+          <i class="fas fa-tachometer-alt"></i><span>Resumen</span>
+        </button>
+        <button class="side-link" type="button" data-target="section-kpis">
+          <i class="fas fa-chart-bar"></i><span>Indicadores</span>
+        </button>
+        <button class="side-link" type="button" data-target="section-salud">
+          <i class="fas fa-shield-alt"></i><span>Salud</span>
+        </button>
+        <button class="side-link" type="button" data-target="section-ritmo">
+          <i class="fas fa-wave-square"></i><span>Ritmo</span>
+        </button>
+        <button class="side-link" type="button" data-target="section-mapa">
+          <i class="fas fa-map"></i><span>Mapa</span>
+        </button>
+        <button class="side-link" type="button" data-target="section-evidencia">
+          <i class="fas fa-images"></i><span>Evidencia</span>
+        </button>
+        <button class="side-link" type="button" data-target="section-historial">
+          <i class="fas fa-history"></i><span>Historial</span>
+        </button>
+        <a
+          class="side-link"
+          href="https://login.telconsulting.cl/dashboard"
+          onclick="this.href='https://login.telconsulting.cl'+(location.pathname.startsWith('/dev')?'/dev':'')+'/dashboard'"
+          title="Volver al ecosistema Monstruo"
+        >
+          <i class="fas fa-cubes"></i> <span>Monstruo</span>
+        </a>
+      </nav>
+      <div class="header-actions">
+        <span
+          id="who"
+          class="pill"
+          style="display: block; margin-bottom: 10px; font-size: 0.8rem; opacity: 0.7"
+          >Usuario</span
+        >
+        <div class="footer-buttons-container">
+          <button id="btn-open-change-password" class="btn-account" title="Cambiar Contraseña">
+            <i class="fas fa-key"></i> <span>Cuenta</span>
+          </button>
+          <button id="btnLogout" class="btn-logout" title="Cerrar Sesión">
+            <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="main-inner">
+        <div class="page-intro" id="section-intro">
+          <div class="intro-copy">
+            <p class="eyebrow">Dashboard ejecutivo</p>
+            <h2>Panorama operativo en tiempo real</h2>
+            <p class="intro-sub">KPIs, productividad y control de calidad centralizados.</p>
+          </div>
+          <div class="intro-status">
+            <span class="live-dot" aria-hidden="true"></span>
+            <div>
+              <p class="status-label">Actualizacion continua</p>
+              <p class="status-value">Operacion en linea</p>
+            </div>
+          </div>
+        </div>
+
+        <section class="section-block" id="section-kpis">
+          <div class="section-header">
+            <div>
+              <h3>Indicadores clave</h3>
+              <p>Lectura rapida del estado general.</p>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-card kpi-blue">
+              <div class="kpi-value" id="kpi-proyectos">0</div>
+              <div class="kpi-label">Proyectos Activos</div>
+            </div>
+
+            <div class="kpi-card kpi-green">
+              <div class="kpi-value" id="kpi-planes">0</div>
+              <div class="kpi-label">Planes en Curso</div>
+            </div>
+
+            <div class="kpi-card kpi-red">
+              <div class="kpi-value" id="kpi-rechazo">0%</div>
+              <div class="kpi-label">Tasa de Rechazo</div>
+            </div>
+
+            <div class="kpi-card kpi-orange">
+              <div class="kpi-value" id="kpi-cuarentena">0</div>
+              <div class="kpi-label">Fotos en Cuarentena</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-block" id="section-salud">
+          <div class="section-header">
+            <div>
+              <h3>Salud operativa</h3>
+              <p>SLA, almacenamiento y riesgos prioritarios.</p>
+            </div>
+          </div>
+          <div class="insight-grid">
+            <div class="insight-card storage-card">
+              <div class="card-header">
+                <h4>Almacenamiento</h4>
+                <span class="card-tag">Global</span>
+              </div>
+              <div class="storage-metric">
+                <div class="storage-value">
+                  <span id="storage-used">0</span> / <span id="storage-total">0</span> GB
+                </div>
+                <div class="storage-sub" id="storage-free">Libre: 0 GB</div>
+              </div>
+              <div class="progress">
+                <div class="progress-bar" id="storage-bar"></div>
+              </div>
+            </div>
+            <div class="insight-card sla-card">
+              <div class="card-header">
+                <h4>SLA de validacion</h4>
+                <span class="card-tag">Terreno a supervisor</span>
+              </div>
+              <div class="sla-grid">
+                <div class="sla-item">
+                  <span class="sla-label">Promedio</span>
+                  <span class="sla-value" id="sla-avg">0 h</span>
+                </div>
+                <div class="sla-item">
+                  <span class="sla-label">P90</span>
+                  <span class="sla-value" id="sla-p90">0 h</span>
+                </div>
+                <div class="sla-item">
+                  <span class="sla-label">Brecha 24h</span>
+                  <span class="sla-value" id="sla-breach">0%</span>
+                </div>
+              </div>
+              <div class="sla-meta" id="sla-range">Global</div>
+            </div>
+            <div class="insight-card risk-card">
+              <div class="card-header">
+                <h4>Riesgos activos</h4>
+                <span class="card-tag">Ultimos 30 dias</span>
+              </div>
+              <ul class="risk-list" id="risk-list"></ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-block" id="section-ritmo">
+          <div class="section-header">
+            <div>
+              <h3>Ritmo de operacion</h3>
+              <p>Distribucion de tareas y avance semanal.</p>
+            </div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-container">
+              <div class="chart-title">Estado de tareas</div>
+              <canvas id="chart-estados"></canvas>
+            </div>
+            <div class="chart-container">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Productividad real</div>
+                  <div class="chart-sub" id="productividad-meta">Ultimas 8 semanas</div>
+                </div>
+                <div class="segmented" id="productividad-controls">
+                  <button class="active" data-productividad="semanal">Semanal</button>
+                  <button data-productividad="diario">Diario</button>
+                  <button data-productividad="mensual">Mensual</button>
+                </div>
+              </div>
+              <canvas id="chart-avance"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-block" id="section-mapa">
+          <div class="section-header">
+            <div>
+              <h3>Mapa de calor</h3>
+              <p>Fotos con GPS extraido desde EXIF.</p>
+            </div>
+          </div>
+          <div class="map-card">
+            <div class="map-controls">
+              <div class="field-group">
+                <label>Proyecto</label>
+                <select id="map-project">
+                  <option value="all">Todos</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label>Desde</label>
+                <input type="date" id="map-from" />
+              </div>
+              <div class="field-group">
+                <label>Hasta</label>
+                <input type="date" id="map-to" />
+              </div>
+              <div class="segmented" id="map-mode">
+                <button class="active" data-map-mode="heat">Calor</button>
+                <button data-map-mode="points">Puntos</button>
+              </div>
+              <button class="btn-refresh" id="map-refresh">
+                <i class="fas fa-sync"></i>Actualizar
+              </button>
+            </div>
+            <div id="map" class="map-canvas"></div>
+            <div class="map-footer">
+              <span id="map-count">0 puntos</span>
+              <span id="map-range">Filtrado global</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-block" id="section-evidencia">
+          <div class="section-header">
+            <div>
+              <h3>Evidencia fotografica</h3>
+              <p>Proyectos listos, por validar y cuarentena.</p>
+            </div>
+          </div>
+          <div class="filter-controls" style="margin-bottom: 15px">
+            <div class="segmented" id="evidencia-tabs">
+              <button class="active" data-evidencia="listos">Proyectos Listos</button>
+              <button data-evidencia="validar">Por Validar</button>
+              <button data-evidencia="cuarentena">Cuarentena</button>
+            </div>
+            <button class="btn-refresh" id="btn-refresh-evidencia">
+              <i class="fas fa-sync"></i> Actualizar
+            </button>
+          </div>
+          <div
+            id="evidencia-content"
+            class="scroll-box"
+            style="
+              max-height: 60vh;
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 8px;
+              padding: 10px;
+              background: rgba(0, 0, 0, 0.2);
+            "
+          >
+            <p class="empty-msg" style="text-align: center; padding: 40px; opacity: 0.5">
+              Seleccione una pestana...
+            </p>
+          </div>
+        </section>
+
+        <section class="section-block" id="section-historial">
+          <div class="section-header">
+            <div>
+              <h3>Historial de Informes</h3>
+              <p>Consulta y descarga reportes generados anteriormente.</p>
+            </div>
+          </div>
+          <div class="filter-card">
+            <div class="filter-controls">
+              <div class="field-group">
+                <label>Cliente</label>
+                <select id="historial-cliente">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label>Proyecto</label>
+                <select id="historial-proyecto">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label>Plan</label>
+                <select id="historial-plan">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <button class="btn-refresh" id="btn-buscar-historial">
+                <i class="fas fa-search"></i> Buscar
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="tabla-historial">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Cliente</th>
+                    <th>Proyecto / Plan</th>
+                    <th>Archivo</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="lista-historial">
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; opacity: 0.5">
+                      Usa los filtros para buscar reportes...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div id="global-loader" style="display: none">
+      <div class="loader-spinner"></div>
+      <h3 style="color: #fff">CARGANDO...</h3>
+    </div>
+
+    <div id="modal-change-password" class="modal-backdrop" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Cambiar Contrasena</h2>
+          <button
+            class="modal-close-btn"
+            onclick="document.getElementById('modal-change-password').style.display='none'"
+          >
+            &times;
+          </button>
+        </div>
+        <form id="form-change-password">
+          <div class="modal-body">
+            <div class="field">
+              <label>Actual</label>
+              <input type="password" id="modal-old-pass" required />
+            </div>
+            <div class="field">
+              <label>Nueva</label>
+              <input type="password" id="modal-new-pass" required />
+            </div>
+          </div>
+          <div id="modal-status-msg" class="modal-status"></div>
+          <div class="modal-footer">
+            <button type="submit" class="btn-principal">Actualizar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="../_compartido/js/utilidades.js?v=413"></script>
+    <script src="../_compartido/js/guarda_rol.js?v=541"></script>
+    <script src="js/gerencia.js?v=601"></script>
+  </body>
+</html>

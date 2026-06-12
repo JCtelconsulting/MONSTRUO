@@ -1,0 +1,292 @@
+/* =========================================
+   ULTRON UI - LOGIN (v4.0)
+   Theme: Neon Command
+   ========================================= */
+:root {
+  --bg-deep: #050505;
+  --bg-soft: #0c0c0c;
+  --panel: #141414;
+  --panel-strong: #1b1b1b;
+  --neon: #d4a843;
+  --danger: #ff3333;
+  --text: #f5f7f8;
+  --text-soft: #a5adb4;
+  --border: #1f2935;
+  --font-main: 'Dosis', 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-main);
+}
+
+body {
+  background-color: var(--bg-deep);
+  background-image: radial-gradient(circle at 50% -8%, rgba(212, 168, 67, 0.05), transparent 55%),
+    linear-gradient(180deg, #050505, #000000);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 12, 18, 0.05), rgba(0, 0, 0, 0.8));
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.login-card {
+  width: 100%;
+  background: linear-gradient(180deg, rgba(18, 26, 36, 0.95), rgba(12, 18, 26, 0.98));
+  border: 1px solid var(--border);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(212, 168, 67, 0.08);
+  padding: 2.8rem 2.4rem;
+  border-radius: 18px;
+  text-align: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  animation: loginIn 0.55s ease-out both;
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 22px;
+  right: 22px;
+  height: 2px;
+  background: var(--neon);
+  box-shadow: 0 0 18px rgba(212, 168, 67, 0.35);
+  opacity: 0.75;
+}
+
+h1 {
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 700;
+  margin-bottom: 1.8rem;
+  font-size: 1.9rem;
+  text-shadow: 0 0 25px rgba(212, 168, 67, 0.3);
+}
+
+form {
+  width: 100%;
+}
+
+.form-group {
+  margin-bottom: 1.1rem;
+  width: 100%;
+  text-align: left;
+}
+
+label {
+  display: block;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  margin-left: 4px;
+}
+
+input {
+  width: 100%;
+  background: #0b1118;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 14px 16px;
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.25s ease;
+  border-radius: 10px;
+}
+
+input:focus {
+  border-color: var(--neon);
+  box-shadow: 0 0 18px rgba(212, 168, 67, 0.15);
+  background: #0f1722;
+}
+
+.btn-login {
+  width: 100%;
+  padding: 14px;
+  margin-top: 1.3rem;
+  background: transparent;
+  color: var(--neon);
+  border: 1px solid var(--neon);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: 0.25s ease;
+  border-radius: 10px;
+}
+
+.btn-login:hover {
+  background: var(--neon);
+  color: #000;
+  box-shadow: 0 0 25px rgba(212, 168, 67, 0.4);
+}
+
+.btn-login:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.modal-status {
+  margin-top: 18px;
+  font-size: 0.9rem;
+  min-height: 20px;
+  font-weight: 500;
+}
+
+.modal-status.loading {
+  color: #fff;
+}
+
+.modal-status.error {
+  color: var(--danger);
+}
+
+.modal-status.success {
+  color: var(--neon);
+}
+
+/* Google Login Refinement */
+.google-login-section {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.btn-google {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(4px);
+}
+
+.btn-google:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--neon);
+  box-shadow: 0 0 15px rgba(212, 168, 67, 0.15);
+  transform: translateY(-1px);
+}
+
+.btn-google img {
+  width: 18px !important;
+  height: 18px !important;
+  object-fit: contain;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.3));
+  flex-shrink: 0;
+}
+
+/* Separator Refinement */
+.login-separator {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.8rem 0;
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.6;
+}
+
+.login-separator::before,
+.login-separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px dashed var(--border);
+}
+
+.login-separator:not(:empty)::before {
+  margin-right: 1.5em;
+}
+
+.login-separator:not(:empty)::after {
+  margin-left: 1.5em;
+}
+
+.sys-id {
+  position: fixed;
+  bottom: 12px;
+  right: 18px;
+  color: #5f6670;
+  font-size: 0.7rem;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+  z-index: 1;
+}
+
+@keyframes loginIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 520px) {
+  .login-container {
+    padding: 16px;
+  }
+
+  .login-card {
+    padding: 2.4rem 2rem;
+  }
+}
+
+/* Logo de marca en el login */
+.brand-logo {
+  display: block;
+  max-width: 240px;
+  width: 70%;
+  height: auto;
+  margin: 0 auto;
+}

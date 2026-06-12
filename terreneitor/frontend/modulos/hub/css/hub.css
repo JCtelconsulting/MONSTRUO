@@ -1,0 +1,116 @@
+/* Hub Terreneitor — SOLO el contenido (hero + tarjetas por rol).
+   La barra lateral es la real de Monstruo: viene de /shared/css/monstruo.css
+   (gateway) y NO se estiliza acá para que sea idéntica al resto del ecosistema. */
+
+/* Logo Telconsulting como FONDO (marca de agua dorada, centrada tras el contenido) */
+body.hub-page::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url('../../_compartido/img/logo/telconsulting-completo-dorado.png') center / 64vmin
+    no-repeat;
+  opacity: 0.1;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body.hub-page main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  min-height: 100vh;
+  padding: 40px 30px;
+}
+
+.hub-hero {
+  text-align: center;
+  font-family: 'Dosis', 'Segoe UI', sans-serif;
+}
+
+.hub-logo {
+  width: 250px;
+  max-width: 70vw;
+  margin-bottom: 18px;
+}
+
+.hub-hero h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.hub-sub {
+  color: var(--text-soft, #a5adb4);
+  margin-top: 6px;
+}
+
+.hub-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  justify-content: center;
+  max-width: 1100px;
+}
+
+.hub-card {
+  display: none; /* hub.js las muestra según el rol */
+  flex-direction: column;
+  gap: 10px;
+  width: 240px;
+  padding: 28px 24px;
+  border-radius: 18px;
+  background: rgba(16, 16, 16, 0.92);
+  border: 1px solid rgba(212, 168, 67, 0.2);
+  border-top: 3px solid var(--neon, #d4a843);
+  color: var(--text, #f5f7f8);
+  text-decoration: none;
+  font-family: 'Dosis', 'Segoe UI', sans-serif;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.5);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.hub-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.65),
+    0 0 22px rgba(212, 168, 67, 0.25);
+}
+
+.hub-card > i {
+  font-size: 1.9rem;
+  color: var(--neon, #d4a843);
+  background: rgba(212, 168, 67, 0.1);
+  border: 1px solid rgba(212, 168, 67, 0.35);
+  border-radius: 12px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hub-card h3 {
+  letter-spacing: 1.5px;
+  font-size: 1.05rem;
+}
+
+.hub-card p {
+  color: var(--text-soft, #a5adb4);
+  font-size: 0.92rem;
+  min-height: 2.6em;
+}
+
+.hub-cta {
+  color: var(--neon, #d4a843);
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}

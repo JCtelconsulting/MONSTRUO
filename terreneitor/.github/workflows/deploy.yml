@@ -1,0 +1,60 @@
+name: Deploy a Produccion
+
+# Solo deploya cuando el CI termina exitosamente en main.
+# workflow_dispatch sigue disponible para deploy manual desde GitHub.
+on:
+  workflow_run:
+    workflows: ["CI - Tests y Linting"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    # Si la ejecucion vino disparada por workflow_run, exigir que el CI haya pasado.
+    # Si vino por workflow_dispatch (manual), siempre corre.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Sincronizar repo en /srv/terreneitor
+        run: |
+          cd /srv/terreneitor
+          echo "Estado previo:"
+          git log --oneline -1
+          git fetch origin main
+          git reset --hard origin/main
+          echo "Estado nuevo:"
+          git log --oneline -1
+
+      - name: Aplicar migraciones Alembic (si hay)
+        working-directory: /srv/terreneitor
+        run: |
+          if docker exec terreneitor_app test -f /app/backend/migrations/env.py; then
+            docker exec terreneitor_app alembic -c /app/backend/migrations/alembic.ini upgrade head || \
+              docker exec -e PYTHONPATH=/app terreneitor_app alembic -c /app/backend/alembic.ini upgrade head || \
+              echo "Sin migraciones aplicadas (config opcional)."
+          fi
+        continue-on-error: true
+
+      - name: Reiniciar contenedor
+        run: |
+          docker restart terreneitor_app
+          sleep 5
+          docker ps --filter name=terreneitor_app --format "{{.Names}} {{.Status}}"
+
+      - name: Verificar que la app responde
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8005/api/auth/whoami || echo "000")
+            echo "Intento $i: HTTP=$code"
+            if [ "$code" = "200" ] || [ "$code" = "401" ]; then
+              echo "OK - app responde."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "ERROR - app no responde tras reinicio."
+          docker logs --tail 30 terreneitor_app
+          exit 1
