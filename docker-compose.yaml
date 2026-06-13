@@ -264,10 +264,10 @@ services:
     restart: unless-stopped
     command: [ "uvicorn", "gta.backend.main:app", "--host", "0.0.0.0", "--port", "9012" ]
 
-  # Terreneitor: informes de terreno con evidencia fotografica. App con
-  # estructura propia (backend/frontend/data) migrada como modulo; usa su
-  # env_file dedicado (TERRENEITOR_* + Postgres central schema terreneitor
-  # + SSO del gateway). Puerto 8005: el proxy ya rutea ahi.
+  # Terreneitor: informes de terreno con evidencia fotografica. Modulo estandar
+  # (backend/ui/data) pero conserva env_file dedicado (TERRENEITOR_* + Postgres
+  # central schema terreneitor + SSO del gateway) y volumenes data/+logs/
+  # (persistencia de fotos/db/reportes). Puerto 8005: el proxy ya rutea ahi.
   terreneitor:
     build:
       context: .

@@ -135,7 +135,7 @@ def _env_prefix() -> str:
 
 
 _FRONTEND_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "frontend")
+    os.path.join(os.path.dirname(__file__), "..", "ui")
 )
 
 
@@ -216,7 +216,7 @@ async def readiness_check():
 
 # Mount Static Files (AFTER routers to avoid shadowing)
 static_dir = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "frontend")
+    os.path.join(os.path.dirname(__file__), "..", "ui")
 )
 if os.path.exists(static_dir):
     # html=True hace que un GET a /modulos/<x>/ devuelva su index.html
