@@ -2723,7 +2723,7 @@ body:not(.login-shell) .btn-sm.btn-danger {
 }
 
 body:not(.login-shell) .btn-primary {
-  background: linear-gradient(135deg, rgba(212, 168, 67, 0.92), rgba(0, 214, 255, 0.8)) !important;
+  background: linear-gradient(135deg, rgba(212, 168, 67, 0.92), rgba(232, 196, 104, 0.8)) !important;
   color: #04110a !important;
   border: 1px solid rgba(212, 168, 67, 0.48) !important;
   border-radius: 10px !important;
