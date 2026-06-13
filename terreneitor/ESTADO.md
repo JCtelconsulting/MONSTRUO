@@ -8,9 +8,9 @@
   subdominios viejos redirigen 307. Barra lateral = la REAL del gateway
   (assets vía proxy interno `/shared/*`). Sin login propio: SSO del gateway
   (`MONSTRUO_SSO_SECRET`); login local de respaldo en `/modulos/login/`.
-- Contenedor `monstruo-dev-terreneitor:8005` (compose propio
-  `terreneitor/docker-compose.yaml`, red `monstruo-dev_default`). El proxy NO
-  necesitó cambios (ya apuntaba a 60.8:8005).
+- Contenedor `monstruo-dev-terreneitor:8005` (servicio del `docker-compose.yaml`
+  raíz = compose único, red `monstruo-dev_default`). El proxy NO necesitó
+  cambios (ya apuntaba a 60.8:8005).
 - Datos en Postgres central, schema `terreneitor` (migración desde SQLite
   verificada 10/10 tablas; rollback = quitar `TERRENEITOR_DATABASE_URL` del
   `.env` del módulo → vuelve a SQLite local intacto).
@@ -30,9 +30,10 @@
    diseño en `docs/AUTOCOMPLETADOR_AUDIO.md`) — requiere faster-whisper + Ollama.
 
 ## Operación
-- Repo fuente de verdad: `/srv/terreneitor_dev` (GitHub TERRENEITOR, rama `dev`).
-  Cambios: commitear allá y sincronizar acá (rsync), o editar acá y portar.
-- Tras cambiar el `.env`: `docker compose -f terreneitor/docker-compose.yaml up
-  -d --force-recreate` (restart no relee env).
+- Fuente de verdad del código: este repo Monstruo (monorepo). El antiguo repo
+  standalone `/srv/terreneitor_dev` queda como legado; PROD sigue corriendo el
+  stack standalone en 60.5 hasta completar la migración (ver Pendiente 1).
+- Tras cambiar el `.env`: `docker compose --env-file plataforma/ops/env/.env.server.dev
+  up -d --force-recreate terreneitor` (restart no relee env).
 - Usuarios QA: qa.terreno / qa.supervisor / qa.gerencia / qa.dev
   @telconsulting.cl (passwords en memoria del agente o resetear vía portal).

@@ -12,14 +12,14 @@ app con hartos módulos"), por etapas reversibles.
 
 - Código en `/srv/monstruo_dev/terreneitor/` (copia rsync del repo
   `/srv/terreneitor_dev`, sin `.git`; la historia git sigue viviendo allá).
-- Compose propio `terreneitor/docker-compose.yaml` → contenedor
-  `monstruo-dev-terreneitor`, puerto host **8005** (el proxy 60.6 ya ruteaba
-  los dominios de terreneitor dev a 60.8:8005 → **cero cambios de proxy**).
+- Servicio `terreneitor` en el `docker-compose.yaml` raíz (compose único) →
+  contenedor `monstruo-dev-terreneitor`, puerto host **8005** (el proxy 60.6 ya
+  ruteaba los dominios de terreneitor dev a 60.8:8005 → **cero cambios de proxy**).
 - Red externa `monstruo-dev_default` → ve el Postgres central como `db:5432`.
 - El contenedor viejo `terreneitor-app-dev` quedó apagado; `/srv/terreneitor_dev`
   queda como respaldo + fuente de verdad git.
-- NO se tocó el `docker-compose.yaml` raíz de monstruo (estaba en curso el
-  hotfix `hotfix/imap-robust`). Cuando aterrice, plegar este bloque:
+- El servicio ya quedó plegado en el `docker-compose.yaml` raíz de monstruo
+  (compose único). El bloque real es:
 
 ```yaml
   terreneitor:
@@ -99,8 +99,8 @@ entrar a Terreneitor sin segundo login (commit `f8831e9` en repo terreneitor).
 
 ## Pendientes
 
-- [ ] Plegar el servicio al `docker-compose.yaml` raíz y commitear `terreneitor/`
-      en el repo monstruo (cuando aterrice el hotfix en curso).
+- [x] Plegar el servicio al `docker-compose.yaml` raíz y commitear `terreneitor/`
+      en el repo monstruo. **Hecho** (2026-06-12); compose único.
 - [ ] Fase 3 SSO (diseño arriba).
 - [ ] PROD: repetir Fases 1-2 en 60.5 (con ventana y respaldo), actualizar
       `terreneitor.conf` del proxy si cambia el backend, y recién ahí retirar

@@ -1,27 +1,28 @@
 # Terreneitor
 
-Sistema de Gestión Operativa (Libro de Obras Digital).
+Sistema de Gestión Operativa (Libro de Obras Digital). Desde 2026-06-12 vive como
+**módulo del ecosistema Monstruo** (monorepo). Estado del módulo: [ESTADO.md](ESTADO.md).
 
 ## 🚀 Inicio Rápido
 
-### En Producción (Servidor con Proxy Inverso)
-El servidor utiliza Nginx como proxy para SSL y balanceo.
+Terreneitor corre como un servicio más del **compose único** del repo Monstruo
+(ya no tiene compose propio). Desde la raíz del repo:
+
 ```bash
-./start.sh
+# Levantar todo el stack (incluye terreneitor en el puerto 8005):
+docker compose --env-file plataforma/ops/env/.env.server.dev up -d --build
+
+# Rebuild solo de terreneitor (maneja ASSET_VERSION para cache-busting):
+./plataforma/ops/scripts/dev-rebuild.sh terreneitor
 ```
 
-### En Desarrollo Local (Tu PC sin Proxy)
-Si quieres trabajar en tu laptop sin complicaciones de red:
-```bash
-# Iniciar App + DB + AI directamente
-docker compose -f docker/docker-compose.dev.yml up -d --build
-```
-La aplicación estará disponible en: [http://localhost:8000](http://localhost:8000)
+La app queda en `terreneitor.telconsulting.cl/dev` (vía proxy) o en el puerto
+`8005` del host DEV.
 
 ## 📚 Documentación
-- **[Plan Maestro](docs/PLAN_MAESTRO.md)**: Visión, Roadmap y Reglas de Oro.
-- **[Contexto Proyecto](docs/PROYECTO_CONTEXTO.md)**: Bitácora de sesiones y decisiones técnicas.
-- **[Handover Técnico](docs/HANDOVER_TECNICO.md)**: Guía para desarrolladores y mantenimiento.
+- **[MIGRACION_MONSTRUO.md](docs/MIGRACION_MONSTRUO.md)**: cómo pasó a ser módulo de Monstruo (el doc clave).
+- **[PROYECTO_CONTEXTO.md](docs/PROYECTO_CONTEXTO.md)** · **[PLAN_MAESTRO.md](docs/PLAN_MAESTRO.md)**: bitácora histórica del proyecto standalone.
+- **[HANDOVER_TECNICO.md](docs/HANDOVER_TECNICO.md)**: guía para desarrolladores y mantenimiento.
 
 ### Manuales de Usuario
 - [Manual Terreno](docs/manuales/usuario_terreno.md)
@@ -30,12 +31,9 @@ La aplicación estará disponible en: [http://localhost:8000](http://localhost:8
 - [Manual Portal/Admin](docs/manuales/usuario_portal.md)
 
 ## 📂 Organización del Proyecto
-*   **`code/`**: Backend FastAPI y Frontend Modular.
-*   **`docker/`**: Configuraciones de despliegue (Prod y Dev).
-*   **`ops/scripts/`**: Automatización (Backup, Mantenimiento, Estructura).
-*   **`data/`**: Persistencia (SQLite y Fotos).
+*   **`backend/`**: Backend FastAPI (core, models, services, utils).
+*   **`frontend/`**: Frontend modular (módulos + `_compartido/`).
+*   **`docker/`**: `Dockerfile` del módulo (lo usa el compose único raíz).
+*   **`ops/scripts/`**: Automatización (backup, QA, mantenimiento, migración).
+*   **`data/`** · **`logs/`**: Volúmenes locales del contenedor (los datos viven en Postgres central, schema `terreneitor`).
 *   **`docs/`**: Documentación técnica.
-*   **`logs/`**: Registros centralizados.
-# Trigger workflow con permisos sudo configurados
-# Test sudo
-# Re-test workflow
