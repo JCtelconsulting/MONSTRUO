@@ -12,14 +12,7 @@ DEPLOY_STACK_NAME="${DEPLOY_STACK_NAME:-}"
 DEPLOY_SERVICE="${DEPLOY_SERVICE:-}"
 
 DEFAULT_COMPOSE_FILE="$APP_DIR/docker-compose.yaml"
-LEGACY_COMPOSE_FILE="$APP_DIR/plataforma/docs/operacion/deploy/docker-compose.yaml"
-if [ -n "${COMPOSE_FILE:-}" ]; then
-  COMPOSE_FILE="$COMPOSE_FILE"
-elif [ -f "$DEFAULT_COMPOSE_FILE" ]; then
-  COMPOSE_FILE="$DEFAULT_COMPOSE_FILE"
-else
-  COMPOSE_FILE="$LEGACY_COMPOSE_FILE"
-fi
+COMPOSE_FILE="${COMPOSE_FILE:-$DEFAULT_COMPOSE_FILE}"
 
 
 # Capture Origin URL from current (runner) workspace before switching context
