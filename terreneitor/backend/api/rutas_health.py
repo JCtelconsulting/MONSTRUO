@@ -4,7 +4,7 @@ import os
 
 from fastapi import APIRouter, Depends
 
-from backend import dependencias
+from terreneitor.backend import dependencias
 
 router = APIRouter(
     tags=["Health"],

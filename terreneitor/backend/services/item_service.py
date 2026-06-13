@@ -7,7 +7,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session, selectinload
 
-from backend import modelos
+from terreneitor.backend import modelos
 
 
 def create_item_in_category(

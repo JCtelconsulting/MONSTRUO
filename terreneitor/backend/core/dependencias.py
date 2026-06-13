@@ -14,8 +14,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.core.nucleo import SessionLocal, get_engine
-from backend.models import modelos
+from terreneitor.backend.core.nucleo import SessionLocal, get_engine
+from terreneitor.backend.models import modelos
 
 # --- Rate Limiter Compartido ---
 limiter = Limiter(key_func=get_remote_address)

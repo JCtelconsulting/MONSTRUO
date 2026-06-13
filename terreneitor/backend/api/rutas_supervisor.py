@@ -10,8 +10,8 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session, selectinload
 
-from backend import dependencias, modelos, nucleo
-from backend.services import (
+from terreneitor.backend import dependencias, modelos, nucleo
+from terreneitor.backend.services import (
     asignacion_service,
     foto_service,
     item_service,

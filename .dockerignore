@@ -16,6 +16,8 @@
 /plataforma/data_runtime/
 /ticketera/data/
 /fundacion/data/
+/terreneitor/data/
+/terreneitor/logs/
 
 # 3. Ignorar secretos y archivos de entorno local
 # Se ignoran todos los archivos .env para no filtrarlos en las imágenes.

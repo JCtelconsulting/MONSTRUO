@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 # (P24.1) FIX: Importaciones Absolutas (quitar el '.')
-from backend import dependencias, modelos, nucleo
+from terreneitor.backend import dependencias, modelos, nucleo
 
 # Router para /api/scanner (protegido)
 router_api = APIRouter(

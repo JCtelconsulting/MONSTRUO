@@ -5,8 +5,8 @@
 import logging
 import os
 
-from backend.core import dependencias, nucleo
-from backend.models import modelos
+from terreneitor.backend.core import dependencias, nucleo
+from terreneitor.backend.models import modelos
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"

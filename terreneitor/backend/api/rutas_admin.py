@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend import dependencias, modelos, nucleo
+from terreneitor.backend import dependencias, modelos, nucleo
 
 router = APIRouter(
     prefix="/api/admin",
@@ -22,8 +22,8 @@ router = APIRouter(
     dependencies=[Depends(dependencias.require_admin)],
 )
 
-from backend.services import gestion_proyectos, usuario_service
-from backend.services.estructura_proyectos import STRUCTURE_TEMPLATES
+from terreneitor.backend.services import gestion_proyectos, usuario_service
+from terreneitor.backend.services.estructura_proyectos import STRUCTURE_TEMPLATES
 
 PROJECT_MARKER_FILENAME = ".terreneitor.json"
 SYNC_INTERVAL_SEC = int(os.environ.get("TERRENEITOR_SYNC_INTERVAL", "900"))

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session, selectinload
 
-from backend import modelos, nucleo
+from terreneitor.backend import modelos, nucleo
 
 
 def list_active_plans(db: Session) -> list[dict]:

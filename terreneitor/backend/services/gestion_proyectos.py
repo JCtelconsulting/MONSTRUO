@@ -7,7 +7,7 @@ import unicodedata
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from backend import modelos, nucleo
+from terreneitor.backend import modelos, nucleo
 
 
 # --- CONFIGURACION ---
@@ -19,7 +19,7 @@ def _is_test_env() -> bool:
     )
 
 
-from backend.services.estructura_proyectos import STRUCTURE_TEMPLATES
+from terreneitor.backend.services.estructura_proyectos import STRUCTURE_TEMPLATES
 
 if not STRUCTURE_TEMPLATES and _is_test_env():
     STRUCTURE_TEMPLATES = {

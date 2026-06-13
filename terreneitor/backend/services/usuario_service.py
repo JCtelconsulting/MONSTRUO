@@ -2,8 +2,8 @@
 
 from sqlalchemy.orm import Session
 
-from backend import modelos
-from backend.core import dependencias
+from terreneitor.backend import modelos
+from terreneitor.backend.core import dependencias
 
 
 def list_users(db: Session) -> list[modelos.User]:

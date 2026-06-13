@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend import dependencias, modelos, nucleo
-from backend.utils.logger import log
+from terreneitor.backend import dependencias, modelos, nucleo
+from terreneitor.backend.utils.logger import log
 
 router = APIRouter(
     prefix="/api/gerencia",
@@ -28,7 +28,7 @@ def gerencia_asignaciones_por_estado(
     gerencia. El endpoint equivalente de supervisor exige rol SUPERVISOR y le
     daba 403 a GERENCIA (la sección mostraba 'Acceso denegado'). Reusa la misma
     lógica pero bajo el router de gerencia (require_session)."""
-    from backend.api import rutas_supervisor
+    from terreneitor.backend.api import rutas_supervisor
 
     return rutas_supervisor.get_asignaciones_estado(estado, db)
 
@@ -37,7 +37,7 @@ def gerencia_asignaciones_por_estado(
 def gerencia_excepciones_fotos(db: Session = Depends(dependencias.get_db)):
     """Fotos en cuarentena (EXIF) para la sección de Evidencia de gerencia.
     Alias de lectura del endpoint de supervisor (que daba 403 a GERENCIA)."""
-    from backend.api import rutas_supervisor
+    from terreneitor.backend.api import rutas_supervisor
 
     return rutas_supervisor.get_exif_pending(db)
 
@@ -46,7 +46,7 @@ def gerencia_excepciones_fotos(db: Session = Depends(dependencias.get_db)):
 def gerencia_archivos_por_validar(id: int, db: Session = Depends(dependencias.get_db)):
     """Lista de archivos de una asignación para la vista de Evidencia de
     gerencia. Alias de lectura del endpoint de supervisor (403 para GERENCIA)."""
-    from backend.api import rutas_supervisor
+    from terreneitor.backend.api import rutas_supervisor
 
     return rutas_supervisor.list_validar(id, db)
 
@@ -91,7 +91,7 @@ def gerencia_archivos_evidencia(id: int, db: Session = Depends(dependencias.get_
 def gerencia_image_thumbnail(path: str):
     """Miniatura para la evidencia de gerencia (el endpoint de supervisor da
     403 a GERENCIA, dejando las imágenes rotas)."""
-    from backend.api import rutas_supervisor
+    from terreneitor.backend.api import rutas_supervisor
 
     return rutas_supervisor.thumb(path)
 
@@ -99,7 +99,7 @@ def gerencia_image_thumbnail(path: str):
 @router.get("/image-full/")
 def gerencia_image_full(path: str):
     """Imagen completa para la evidencia de gerencia (alias del de supervisor)."""
-    from backend.api import rutas_supervisor
+    from terreneitor.backend.api import rutas_supervisor
 
     return rutas_supervisor.full(path)
 

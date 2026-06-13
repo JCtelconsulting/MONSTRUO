@@ -16,7 +16,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.utils.logger import log
+from terreneitor.backend.utils.logger import log
 
 # -----------------------------------------------------------------------------
 # Middleware: soporte de prefijos /dev y /prod
@@ -162,7 +162,7 @@ def serve_file(path: str, thumb: bool = False):  # noqa: C901
     # convertir a JPEG al vuelo (miniatura o completa) para que se vean.
     from fastapi.responses import Response as _Resp
 
-    from backend.services import foto_service as _fs
+    from terreneitor.backend.services import foto_service as _fs
 
     _ext = os.path.splitext(clean_path)[1].lower()
     if _ext in _fs.NAVEGADOR_NO_SOPORTA:
@@ -473,7 +473,7 @@ def natural_sort_key(s):
 mimetypes.add_type("image/webp", ".webp")
 
 # === AUTO FIX PENDIENTE METADATA / VALIDACION ===
-from backend.models.modelos import AsignacionPlan, EstadoItemEnum, EstadoPlanEnum
+from terreneitor.backend.models.modelos import AsignacionPlan, EstadoItemEnum, EstadoPlanEnum
 
 AUTO_FIX_INTERVAL = 1800  # 30 minutos
 

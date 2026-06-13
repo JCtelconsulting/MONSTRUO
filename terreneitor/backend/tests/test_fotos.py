@@ -7,7 +7,7 @@ from datetime import datetime
 
 from PIL import Image
 
-from backend import modelos
+from terreneitor.backend import modelos
 
 
 def crear_imagen_con_exif(width=100, height=100, fecha=None):

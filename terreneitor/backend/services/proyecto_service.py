@@ -4,8 +4,8 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session, selectinload
 
-from backend import modelos, nucleo
-from backend.services.estructura_proyectos import STRUCTURE_TEMPLATES
+from terreneitor.backend import modelos, nucleo
+from terreneitor.backend.services.estructura_proyectos import STRUCTURE_TEMPLATES
 
 
 def delete_project_filesystem(ruta_base: str) -> None:

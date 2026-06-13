@@ -1,5 +1,5 @@
-from backend import modelos
-from backend.core.dependencias import get_db_hash
+from terreneitor.backend import modelos
+from terreneitor.backend.core.dependencias import get_db_hash
 
 
 def test_admin_no_puede_eliminarse_a_si_mismo(

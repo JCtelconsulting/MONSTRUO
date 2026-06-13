@@ -10,8 +10,8 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from jose import JWTError
 from sqlalchemy.orm import Session
 
-from backend import dependencias, modelos
-from backend.utils.logger import log
+from terreneitor.backend import dependencias, modelos
+from terreneitor.backend.utils.logger import log
 
 router = APIRouter(prefix="/api", tags=["Auth"])
 COOKIE_DOMAIN = ".telconsulting.cl"

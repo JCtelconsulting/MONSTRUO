@@ -2,7 +2,7 @@
 Tests de gestión de proyectos (crear, listar, eliminar).
 """
 
-from backend import modelos
+from terreneitor.backend import modelos
 
 
 def test_crear_proyecto_pmc(

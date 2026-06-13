@@ -12,8 +12,8 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from backend import dependencias, nucleo
-from backend.services import ia_autocompletador
+from terreneitor.backend import dependencias, nucleo
+from terreneitor.backend.services import ia_autocompletador
 
 router = APIRouter(
     prefix="/api/ia",

@@ -16,7 +16,7 @@ if os.environ.get("ENV", "").lower() in {"prod", "production"}:
     print("ABORTADO: ENV es producción. Este script es solo para DEV.")
     sys.exit(1)
 
-from backend.core import dependencias  # noqa: E402  (hash de contraseñas)
+from terreneitor.backend.core import dependencias  # noqa: E402  (hash de contraseñas)
 
 DB = os.environ.get("TERRENEITOR_DB_DIR", "/app/data/db") + "/terreneitor.db"
 FILES = os.environ.get("BASE_FILES_DIR", "/app/data/files")

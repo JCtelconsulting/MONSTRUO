@@ -22,7 +22,7 @@ from sqlalchemy import Integer, create_engine, insert, select, text
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-from backend.models.modelos import Base  # noqa: E402
+from terreneitor.backend.models.modelos import Base  # noqa: E402
 
 # Orden de carga respetando claves foráneas.
 ORDEN = [

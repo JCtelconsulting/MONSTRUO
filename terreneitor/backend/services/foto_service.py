@@ -9,7 +9,7 @@ import piexif
 from PIL import Image
 from sqlalchemy.orm import Session
 
-from backend import modelos, nucleo
+from terreneitor.backend import modelos, nucleo
 
 # Registrar el opener HEIF/HEIC para que PIL pueda abrir fotos de iPhone
 # (formato por defecto). Sin esto, las HEIC daban UnidentifiedImageError y las

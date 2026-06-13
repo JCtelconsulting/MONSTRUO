@@ -12,8 +12,8 @@ import sys
 
 sys.path.append(os.getcwd())
 
-from backend.core.nucleo import DB_DIR, DEFAULT_DB_FILE
-from backend.models.modelos import Base
+from terreneitor.backend.core.nucleo import DB_DIR, DEFAULT_DB_FILE
+from terreneitor.backend.models.modelos import Base
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

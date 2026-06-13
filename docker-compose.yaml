@@ -270,27 +270,30 @@ services:
   # + SSO del gateway). Puerto 8005: el proxy ya rutea ahi.
   terreneitor:
     build:
-      context: ./terreneitor
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: ./terreneitor/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-terreneitor
     env_file:
       - ./terreneitor/ops/environments/.env
     ports:
-      - "${TERRENEITOR_PORT:-8005}:8000"
+      - "${TERRENEITOR_PORT:-8005}:8005"
     environment:
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - ASSET_VERSION=${ASSET_VERSION:-}
       - ENV=dev
     volumes:
-      - ./terreneitor/backend:/app/backend
-      - ./terreneitor/frontend:/app/frontend
       - ./terreneitor/data:/app/data
       - ./terreneitor/logs:/app/logs
-    user: "1000:1000"
     depends_on:
       - db
     mem_limit: 512m
     mem_reservation: 128m
     restart: unless-stopped
+    command: [ "uvicorn", "terreneitor.backend.main:app", "--host", "0.0.0.0", "--port", "8005" ]
 
   zabbix:
     build:

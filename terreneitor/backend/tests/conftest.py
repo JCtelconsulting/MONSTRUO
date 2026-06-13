@@ -32,9 +32,9 @@ Path(os.environ["TERRENEITOR_DB_DIR"]).mkdir(parents=True, exist_ok=True)
 Path(os.environ["TERRENEITOR_LOCKS_DIR"]).mkdir(parents=True, exist_ok=True)
 Path(os.environ["BASE_FILES_DIR"]).mkdir(parents=True, exist_ok=True)
 
-from backend import modelos
-from backend.core.cerebro import app
-from backend.core.dependencias import get_db, get_db_hash
+from terreneitor.backend import modelos
+from terreneitor.backend.main import app
+from terreneitor.backend.core.dependencias import get_db, get_db_hash
 
 
 @pytest.fixture(scope="function")

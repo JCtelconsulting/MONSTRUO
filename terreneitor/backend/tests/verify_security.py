@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 os.environ["TERRENEITOR_SECRET_KEY"] = "test_key_verification_123"
 
-from backend.core.cerebro import app
+from terreneitor.backend.main import app
 
 client = TestClient(app)
 

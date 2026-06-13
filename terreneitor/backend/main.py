@@ -2,12 +2,11 @@ import os
 import time
 
 import sentry_sdk
-import uvicorn
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend import (
+from terreneitor.backend import (
     rutas_admin,
     rutas_auth,
     rutas_gerencia,
@@ -18,10 +17,10 @@ from backend import (
     rutas_supervisor,
     rutas_terreno,
 )
-from backend.core.dependencias import get_db_hash
-from backend.core.nucleo import SessionLocal, app, engine
-from backend.models.modelos import Base, User, UserRoleEnum
-from backend.utils.logger import log
+from terreneitor.backend.core.dependencias import get_db_hash
+from terreneitor.backend.core.nucleo import SessionLocal, app, engine
+from terreneitor.backend.models.modelos import Base, User, UserRoleEnum
+from terreneitor.backend.utils.logger import log
 
 # --- Sentry: monitoreo de errores en produccion ---
 # Si SENTRY_DSN no esta seteado, Sentry queda inactivo (no rompe nada).
@@ -62,7 +61,7 @@ else:
 from slowapi import _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
 
-from backend.core.dependencias import limiter  # noqa: E402
+from terreneitor.backend.core.dependencias import limiter  # noqa: E402
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -136,7 +135,7 @@ def _env_prefix() -> str:
 
 
 _FRONTEND_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
+    os.path.join(os.path.dirname(__file__), "..", "frontend")
 )
 
 
@@ -217,7 +216,7 @@ async def readiness_check():
 
 # Mount Static Files (AFTER routers to avoid shadowing)
 static_dir = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
+    os.path.join(os.path.dirname(__file__), "..", "frontend")
 )
 if os.path.exists(static_dir):
     # html=True hace que un GET a /modulos/<x>/ devuelva su index.html
@@ -292,7 +291,3 @@ def startup_event():
     finally:
         db.close()
     rutas_admin.start_project_sync_timer()
-
-
-if __name__ == "__main__":
-    uvicorn.run("backend.core.cerebro:app", host="0.0.0.0", port=8000, reload=False)

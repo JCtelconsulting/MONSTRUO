@@ -12,7 +12,7 @@ from PIL import Image
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
-from backend import dependencias, modelos, nucleo
+from terreneitor.backend import dependencias, modelos, nucleo
 
 router = APIRouter(
     prefix="/api",

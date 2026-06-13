@@ -21,9 +21,9 @@ from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
-from backend import dependencias, modelos, nucleo
-from backend.services import reporte_service
-from backend.utils.logger import log
+from terreneitor.backend import dependencias, modelos, nucleo
+from terreneitor.backend.services import reporte_service
+from terreneitor.backend.utils.logger import log
 
 router = APIRouter(
     prefix="/api",

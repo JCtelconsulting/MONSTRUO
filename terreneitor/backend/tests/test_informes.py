@@ -4,7 +4,7 @@ Tests de generación de informes PDF.
 
 from datetime import datetime
 
-from backend import modelos
+from terreneitor.backend import modelos
 
 
 def test_generar_informe_basico(test_client, auth_headers, test_db):
