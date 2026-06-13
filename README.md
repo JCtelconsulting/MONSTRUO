@@ -16,18 +16,20 @@ Este README es el punto de entrada: en 5 minutos te sitúas.
 | Ticketera | ticketera.telconsulting.cl/dev | 9005 | [ticketera/ESTADO.md](ticketera/ESTADO.md) |
 | Terreneitor | terreneitor.telconsulting.cl/dev | 8005 | [terreneitor/ESTADO.md](terreneitor/ESTADO.md) |
 | Fundación | login.telconsulting.cl/dev/fundacion | 9006 | [fundacion/ESTADO.md](fundacion/ESTADO.md) |
-| GTA | (legacy, fuera del compose) | 9012 | [gta/ESTADO.md](gta/ESTADO.md) |
+| GTA | vía gateway · /gta | 9012 | [gta/ESTADO.md](gta/ESTADO.md) |
 | Configuración | config.telconsulting.cl/dev | 9001 | — |
-| ERP/CRM/Bodega/PMO/IA/Zabbix | stubs | 9006-9011 | sin desarrollo activo |
+| ERP · CRM · Bodega | compose único | 9009 · 9008 · 9007 | activos (ERP=Laudus/SII, Bodega=kardex, CRM) |
+| PMO · IA · Zabbix | compose único | 9010 · 9011 · 9013 | placeholders en construcción |
 
 ## Cómo se levanta
 
 ```bash
-# Stack principal (db + gateway + ticketera + fundacion)
+# Compose ÚNICO: todos los módulos en un solo stack
+# (db + gateway + ticketera + fundacion + terreneitor + gta + erp/crm/bodega/pmo/ia/zabbix)
 docker compose --env-file plataforma/ops/env/.env.server.dev up -d --build
 
-# Terreneitor (módulo con compose propio, misma red)
-docker compose -f terreneitor/docker-compose.yaml up -d --build
+# Rebuild de containers puntuales (maneja ASSET_VERSION para cache-busting):
+./plataforma/ops/scripts/dev-rebuild.sh gateway gta
 ```
 
 - Postgres central: contenedor `monstruo-dev-db` (NUNCA publica 5432 al host).
@@ -39,9 +41,6 @@ docker compose -f terreneitor/docker-compose.yaml up -d --build
 
 - Rama de trabajo única: **`dev`**. `main` = producción (deploy automático CI).
 - Flujo: commits chicos a dev → push → (PROD: merge a main con autorización).
-- ⚠️ Hay una línea archivada pendiente de fusionar:
-  `archivo/dev-pre-regularizacion-20260612` (GTA + Fundación). Ver
-  PROYECTO_CONTEXTO → Decisiones pendientes.
 
 ## Documentación
 
@@ -49,8 +48,8 @@ docker compose -f terreneitor/docker-compose.yaml up -d --build
 |---|---|
 | Estado actual y decisiones | [plataforma/docs/PROYECTO_CONTEXTO.md](plataforma/docs/PROYECTO_CONTEXTO.md) + `<modulo>/ESTADO.md` |
 | Prioridades de negocio (EPICs) | [plataforma/docs/GUIA_MAESTRA.md](plataforma/docs/GUIA_MAESTRA.md) |
-| Arquitectura y red | [plataforma/docs/ARQUITECTURA.md](plataforma/docs/ARQUITECTURA.md) |
-| Proxy / dominios | [plataforma/docs/PROXY_INVERSO.md](plataforma/docs/PROXY_INVERSO.md) |
+| Arquitectura y red | [plataforma/docs/arquitectura/ARQUITECTURA.md](plataforma/docs/arquitectura/ARQUITECTURA.md) |
+| Proxy / dominios | [plataforma/docs/arquitectura/PROXY_INVERSO.md](plataforma/docs/arquitectura/PROXY_INVERSO.md) |
 | Línea visual + marca | [plataforma/docs/design.md](plataforma/docs/design.md) + [manual de marca](plataforma/docs/manual-marca-telconsulting.md) |
 | Reglas para apps nuevas | [plataforma/docs/CONTRATO_APPS.md](plataforma/docs/CONTRATO_APPS.md) |
 | Historia | [plataforma/docs/CHANGELOG.md](plataforma/docs/CHANGELOG.md) · viejo: `plataforma/docs/antiguo/` |
