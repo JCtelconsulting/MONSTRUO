@@ -256,7 +256,7 @@ Usar **siempre** Font Awesome dentro de las pestañas — NO emojis Unicode. Pat
 
 | Clase           | Uso                      | Estilo                                    |
 |-----------------|--------------------------|-------------------------------------------|
-| `.btn-primary`  | Acción principal         | Gradiente neon→info, texto oscuro         |
+| `.btn-primary`  | Acción principal         | Degradado dorado puro, texto oscuro       |
 | `.btn-secondary`| Acción secundaria        | Fondo oscuro, borde blanco suave          |
 | `.btn-danger`   | Eliminar / acción riesgosa | Borde rojo, hover fondo rojo            |
 | `.btn-sm`       | Acciones en tabla/card   | Compacto, borde gris, hover blanco       |
@@ -312,7 +312,7 @@ Clase estándar: `.input-dark`
 ```
 
 - Fondo: `rgba(6,10,14,0.88)`, borde `rgba(255,255,255,0.14)`
-- Focus: borde `rgba(0,255,65,0.5)` + glow verde suave
+- Focus: borde `rgba(212,168,67,0.5)` + glow dorado suave
 - `min-height: 38px`
 - Labels: uppercase, 0.8rem, weight 700, color blanco
 
