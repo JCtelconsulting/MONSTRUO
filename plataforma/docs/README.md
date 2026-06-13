@@ -4,7 +4,7 @@
 
 - [Proyecto Contexto](PROYECTO_CONTEXTO.md)
 - [Plan Maestro](GUIA_MAESTRA.md)
-- [Proxy Inverso](PROXY_INVERSO.md)
+- [Proxy Inverso](arquitectura/PROXY_INVERSO.md)
 - [Arquitectura](arquitectura/ARQUITECTURA.md)
 - [Contrato de Apps](CONTRATO_APPS.md)
 - [Estándares](ESTANDARES.md)

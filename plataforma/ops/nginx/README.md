@@ -23,9 +23,9 @@ Sincronización mínima:
 - cambiar en la VM proxy
 - validar con `nginx -t`
 - copiar el `conf` actualizado a este directorio
-- registrar el cambio en `plataforma/docs/PROXY_INVERSO.md`
+- registrar el cambio en `plataforma/docs/arquitectura/PROXY_INVERSO.md`
 
 ## Referencia
 
 Descripción operativa:
-- [../../docs/PROXY_INVERSO.md](../../docs/PROXY_INVERSO.md)
+- [../../docs/arquitectura/PROXY_INVERSO.md](../../docs/arquitectura/PROXY_INVERSO.md)

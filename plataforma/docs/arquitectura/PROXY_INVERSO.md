@@ -68,6 +68,13 @@ Configuración activa en `/etc/nginx/sites-enabled/`:
 
 Regla pública: PROD usa `/`, DEV usa `/dev/`.
 
+> **Actualización 2026-06-12 (Terreneitor como módulo):** en DEV, Terreneitor
+> corre como contenedor del ecosistema `monstruo-dev-terreneitor`
+> (`192.168.60.8:8005`). La URL única es `terreneitor.telconsulting.cl` y
+> portal/supervisor/gerencial/terreno redirigen 307 desde la app (el proxy no
+> necesitó cambios). PROD sigue legado en `192.168.60.5` hasta su migración
+> (ver `terreneitor/docs/MIGRACION_MONSTRUO.md`).
+
 ### Sapa (`sapa.conf`)
 
 Sin cambios desde 2026-04. Servicio externo.
