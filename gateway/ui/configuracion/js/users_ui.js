@@ -183,6 +183,7 @@ const UsersUI = (() => {
         { id: 'ia', label: 'IA (Ultron)' },
         { id: 'zabbix', label: 'Zabbix' },
         { id: 'fundacion', label: 'Fundación' },
+        { id: 'gta', label: 'GTA (Tareas por Áreas)' },
         { id: 'terreneitor', label: 'Terreneitor' },
         { id: 'config', label: 'Configuracion' }
     ];
@@ -207,6 +208,7 @@ const UsersUI = (() => {
         auditoria: 90,
         reportes: 100,
         fundacion: 105,
+        gta: 106,
         terreneitor: 107,
         configuracion_administrativa: 110,
     });
@@ -238,6 +240,7 @@ const UsersUI = (() => {
         'auditoria',
         'reportes',
         'fundacion',
+        'gta',
         'terreneitor',
         'configuracion_administrativa',
         'acceso_total_del_sistema',
