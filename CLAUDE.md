@@ -6,7 +6,7 @@ Léelo primero. Lo de abajo es solo el resumen mínimo para arrancar.
 
 ## Contexto rápido
 
-- **Prioridad actual:** GTA (Gestión y Tableros por Área)
+- **Prioridad actual:** GTA (Gestión de Tareas Automatizadas)
 - **Ticketera:** en producción y mantención post-PROD (EPIC 11 cerrado)
 - **Rama base:** `dev` (nunca `main`/`prod` sin autorización explícita)
 - **Entornos:**

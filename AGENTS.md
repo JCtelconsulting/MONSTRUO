@@ -28,7 +28,7 @@ Cuando haya conflicto, obedecer en este orden:
 
 ## 3) Prioridad de negocio vigente
 
-- **GTA (Gestión y Tableros por Área) es la prioridad actual.**
+- **GTA (Gestión de Tareas Automatizadas) es la prioridad actual.**
 - Ticketera (EPIC 11) ya está en producción y entra en mantención post-PROD; no se abre trabajo en ticketera salvo bug crítico.
 - No mezclar trabajo de GTA con trabajo de otras apps en el mismo commit/PR.
 
