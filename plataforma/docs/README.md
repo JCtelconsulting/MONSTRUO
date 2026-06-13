@@ -6,7 +6,7 @@
 - [Plan Maestro](GUIA_MAESTRA.md)
 - [Proxy Inverso](arquitectura/PROXY_INVERSO.md)
 - [Arquitectura](arquitectura/ARQUITECTURA.md)
-- [Contrato de Apps](CONTRATO_APPS.md)
+- [Contrato de Apps](arquitectura/CONTRATO_APPS.md)
 - [Estándares](ESTANDARES.md)
 - [Guía de diseño](design.md) — línea visual Premium Gold + checklist de UI
 - [Manual de marca](manual-marca-telconsulting.md) — reglas oficiales de marca Telconsulting
@@ -20,8 +20,7 @@
 
 ## Históricos
 
-- [antiguo/](antiguo/)
-- `archive/`
+- [archive/](archive/) — docs retirados, playbooks legacy, demos viejas y saneamiento (cementerio único)
 
 ## Regla
 

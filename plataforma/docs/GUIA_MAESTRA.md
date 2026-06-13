@@ -12,8 +12,8 @@ Documentos relacionados:
 - [arquitectura/ARQUITECTURA.md](arquitectura/ARQUITECTURA.md) — flujo de red, componentes Docker, modelo de comunicación
 - [arquitectura/PROXY_INVERSO.md](arquitectura/PROXY_INVERSO.md) — detalle del proxy
 - [arquitectura/CONTRATO_APPS.md](arquitectura/CONTRATO_APPS.md) — contrato que toda app debe cumplir
-- [estandares/ESTANDARES.md](estandares/ESTANDARES.md) y [design.md](design.md)
-- [operacion/deploy/GUIA_DEPLOY.md](operacion/deploy/GUIA_DEPLOY.md) — cómo se despliega
+- [ESTANDARES.md](ESTANDARES.md) y [design.md](design.md)
+- [operacion/GUIA_DEPLOY.md](operacion/GUIA_DEPLOY.md) — cómo se despliega
 - [changelog/](changelog/) — bitácora completa del proyecto
 
 ---
@@ -53,7 +53,7 @@ No es un iPaaS comercial. Es una plataforma propia, modular, con una app por dom
 
 - Rama `dev` y rama `main`. No se promueve a `main` sin autorización explícita.
 - Nombres de stack, env files y compose projects nunca se cruzan entre entornos.
-- Detalle del contrato canónico en [PROYECTO_CONTEXTO.md](PROYECTO_CONTEXTO.md) y [operacion/deploy/GUIA_DEPLOY.md](operacion/deploy/GUIA_DEPLOY.md).
+- Detalle del contrato canónico en [PROYECTO_CONTEXTO.md](PROYECTO_CONTEXTO.md) y [operacion/GUIA_DEPLOY.md](operacion/GUIA_DEPLOY.md).
 
 ## 3. Protocolo de trabajo
 
@@ -186,7 +186,7 @@ Solo lógica genuinamente transversal:
 ## 9. Cómo se actualiza esta guía
 
 - Cambios de **reglas o protocolo** (secciones 2-5): actualizar acá.
-- Cambios **operativos** (deploy, contrato canónico): en `operacion/deploy/GUIA_DEPLOY.md` o `PROYECTO_CONTEXTO.md`.
+- Cambios **operativos** (deploy, contrato canónico): en `operacion/GUIA_DEPLOY.md` o `PROYECTO_CONTEXTO.md`.
 - Cambios de **una app específica**: en `<app>/docs/` o su `README.md`, no acá.
 - **Hitos ejecutados**: en [changelog/](changelog/) (mes-año correspondiente), nunca acá.
 - **Estructura del repo**: pendiente. Cuando se estabilice, doc propio.

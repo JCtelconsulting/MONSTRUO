@@ -142,8 +142,8 @@ def repo_checks() -> List[str]:
             errors.append(f"config.py sin variable requerida de ticketera: {required}")
 
     for env_file in (
-        PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.dev.example",
-        PROJECT_ROOT / "plataforma/docs/operacion/deploy/plantillas_env/env.server.example",
+        PROJECT_ROOT / "plataforma/docs/operacion/plantillas_env/env.server.dev.example",
+        PROJECT_ROOT / "plataforma/docs/operacion/plantillas_env/env.server.example",
     ):
         env_text = read_text(env_file)
         for required in (

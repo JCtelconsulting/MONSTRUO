@@ -11,10 +11,10 @@ Plantillas versionadas de variables de entorno. Los `.env` reales viven en `plat
 
 ```bash
 # DEV
-cp plataforma/docs/operacion/deploy/plantillas_env/env.server.dev.example plataforma/ops/env/.env.server.dev
+cp plataforma/docs/operacion/plantillas_env/env.server.dev.example plataforma/ops/env/.env.server.dev
 
 # PROD
-cp plataforma/docs/operacion/deploy/plantillas_env/env.server.example plataforma/ops/env/.env.server
+cp plataforma/docs/operacion/plantillas_env/env.server.example plataforma/ops/env/.env.server
 ```
 
 Después editar el archivo copiado para reemplazar los `replace_me` y placeholders.

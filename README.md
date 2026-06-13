@@ -51,8 +51,8 @@ docker compose --env-file plataforma/ops/env/.env.server.dev up -d --build
 | Arquitectura y red | [plataforma/docs/arquitectura/ARQUITECTURA.md](plataforma/docs/arquitectura/ARQUITECTURA.md) |
 | Proxy / dominios | [plataforma/docs/arquitectura/PROXY_INVERSO.md](plataforma/docs/arquitectura/PROXY_INVERSO.md) |
 | Línea visual + marca | [plataforma/docs/design.md](plataforma/docs/design.md) + [manual de marca](plataforma/docs/manual-marca-telconsulting.md) |
-| Reglas para apps nuevas | [plataforma/docs/CONTRATO_APPS.md](plataforma/docs/CONTRATO_APPS.md) |
-| Historia | [plataforma/docs/CHANGELOG.md](plataforma/docs/CHANGELOG.md) · viejo: `plataforma/docs/antiguo/` |
+| Reglas para apps nuevas | [plataforma/docs/arquitectura/CONTRATO_APPS.md](plataforma/docs/arquitectura/CONTRATO_APPS.md) |
+| Historia | [plataforma/docs/CHANGELOG.md](plataforma/docs/CHANGELOG.md) · retirados: `plataforma/docs/archive/` |
 
 ## Documentación
 

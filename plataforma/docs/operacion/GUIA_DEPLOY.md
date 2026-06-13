@@ -2,7 +2,7 @@
 
 Cómo se despliega Monstruo: PC → GitHub → VM de aplicaciones, con Nginx como proxy inverso.
 
-> Para detalle del proxy inverso ver [arquitectura/PROXY_INVERSO.md](../../arquitectura/PROXY_INVERSO.md). Para contrato canónico DEV/PROD ver [PROYECTO_CONTEXTO.md](../../PROYECTO_CONTEXTO.md).
+> Para detalle del proxy inverso ver [arquitectura/PROXY_INVERSO.md](../arquitectura/PROXY_INVERSO.md). Para contrato canónico DEV/PROD ver [PROYECTO_CONTEXTO.md](../PROYECTO_CONTEXTO.md).
 
 ## Topología
 
@@ -56,9 +56,9 @@ git checkout main                      # DEV: git checkout dev
 ```bash
 mkdir -p plataforma/ops/env
 # PROD:
-cp plataforma/docs/operacion/deploy/plantillas_env/env.server.example plataforma/ops/env/.env.server
+cp plataforma/docs/operacion/plantillas_env/env.server.example plataforma/ops/env/.env.server
 # DEV:
-cp plataforma/docs/operacion/deploy/plantillas_env/env.server.dev.example plataforma/ops/env/.env.server.dev
+cp plataforma/docs/operacion/plantillas_env/env.server.dev.example plataforma/ops/env/.env.server.dev
 ```
 
 Claves obligatorias para PROD:
@@ -146,7 +146,7 @@ Por rama:
 
 ## Plantillas de entorno
 
-Versionadas en `plataforma/docs/operacion/deploy/plantillas_env/`:
+Versionadas en `plataforma/docs/operacion/plantillas_env/`:
 
 - `env.base.example` — base genérica
 - `env.local.example` — para correr en PC sin docker (legacy, casi no se usa)
