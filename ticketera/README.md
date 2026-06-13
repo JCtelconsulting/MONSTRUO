@@ -9,7 +9,7 @@ Unificar la gestión de casos internos (operación, incidentes, proyectos, preve
 La aplicación está estructurada bajo el patrón **Package-by-Feature** separando claramente el backend del frontend:
 
 *   `backend/`: Contiene la aplicación FastAPI, rutas (`api/`), lógica de negocio (`services/`), y tareas asíncronas (`jobs/`).
-*   `frontend/`: Contiene la interfaz de usuario en Vanilla JS, HTML y CSS.
+*   `ui/`: Contiene la interfaz de usuario en Vanilla JS, HTML y CSS.
 
 ## Tipos de Ticket
 *   **Operación interna** (finanzas, bodega, crm)

@@ -4,8 +4,8 @@
 Gestión de relación con clientes, leads, oportunidades comerciales y cumplimiento legal (Ficha Legal/Compliance).
 
 ## Estructura Local
-- `main.py`: API del módulo.
-- `service.py`: Lógica de gestión de cuentas y contactos.
+- `backend/main.py`: API del módulo.
+- `backend/services/service.py`: Lógica de gestión de cuentas y contactos (consume `erp.sales_service`).
 - `ui/`: Dashboard comercial y ficha de cliente.
 
 ## Configuración Canónica
@@ -13,4 +13,4 @@ Gestión de relación con clientes, leads, oportunidades comerciales y cumplimie
 - **Puerto Prod:** 8008
 
 ---
-*Referencia: Se rige por el [Plan Maestro](file:///srv/monstruo_dev/plataforma/docs/PLAN_MAESTRO_MONSTRUO.md).*
+*Referencia: Se rige por la [Guía Maestra](../plataforma/docs/GUIA_MAESTRA.md).*

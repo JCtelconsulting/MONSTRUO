@@ -19,7 +19,7 @@ gateway/
 
 Prefijo: `/api/gateway/`
 
-Ver `backend/router.py` para los endpoints disponibles.
+Ver `backend/routers/` para los endpoints disponibles.
 
 ## Tests
 

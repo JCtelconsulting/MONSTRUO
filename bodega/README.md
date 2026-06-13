@@ -4,7 +4,8 @@
 Control de inventario, catálogo maestro de productos, movimientos de stock y gestión de evidencias físicas.
 
 ## Estructura Local
-- `main.py`: API del módulo.
+- `backend/main.py`: API del módulo.
+- `backend/services/`: kardex, ajustes de stock, sync de catálogo.
 - `ui/`: Gestión de inventario y Kardex.
 
 ## Configuración Canónica
@@ -12,4 +13,4 @@ Control de inventario, catálogo maestro de productos, movimientos de stock y ge
 - **Puerto Prod:** 8007
 
 ---
-*Referencia: Se rige por el [Plan Maestro](file:///srv/monstruo_dev/plataforma/docs/PLAN_MAESTRO_MONSTRUO.md).*
+*Referencia: Se rige por la [Guía Maestra](../plataforma/docs/GUIA_MAESTRA.md).*

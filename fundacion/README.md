@@ -1,17 +1,25 @@
-# Módulo: Módulos Secundarios (PMO, IA, Zabbix, Fundación) 🛠️
+# Módulo: Fundación 🏫
 
 ## Propósito
-Este directorio contiene módulos de apoyo y servicios extendidos del ecosistema MONSTRUO:
-- **PMO:** Gestión de proyectos e hitos.
-- **IA:** Asistente cognitivo (ULTRON).
-- **Zabbix:** Monitoreo de infraestructura.
-- **Fundación:** Módulo legado activo.
+Gestión social y educativa de la Fundación Telconsulting: sedes, membresías por
+sede, roles del organigrama (directora social, jefa pedagógica, coordinadora
+territorial, líder educativo, gestora educativa, ejecutiva) y sincronización con
+Google Drive. Corre aislado en su carpeta (mismo repo), con routing por dominio
+de correo.
 
-## Puertos Canónicos (Dev)
-- PMO: 9009
-- IA: 9010
-- Zabbix: 9011
-- Fundación: 9012
+## Estructura Local
+- `backend/main.py`: API del módulo (prefijo `/api/fundacion`).
+- `backend/router.py` + `backend/routers/{reportes,sesiones,sync}.py`: endpoints.
+- `backend/services/`: `drive_sync`, membresías, sedes.
+- `ui/`: vistas del módulo.
+- `migrations/`: migraciones SQL versionadas.
+
+## Configuración Canónica
+- **Puerto Dev:** 9006
+
+## Documentación
+- Reglas de negocio: [docs/REGLAS_NEGOCIO.md](docs/REGLAS_NEGOCIO.md).
+- Estado del módulo: [ESTADO.md](ESTADO.md).
 
 ---
-*Referencia: Se rigen por el [Plan Maestro](file:///srv/monstruo_dev/plataforma/docs/PLAN_MAESTRO_MONSTRUO.md).*
+*Referencia: Se rige por la [Guía Maestra](../plataforma/docs/GUIA_MAESTRA.md).*
