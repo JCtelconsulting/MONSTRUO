@@ -1,25 +1,24 @@
-# Configuración del Proxy Inverso (Terreneitor)
+# Proxy Inverso (Terreneitor)
 
-Este documento explica cómo está configurada la arquitectura de red y el proxy inverso para la aplicación.
+> **Canónico:** el detalle del proxy (VM, upstreams PROD/DEV, dominios,
+> sincronización repo↔VM) vive en
+> [`../../plataforma/docs/arquitectura/PROXY_INVERSO.md`](../../plataforma/docs/arquitectura/PROXY_INVERSO.md)
+> del repo Monstruo. Este archivo solo deja la nota específica de Terreneitor.
 
-## Arquitectura de Red
+## Resumen Terreneitor
 
-La configuración ha sido consolidada. En lugar de correr en tándem, todo el enrutamiento HTTPS (SSL) y mapeo de subdominios (`*.telconsulting.cl`) es manejado exclusivamente por una **Máquina Virtual de Proxy Inverso dedicada**, la cual redirige todo el tráfico hacia el contenedor Docker de Terreneitor directamente.
+Todo el enrutamiento HTTPS (SSL) y los subdominios `*.telconsulting.cl` los
+maneja la VM de proxy inverso dedicada `192.168.60.6`, que hace `proxy_pass` al
+backend de Terreneitor.
 
-- **App Terreneitor (Docker Node):** `192.168.60.5` (Puerto expuesto: `8005`)
-- **Proxy Inverso Nginx (VM Dedicada):** `192.168.60.6`
+- **DEV:** Terreneitor corre como módulo del ecosistema en el contenedor
+  `monstruo-dev-terreneitor` (`192.168.60.8:8005`). La URL única es
+  `terreneitor.telconsulting.cl`; portal/supervisor/gerencial/terreno redirigen
+  307 desde la app (el proxy no necesitó cambios).
+- **PROD:** sigue legado en `192.168.60.5` hasta su migración (ver
+  [`MIGRACION_MONSTRUO.md`](MIGRACION_MONSTRUO.md)).
+- Archivo de configuración en la VM: `/etc/nginx/sites-available/terreneitor.conf`
+  (copia versionada en `plataforma/ops/nginx/terreneitor.conf`).
 
-### Detalles Administrativos del Proxy Externa
-
-- **IP de Conexión:** `192.168.60.6`
-- **Autenticación (Usuario/Pass):** `root` / `Apstref.8`
-- **Archivo de Configuración:** `/etc/nginx/sites-available/terreneitor.conf`
-
-### Cómo Funciona el Flujo
-1. El usuario accede a `https://terreneitor.telconsulting.cl` desde internet.
-2. La solicitud llega a la IP Pública y es enrutada internamente hacia la VM `192.168.60.6` (Proxy).
-3. El Nginx del proxy verifica certificados SSL y procesa reglas de subdominio (Dev/Prod).
-4. El proxy hace un `proxy_pass` apuntando a la IP y puerto internos de la aplicación Dockerizada: `http://192.168.60.5:8005`.
-
-### Nginx Local (Host 192.168.60.5)
-El servidor Nginx corriendo en esta misma máquina (`192.168.60.5`) **fue DESHABILITADO** para Terreneitor. Sus configuraciones locales (`terreneitor_local.conf` y `terreneitor_local_dev.conf`) fueron removidas de `/etc/nginx/sites-enabled/` para evitar doble proxy y conflictos de puertos. Sigue corriendo exclusivamente para las conexiones o apps que dependan de él localmente (ej. Monstruo).
+> Las credenciales de acceso al proxy **no van en el repo**: viven en
+> `plataforma/ops/secrets/` (o en el gestor de secretos del equipo).
