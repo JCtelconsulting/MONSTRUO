@@ -44,6 +44,6 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["backend/tests"]
+testpaths = ["tests/unit"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-v --asyncio-mode=auto -o cache_dir=/tmp/pytest_cache"

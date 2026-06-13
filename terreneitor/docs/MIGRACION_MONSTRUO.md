@@ -16,10 +16,10 @@ app con hartos módulos"), por etapas reversibles.
   contenedor `monstruo-dev-terreneitor`, puerto host **8005** (el proxy 60.6 ya
   ruteaba los dominios de terreneitor dev a 60.8:8005 → **cero cambios de proxy**).
 - Red externa `monstruo-dev_default` → ve el Postgres central como `db:5432`.
-- El contenedor viejo `terreneitor-app-dev` quedó apagado; `/srv/terreneitor_dev`
+- El contenedor viejo `terreneitor-app-dev` (standalone) quedó apagado; `/srv/terreneitor_dev`
   queda como respaldo + fuente de verdad git.
 - El servicio ya quedó plegado en el `docker-compose.yaml` raíz de monstruo
-  (compose único). El bloque real es:
+  (compose unico). El bloque inicial (Fase 1) fue el de abajo; hoy el servicio sigue el patron de modulo estandar (context . del repo, Dockerfile a la raiz, ui/, command uvicorn terreneitor.backend.main:app):
 
 ```yaml
   terreneitor:
@@ -31,7 +31,7 @@ app con hartos módulos"), por etapas reversibles.
       - ./terreneitor/frontend:/app/frontend
       - ./terreneitor/data:/app/data
       - ./terreneitor/logs:/app/logs
-    env_file: [./terreneitor/ops/environments/.env]
+    env_file: [./terreneitor/environments/.env]
     environment: [PYTHONUNBUFFERED=1, ENV=dev]
     user: "1000:1000"
     restart: unless-stopped
@@ -44,11 +44,11 @@ app con hartos módulos"), por etapas reversibles.
   engine único Postgres, si no, SQLite multi-tenant como siempre. El listener de
   PRAGMA quedó blindado a SQLite. Driver `psycopg2-binary`.
 - Datos en schema **`terreneitor`** de la DB `monstruo_dev` (convención schema
-  por módulo). Migración con `ops/scripts/migracion/sqlite_a_postgres.py`
+  por módulo). Migración con `scripts/migracion/sqlite_a_postgres.py`
   (tablas desde modelos + datos con IDs + secuencias + verificación): **PASS**,
   10/10 tablas con conteos idénticos.
 - La URL (con `search_path=terreneitor,public`) vive en
-  `terreneitor/ops/environments/.env` (no commiteado). OJO: tras cambiar el
+  `terreneitor/environments/.env` (no commiteado). OJO: tras cambiar el
   `.env`, `docker compose up -d --force-recreate` (restart no relee env).
 - Fixes de portabilidad encontrados con la app corriendo en PG (commit `476dbc6`):
   - `strftime('%s')` → `EXTRACT(EPOCH ...)` en PG (duración SLA).

@@ -5,7 +5,7 @@ Pieza 3 (propuesta): un LLM LOCAL vía Ollama (API compatible con OpenAI) recibe
 transcripción + las fotos (si el modelo es de visión) + el contexto y propone la
 estructura del informe.
 
-Config por entorno (ops/environments/.env):
+Config por entorno (environments/.env):
   OLLAMA_BASE_URL   p.ej. http://192.168.60.50:11434/v1   (el PC con Ollama)
   OLLAMA_MODEL      p.ej. qwen2.5vl:3b / llava:7b / llama3.2:3b   (default qwen2.5vl:3b)
   WHISPER_MODEL     tiny|base|small   (default base)

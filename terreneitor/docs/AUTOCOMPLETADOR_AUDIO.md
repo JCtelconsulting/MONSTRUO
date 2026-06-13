@@ -40,7 +40,7 @@ Juan no tiene claves de API. Se usa IA **local**, gratis:
   RAM, 2 cores, sin GPU → no corre un LLM útil). El backend llama a Ollama por su
   API compatible con OpenAI (`OLLAMA_BASE_URL`).
 
-Config en `ops/environments/.env`:
+Config en `environments/.env`:
 ```
 OLLAMA_BASE_URL=http://<IP-del-PC>:11434/v1
 OLLAMA_MODEL=qwen2.5vl:3b      # liviano con visión; o llava:7b / llama3.2:3b (sin visión)
@@ -56,7 +56,7 @@ rebuild), instalar Ollama en el PC (`ollama pull qwen2.5vl:3b`), abrir el puerto
 |---|---|---|
 | STT (audio→texto) | OpenAI Whisper API · Whisper local (faster-whisper) · Google STT | **Whisper API** (openai ya está en requirements; ~US$0.006/min). Local si se quiere costo cero/offline. |
 | Modelo IA propuesta | **claude-opus-4-8** (Anthropic SDK, visión para fotos, salida estructurada) | claude-opus-4-8 con adaptive thinking + structured output (JSON schema) |
-| Claves | `OPENAI_API_KEY` (Whisper) + `ANTHROPIC_API_KEY` (Claude) en `ops/environments/.env` | — |
+| Claves | `OPENAI_API_KEY` (Whisper) + `ANTHROPIC_API_KEY` (Claude) en `environments/.env` | — |
 | Almacenamiento audio | `data/files/<...>/_AUDIO/` junto al proyecto | sí (igual que fotos) |
 | Privacidad/costo | el audio + fotos van a APIs externas; estimar costo por informe (~US$0.05–0.20) | feature-flag por proyecto; log de costo en `ia_logs` |
 

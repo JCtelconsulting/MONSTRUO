@@ -30,10 +30,13 @@ La app queda en `terreneitor.telconsulting.cl/dev` (vía proxy) o en el puerto
 - [Manual Gerencia](docs/manuales/usuario_gerencia.md)
 - [Manual Portal/Admin](docs/manuales/usuario_portal.md)
 
-## 📂 Organización del Proyecto
-*   **`backend/`**: Backend FastAPI (core, models, services, utils).
-*   **`frontend/`**: Frontend modular (módulos + `_compartido/`).
-*   **`docker/`**: `Dockerfile` del módulo (lo usa el compose único raíz).
-*   **`ops/scripts/`**: Automatización (backup, QA, mantenimiento, migración).
-*   **`data/`** · **`logs/`**: Volúmenes locales del contenedor (los datos viven en Postgres central, schema `terreneitor`).
-*   **`docs/`**: Documentación técnica.
+## 📂 Organización del Proyecto (layout de módulo Monstruo)
+*   **`backend/`**: Backend FastAPI (`core/`, `models/`, `services/`, `api/`, `utils/`). Entry: `backend/main.py`.
+*   **`ui/`**: Frontend modular (`modulos/` + `_compartido/`).
+*   **`scripts/`**: Automatización (backup, QA, mantenimiento, migración).
+*   **`tests/`**: `unit/` (pytest) + `e2e/` (Playwright).
+*   **`migrations/`** + `alembic.ini`: migraciones Alembic.
+*   **`environments/`**: `.env.example` del módulo (el `.env` real va gitignored).
+*   **`data/`** · **`logs/`**: volúmenes locales del contenedor (los datos viven en Postgres central, schema `terreneitor`).
+*   **`docs/`**: documentación técnica.
+*   **`Dockerfile`** · **`requirements.txt`** · **`__init__.py`**: imagen y paquete del módulo (los usa el compose único raíz).

@@ -215,7 +215,7 @@ def _try_load_local_dotenv():
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     )
     paths = [
-        os.path.join(base_dir, "ops", "environments", ".env"),
+        os.path.join(base_dir, "..", "environments", ".env"),
         os.path.join(base_dir, ".env"),
         os.path.join(base_dir, "code", ".env"),
     ]

@@ -277,7 +277,7 @@ services:
         APP_GID: ${APP_GID:-1000}
     container_name: ${STACK_NAME:-monstruo-dev}-terreneitor
     env_file:
-      - ./terreneitor/ops/environments/.env
+      - ./terreneitor/environments/.env
     ports:
       - "${TERRENEITOR_PORT:-8005}:8005"
     environment:

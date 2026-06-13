@@ -33,7 +33,7 @@ Este proyecto fue desarrollado en su totalidad mediante Pair Programming con IA.
 - **UI/UX**: Mantenga el estándar "Dark Mode" y el uso de la fuente *Space Grotesk*. No use frameworks de CSS pesados si no es estrictamente necesario.
 
 ## 5. Mantenimiento y Scripts
-La carpeta `ops/scripts/` contiene herramientas vitales:
+La carpeta `scripts/` contiene herramientas vitales:
 - `backup/`: Gestión de respaldos externos.
 - `mantenimiento/`: Limpieza de logs y temporales.
 - `crear_estructura/`: Script para generar la jerarquía de carpetas requerida por los proyectos PMC/SATLINK/etc.

@@ -32,20 +32,20 @@ Patrón base de cualquier script:
 ```bash
 docker run --rm --network host -v "$PWD:/work" -w /work \
   mcr.microsoft.com/playwright/python:v1.49.0-jammy \
-  bash -lc 'pip install -q --break-system-packages "playwright==1.49.0" >/dev/null 2>&1; python3 e2e/<script>.py'
+  bash -lc 'pip install -q --break-system-packages "playwright==1.49.0" >/dev/null 2>&1; python3 tests/e2e/<script>.py'
 ```
 
-Los screenshots quedan en `e2e/shots/` (ignorado por git). Claude los **ve** con
+Los screenshots quedan en `tests/e2e/shots/` (ignorado por git). Claude los **ve** con
 la herramienta Read (renderiza imágenes), que es como juzga "se ve feo".
 
 ## 3. Datos de prueba (en TODOS los estados)
 
 ```bash
 # Reset limpio (borra datos de prod, siembra demo + crea carpetas)
-docker exec -i terreneitor-app-dev python - < ops/scripts/qa/seed_dev.py
+docker exec -i monstruo-dev-terreneitor python - < scripts/qa/seed_dev.py
 # Demo COMPLETA: fotos reales con/sin EXIF + tareas en cada estado + proyectos
 # activo/pausado/cerrado + informes
-bash ops/scripts/qa/demo_flujo_completo.sh
+bash scripts/qa/demo_flujo_completo.sh
 ```
 
 Deja asignaciones en: ASIGNADA, EN_PROGRESO, COMPLETADA_TERRENO, PENDIENTE_EXIF
@@ -55,14 +55,14 @@ informes. Usuarios QA (uno por rol): `qa.dev` / `qa.supervisor` / `qa.gerencia`
 
 Fotos demo en varios formatos para probar render: JPG (con/sin EXIF), PNG, HEIC.
 
-## 4. Scripts de QA (en `e2e/`)
+## 4. Scripts de QA (en `tests/e2e/`)
 
 | Script | Qué hace |
 |---|---|
 | `test_dev_navegador.py` | Portal: login, detecta loop de redirección, cuenta secciones visibles, errores de consola, screenshot. Da veredicto OK/FALLO. |
 | `test_terreno_navegador.py` | Terreno (rol terreno): recorre pestañas y entra a una tarea; verifica que no rebote. |
 | `inspeccion_total.py` | Entra a cada módulo con su rol y screenshotea CADA sección, con errores por sección. |
-| `explorador_total.py` | EXHAUSTIVO: por módulo/sección abre cada modal **no-destructivo**, detecta imágenes rotas, errores de consola y peticiones fallidas → `e2e/explorador_reporte.json`. |
+| `explorador_total.py` | EXHAUSTIVO: por módulo/sección abre cada modal **no-destructivo**, detecta imágenes rotas, errores de consola y peticiones fallidas → `tests/e2e/explorador_reporte.json`. |
 | `capturar_modales.py` | Captura dirigida de ventanas clave (nuevo usuario/proyecto, estructura, reset clave, upload terreno, lightbox, add-items). |
 | `multi_modulos.py` | Verifica que ningún módulo rebote al login. |
 | `debug_login.py` / `debug_terreno.py` / `debug_gerencia.py` | Imprimen respuestas de `/api/*`, cookies y navegaciones (para depurar). |
@@ -101,9 +101,9 @@ Fotos demo en varios formatos para probar render: JPG (con/sin EXIF), PNG, HEIC.
 
 ## 7. Cómo reusar en otro proyecto
 
-1. Copiar `e2e/` y `ops/scripts/qa/` y ajustar: URLs/subdominios, selectores de
+1. Copiar `tests/e2e/` y `scripts/qa/` y ajustar: URLs/subdominios, selectores de
    nav (`data-section`/`data-tab`/`data-target`), lista de secciones y usuarios QA.
 2. Adaptar el seed (`seed_dev.py`) al modelo de datos del proyecto.
 3. Correr `explorador_total.py` → revisar `explorador_reporte.json` (imágenes rotas
-   + errores) y los screenshots `e2e/shots/exp_*`.
+   + errores) y los screenshots `tests/e2e/shots/exp_*`.
 4. Arreglar, re-correr, repetir hasta 0 imágenes rotas / 0 errores de consola.

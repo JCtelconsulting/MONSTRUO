@@ -1,7 +1,7 @@
 # Plan: alinear Terreneitor al modelo de módulo Monstruo
 
 > **Para quién:** el agente (Fable) que ejecute esta re-arquitectura.
-> **Autor del plan:** sesión Opus 2026-06-13. **Estado:** PENDIENTE de ejecución.
+> **Autor del plan:** sesión Opus 2026-06-13. **Estado:** EJECUTADO 2026-06-13 (etapas 1-3, verificado en runtime).
 > **Tamaño:** grande — toca packaging Python, build, runtime, serving y rutas de assets.
 
 ## 0. Objetivo

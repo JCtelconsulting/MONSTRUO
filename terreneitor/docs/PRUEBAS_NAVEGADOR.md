@@ -34,7 +34,7 @@ de prueba (4 usuarios uno por rol, 4 proyectos demo, items, un plan y
 asignaciones con estados variados) + crear sus carpetas en disco:
 
 ```bash
-docker exec -i terreneitor-app-dev python - < ops/scripts/qa/seed_dev.py
+docker exec -i monstruo-dev-terreneitor python - < scripts/qa/seed_dev.py
 ```
 
 El script aborta si `ENV=production` (salvaguarda). Tras sembrar, supervisor ve
@@ -48,29 +48,29 @@ instala en runtime fijado a `1.49.0` para que calce con el Chromium de la imagen
 
 ```bash
 # Portal (login + loop + secciones + screenshot)
-bash ops/scripts/qa/correr_pruebas_navegador.sh
+bash scripts/qa/correr_pruebas_navegador.sh
 
 # Módulo terreno (login rol terreno + 3 pestañas + entrar a una tarea)
 docker run --rm --network host -v "$PWD:/work" -w /work \
   -e QA_EMAIL=qa.terreno@telconsulting.cl -e QA_PASS='QaTerr2026!' \
   mcr.microsoft.com/playwright/python:v1.49.0-jammy \
-  bash -lc 'pip install -q --break-system-packages "playwright==1.49.0" >/dev/null 2>&1; python3 e2e/test_terreno_navegador.py'
+  bash -lc 'pip install -q --break-system-packages "playwright==1.49.0" >/dev/null 2>&1; python3 tests/e2e/test_terreno_navegador.py'
 ```
 
 Cada prueba imprime un veredicto `RESULTADO ... OK ✅ / FALLO ❌` y guarda
-screenshots en `e2e/shots/` (ignorados por git) para revisión visual.
+screenshots en `tests/e2e/shots/` (ignorados por git) para revisión visual.
 
 ## Archivos
 
 | Archivo | Qué hace |
 |---|---|
-| `e2e/test_dev_navegador.py` | Portal: login, detecta loop, cuenta secciones visibles, errores de consola, screenshot |
-| `e2e/test_terreno_navegador.py` | Terreno: login rol terreno, recorre pestañas, entra a una tarea, verifica que no rebote |
-| `e2e/multi_modulos.py` | Carga portal/supervisor/gerencia/terreno y verifica que ninguno rebote |
-| `e2e/inspeccion_total.py` | Inspección visual TOTAL: entra a cada módulo con su rol y screenshotea CADA sección/pestaña, registrando errores por sección |
-| `ops/scripts/qa/seed_dev.py` | Borra datos de prod y siembra datos de prueba + carpetas |
-| `e2e/debug_login.py`, `e2e/debug_terreno.py` | Debug: imprimen respuestas de `/api/*`, cookies y navegaciones |
-| `ops/scripts/qa/correr_pruebas_navegador.sh` | Runner del test de portal |
+| `tests/e2e/test_dev_navegador.py` | Portal: login, detecta loop, cuenta secciones visibles, errores de consola, screenshot |
+| `tests/e2e/test_terreno_navegador.py` | Terreno: login rol terreno, recorre pestañas, entra a una tarea, verifica que no rebote |
+| `tests/e2e/multi_modulos.py` | Carga portal/supervisor/gerencia/terreno y verifica que ninguno rebote |
+| `tests/e2e/inspeccion_total.py` | Inspección visual TOTAL: entra a cada módulo con su rol y screenshotea CADA sección/pestaña, registrando errores por sección |
+| `scripts/qa/seed_dev.py` | Borra datos de prod y siembra datos de prueba + carpetas |
+| `tests/e2e/debug_login.py`, `tests/e2e/debug_terreno.py` | Debug: imprimen respuestas de `/api/*`, cookies y navegaciones |
+| `scripts/qa/correr_pruebas_navegador.sh` | Runner del test de portal |
 
 ## Usuarios de QA (solo en la BD de DEV)
 

@@ -68,10 +68,10 @@ _papelera_refactor/
 .claude/
 
 # Screenshots de pruebas de navegador (artefactos)
-e2e/shots/
+tests/e2e/shots/
 data/cache/
 
 # --- Modulo Monstruo: datos runtime fuera del repo (AGENTS.md regla 9) ---
 data/
 logs/
-e2e/shots/
+tests/e2e/shots/
