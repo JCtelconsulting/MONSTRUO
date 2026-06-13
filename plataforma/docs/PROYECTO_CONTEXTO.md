@@ -1,8 +1,7 @@
 # Proyecto Contexto — Monstruo (central)
 
 > Solo lo puntual. El detalle de cada módulo vive en su `<modulo>/ESTADO.md`.
-> Historia cronológica: [CHANGELOG.md](CHANGELOG.md). Versión anterior de este
-> doc: [antiguo/PROYECTO_CONTEXTO-hasta-2026-06-12.md](antiguo/PROYECTO_CONTEXTO-hasta-2026-06-12.md).
+> Historia cronológica: [CHANGELOG.md](CHANGELOG.md).
 
 **Actualizado:** 2026-06-12
 

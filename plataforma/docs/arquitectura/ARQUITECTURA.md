@@ -1,7 +1,6 @@
 # Arquitectura del Ecosistema Monstruo (AS-IS)
 
-**Actualizado:** 2026-06-12 (versión anterior en
-[antiguo/ARQUITECTURA-hasta-2026-06-12.md](antiguo/ARQUITECTURA-hasta-2026-06-12.md)).
+**Actualizado:** 2026-06-12
 
 ## 1. Topología de red
 
