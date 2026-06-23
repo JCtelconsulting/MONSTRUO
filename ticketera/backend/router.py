@@ -186,6 +186,11 @@ class TicketApprovalIn(BaseModel):
     decision_note: Optional[str] = ""
 
 
+class GerenciaDecisionIn(BaseModel):
+    decision: str  # 'aprobado' | 'rechazado'
+    note: Optional[str] = ""
+
+
 class LegalHoldCreate(BaseModel):
     ticket_id: int
     reason: str
@@ -731,6 +736,47 @@ async def list_ticket_approvals(
 ):
     _ensure_ticket_read_scope(ticket_id, sess)
     return {"items": tickets_service.list_ticket_approvals(ticket_id)}
+
+
+@router.post("/tickets/{ticket_id}/gerencia-decision", response_model=dict)
+async def gerencia_decision(
+    ticket_id: int,
+    body: GerenciaDecisionIn,
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    """Aprobar/rechazar (con nota) un ticket en 'pendiente_gerencia'. Solo rol gerencia/admin."""
+    roles = _session_actor_roles(sess)
+    if not ({str(r).strip().lower() for r in roles} & {"gerencia", "admin"}):
+        raise HTTPException(status_code=403, detail="Solo gerencia o admin pueden aprobar/rechazar.")
+    try:
+        return tickets_service.gerencia_decision(
+            ticket_id=ticket_id,
+            decision=body.decision,
+            note=body.note or "",
+            actor_id=sess["username"],
+            actor_roles=roles,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/reports/atendidos", response_model=dict)
+async def reports_atendidos(
+    period: str = "day",
+    customer_id: Optional[str] = None,
+    resolved_after: Optional[str] = None,
+    resolved_before: Optional[str] = None,
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    """Reporte de tickets atendidos (resuelto/cerrado) por periodo (day/week/month) segun resolved_at."""
+    return tickets_service.get_atendidos_report(
+        period=period,
+        customer_id=customer_id,
+        resolved_after=resolved_after,
+        resolved_before=resolved_before,
+    )
 
 
 @router.post("/tickets/{ticket_id}/reply-email", response_model=dict)

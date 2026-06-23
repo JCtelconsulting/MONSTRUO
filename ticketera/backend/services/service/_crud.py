@@ -2547,6 +2547,38 @@ def approve_ticket_change(
     finally:
         conn.close()
 
+def gerencia_decision(ticket_id: int, decision: str, note: str, actor_id: str, actor_roles) -> Dict[str, Any]:
+    """Aprueba o rechaza un ticket que está en 'pendiente_gerencia' (rol gerencia/admin).
+    Registra la decisión + nota como comentario y devuelve el ticket a en_progreso."""
+    roles = {str(r).strip().lower() for r in (actor_roles or [])}
+    if not (roles & {"gerencia", "admin"}):
+        raise PermissionError("Solo gerencia o admin pueden aprobar/rechazar.")
+    dec = (decision or "").strip().lower()
+    if dec not in {"aprobado", "rechazado"}:
+        raise ValueError("decision debe ser 'aprobado' o 'rechazado'.")
+    conn = db.get_conn()
+    try:
+        row = conn.execute("SELECT subestado FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+        if not row:
+            raise ValueError("Ticket no encontrado.")
+        if normalize_subestado(row["subestado"]) != "pendiente_gerencia":
+            raise ValueError("El ticket no está en 'Pendiente Gerencia'.")
+        now_iso = db.now_utc_iso()
+        verbo = "APROBÓ" if dec == "aprobado" else "RECHAZÓ"
+        nota_txt = f" Nota: {note.strip()}" if (note or "").strip() else ""
+        _emit_system_comment(
+            conn, ticket_id, f"[GERENCIA] {actor_id} {verbo} el requerimiento.{nota_txt}", now_iso, author_id=actor_id
+        )
+        conn.execute(
+            "UPDATE tickets SET subestado = 'en_progreso', estado = 'en_progreso', updated_at = ? WHERE id = ?",
+            (now_iso, ticket_id),
+        )
+        conn.commit()
+        return {"ok": True, "decision": dec, "estado": "en_progreso", "subestado": "en_progreso", "ticket": get_ticket(ticket_id)}
+    finally:
+        conn.close()
+
+
 def list_ticket_approvals(ticket_id: int) -> List[Dict[str, Any]]:
     conn = db.get_conn()
     try:

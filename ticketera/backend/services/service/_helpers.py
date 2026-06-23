@@ -1257,6 +1257,45 @@ def get_monthly_report_data(year: int = None, month: int = None) -> Dict[str, An
     finally:
         conn.close()
 
+
+def get_atendidos_report(period: str = "day", customer_id: str = None,
+                         resolved_after: str = None, resolved_before: str = None) -> Dict[str, Any]:
+    """Reporte de tickets ATENDIDOS (resuelto/cerrado) agrupados por período
+    (day/week/month) según resolved_at, opcionalmente filtrado por cliente."""
+    bucket = {"day": "day", "week": "week", "month": "month"}.get((period or "day").lower(), "day")
+    where = ["estado IN ('resuelto', 'cerrado')", "resolved_at IS NOT NULL",
+             "COALESCE(is_trashed, FALSE) = FALSE"]
+    params = []
+    if resolved_after:
+        where.append("resolved_at >= ?"); params.append(resolved_after)
+    if resolved_before:
+        where.append("resolved_at < ?"); params.append(resolved_before)
+    if customer_id:
+        where.append("LOWER(COALESCE(customer_id, '')) = ?"); params.append(str(customer_id).strip().lower())
+    wsql = " AND ".join(where)
+    conn = db.get_conn()
+    try:
+        series = conn.execute(
+            f"""SELECT date_trunc('{bucket}', resolved_at::timestamptz) AS bucket, COUNT(*) AS total
+                FROM tickets WHERE {wsql} GROUP BY 1 ORDER BY 1""",
+            tuple(params),
+        ).fetchall()
+        by_customer = conn.execute(
+            f"""SELECT COALESCE(cliente_nombre, 'Sin Cliente / Directo') AS nombre, COUNT(*) AS total
+                FROM tickets WHERE {wsql} GROUP BY cliente_nombre ORDER BY total DESC LIMIT 100""",
+            tuple(params),
+        ).fetchall()
+        total_row = conn.execute(f"SELECT COUNT(*) AS total FROM tickets WHERE {wsql}", tuple(params)).fetchone()
+        return {
+            "period": bucket,
+            "total": int(dict(total_row)["total"]) if total_row else 0,
+            "series": [{"bucket": str(r["bucket"])[:10], "total": int(r["total"])} for r in series],
+            "by_customer": [dict(r) for r in by_customer],
+            "generated_at": db.now_utc_iso(),
+        }
+    finally:
+        conn.close()
+
 def get_ticketera_mail_template(template_key: str) -> Dict[str, Any]:
     conn = db.get_conn()
     try:
