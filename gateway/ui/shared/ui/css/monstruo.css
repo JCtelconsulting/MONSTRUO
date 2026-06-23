@@ -112,6 +112,17 @@ header h1::before {
   object-fit: contain;
 }
 
+/* Marca de agua: isotipo Telconsulting de fondo (muy sutil), en todos los modulos del shell */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url('../img/telconsulting-isotipo-dorado.png') center / 46vmin no-repeat;
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .header-actions {
   display: flex;
   flex-direction: column;

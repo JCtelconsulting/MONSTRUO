@@ -24,6 +24,17 @@ function getApiBase() {
 window.getApiBase = getApiBase;
 window.getEnvPrefix = getEnvPrefix;
 
+// Favicon de marca (logo en la pestaña del navegador) en todas las paginas del shell.
+(function () {
+  try {
+    var href = (getEnvPrefix() || '') + '/shared/img/telconsulting-isotipo-dorado.png';
+    var link = document.querySelector("link[rel~='icon']");
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; (document.head || document.documentElement).appendChild(link); }
+    link.type = 'image/png';
+    link.href = href;
+  } catch (e) { /* noop */ }
+})();
+
 const LOCAL_GATEWAY_URL = `${window.location.protocol || 'http:'}//${window.location.hostname || '127.0.0.1'}:9001`;
 const LOGIN_URL = IS_PROD_DOMAIN
   ? `https://login.telconsulting.cl${getEnvPrefix() || ''}/`

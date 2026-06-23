@@ -44,6 +44,17 @@ window.withEnvPrefix = withEnvPrefix;
 window.getEnvLoginUrl = getEnvLoginUrl;
 window.escapeHtml = escapeHtml;
 
+// Favicon de marca (logo en la pestaña del navegador) en todas las paginas de terreneitor.
+(function () {
+  try {
+    var href = withEnvPrefix('/shared/img/telconsulting-isotipo-dorado.png');
+    var link = document.querySelector("link[rel~='icon']");
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; (document.head || document.documentElement).appendChild(link); }
+    link.type = 'image/png';
+    link.href = href;
+  } catch (e) { /* noop */ }
+})();
+
 function normalizeTelconsultingEnvLinks(root = document) {
   const envPrefix = getEnvPrefix();
   const prefixPath = envPrefix === '/dev' ? '/dev' : '';
