@@ -2287,6 +2287,19 @@ def get_dashboard_kpi() -> Dict[str, Any]:
     finally:
         conn.close()
 
+def _gerencia_username(conn) -> Optional[str]:
+    """Usuario activo con rol gerencia, para auto-asignar los 'pendiente_gerencia'.
+    Dinámico: si mañana cambia la persona del rol, no hay que tocar código."""
+    try:
+        row = conn.execute(
+            "SELECT username FROM users WHERE role = 'gerencia' AND COALESCE(is_active, 1) = 1 "
+            "ORDER BY username ASC LIMIT 1"
+        ).fetchone()
+    except Exception:
+        return None
+    return str(row["username"]) if row and row["username"] else None
+
+
 def transition_ticket(
     ticket_id: int,
     to_subestado: str,
@@ -2395,6 +2408,24 @@ def transition_ticket(
             now,
             author_id=actor_id,
         )
+        # Pendiente Gerencia: auto-asignar al gerente (rol gerencia) para que le aparezca
+        # como pendiente de su aprobación. Guardamos el asignado previo para restaurarlo
+        # cuando gerencia decida (ver gerencia_decision).
+        if target_sub == "pendiente_gerencia":
+            _ger_user = _gerencia_username(conn)
+            if _ger_user and _ger_user != ticket.get("asignado_a"):
+                _prev = (ticket.get("asignado_a") or "").strip()
+                conn.execute(
+                    "UPDATE tickets SET asignado_a = ?, updated_at = ? WHERE id = ?",
+                    (_ger_user, now, ticket_id),
+                )
+                _emit_system_comment(
+                    conn,
+                    ticket_id,
+                    f"[GERENCIA] En aprobación de {_ger_user}. Asignado previo: {_prev}",
+                    now,
+                    author_id=actor_id,
+                )
         if target_sub in {"resuelto", "cerrado"} and ticket.get("asignado_a"):
             decrementar_carga(str(ticket["asignado_a"]), specialty=ticket.get("categoria"))
         _recompute_ticket_retention(conn, ticket_id)
@@ -2569,10 +2600,27 @@ def gerencia_decision(ticket_id: int, decision: str, note: str, actor_id: str, a
         _emit_system_comment(
             conn, ticket_id, f"[GERENCIA] {actor_id} {verbo} el requerimiento.{nota_txt}", now_iso, author_id=actor_id
         )
+        # Restaurar al técnico que tenía el ticket antes de mandarlo a aprobación de gerencia.
+        prev_row = conn.execute(
+            "SELECT content FROM ticket_comments WHERE ticket_id = ? "
+            "AND content LIKE ? ORDER BY id DESC LIMIT 1",
+            (ticket_id, "[GERENCIA] En aprobación%"),
+        ).fetchone()
+        prev_assignee = None
+        if prev_row and prev_row["content"]:
+            marker = "Asignado previo:"
+            txt = str(prev_row["content"])
+            if marker in txt:
+                prev_assignee = txt.split(marker, 1)[1].strip() or None
         conn.execute(
-            "UPDATE tickets SET subestado = 'en_progreso', estado = 'en_progreso', updated_at = ? WHERE id = ?",
-            (now_iso, ticket_id),
+            "UPDATE tickets SET subestado = 'en_progreso', estado = 'en_progreso', "
+            "asignado_a = ?, updated_at = ? WHERE id = ?",
+            (prev_assignee, now_iso, ticket_id),
         )
+        if prev_assignee:
+            _emit_system_comment(
+                conn, ticket_id, f"[GERENCIA] Devuelto a {prev_assignee} tras la decisión.", now_iso, author_id=actor_id
+            )
         conn.commit()
         return {"ok": True, "decision": dec, "estado": "en_progreso", "subestado": "en_progreso", "ticket": get_ticket(ticket_id)}
     finally:

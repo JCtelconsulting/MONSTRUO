@@ -1034,11 +1034,21 @@ return {
                 </div>
             `
             : '';
+        const mineFilterHtml = (showListFilters && sessionCtx.user)
+            ? `
+                <div class="tks-filter-row" id="tks-mine-filter">
+                    <button class="tks-filter-chip ${filters.asignado_a ? 'active' : ''}" id="tks-filter-mine" title="Ver solo los tickets asignados a mí">
+                        <i class="fas fa-user"></i> Mis asignados
+                    </button>
+                </div>
+            `
+            : '';
         container.innerHTML = `
         <div class="tks-list-layout">
             <div class="tks-list-panel" id="tks-list-panel">
                 ${toolbarHtml}
                 ${statusFiltersHtml}
+                ${mineFilterHtml}
                 ${categoryFiltersHtml}
                 <div class="tks-items-list" id="tks-items-list">
                     <div class="tks-skeleton tks-list-skeleton"></div>
@@ -1087,6 +1097,16 @@ return {
                     chip.classList.add('active');
                     refreshList(token);
                 });
+            });
+        }
+
+        // Bind "Mis asignados" toggle (independiente del filtro de estado/área)
+        const mineBtn = el('tks-filter-mine');
+        if (mineBtn) {
+            mineBtn.addEventListener('click', () => {
+                filters.asignado_a = filters.asignado_a ? null : (sessionCtx.user || null);
+                mineBtn.classList.toggle('active', !!filters.asignado_a);
+                refreshList(token);
             });
         }
 

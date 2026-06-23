@@ -140,11 +140,12 @@ class Settings(BaseSettings):
         "redes": ["tickets:read", "tickets:write", "dashboard:read"],
         "sistemas": ["tickets:read", "tickets:write", "dashboard:read", "zabbix:read", "admin.settings"],
         "implementaciones": ["tickets:read", "tickets:write", "dashboard:read", "pmo:read", "pmo:write"],
-        # Rol gerencial (solo lectura global + reportes)
+        # Rol gerencial (lectura global + reportes; write para interactuar con tickets asignados)
         "gerencia": [
-            "dashboard:read", 
-            "tickets:read", 
-            "pmo:read", 
+            "dashboard:read",
+            "tickets:read",
+            "tickets:write",
+            "pmo:read",
             "finanzas:read", 
             "audit:read",
             "reports:read"
