@@ -15,4 +15,4 @@ docker run --rm --network host \
   -e QA_EMAIL="${QA_EMAIL:-qa.dev@telconsulting.cl}" \
   -e QA_PASS="${QA_PASS:-QaDev2026!}" \
   -e SHOT_DIR="/work/tests/e2e/shots" \
-  "${IMG}" bash -lc 'pip install -q --break-system-packages "playwright==1.49.0" >/dev/null 2>&1; python3 e2e/test_dev_navegador.py'
+  "${IMG}" bash -lc 'pip install -q --break-system-packages "playwright==1.49.0" >/dev/null 2>&1; python3 tests/e2e/test_dev_navegador.py'
