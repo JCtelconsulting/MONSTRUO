@@ -11,6 +11,7 @@ SUBESTADOS_VALIDOS = {
     "pendiente_compra",
     "pendiente_cliente",
     "pendiente_tercero",
+    "pendiente_gerencia",
     "pendiente_aprobacion_1",
     "pendiente_aprobacion_2",
     "aprobado",
@@ -27,6 +28,7 @@ SUBESTADOS_ESPERA = {
     "pendiente_compra",
     "pendiente_cliente",
     "pendiente_tercero",
+    "pendiente_gerencia",
 }
 
 SUBESTADOS_LEGACY_MAP = {
@@ -41,7 +43,8 @@ WORKFLOW_RULES: Dict[str, Dict[str, List[str]]] = {
         "pendiente_cliente": ["en_progreso"],
         "pendiente_compra": ["en_progreso"],
         "pendiente_tercero": ["en_progreso"],
-        "en_progreso": ["resuelto", "pendiente_cliente", "pendiente_compra", "pendiente_tercero"],
+        "pendiente_gerencia": ["en_progreso"],
+        "en_progreso": ["resuelto", "pendiente_cliente", "pendiente_compra", "pendiente_tercero", "pendiente_gerencia"],
         "resuelto": ["cerrado", "reabierto"],
         "cerrado": ["en_progreso", "reabierto"],
         "reabierto": ["en_progreso"],
@@ -53,7 +56,8 @@ WORKFLOW_RULES: Dict[str, Dict[str, List[str]]] = {
         "pendiente_cliente": ["en_progreso"],
         "pendiente_compra": ["en_progreso"],
         "pendiente_tercero": ["en_progreso"],
-        "en_progreso": ["resuelto", "en_validacion", "pendiente_cliente", "pendiente_compra", "pendiente_tercero"],
+        "pendiente_gerencia": ["en_progreso"],
+        "en_progreso": ["resuelto", "en_validacion", "pendiente_cliente", "pendiente_compra", "pendiente_tercero", "pendiente_gerencia"],
         "en_validacion": ["resuelto", "en_progreso", "cerrado"],  # legacy cierre directo
         "resuelto": ["cerrado", "reabierto"],
         "cerrado": ["en_progreso", "reabierto"],
@@ -69,7 +73,8 @@ WORKFLOW_RULES: Dict[str, Dict[str, List[str]]] = {
         "pendiente_aprobacion_1": ["pendiente_aprobacion_2", "rechazado"],
         "pendiente_aprobacion_2": ["aprobado", "rechazado"],
         "aprobado": ["en_ejecucion"],
-        "en_ejecucion": ["en_validacion", "pendiente_cliente", "pendiente_compra", "pendiente_tercero"],
+        "pendiente_gerencia": ["en_ejecucion", "en_progreso"],
+        "en_ejecucion": ["en_validacion", "pendiente_cliente", "pendiente_compra", "pendiente_tercero", "pendiente_gerencia"],
         "en_validacion": ["resuelto", "en_progreso", "cerrado"],  # legacy cierre directo
         "resuelto": ["cerrado", "reabierto"],
         "rechazado": ["en_analisis"],

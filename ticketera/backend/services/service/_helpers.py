@@ -238,7 +238,7 @@ __all__ = [
 # ==========================================================================
 # CONSTANTES
 # ==========================================================================
-CATEGORIAS_VALIDAS = {"redes", "sistemas", "ejecucion", "admin", "general"}
+CATEGORIAS_VALIDAS = {"redes", "sistemas", "ejecucion", "admin", "general", "bodega", "gerencia"}
 ESTADOS_VALIDOS = {"abierto", "en_progreso", "resuelto", "cerrado"}
 MAIN_STATUS_SEQUENCE = ("abierto", "en_progreso", "resuelto", "cerrado")
 SEVERIDADES_VALIDAS = {"baja", "media", "alta", "critica"}
@@ -1910,7 +1910,10 @@ def estado_from_subestado(subestado: str, current_estado: str = "abierto") -> st
         return "resuelto"
     if s in {"cerrado"}:
         return "cerrado"
-    if s in {"en_progreso", "en_ejecucion", "en_validacion", "aprobado"}:
+    if s in {"en_progreso", "en_ejecucion", "en_validacion", "aprobado",
+             "pendiente_cliente", "pendiente_compra", "pendiente_tercero",
+             "pendiente_gerencia", "pendiente_aprobacion_1", "pendiente_aprobacion_2"}:
+        # Subestados de espera/aprobación: el ticket sigue "en progreso", no rebota a abierto.
         return "en_progreso"
     if current_estado in ESTADOS_VALIDOS and current_estado in {"resuelto", "cerrado"} and s == "reabierto":
         return "abierto"
