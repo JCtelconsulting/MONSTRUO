@@ -220,6 +220,8 @@ const TksUI = (() => {
         ejecucion: 'Ejecución',
         admin: 'Admin',
         general: 'General',
+        bodega: 'Bodega',
+        gerencia: 'Gerencia',
     });
 
     const ROLE_CAPABILITY_LABELS = Object.freeze({
@@ -5769,6 +5771,8 @@ return `
                             <option value="ejecucion">Ejecución</option>
                             <option value="admin">Admin</option>
                             <option value="general">General</option>
+                            <option value="bodega">Bodega</option>
+                            <option value="gerencia">Gerencia</option>
                             <option value="implementaciones">Implementaciones</option>
                         </select>
                     </div>
@@ -5915,6 +5919,8 @@ return `
                                 <option value="sistemas">💻 Sistemas</option>
                                 <option value="ejecucion">🔧 Ejecución</option>
                                 <option value="admin">📋 Admin</option>
+                                <option value="bodega">📦 Bodega</option>
+                                <option value="gerencia">👔 Gerencia</option>
                             </select>
                         </div>
                     </div>

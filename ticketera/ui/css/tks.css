@@ -1095,6 +1095,7 @@
     background: var(--tks-bg-secondary);
     border: 1px solid var(--tks-border);
     border-radius: 10px;
+    overflow-x: auto;
     padding: 1.2rem;
     overflow: visible;
 }

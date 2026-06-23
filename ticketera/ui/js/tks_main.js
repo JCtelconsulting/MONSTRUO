@@ -22,7 +22,7 @@ const TksMain = (() => {
     let notifAbortController = null;
     const DEFAULT_LIST_LIMIT = 50;
     const CACHE_TTL_MS = 15000;
-    const DEFAULT_TICKETERA_CATEGORIES = Object.freeze(['admin', 'ejecucion', 'general', 'redes', 'sistemas']);
+    const DEFAULT_TICKETERA_CATEGORIES = Object.freeze(['admin', 'bodega', 'ejecucion', 'general', 'gerencia', 'redes', 'sistemas']);
     const cache = {
         dashboard: null,
         assignment: null,
@@ -1029,6 +1029,8 @@ return {
                     <button class="tks-filter-chip ${filters.categoria === 'sistemas' ? 'active' : ''}" data-filter-cat="sistemas">💻 Sistemas</button>
                     <button class="tks-filter-chip ${filters.categoria === 'ejecucion' ? 'active' : ''}" data-filter-cat="ejecucion">🔧 Ejecución</button>
                     <button class="tks-filter-chip ${filters.categoria === 'admin' ? 'active' : ''}" data-filter-cat="admin">📋 Admin</button>
+                    <button class="tks-filter-chip ${filters.categoria === 'bodega' ? 'active' : ''}" data-filter-cat="bodega">📦 Bodega</button>
+                    <button class="tks-filter-chip ${filters.categoria === 'gerencia' ? 'active' : ''}" data-filter-cat="gerencia">👔 Gerencia</button>
                 </div>
             `
             : '';
@@ -2859,6 +2861,13 @@ window.cargarClientesSelect = async function(selectId) {
     }
 };
 
+window.tksAbrirArchivado = function(id) {
+    // El panel de detalle vive en la pestaña Lista: saltamos ahi y abrimos el ticket
+    // (sirve para resueltos/cerrados: openDetail es agnostico al estado).
+    if (window.TksMain && TksMain.loadTab) TksMain.loadTab('lista');
+    setTimeout(function() { if (window.TksMain && TksMain.openDetail) TksMain.openDetail(parseInt(id)); }, 400);
+};
+
 window.loadArchivados = async function() {
     const listContainer = document.getElementById('tks-archivados-results-container');
     if (!listContainer) return;
@@ -2912,7 +2921,7 @@ window.loadArchivados = async function() {
             return `
             <tr>
                 <td><span class="tks-code">${esc(t.codigo || '#' + t.id)}</span></td>
-                <td><div class="tks-ticket-title fade-overflow" title="${esc(t.titulo || '')}" style="max-width:260px">${esc(t.titulo || '-')}</div></td>
+                <td><a href="javascript:void(0)" class="tks-ticket-title fade-overflow" title="Ver cómo se resolvió" style="max-width:260px;cursor:pointer;color:var(--tks-accent)" onclick="window.tksAbrirArchivado(${t.id})">${esc(t.titulo || '-')}</a></td>
                 <td>${esc(t.estado || '-')}</td>
                 <td>${esc(t.categoria || '-')}</td>
                 <td>${clienteLabel}</td>

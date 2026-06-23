@@ -151,6 +151,29 @@
     <script src="static/js/tks_ui.js?v=ASSET_VERSION"></script>
     <script src="static/js/tks_main.js?v=ASSET_VERSION"></script>
     <script src="shared/js/sidebar.js?v=ASSET_VERSION"></script>
+    <!-- Móvil: envolver tablas anchas en wrapper de scroll horizontal -->
+    <script>
+    (function () {
+      function wrapTables() {
+        document.querySelectorAll('table.tks-table:not([data-mwrap])').forEach(function (t) {
+          t.setAttribute('data-mwrap', '1');
+          var p = t.parentElement;
+          if (!p || p.classList.contains('tks-table-wrapper')) return;
+          var w = document.createElement('div');
+          w.className = 'tks-table-wrapper';
+          p.insertBefore(w, t);
+          w.appendChild(t);
+        });
+      }
+      function init() {
+        wrapTables();
+        var root = document.querySelector('main') || document.body;
+        try { new MutationObserver(wrapTables).observe(root, { childList: true, subtree: true }); } catch (e) {}
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+      else init();
+    })();
+    </script>
 </body>
 
 </html>
