@@ -103,6 +103,15 @@ header h1::before {
   box-shadow: 0 0 12px rgba(212, 168, 67, 0.7);
 }
 
+/* Logo de marca en la cabecera del sidebar (todos los modulos del shell compartido) */
+.brand-cube {
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin: 4px auto 8px;
+  object-fit: contain;
+}
+
 .header-actions {
   display: flex;
   flex-direction: column;

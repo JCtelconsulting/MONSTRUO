@@ -33,6 +33,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const envPrefix = isProdHost ? (window.getEnvPrefix ? window.getEnvPrefix() : (window.location.pathname.startsWith('/dev') ? '/dev' : '')) : '';
 
+    // Logo de marca en la cabecera del sidebar (todos los modulos del shell compartido).
+    const __appHeader = document.getElementById('app-header');
+    if (__appHeader && !__appHeader.querySelector('.brand-cube')) {
+        const __logo = document.createElement('img');
+        __logo.className = 'brand-cube';
+        __logo.alt = 'Telconsulting';
+        __logo.src = `${envPrefix}/shared/img/telconsulting-isotipo-dorado.png`;
+        __appHeader.insertBefore(__logo, __appHeader.firstChild);
+    }
+
     const menuItems = isProdHost ? [
         { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', link: `https://login.telconsulting.cl${envPrefix}/dashboard`, title: 'Dashboard' },
         { id: 'tks', label: 'TKs', icon: 'fas fa-ticket-alt', link: `https://ticketera.telconsulting.cl${envPrefix}/`, title: 'Ticketera' },
