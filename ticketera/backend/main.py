@@ -39,7 +39,7 @@ _WEAK_SECRET_MARKERS = {
 
 def _resolve_shared_ui_dir() -> Optional[Path]:
     repo_root = Path(__file__).resolve().parents[2]
-    shared_ui_dir = repo_root / "gateway" / "shared" / "ui"
+    shared_ui_dir = repo_root / "gateway" / "ui" / "shared" / "ui"
     return shared_ui_dir if shared_ui_dir.exists() else None
 
 

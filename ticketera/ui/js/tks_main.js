@@ -910,7 +910,6 @@ return {
         else if (tab === 'lista') loadList(content, token);
         else if (tab === 'kanban') { cache.kanban = null; loadKanban(content, token); }
         else if (tab === 'messages') { cache.messages = null; loadMessageTemplates(content, token); }
-        else if (tab === 'ops') { cache.ops = null; loadOps(content, token); }
         else if (tab === 'reportes') loadArchivosReportes(content, token);
     }
 
