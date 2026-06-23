@@ -52,6 +52,7 @@ const TksApi = (() => {
                 requestOpts ? { method: 'POST', body, ...requestOpts } : { method: 'POST', body }
             ),
         getTicketApprovals: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/approvals`, requestOpts || {}),
+        gerenciaDecision: (ticketId, body) => _fetch(`${BASE}/tickets/${ticketId}/gerencia-decision`, { method: 'POST', body }),
         getTicketAttachments: (ticketId, requestOpts = null) => _fetch(`${BASE}/tickets/${ticketId}/attachments`, requestOpts || {}),
         getTicketAttachmentDownloadUrl: (ticketId, attachmentId) => `${BASE}/tickets/${ticketId}/attachments/${attachmentId}/download`,
         getTicketAttachmentInlineUrl: (ticketId, attachmentId) => `${BASE}/tickets/${ticketId}/attachments/${attachmentId}/download?inline=1`,
@@ -113,6 +114,15 @@ const TksApi = (() => {
 
         // --- Stats ---
         getStats: (requestOpts = null) => _fetch(`${BASE}/stats`, requestOpts || {}),
+        getAtendidosReport: (params = {}) => {
+            const qs = new URLSearchParams();
+            if (params.period) qs.set('period', params.period);
+            if (params.customer_id) qs.set('customer_id', params.customer_id);
+            if (params.resolved_after) qs.set('resolved_after', params.resolved_after);
+            if (params.resolved_before) qs.set('resolved_before', params.resolved_before);
+            const query = qs.toString();
+            return _fetch(`${BASE}/reports/atendidos${query ? '?' + query : ''}`);
+        },
         getSlaMetrics: (params = {}, requestOpts = null) => {
             const qs = new URLSearchParams();
             if (params.date_from) qs.set('date_from', params.date_from);

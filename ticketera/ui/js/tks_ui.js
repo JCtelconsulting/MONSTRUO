@@ -5207,6 +5207,20 @@ return `
               `
             : `<div class="tks-readonly-box">${escapeHtml(isTrashed ? 'El ticket está en papelera. Restáuralo para retomar flujo, asignación o correo.' : (blockedReason || 'Solo lectura para gestión de estado.'))}</div>`;
 
+        const gerenciaApprovalHtml = (!isTrashed && t.subestado === 'pendiente_gerencia')
+            ? `
+                <div class="tks-status-editor tks-status-editor-v2" style="border:1px solid var(--tks-accent);border-radius:10px;padding:0.75rem;margin-top:0.5rem">
+                    <label class="tks-status-editor-label"><i class="fas fa-user-tie"></i> Decisión de Gerencia</label>
+                    <textarea id="tks-gerencia-note" rows="2" placeholder="Nota (opcional)..." style="width:100%;margin:0.4rem 0;background:var(--tks-bg-secondary);border:1px solid var(--tks-border);border-radius:8px;color:var(--tks-text);padding:0.5rem;font-family:inherit"></textarea>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                        <button class="tks-btn tks-btn-primary" onclick="window.tksGerenciaDecision(${t.id}, 'aprobado')"><i class="fas fa-check"></i> Aprobar</button>
+                        <button class="tks-btn tks-btn-ghost" style="color:var(--tks-danger)" onclick="window.tksGerenciaDecision(${t.id}, 'rechazado')"><i class="fas fa-times"></i> Rechazar</button>
+                    </div>
+                    <div class="tks-status-editor-hint">Solo gerencia/admin puede decidir. Aprobar o rechazar devuelve el ticket a En progreso y registra la nota.</div>
+                </div>
+              `
+            : '';
+
         const assigneeFallbackLabel = formatAssigneeDisplay(t.asignado_a || '');
         const assigneeControlHtml = canAssignTicket
             ? `
@@ -5236,6 +5250,7 @@ return `
                     </div>
                     ${trashInfoHtml}
                     ${statusManagementHtml}
+                    ${gerenciaApprovalHtml}
                     ${managementActions ? `
                         <div class="tks-status-actions-wrap">
                             <div class="tks-status-actions-title">Acciones</div>
@@ -5832,6 +5847,37 @@ return `
                     </button>
                 </div>
                 <div id="tks-reporte-resultado" style="margin-top:1rem"></div>
+            </section>
+
+            <section class="tks-settings-panel">
+                <div class="tks-settings-head">
+                    <div>
+                        <h3>Atendidos por período</h3>
+                        <p>Cuántos tickets se atendieron (resueltos/cerrados) por día, semana o mes — total y por cliente.</p>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end">
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Agrupar por</label>
+                        <select class="tks-select" id="tks-atendidos-period" style="min-width:120px">
+                            <option value="day">Día</option>
+                            <option value="week">Semana</option>
+                            <option value="month" selected>Mes</option>
+                        </select>
+                    </div>
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
+                        <input type="date" class="tks-input" id="tks-atendidos-desde" style="min-width:140px">
+                    </div>
+                    <div class="tks-form-group" style="margin:0">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Hasta</label>
+                        <input type="date" class="tks-input" id="tks-atendidos-hasta" style="min-width:140px">
+                    </div>
+                    <button class="tks-btn tks-btn-primary" onclick="window.generarReporteAtendidos()" style="align-self:flex-end">
+                        <i class="fas fa-chart-bar"></i> Generar
+                    </button>
+                </div>
+                <div id="tks-atendidos-resultado" style="margin-top:1rem"></div>
             </section>
         </div>
         `;

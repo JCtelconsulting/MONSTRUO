@@ -2868,6 +2868,18 @@ window.tksAbrirArchivado = function(id) {
     setTimeout(function() { if (window.TksMain && TksMain.openDetail) TksMain.openDetail(parseInt(id)); }, 400);
 };
 
+window.tksGerenciaDecision = async function(ticketId, decision) {
+    var noteEl = document.getElementById('tks-gerencia-note');
+    var note = (noteEl ? noteEl.value : '').trim();
+    try {
+        await TksApi.gerenciaDecision(ticketId, { decision: decision, note: note });
+        if (window.showToast) window.showToast(decision === 'aprobado' ? 'Requerimiento aprobado' : 'Requerimiento rechazado', 'success');
+        if (window.TksMain && TksMain.openDetail) TksMain.openDetail(parseInt(ticketId), { preserveTab: true });
+    } catch (e) {
+        if (window.showToast) window.showToast('Error: ' + (e && e.message ? e.message : e), 'error');
+    }
+};
+
 window.loadArchivados = async function() {
     const listContainer = document.getElementById('tks-archivados-results-container');
     if (!listContainer) return;
@@ -3084,6 +3096,30 @@ window.abrirAsignarCliente = async function(ticketId, origenEmail, tituloTicket)
     // Carga inicial con todos los clientes
     window.buscarClientesModal();
     document.getElementById('tks-arch-asignar-search')?.focus();
+};
+
+window.generarReporteAtendidos = async function() {
+    var period = (document.getElementById('tks-atendidos-period') ? document.getElementById('tks-atendidos-period').value : 'month');
+    var desde = (document.getElementById('tks-atendidos-desde') ? document.getElementById('tks-atendidos-desde').value : '').trim();
+    var hasta = (document.getElementById('tks-atendidos-hasta') ? document.getElementById('tks-atendidos-hasta').value : '').trim();
+    var out = document.getElementById('tks-atendidos-resultado');
+    if (out) out.innerHTML = '<p style="opacity:0.6">Generando...</p>';
+    try {
+        var params = { period: period };
+        if (desde) params.resolved_after = desde;
+        if (hasta) params.resolved_before = hasta + 'T23:59:59';
+        var r = await TksApi.getAtendidosReport(params);
+        var rows = (r.series || []).map(function (s) { return '<tr><td>' + s.bucket + '</td><td style="text-align:right">' + s.total + '</td></tr>'; }).join('');
+        var cli = (r.by_customer || []).map(function (c) { return '<tr><td>' + (c.nombre || '-') + '</td><td style="text-align:right">' + c.total + '</td></tr>'; }).join('');
+        var html = '<p style="font-weight:600;margin-bottom:0.5rem">Total atendidos: ' + (r.total || 0) + '</p>';
+        html += '<div style="display:flex;gap:1.5rem;flex-wrap:wrap">';
+        html += '<div><h4>Por período (' + (r.period || '') + ')</h4><table class="tks-table"><thead><tr><th>Período</th><th>Atendidos</th></tr></thead><tbody>' + (rows || '<tr><td colspan="2">Sin datos</td></tr>') + '</tbody></table></div>';
+        html += '<div><h4>Por cliente</h4><table class="tks-table"><thead><tr><th>Cliente</th><th>Atendidos</th></tr></thead><tbody>' + (cli || '<tr><td colspan="2">Sin datos</td></tr>') + '</tbody></table></div>';
+        html += '</div>';
+        if (out) out.innerHTML = html;
+    } catch (e) {
+        if (out) out.innerHTML = '<p style="color:var(--tks-danger)">Error: ' + (e && e.message ? e.message : e) + '</p>';
+    }
 };
 
 window.exportarReporteCliente = async function() {
