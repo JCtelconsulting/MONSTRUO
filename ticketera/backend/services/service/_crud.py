@@ -23,8 +23,8 @@ from plataforma.core.config import settings as app_settings
 from ticketera.backend.services import roles as ticket_roles
 from ticketera.backend.services import workflow as ticket_workflow
 from ._helpers import *  # noqa: F401,F403
-from ._classify import auto_asignar, clasificar_ticket
-from ._notifications import programar_notificaciones
+from ._classify import auto_asignar, clasificar_ticket, incrementar_carga, decrementar_carga
+from ._notifications import programar_notificaciones, notify_client_resolution
 from ._specialties import list_specialties
 from ._customers import get_client_for_email
 from ._sla import create_evidence_event
