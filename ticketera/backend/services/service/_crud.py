@@ -2607,16 +2607,28 @@ def gerencia_decision(ticket_id: int, decision: str, note: str, actor_id: str, a
             (ticket_id, "[GERENCIA] En aprobación%"),
         ).fetchone()
         prev_assignee = None
+        marker_found = False
         if prev_row and prev_row["content"]:
             marker = "Asignado previo:"
             txt = str(prev_row["content"])
             if marker in txt:
+                marker_found = True
                 prev_assignee = txt.split(marker, 1)[1].strip() or None
-        conn.execute(
-            "UPDATE tickets SET subestado = 'en_progreso', estado = 'en_progreso', "
-            "asignado_a = ?, updated_at = ? WHERE id = ?",
-            (prev_assignee, now_iso, ticket_id),
-        )
+        if marker_found:
+            # Sabemos quién lo tenía: restauramos (prev_assignee None = estaba sin asignar).
+            conn.execute(
+                "UPDATE tickets SET subestado = 'en_progreso', estado = 'en_progreso', "
+                "asignado_a = ?, updated_at = ? WHERE id = ?",
+                (prev_assignee, now_iso, ticket_id),
+            )
+        else:
+            # No hay marker (entró a pendiente_gerencia por otra vía): NO tocar asignado_a
+            # para no dejar el ticket huérfano; solo devolver a en_progreso.
+            conn.execute(
+                "UPDATE tickets SET subestado = 'en_progreso', estado = 'en_progreso', "
+                "updated_at = ? WHERE id = ?",
+                (now_iso, ticket_id),
+            )
         if prev_assignee:
             _emit_system_comment(
                 conn, ticket_id, f"[GERENCIA] Devuelto a {prev_assignee} tras la decisión.", now_iso, author_id=actor_id

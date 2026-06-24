@@ -3129,8 +3129,8 @@ window.generarReporteAtendidos = async function() {
         if (desde) params.resolved_after = desde;
         if (hasta) params.resolved_before = hasta + 'T23:59:59';
         var r = await TksApi.getAtendidosReport(params);
-        var rows = (r.series || []).map(function (s) { return '<tr><td>' + s.bucket + '</td><td style="text-align:right">' + s.total + '</td></tr>'; }).join('');
-        var cli = (r.by_customer || []).map(function (c) { return '<tr><td>' + (c.nombre || '-') + '</td><td style="text-align:right">' + c.total + '</td></tr>'; }).join('');
+        var rows = (r.series || []).map(function (s) { return '<tr><td>' + TksUI.escapeHtml(s.bucket || '') + '</td><td style="text-align:right">' + s.total + '</td></tr>'; }).join('');
+        var cli = (r.by_customer || []).map(function (c) { return '<tr><td>' + TksUI.escapeHtml(c.nombre || '-') + '</td><td style="text-align:right">' + c.total + '</td></tr>'; }).join('');
         var html = '<p style="font-weight:600;margin-bottom:0.5rem">Total atendidos: ' + (r.total || 0) + '</p>';
         html += '<div style="display:flex;gap:1.5rem;flex-wrap:wrap">';
         html += '<div><h4>Por período (' + (r.period || '') + ')</h4><table class="tks-table"><thead><tr><th>Período</th><th>Atendidos</th></tr></thead><tbody>' + (rows || '<tr><td colspan="2">Sin datos</td></tr>') + '</tbody></table></div>';
