@@ -1096,7 +1096,7 @@ window.openEditProject = function (id) {
 
   document.getElementById('modal-project-id').value = p.id;
   document.getElementById('modal-project-nombre').value = p.nombre_pmc.replace(
-    /^(PMC|OBRA|SATLINK|DOMICILIO|LEVANTAMIENTO)_/,
+    /^(PMC|OBRA|SATLINK|DOMICILIO|LEVANTAMIENTO|INTERPOSTE)_/,
     ''
   ); // Attempt to strip prefix for editing friendly name if desired, or show full
   // actually, let's show user friendly raw parts if we can, but backend stores normalized.

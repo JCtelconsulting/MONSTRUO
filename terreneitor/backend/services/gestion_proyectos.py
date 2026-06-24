@@ -153,7 +153,7 @@ def create_project_and_structure(
     if tipo_norm not in STRUCTURE_TEMPLATES:
         raise HTTPException(
             status_code=400,
-            detail="Tipo no valido (Templates: PMC, OBRA, SATLINK, DOMICILIO, LEVANTAMIENTO)",
+            detail="Tipo no valido (Templates: PMC, OBRA, SATLINK, DOMICILIO, LEVANTAMIENTO, INTERPOSTE)",
         )
     nombre_pmc = build_project_name(tipo_norm, nombre)
     if not nombre_pmc:
