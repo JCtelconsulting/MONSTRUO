@@ -500,6 +500,7 @@ _TAREAS_POR_TIPO = {
     "Reportabilidad EPP": ["EPP puesto", "Área de trabajo", "Checklist"],
     "Avance del día": ["Avance general", "Detalle"],
     "Visita / Preventa": ["Lugar", "Detalle técnico", "Mediciones"],
+    "Interposte": ["Previo", "Excavación", "Hormigón", "Conexiones", "Aplomado", "Terminaciones"],
 }
 _TAREAS_GENERICAS = ["Foto general", "Foto detalle", "Foto de cierre"]
 

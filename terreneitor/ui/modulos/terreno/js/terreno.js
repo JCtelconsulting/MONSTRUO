@@ -691,6 +691,7 @@ window.Guia = {
     if (/avance|produc/.test(t)) return { n: 'Avance del día', i: 'fa-chart-line' };
     if (/visita|preventa|levantam/.test(t))
       return { n: 'Visita / Preventa', i: 'fa-clipboard-check' };
+    if (/interposte/.test(t)) return { n: 'Interposte', i: 'fa-tower-cell' };
     return { n: 'Trabajo', i: 'fa-briefcase' };
   },
 
@@ -766,6 +767,7 @@ window.Guia = {
         <option>Instalación</option><option>Retiro</option><option>Traslado</option>
         <option>Despacho</option><option>Reportabilidad EPP</option>
         <option>Avance del día</option><option>Visita / Preventa</option>
+        <option>Interposte</option>
       </select>
       <label class="guia-lbl">Cliente</label>
       <div style="display:flex; gap:8px">
