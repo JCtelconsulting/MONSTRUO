@@ -174,6 +174,7 @@ if [ "$HAS_GIT_REPO" = "1" ]; then
     -e "ticketera/data/" \
     -e "fundacion/data/" \
     -e "erp/data/" \
+    -e "terreneitor/data/" \
     -e "ops/env/" \
     -e "ops/env/.env.server" \
     -e "plataforma/ops/env/.env.server" \
