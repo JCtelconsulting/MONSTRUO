@@ -83,3 +83,10 @@ gateway/data/
 .claude/settings.local.json
 .claude/.cache/
 .claude/hooks/*.log
+
+# Datos de runtime y artefactos locales (no trackear)
+database.sqlite
+plataforma/data_runtime/
+terreneitor/logs/
+terreneitor/tests/e2e/shots/
+terreneitor/tests/e2e/explorador_reporte.json
