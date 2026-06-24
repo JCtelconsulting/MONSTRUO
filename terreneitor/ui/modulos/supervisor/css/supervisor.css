@@ -1835,6 +1835,25 @@ select:focus {
   color: var(--text-soft);
   font-size: 0.82rem;
 }
+/* Avatar de iniciales (cuadrilla en header de plan y en el modal). Estaba sin estilo. */
+.user-avatar-mini {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neon), #b88a2e);
+  color: #000;
+  font-weight: 800;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.3px;
+}
+.crew-cancel-btn {
+  border: 1px solid var(--border) !important;
+  color: #fff !important;
+}
 
 #add-items-list-container {
   border: 1px solid var(--border);

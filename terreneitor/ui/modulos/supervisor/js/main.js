@@ -490,7 +490,7 @@ function openEditCrewModal(plan) {
       <div class="modal-footer-row">
         <span class="crew-count"></span>
         <div style="display:flex;gap:10px">
-          <button class="btn-tiny" id="crew-cancel">Cancelar</button>
+          <button class="btn-tiny crew-cancel-btn" id="crew-cancel">Cancelar</button>
           <button class="btn-tiny green" id="crew-save"><i class="fas fa-save"></i> Guardar</button>
         </div>
       </div>
