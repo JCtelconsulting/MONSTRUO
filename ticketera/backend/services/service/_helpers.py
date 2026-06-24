@@ -387,6 +387,9 @@ class _IncomingEmailHtmlSanitizer(HTMLParser):
         cleaned_attrs: List[Tuple[str, str]] = []
         allowed_attrs = set(INCOMING_EMAIL_ALLOWED_ATTRS.get("*", set()))
         allowed_attrs.update(INCOMING_EMAIL_ALLOWED_ATTRS.get(normalized, set()))
+        # Sanitizer de atributos: definido en _crud (que hace 'from ._helpers import *').
+        # Import perezoso para evitar el ciclo (mismo patrón que 'from ._crud import get_ticket').
+        from ._crud import _sanitize_incoming_email_attr
         for raw_name, raw_value in attrs:
             name = str(raw_name or "").strip().lower()
             if not name or name.startswith("on") or name not in allowed_attrs:
