@@ -258,14 +258,24 @@ export const SupervisorUI = {
       card.className = 'panel-container glass-panel plan-card';
       card.style.marginBottom = '15px';
 
-      let avatars = (p.responsables_nombres || [])
-        .map(
-          (n) =>
-            `<div class="user-avatar-mini" title="${escapeHtml(n)}">${escapeHtml(
-              n.substring(0, 2).toUpperCase()
-            )}</div>`
-        )
-        .join('');
+      // Cuadrilla del plan = unión de los usuarios asignados en sus tareas.
+      const crewMap = {};
+      (p.asignaciones || []).forEach((a) =>
+        (a.usuarios || []).forEach((u) => {
+          crewMap[u.id] = u.name || u.username || '?';
+        })
+      );
+      const crewNames = Object.values(crewMap);
+      let avatars =
+        crewNames
+          .map(
+            (n) =>
+              `<div class="user-avatar-mini" title="${escapeHtml(n)}">${escapeHtml(
+                n.substring(0, 2).toUpperCase()
+              )}</div>`
+          )
+          .join('') ||
+        '<span style="opacity:0.55;font-size:0.72rem">Sin asignar</span>';
 
       card.innerHTML = `
                 <div class="panel-header collapsed" style="cursor:pointer; display: flex; justify-content: space-between; align-items: center;">
@@ -281,6 +291,7 @@ export const SupervisorUI = {
                         </div>
                     </div>
                     <div class="plan-actions" style="display: flex; gap: 10px; align-items: center;" onclick="event.stopPropagation()">
+                        <button class="btn-tiny blue btn-edit-crew" title="Editar cuadrilla (quién está asignado)"><i class="fas fa-users"></i></button>
                         <button class="btn-tiny blue btn-add-items" title="Agregar tareas"><i class="fas fa-plus"></i> AGREGAR</button>
                         <button class="btn-tiny green btn-archive" title="Archivar plan"><i class="fas fa-archive"></i></button>
                         <button class="btn-tiny red btn-delete-plan" title="Eliminar plan"><i class="fas fa-trash"></i></button>
@@ -295,6 +306,10 @@ export const SupervisorUI = {
 
       headerClick.onclick = () => this.toggleAcordeon(header);
 
+      card.querySelector('.btn-edit-crew').onclick = (e) => {
+        e.stopPropagation();
+        onAction('edit-crew', p);
+      };
       card.querySelector('.btn-add-items').onclick = (e) => {
         e.stopPropagation();
         onAction('add-items', p);

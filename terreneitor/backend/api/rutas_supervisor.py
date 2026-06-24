@@ -184,6 +184,34 @@ def create_plan(
     return {"status": "ok", "plan_id": plan.id}
 
 
+@router.post("/planes-trabajo/{plan_id}/cuadrilla")
+def set_plan_cuadrilla(
+    plan_id: int,
+    usuario_ids: List[int] = Body(..., embed=True),
+    db: Session = Depends(dependencias.get_db),
+):
+    """Reemplaza la cuadrilla (usuarios asignados) de TODAS las tareas del plan.
+    Permite editar a quién le aparece el plan (agregar/quitar gente)."""
+    plan = db.query(modelos.PlanTrabajo).filter(modelos.PlanTrabajo.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+    asigs = (
+        db.query(modelos.AsignacionPlan)
+        .filter(modelos.AsignacionPlan.plan_id == plan_id)
+        .all()
+    )
+    principal = usuario_ids[0] if usuario_ids else None
+    for a in asigs:
+        db.query(modelos.AsignacionUsuario).filter(
+            modelos.AsignacionUsuario.asignacion_id == a.id
+        ).delete()
+        for u_id in usuario_ids:
+            db.add(modelos.AsignacionUsuario(asignacion_id=a.id, usuario_id=u_id))
+        a.usuario_id = principal
+    db.commit()
+    return {"status": "ok", "plan_id": plan_id, "miembros": len(usuario_ids)}
+
+
 @router.get("/planes-trabajo/activos-detalle/")
 def get_planes_activos(db: Session = Depends(dependencias.get_db)):
     return plan_service.list_active_plans(db)

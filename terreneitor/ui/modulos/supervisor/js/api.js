@@ -57,6 +57,12 @@ export const SupervisorAPI = {
   async createPlan(data) {
     return fetchApi('/api/planes-trabajo/', { method: 'POST', body: data });
   },
+  async setPlanCuadrilla(planId, usuarioIds) {
+    return fetchApi(`/api/planes-trabajo/${planId}/cuadrilla`, {
+      method: 'POST',
+      body: { usuario_ids: usuarioIds },
+    });
+  },
   async getClientes() {
     return fetchApi('/api/clientes');
   },
