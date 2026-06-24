@@ -464,34 +464,52 @@ function openEditCrewModal(plan) {
     (AppState.especialistas || [])
       .map((u) => {
         const nm = u.name || u.username || 'Usuario ' + u.id;
+        const ini = nm.substring(0, 2).toUpperCase();
         const checked = currentIds.has(u.id) ? 'checked' : '';
-        return `<label style="display:flex;align-items:center;gap:8px;padding:7px 4px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06)">
+        return `<label class="crew-row">
+          <div class="user-avatar-mini">${escapeHtml(ini)}</div>
+          <span class="crew-name">${escapeHtml(nm)}</span>
           <input type="checkbox" class="crew-chk" value="${u.id}" ${checked}>
-          <span>${escapeHtml(nm)}</span>
         </label>`;
       })
       .join('') ||
-    '<p style="opacity:0.6">No hay especialistas (rol Terreno) cargados.</p>';
+    '<p style="opacity:0.6;padding:14px;text-align:center">No hay especialistas (rol Terreno) cargados.</p>';
 
   const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
   overlay.style.cssText =
-    'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999';
+    'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:16px';
   overlay.innerHTML = `
-    <div class="glass-panel" style="max-width:420px;width:92%;max-height:80vh;display:flex;flex-direction:column;padding:18px;border-radius:12px">
-      <h3 style="margin:0 0 4px"><i class="fas fa-users" style="color:var(--neon)"></i> Editar cuadrilla</h3>
-      <p style="opacity:0.7;font-size:0.8rem;margin:0 0 10px">${escapeHtml(plan.descripcion || '')}</p>
-      <div style="overflow:auto;flex:1;margin-bottom:12px">${rows}</div>
-      <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button class="btn-tiny" id="crew-cancel">Cancelar</button>
-        <button class="btn-tiny green" id="crew-save"><i class="fas fa-save"></i> Guardar</button>
+    <div class="modal-content glass-panel" style="max-width:440px">
+      <div class="modal-header">
+        <h2><i class="fas fa-users" style="color:var(--neon);margin-right:10px"></i>Editar cuadrilla</h2>
+        <button class="modal-close-btn" id="crew-close">&times;</button>
+      </div>
+      <p class="modal-subtitle">${escapeHtml(plan.descripcion || '')}</p>
+      <div class="crew-list">${rows}</div>
+      <div class="modal-footer-row">
+        <span class="crew-count"></span>
+        <div style="display:flex;gap:10px">
+          <button class="btn-tiny" id="crew-cancel">Cancelar</button>
+          <button class="btn-tiny green" id="crew-save"><i class="fas fa-save"></i> Guardar</button>
+        </div>
       </div>
     </div>`;
   document.body.appendChild(overlay);
+
+  const countEl = overlay.querySelector('.crew-count');
+  const updateCount = () => {
+    const n = overlay.querySelectorAll('.crew-chk:checked').length;
+    countEl.textContent = n === 0 ? 'Sin asignar' : `${n} asignado${n > 1 ? 's' : ''}`;
+  };
+  updateCount();
+  overlay.querySelectorAll('.crew-chk').forEach((c) => (c.onchange = updateCount));
 
   const close = () => overlay.remove();
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
   });
+  overlay.querySelector('#crew-close').onclick = close;
   overlay.querySelector('#crew-cancel').onclick = close;
   overlay.querySelector('#crew-save').onclick = async () => {
     const ids = Array.from(overlay.querySelectorAll('.crew-chk:checked')).map((c) =>

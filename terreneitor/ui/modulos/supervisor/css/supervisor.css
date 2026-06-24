@@ -1795,6 +1795,47 @@ select:focus {
   margin-top: 12px;
 }
 
+/* Modal "Editar cuadrilla" (Proyectos en curso) */
+.crew-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  background: rgba(8, 12, 18, 0.85);
+  border-radius: 12px;
+  padding: 6px;
+}
+.crew-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.crew-row:hover {
+  background: rgba(212, 168, 67, 0.08);
+}
+.crew-row .crew-name {
+  flex: 1;
+  color: #fff;
+  font-size: 0.92rem;
+}
+.crew-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--neon);
+  cursor: pointer;
+}
+.crew-row:has(.crew-chk:checked) {
+  background: rgba(212, 168, 67, 0.12);
+  box-shadow: inset 3px 0 0 var(--neon);
+}
+.crew-count {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
 #add-items-list-container {
   border: 1px solid var(--border);
   background: rgba(8, 12, 18, 0.85);
