@@ -140,7 +140,10 @@ def _is_dev_env() -> bool:
 # Nombre de cookie POR ENTORNO: aísla la sesión de dev y prod aunque compartan
 # dominio (.telconsulting.cl) y el path /dev. Permite estar logueado en ambos a
 # la vez sin que una sesión pise a la otra.
-COOKIE_NAME = "access_token_dev" if _is_dev_env() else "access_token"
+# En PROD NO usar 'access_token': ese nombre es el del gateway sobre .telconsulting.cl
+# y se pisarían mutuamente (rompiendo el SSO). La sesión del gateway se lee aparte
+# vía MONSTRUO_SSO_COOKIE; la propia de Terreneitor usa un nombre dedicado.
+COOKIE_NAME = "access_token_dev" if _is_dev_env() else "access_token_terreneitor"
 
 
 def _get_cookie_domain() -> str | None:
