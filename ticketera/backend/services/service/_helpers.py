@@ -994,7 +994,15 @@ def _ticket_is_trashed(ticket: Optional[Dict[str, Any]]) -> bool:
 def _ticket_display_status(ticket: Optional[Dict[str, Any]]) -> str:
     if _ticket_is_trashed(ticket):
         return "papelera"
-    return str((ticket or {}).get("estado") or "").strip().lower()
+    t = ticket or {}
+    estado = str(t.get("estado") or "").strip().lower()
+    # Si el ticket está esperando algo (subestado de espera: pendiente_cliente/compra/
+    # tercero/gerencia), mostramos ESE subestado real y no el genérico 'en_progreso':
+    # el ticket no está avanzando, está pendiente de algo. Aplica en lista y detalle.
+    subestado = normalize_subestado(t.get("subestado"), estado)
+    if subestado in SUBESTADOS_ESPERA:
+        return subestado
+    return estado
 
 def _is_readonly_blocked_by_estado(ticket: Dict[str, Any]) -> bool:
     estado = str(ticket.get("estado") or "").strip().lower()

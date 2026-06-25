@@ -3,7 +3,7 @@
  * Renderizado puro: recibe datos, devuelve HTML.
  */
 const TksUI = (() => {
-    const WAITING_SUBESTADOS = Object.freeze(['pendiente_cliente', 'pendiente_compra', 'pendiente_tercero']);
+    const WAITING_SUBESTADOS = Object.freeze(['pendiente_cliente', 'pendiente_compra', 'pendiente_tercero', 'pendiente_gerencia']);
 
     // --- Helpers ---
     function escapeHtml(text) {
@@ -436,7 +436,7 @@ const TksUI = (() => {
         `;
     }
 
-    return { abierto: 'Abierto', en_progreso: 'En Progreso', resuelto: 'Resuelto', cerrado: 'Cerrado', papelera: 'Papelera' }[s] || escapeHtml(s);
+    return { abierto: 'Abierto', en_progreso: 'En Progreso', resuelto: 'Resuelto', cerrado: 'Cerrado', papelera: 'Papelera' }[s] || subestadoLabel(s);
     }
 
     function ticketDisplayStatusKey(ticket) {
@@ -640,6 +640,7 @@ const TksUI = (() => {
             pendiente_compra: 'Pendiente compra',
             pendiente_cliente: 'Pendiente cliente',
             pendiente_tercero: 'Pendiente tercero',
+            pendiente_gerencia: 'Pendiente aprobación',
             pendiente_aprobacion_1: 'Pendiente aprobación 1',
             pendiente_aprobacion_2: 'Pendiente aprobación 2',
             aprobado: 'Aprobado',
@@ -5220,14 +5221,6 @@ return `
                     }).join('')
                     : '<div class="tks-feed-empty">Sin subestados de espera disponibles.</div>'}
                             </div>
-                        </div>
-                        <div class="tks-subestado-wait-wrap" style="margin-top:0.5rem">
-                            <label class="tks-status-editor-label">Aprobación de gerencia</label>
-                            <button class="tks-status-quick-btn tks-subestado-wait-btn" style="border-color:var(--tks-accent);color:var(--tks-accent)"
-                                    onclick="TksMain.transitionSubestado(${t.id}, 'pendiente_gerencia')">
-                                <i class="fas fa-user-tie"></i> Marcar pendiente aprobación
-                            </button>
-                            <div class="tks-status-editor-hint">Envía el ticket a gerencia para aprobar o rechazar; vuelve a ti cuando decidan.</div>
                         </div>
                     ` : ''}
                 </div>

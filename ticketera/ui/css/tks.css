@@ -1860,6 +1860,17 @@
     color: #fda4af;
 }
 
+/* Subestados de espera: el ticket está pendiente de algo (no "en progreso") */
+.tks-status-tone-pendiente_cliente,
+.tks-status-tone-pendiente_compra,
+.tks-status-tone-pendiente_tercero {
+    color: #fb923c;
+}
+
+.tks-status-tone-pendiente_gerencia {
+    color: #d4a843;
+}
+
 .tks-trash-info {
     margin-top: 0.8rem;
     padding: 0.85rem 0.95rem;

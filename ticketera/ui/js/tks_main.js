@@ -1700,7 +1700,17 @@ return {
             }
             if (!canAssign || !pickerSelect) return;
 
-            const options = buildAssigneeOptions(users, currentAssignee, currentLabel);
+            // En 'pendiente aprobación' el ticket solo se pasa ENTRE gerentes: limitamos el
+            // picker a usuarios con rol gerencia (el backend además lo valida y rechaza el resto).
+            let assignable = users;
+            if (String(ticket?.subestado || '').trim().toLowerCase() === 'pendiente_gerencia') {
+                assignable = users.filter((u) => {
+                    const roles = Array.isArray(u?.roles) ? u.roles : [];
+                    return String(u?.role || '').toLowerCase() === 'gerencia'
+                        || roles.some((r) => String(r).toLowerCase() === 'gerencia');
+                });
+            }
+            const options = buildAssigneeOptions(assignable, currentAssignee, currentLabel);
             pickerSelect.innerHTML = options.join('') || `<option value="${TksUI.escapeHtml(currentAssignee || '')}">${TksUI.escapeHtml(fallbackLabel)}</option>`;
             if (currentAssignee) {
                 pickerSelect.value = currentAssignee;

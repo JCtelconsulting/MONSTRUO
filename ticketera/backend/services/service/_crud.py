@@ -848,6 +848,18 @@ def update_ticket(
         elif target_estado == "cerrado":
             normalized_updates["subestado"] = "cerrado"
 
+    # 'pendiente_gerencia' (pendiente aprobación) solo se pasa ENTRE gerentes: no se permite
+    # reasignar el ticket a un usuario común mientras está en aprobación de gerencia.
+    if normalized_updates.get("asignado_a"):
+        _target_sub = normalized_updates.get("subestado") or normalize_subestado(current.get("subestado"), "recibido")
+        if _target_sub == "pendiente_gerencia":
+            _vconn = db.get_conn()
+            try:
+                if not _is_gerencia_user(_vconn, normalized_updates["asignado_a"]):
+                    raise ValueError("En 'pendiente aprobación' el ticket solo se puede asignar a un gerente.")
+            finally:
+                _vconn.close()
+
     keys_to_update = list(normalized_updates.keys())
     if not keys_to_update:
         return get_ticket(ticket_id)
@@ -2300,6 +2312,30 @@ def _gerencia_username(conn) -> Optional[str]:
     except Exception:
         return None
     return str(row["username"]) if row and row["username"] else None
+
+
+def _is_gerencia_user(conn, username: str) -> bool:
+    """True si el username tiene rol gerencia (principal o secundario). Se usa para que un
+    ticket en 'pendiente_gerencia' (pendiente aprobación) solo se pueda asignar entre gerentes."""
+    uname = str(username or "").strip()
+    if not uname:
+        return False
+    try:
+        row = conn.execute(
+            "SELECT role, secondary_roles FROM users WHERE username = ? AND COALESCE(is_active, 1) = 1 LIMIT 1",
+            (uname,),
+        ).fetchone()
+    except Exception:
+        return False
+    if not row:
+        return False
+    if _normalize_role(row["role"]) == "gerencia":
+        return True
+    try:
+        secondary = json.loads(row["secondary_roles"] or "[]")
+        return any(_normalize_role(r) == "gerencia" for r in (secondary or []))
+    except Exception:
+        return False
 
 
 def transition_ticket(
