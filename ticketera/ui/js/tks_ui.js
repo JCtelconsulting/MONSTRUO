@@ -5627,33 +5627,11 @@ return `
                     >
                 </div>
 
-                <div class="tks-form-group">
-                    <label>Estado</label>
-                    <select id="tks-routing-status" class="tks-select">
-                        <option value="1"${editingRule && !editingRule.is_active ? '' : ' selected'}>Activa</option>
-                        <option value="0"${editingRule && !editingRule.is_active ? ' selected' : ''}>Inactiva</option>
-                    </select>
-                </div>
-
                 <div class="tks-form-group" style="align-self: flex-end; padding-bottom: 4px;">
                     ${editing ? `<button class="tks-btn tks-btn-ghost" type="button" onclick="TksMain.editRoutingRule(null);" style="margin-right: 0.5rem;">Cancelar</button>` : ''}
-                    <button class="tks-btn tks-btn-primary" type="button" onclick="window.saveRoutingRuleCustom()">
+                    <button class="tks-btn tks-btn-primary" type="button" onclick="TksMain.saveRoutingRule()">
                         <i class="fas fa-save"></i> ${editing ? 'Actualizar regla' : 'Guardar regla'}
                     </button>
-                    <script>
-                        window.saveRoutingRuleCustom = async function() {
-                            const params = {
-                                id: ${editingRule ? Number(editingRule.id) : 0},
-                                match_type: document.getElementById('tks-routing-match-type').value,
-                                match_value: document.getElementById('tks-routing-match-value').value,
-                                categoria: document.getElementById('tks-routing-categoria').value,
-                                customer_id: document.getElementById('tks-routing-customer-id').value,
-                                customer_name: document.getElementById('tks-routing-customer-name').value,
-                                is_active: document.getElementById('tks-routing-status').value === "1",
-                            };
-                            await TksMain.saveRoutingRuleWithFields(params);
-                        };
-                    </script>
                 </div>
             </div>
         `;

@@ -2318,12 +2318,14 @@ return {
     }
 
     function readRoutingRuleEditor() {
-return {
+        return {
             id: Number(messageSettingsState.editingRuleId || 0) || null,
             match_type: String(el('tks-routing-match-type')?.value || 'email').trim(),
             match_value: String(el('tks-routing-match-value')?.value || '').trim(),
             categoria: String(el('tks-routing-categoria')?.value || '').trim(),
-            is_active: el('tks-routing-is-active')?.checked !== false,
+            customer_id: String(el('tks-routing-customer-id')?.value || '').trim(),
+            customer_name: String(el('tks-routing-customer-name')?.value || '').trim(),
+            is_active: true,
         };
     }
 
@@ -2341,10 +2343,6 @@ return {
         const payload = readRoutingRuleEditor();
         if (!payload.match_value) {
             if (window.showToast) window.showToast('Debes ingresar un correo o dominio para la regla.', 'warning');
-            return;
-        }
-        if (!payload.categoria) {
-            if (window.showToast) window.showToast('Debes seleccionar un área para la regla.', 'warning');
             return;
         }
         try {

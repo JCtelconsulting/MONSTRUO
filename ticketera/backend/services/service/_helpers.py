@@ -1418,6 +1418,8 @@ def _serialize_email_route_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "created_by": str(row.get("created_by") or "").strip(),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
+        "customer_id": str(row.get("customer_id") or "").strip(),
+        "customer_name": str(row.get("customer_name") or "").strip(),
     }
 
 def list_ticketera_routing_rules(*, only_active: bool = False) -> List[Dict[str, Any]]:
@@ -1425,7 +1427,7 @@ def list_ticketera_routing_rules(*, only_active: bool = False) -> List[Dict[str,
     try:
         where = "WHERE is_active = true" if only_active else ""
         rows = conn.execute(
-            f"""SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at
+            f"""SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at, customer_id, customer_name
                 FROM ticket_config_email_routes
                 {where}
                 ORDER BY match_type ASC, match_value ASC, id ASC"""
@@ -1454,7 +1456,7 @@ def upsert_ticketera_routing_rule(
         raise ValueError("Valor de regla inválido para el tipo seleccionado.")
 
     normalized_categoria = str(categoria or "").strip().lower()
-    if normalized_categoria not in CATEGORIAS_VALIDAS:
+    if normalized_categoria and normalized_categoria not in CATEGORIAS_VALIDAS:
         raise ValueError("Categoría inválida para routing Ticketera.")
 
     conn = db.get_conn()
@@ -1487,6 +1489,8 @@ def upsert_ticketera_routing_rule(
                        match_value = ?,
                        categoria = ?,
                        is_active = ?,
+                       customer_id = ?,
+                       customer_name = ?,
                        updated_at = ?
                    WHERE id = ?""",
                 (
@@ -1494,6 +1498,8 @@ def upsert_ticketera_routing_rule(
                     normalized_value,
                     normalized_categoria,
                     bool(is_active),
+                    customer_id or None,
+                    customer_name or None,
                     now,
                     target_rule_id,
                 ),
@@ -1524,7 +1530,7 @@ def upsert_ticketera_routing_rule(
         conn.commit()
         if target_rule_id > 0:
             row = conn.execute(
-                """SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at
+                """SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at, customer_id, customer_name
                    FROM ticket_config_email_routes
                    WHERE id = ?
                    LIMIT 1""",
@@ -1532,7 +1538,7 @@ def upsert_ticketera_routing_rule(
             ).fetchone()
         else:
             row = conn.execute(
-                """SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at
+                """SELECT id, match_type, match_value, categoria, is_active, created_by, created_at, updated_at, customer_id, customer_name
                    FROM ticket_config_email_routes
                    WHERE match_type = ? AND match_value = ?
                    LIMIT 1""",
