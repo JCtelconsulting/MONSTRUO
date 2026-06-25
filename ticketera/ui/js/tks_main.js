@@ -2079,7 +2079,14 @@ return { ticket, permissions };
                 return;
             }
             if (preserveTab) {
-                openDetail(ticketId, { preserveTab: true });
+                // Si el detalle YA está abierto en ese ticket, refresco SILENCIOSO (sin skeleton):
+                // se siente instantáneo. openDetail re-pintaba un skeleton en cada acción.
+                // Si no estaba abierto, sí lo abrimos normal (la primera carga sí puede mostrar carga).
+                if (Number(selectedTicketId) === Number(ticketId) && el('tks-detail-panel')) {
+                    refreshDetailFeed(ticketId);
+                } else {
+                    openDetail(ticketId, { preserveTab: true });
+                }
             }
             return;
         }
@@ -2704,10 +2711,26 @@ return {
         }
     }
 
+    async function gerenciaDecision(ticketId, decision) {
+        const noteEl = document.getElementById('tks-gerencia-note');
+        const note = (noteEl ? noteEl.value : '').trim();
+        try {
+            await TksApi.gerenciaDecision(ticketId, { decision, note });
+            clearDataCache();
+            if (window.showToast) window.showToast(decision === 'aprobado' ? 'Requerimiento aprobado' : 'Requerimiento rechazado', 'success');
+            // El ticket vuelve al especialista (sale del scope de gerencia): refrescamos la
+            // lista y cerramos el detalle al instante, sin skeleton ni refresh manual.
+            refreshTicketAfterMutation(ticketId, { closeDetailOnList: true });
+        } catch (e) {
+            if (window.showToast) window.showToast('Error: ' + (e && e.message ? e.message : e), 'error');
+        }
+    }
+
     // ---- PUBLIC API ----
 return {
         init,
         loadTab,
+        gerenciaDecision,
         openDetail,
         closeDetail,
         refreshList,
@@ -2914,16 +2937,10 @@ window.tksAbrirArchivado = function(id) {
     if (window.TksMain && TksMain.openDetail) TksMain.openDetail(parseInt(id), { preserveTab: true });
 };
 
-window.tksGerenciaDecision = async function(ticketId, decision) {
-    var noteEl = document.getElementById('tks-gerencia-note');
-    var note = (noteEl ? noteEl.value : '').trim();
-    try {
-        await TksApi.gerenciaDecision(ticketId, { decision: decision, note: note });
-        if (window.showToast) window.showToast(decision === 'aprobado' ? 'Requerimiento aprobado' : 'Requerimiento rechazado', 'success');
-        if (window.TksMain && TksMain.openDetail) TksMain.openDetail(parseInt(ticketId), { preserveTab: true });
-    } catch (e) {
-        if (window.showToast) window.showToast('Error: ' + (e && e.message ? e.message : e), 'error');
-    }
+window.tksGerenciaDecision = function(ticketId, decision) {
+    // Wrapper: la lógica vive en TksMain.gerenciaDecision (dentro del closure) para usar el
+    // patrón estándar de refresco inmediato (clearDataCache + refreshTicketAfterMutation).
+    if (window.TksMain && TksMain.gerenciaDecision) return TksMain.gerenciaDecision(parseInt(ticketId), decision);
 };
 
 window.loadArchivados = async function() {
