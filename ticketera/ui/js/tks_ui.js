@@ -5202,12 +5202,20 @@ return `
                     : '<div class="tks-feed-empty">Sin subestados de espera disponibles.</div>'}
                             </div>
                         </div>
+                        <div class="tks-subestado-wait-wrap" style="margin-top:0.5rem">
+                            <label class="tks-status-editor-label">Aprobación de gerencia</label>
+                            <button class="tks-status-quick-btn tks-subestado-wait-btn" style="border-color:var(--tks-accent);color:var(--tks-accent)"
+                                    onclick="TksMain.transitionSubestado(${t.id}, 'pendiente_gerencia')">
+                                <i class="fas fa-user-tie"></i> Marcar pendiente aprobación
+                            </button>
+                            <div class="tks-status-editor-hint">Envía el ticket a gerencia para aprobar o rechazar; vuelve a ti cuando decidan.</div>
+                        </div>
                     ` : ''}
                 </div>
               `
             : `<div class="tks-readonly-box">${escapeHtml(isTrashed ? 'El ticket está en papelera. Restáuralo para retomar flujo, asignación o correo.' : (blockedReason || 'Solo lectura para gestión de estado.'))}</div>`;
 
-        const gerenciaApprovalHtml = (!isTrashed && t.subestado === 'pendiente_gerencia')
+        const gerenciaApprovalHtml = (!isTrashed && t.subestado === 'pendiente_gerencia' && (isGerenciaViewer || roleKey === 'admin'))
             ? `
                 <div class="tks-status-editor tks-status-editor-v2" style="border:1px solid var(--tks-accent);border-radius:10px;padding:0.75rem;margin-top:0.5rem">
                     <label class="tks-status-editor-label"><i class="fas fa-user-tie"></i> Decisión de Gerencia</label>
@@ -5250,7 +5258,6 @@ return `
                     </div>
                     ${trashInfoHtml}
                     ${statusManagementHtml}
-                    ${gerenciaApprovalHtml}
                     ${managementActions ? `
                         <div class="tks-status-actions-wrap">
                             <div class="tks-status-actions-title">Acciones</div>
@@ -5299,6 +5306,8 @@ return `
                 </div>
 
                 ${composerHtml}
+
+                ${gerenciaApprovalHtml}
             </section>
         </div>`;
     }

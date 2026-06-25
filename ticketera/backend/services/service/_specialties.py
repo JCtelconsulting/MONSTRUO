@@ -87,6 +87,26 @@ def _list_specialties_with_role_fallback(conn) -> List[Dict[str, Any]]:
             secondary_roles_raw = []
         derived_specialties = _resolve_role_specialties(role, secondary_roles_raw)
         if not derived_specialties:
+            # Gerencia no tiene rol técnico, pero debe poder ser asignado como un usuario
+            # más (Diego aprueba/rechaza requerimientos, pero también recibe tickets normales).
+            if role == "gerencia":
+                key = (username, "gerencia")
+                if key not in existing_keys:
+                    active_load = int(load_map.get(username, 0))
+                    items.append(
+                        {
+                            "username": username,
+                            "specialty": "gerencia",
+                            "current_load": active_load,
+                            "max_load": max(10, active_load + 1),
+                            "is_available": 1,
+                            "created_at": now,
+                            "updated_at": now,
+                            "role": role,
+                            "secondary_roles": json.dumps(_normalize_roles(secondary_roles_raw)),
+                        }
+                    )
+                    existing_keys.add(key)
             continue
         role_secondary_json = json.dumps(_normalize_roles(secondary_roles_raw))
         active_load = int(load_map.get(username, 0))
