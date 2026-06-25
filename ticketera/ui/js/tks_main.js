@@ -2880,10 +2880,27 @@ window.cargarClientesSelect = async function(selectId) {
 };
 
 window.tksAbrirArchivado = function(id) {
-    // El panel de detalle vive en la pestaña Lista: saltamos ahi y abrimos el ticket
-    // (sirve para resueltos/cerrados: openDetail es agnostico al estado).
-    if (window.TksMain && TksMain.loadTab) TksMain.loadTab('lista');
-    setTimeout(function() { if (window.TksMain && TksMain.openDetail) TksMain.openDetail(parseInt(id)); }, 400);
+    // Modal con el historial COMPLETO del ticket, sin salir de Archivados.
+    // Monta el panel de detalle (#tks-detail-panel) dentro del modal y reusa openDetail:
+    // como en Archivados ese id no existe en el DOM, el render cae limpio acá. Antes esto
+    // saltaba a la pestaña Lista con un setTimeout(400ms) frágil y a veces no abría nada.
+    document.getElementById('tks-historial-modal')?.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'tks-modal-overlay open';
+    overlay.id = 'tks-historial-modal';
+    overlay.innerHTML = `
+        <div class="tks-modal" style="max-width:1100px;width:94vw;height:90vh;display:flex;flex-direction:column">
+            <div class="tks-modal-header">
+                <h3><i class="fas fa-clock-rotate-left"></i> Historial del ticket #${parseInt(id)}</h3>
+                <button class="tks-modal-close" onclick="document.getElementById('tks-historial-modal')?.remove()">&times;</button>
+            </div>
+            <div class="tks-modal-body" style="padding:0.8rem;flex:1;min-height:0;overflow-y:auto">
+                <div class="tks-full-detail-view" id="tks-detail-panel"></div>
+            </div>
+        </div>`;
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    if (window.TksMain && TksMain.openDetail) TksMain.openDetail(parseInt(id), { preserveTab: true });
 };
 
 window.tksGerenciaDecision = async function(ticketId, decision) {

@@ -3135,6 +3135,10 @@
     font-weight: 500;
     color: var(--tks-text);
     max-width: 300px; /* Reducido para evitar ancho excesivo */
+    /* inline-block para que max-width + overflow (fade-overflow) recorten de verdad;
+       sin esto el <a> es inline, ignora el max-width y el título se desborda/encima. */
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .tks-client-cell {
