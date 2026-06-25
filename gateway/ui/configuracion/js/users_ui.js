@@ -4,6 +4,7 @@
 const UsersUI = (() => {
     let _users = [];
     let _secondaryRolesDraft = [];
+    let _terreneitorRoleDraft = ''; // rol elegido dentro de Terreneitor (module_roles.terreneitor)
     let _tableActionsBound = false;
     let _roleScopes = new Map();
     let _roleScopeItems = [];
@@ -810,6 +811,8 @@ const UsersUI = (() => {
 
             // Combinar rol primario y secundarios en el draft
             _secondaryRolesDraft = normalizeRoleList(user.role, user.secondary_roles);
+            // Rol específico dentro de Terreneitor (si lo tiene)
+            _terreneitorRoleDraft = (user.module_roles && user.module_roles.terreneitor) || '';
         } else {
             title.textContent = 'Nuevo Usuario';
             userInput.value = '';
@@ -819,6 +822,7 @@ const UsersUI = (() => {
             form.dataset.mode = 'create';
             userModules = ['dashboard'];
             _secondaryRolesDraft = [];
+            _terreneitorRoleDraft = '';
         }
 
         // Renderizar Módulos
@@ -839,9 +843,34 @@ const UsersUI = (() => {
             const mark = document.createElement('span');
             mark.className = 'cfg-check-mark';
 
+            // Módulos con rol PROPIO (hoy: Terreneitor): selector de rol que se muestra
+            // cuando el módulo está marcado, para elegir el rol del usuario DENTRO del módulo.
+            let roleSelect = null;
+            if (mod.id === 'terreneitor') {
+                roleSelect = document.createElement('select');
+                roleSelect.id = 'terreneitorRoleSelect';
+                roleSelect.className = 'cfg-input cfg-module-role-select';
+                roleSelect.style.marginLeft = 'auto';
+                roleSelect.style.maxWidth = '170px';
+                [['', 'Rol en Terreneitor…'], ['TERRENO', 'Terreno'], ['SUPERVISOR', 'Supervisor'], ['GERENCIA', 'Gerencia'], ['ADMIN', 'Admin']]
+                    .forEach(([val, txt]) => {
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.textContent = txt;
+                        if (val === (_terreneitorRoleDraft || '')) opt.selected = true;
+                        roleSelect.appendChild(opt);
+                    });
+                roleSelect.addEventListener('click', (e) => e.stopPropagation());
+                roleSelect.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    _terreneitorRoleDraft = roleSelect.value;
+                });
+            }
+
             const syncCheckedState = () => {
                 div.classList.toggle('is-checked', Boolean(input.checked));
                 mark.textContent = input.checked ? '✓' : '';
+                if (roleSelect) roleSelect.style.display = input.checked ? '' : 'none';
             };
             syncCheckedState();
             input.addEventListener('change', syncCheckedState);
@@ -851,6 +880,7 @@ const UsersUI = (() => {
             };
             div.addEventListener('click', (evt) => {
                 if (evt.target === label) return;
+                if (roleSelect && evt.target === roleSelect) return;
                 toggleModule();
             });
             label.addEventListener('click', (evt) => {
@@ -862,6 +892,7 @@ const UsersUI = (() => {
             div.appendChild(input);
             div.appendChild(label);
             div.appendChild(mark);
+            if (roleSelect) div.appendChild(roleSelect);
             container.appendChild(div);
         });
 
@@ -922,6 +953,12 @@ const UsersUI = (() => {
             if (check.checked) allowedModules.push(check.value);
         });
 
+        // Rol por módulo (hoy solo Terreneitor): solo si el módulo está habilitado y se eligió rol.
+        const moduleRoles = {};
+        if (allowedModules.includes('terreneitor') && _terreneitorRoleDraft) {
+            moduleRoles.terreneitor = _terreneitorRoleDraft;
+        }
+
         // Mapear roles: el primero es 'role', el resto son 'secondary_roles'
         const allRoles = [..._secondaryRolesDraft];
         if (allRoles.length === 0) {
@@ -945,10 +982,10 @@ const UsersUI = (() => {
                 }
                 await window.fetchApi('/api/admin/users', {
                     method: 'POST',
-                    body: { username, password, role, secondary_roles: secondaryRoles, allowed_modules: allowedModules }
+                    body: { username, password, role, secondary_roles: secondaryRoles, allowed_modules: allowedModules, module_roles: moduleRoles }
                 });
             } else {
-                const body = { role, secondary_roles: secondaryRoles, is_active: isActive, allowed_modules: allowedModules };
+                const body = { role, secondary_roles: secondaryRoles, is_active: isActive, allowed_modules: allowedModules, module_roles: moduleRoles };
                 if (password) body.password = password;
 
                 await window.fetchApi(`/api/admin/users/${encodeURIComponent(username)}`, {

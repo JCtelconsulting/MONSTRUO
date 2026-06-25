@@ -33,6 +33,33 @@ def _normalize_role_input(raw_role: Optional[str]) -> str:
     return aliases.get(role, role)
 
 
+# Módulos que manejan su PROPIO rol (distinto del rol global del gateway) y sus valores válidos.
+MODULE_ROLE_VALUES: Dict[str, Set[str]] = {
+    "terreneitor": {"TERRENO", "SUPERVISOR", "GERENCIA", "ADMIN"},
+}
+
+
+def _normalize_module_roles(
+    raw: Optional[Dict[str, str]], allowed_modules: Optional[List[str]] = None
+) -> Dict[str, str]:
+    """Normaliza el rol por módulo: solo módulos con rol propio conocido, con un valor
+    válido, y únicamente si el usuario tiene ese módulo habilitado."""
+    out: Dict[str, str] = {}
+    if not isinstance(raw, dict):
+        return out
+    mods = {str(m or "").strip().lower() for m in (allowed_modules or [])}
+    for mod, rol in raw.items():
+        mod_k = str(mod or "").strip().lower()
+        rol_v = str(rol or "").strip().upper()
+        valid = MODULE_ROLE_VALUES.get(mod_k)
+        if not valid or rol_v not in valid:
+            continue
+        if allowed_modules is not None and mod_k not in mods:
+            continue
+        out[mod_k] = rol_v
+    return out
+
+
 def _normalize_secondary_roles_input(raw_roles: Optional[List[str]], primary_role: str) -> List[str]:
     out: List[str] = []
     primary = _normalize_role_input(primary_role)
@@ -55,6 +82,7 @@ class UserCreate(BaseModel):
     secondary_roles: List[str] = Field(default_factory=list)
     allowed_modules: List[str] = Field(default_factory=list)
     fundacion_scope: Dict[str, Any] = Field(default_factory=dict)
+    module_roles: Dict[str, str] = Field(default_factory=dict)  # {"terreneitor": "SUPERVISOR"}
     organizacion: Optional[str] = None  # 'monstruo' | 'fundacion'
 
 
@@ -65,6 +93,7 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
     allowed_modules: Optional[List[str]] = None
     fundacion_scope: Optional[Dict[str, Any]] = None
+    module_roles: Optional[Dict[str, str]] = None  # {"terreneitor": "SUPERVISOR"}
     organizacion: Optional[str] = None
 
 
@@ -143,7 +172,7 @@ async def list_users(
 
     sql = (
         "SELECT id, username, role, secondary_roles, is_active, allowed_modules, "
-        "fundacion_scope, organizacion, created_at "
+        "fundacion_scope, module_roles, organizacion, created_at "
         f"FROM users WHERE {' AND '.join(where_clauses)} ORDER BY username ASC"
     )
 
@@ -166,6 +195,12 @@ async def list_users(
                 item["secondary_roles"] = []
 
             item["fundacion_scope"] = auth_service.normalize_fundacion_scope(item.get("fundacion_scope"))
+            try:
+                item["module_roles"] = json.loads(item.get("module_roles") or "{}")
+                if not isinstance(item["module_roles"], dict):
+                    item["module_roles"] = {}
+            except Exception:
+                item["module_roles"] = {}
             users.append(item)
         return {"items": users, "actor_organizacion": actor_org}
     finally:
@@ -203,8 +238,8 @@ async def create_user_endpoint(
 
         conn.execute(
             """INSERT INTO users (username, password_hash, role, secondary_roles, is_active,
-                                  allowed_modules, fundacion_scope, organizacion, created_at)
-               VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)""",
+                                  allowed_modules, fundacion_scope, module_roles, organizacion, created_at)
+               VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)""",
             (
                 body.username,
                 security.get_password_hash(body.password),
@@ -212,6 +247,7 @@ async def create_user_endpoint(
                 json.dumps(normalized_secondary_roles),
                 json.dumps(body.allowed_modules or []),
                 json.dumps(normalized_fundacion_scope),
+                json.dumps(_normalize_module_roles(body.module_roles, body.allowed_modules)),
                 target_org,
                 db.now_utc_iso(),
             ),
@@ -280,6 +316,13 @@ async def update_user(
         if body.allowed_modules is not None:
             updates.append("allowed_modules = ?")
             params.append(json.dumps(body.allowed_modules))
+
+        if body.module_roles is not None:
+            # La UI manda allowed_modules + module_roles juntos al guardar; si vino
+            # allowed_modules en este PATCH lo usamos para validar que el módulo esté habilitado.
+            mods_for_validation = body.allowed_modules if body.allowed_modules is not None else None
+            updates.append("module_roles = ?")
+            params.append(json.dumps(_normalize_module_roles(body.module_roles, mods_for_validation)))
 
         if body.fundacion_scope is not None:
             updates.append("fundacion_scope = ?")

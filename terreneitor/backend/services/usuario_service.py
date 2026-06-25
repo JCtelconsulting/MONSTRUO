@@ -7,7 +7,24 @@ from terreneitor.backend.core import dependencias
 
 
 def list_users(db: Session) -> list[modelos.User]:
-    return db.query(modelos.User).order_by(modelos.User.email).all()
+    users = db.query(modelos.User).order_by(modelos.User.email).all()
+    # Solo mostrar usuarios que tengan Terreneitor HABILITADO en auth.users (allowed_modules),
+    # o admin global. Evita que aparezcan espejos de gente que ya no participa del módulo.
+    try:
+        from sqlalchemy import text as _text
+
+        rows = db.execute(
+            _text(
+                "SELECT lower(username) FROM auth.users "
+                "WHERE COALESCE(is_active::int, 0) = 1 "
+                "AND (role = 'admin' OR COALESCE(allowed_modules::text, '') LIKE :pat)"
+            ),
+            {"pat": '%"terreneitor"%'},
+        ).fetchall()
+        permitidos = {r[0] for r in rows}
+    except Exception:
+        return users  # sin schema auth (modo standalone) => no filtrar
+    return [u for u in users if str(u.email or "").lower() in permitidos]
 
 
 def create_user(

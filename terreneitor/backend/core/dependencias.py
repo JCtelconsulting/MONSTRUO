@@ -373,7 +373,7 @@ def _session_desde_gateway(request: Request, db: Session):
 
         row = db.execute(
             _text(
-                "SELECT role, COALESCE(allowed_modules::text, '') "
+                "SELECT role, COALESCE(allowed_modules::text, ''), COALESCE(module_roles::text, '{}') "
                 "FROM auth.users WHERE lower(username) = :u "
                 "AND COALESCE(is_active::int, 0) = 1"
             ),
@@ -386,15 +386,30 @@ def _session_desde_gateway(request: Request, db: Session):
     rol_gw = (row[0] or "").strip().lower()
     if rol_gw != "admin" and '"terreneitor"' not in (row[1] or ""):
         return None
-    # Usuario local espejo (get-or-create)
-    user = db.query(modelos.User).filter(modelos.User.email.ilike(email)).first()
-    if not user:
+
+    # Rol DENTRO de terreneitor: si el admin lo eligió explícito (module_roles.terreneitor),
+    # se usa ese; si no, se deriva del rol global del gateway (comportamiento previo).
+    import json as _json
+    try:
+        _module_roles = _json.loads(row[2] or "{}")
+        if not isinstance(_module_roles, dict):
+            _module_roles = {}
+    except Exception:
+        _module_roles = {}
+    _explicit = str(_module_roles.get("terreneitor") or "").strip().upper()
+    if _explicit in {"TERRENO", "SUPERVISOR", "GERENCIA", "ADMIN"}:
+        rol_local = _explicit
+    else:
         roles_gw = [rol_gw] + [
             str(r).strip().lower() for r in (payload.get("roles") or [])
         ]
         rol_local = next(
             (_SSO_ROL_MAP[r] for r in roles_gw if r in _SSO_ROL_MAP), "TERRENO"
         )
+
+    # Usuario local espejo (get-or-create) + re-sincronización del rol si cambió en el gateway.
+    user = db.query(modelos.User).filter(modelos.User.email.ilike(email)).first()
+    if not user:
         user = modelos.User(
             email=email,
             name=email.split("@")[0].replace(".", " ").title(),
@@ -402,6 +417,10 @@ def _session_desde_gateway(request: Request, db: Session):
             role=rol_local,
         )
         db.add(user)
+        db.commit()
+        db.refresh(user)
+    elif str(getattr(user.role, "value", user.role)).upper() != str(rol_local).upper():
+        user.role = rol_local
         db.commit()
         db.refresh(user)
     return {

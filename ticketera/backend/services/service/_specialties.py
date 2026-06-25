@@ -56,13 +56,17 @@ def _active_ticket_load_map(conn) -> Dict[str, int]:
     return out
 
 def _list_specialties_with_role_fallback(conn) -> List[Dict[str, Any]]:
+    # El patrón del LIKE va como PARÁMETRO (no inline): psycopg interpreta el '%' del SQL
+    # como placeholder y rompe la query si se escribe '%"tks"%' literal.
     base_rows = conn.execute(
         """
         SELECT us.*, u.role, u.secondary_roles
         FROM user_specialties us
         LEFT JOIN users u ON u.username = us.username
+        WHERE COALESCE(u.allowed_modules, '') LIKE ?
         ORDER BY us.specialty, us.username
-        """
+        """,
+        ('%"tks"%',),
     ).fetchall()
     items = [dict(r) for r in base_rows]
     existing_keys = {
@@ -74,7 +78,9 @@ def _list_specialties_with_role_fallback(conn) -> List[Dict[str, Any]]:
     load_map = _active_ticket_load_map(conn)
     now = db.now_utc_iso()
     user_rows = conn.execute(
-        "SELECT username, role, secondary_roles FROM users WHERE COALESCE(is_active, 1) = 1 ORDER BY username ASC"
+        "SELECT username, role, secondary_roles FROM users WHERE COALESCE(is_active, 1) = 1 "
+        "AND COALESCE(allowed_modules, '') LIKE ? ORDER BY username ASC",
+        ('%"tks"%',),
     ).fetchall()
     for row in user_rows:
         username = _normalize_username(row.get("username"))
