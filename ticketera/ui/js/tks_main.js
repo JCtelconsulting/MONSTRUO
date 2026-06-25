@@ -2212,7 +2212,8 @@ return { ticket, permissions };
         container.innerHTML = TksUI.renderArchivosView();
         // Poblar select de clientes y luego cargar tickets
         window.cargarClientesSelect('tks-arch-filter-cliente').then(() => window.loadArchivados());
-        window.cargarClientesSelect('tks-reporte-cliente-select');
+        window.cargarClientesSelect('tks-atendidos-cliente');
+        window.cargarResumenClientes();
     }
 
     // ---- OPS ----
@@ -3137,16 +3138,21 @@ window.generarReporteAtendidos = async function() {
     var period = (document.getElementById('tks-atendidos-period') ? document.getElementById('tks-atendidos-period').value : 'month');
     var desde = (document.getElementById('tks-atendidos-desde') ? document.getElementById('tks-atendidos-desde').value : '').trim();
     var hasta = (document.getElementById('tks-atendidos-hasta') ? document.getElementById('tks-atendidos-hasta').value : '').trim();
+    var cliSel = document.getElementById('tks-atendidos-cliente');
+    var customerId = (cliSel ? cliSel.value : '').trim();
+    var customerName = (cliSel && cliSel.selectedIndex >= 0) ? (cliSel.options[cliSel.selectedIndex].text || '') : '';
     var out = document.getElementById('tks-atendidos-resultado');
     if (out) out.innerHTML = '<p style="opacity:0.6">Generando...</p>';
     try {
         var params = { period: period };
         if (desde) params.resolved_after = desde;
         if (hasta) params.resolved_before = hasta + 'T23:59:59';
+        if (customerId) params.customer_id = customerId;
         var r = await TksApi.getAtendidosReport(params);
         var rows = (r.series || []).map(function (s) { return '<tr><td>' + TksUI.escapeHtml(s.bucket || '') + '</td><td style="text-align:right">' + s.total + '</td></tr>'; }).join('');
         var cli = (r.by_customer || []).map(function (c) { return '<tr><td>' + TksUI.escapeHtml(c.nombre || '-') + '</td><td style="text-align:right">' + c.total + '</td></tr>'; }).join('');
-        var html = '<p style="font-weight:600;margin-bottom:0.5rem">Total atendidos: ' + (r.total || 0) + '</p>';
+        var scopeLabel = customerId ? ('Cliente: ' + TksUI.escapeHtml(customerName || customerId)) : 'Todos los clientes';
+        var html = '<p style="font-weight:600;margin-bottom:0.5rem">' + scopeLabel + ' — Total atendidos: ' + (r.total || 0) + '</p>';
         html += '<div style="display:flex;gap:1.5rem;flex-wrap:wrap">';
         html += '<div><h4>Por período (' + (r.period || '') + ')</h4><table class="tks-table"><thead><tr><th>Período</th><th>Atendidos</th></tr></thead><tbody>' + (rows || '<tr><td colspan="2">Sin datos</td></tr>') + '</tbody></table></div>';
         html += '<div><h4>Por cliente</h4><table class="tks-table"><thead><tr><th>Cliente</th><th>Atendidos</th></tr></thead><tbody>' + (cli || '<tr><td colspan="2">Sin datos</td></tr>') + '</tbody></table></div>';
@@ -3155,6 +3161,53 @@ window.generarReporteAtendidos = async function() {
     } catch (e) {
         if (out) out.innerHTML = '<p style="color:var(--tks-danger)">Error: ' + (e && e.message ? e.message : e) + '</p>';
     }
+};
+
+window.cargarResumenClientes = async function() {
+    var cont = document.getElementById('tks-clientes-resumen-container');
+    if (!cont) return;
+    cont.innerHTML = '<div style="text-align:center;padding:1.5rem"><i class="fas fa-circle-notch fa-spin"></i> Cargando resumen...</div>';
+    try {
+        var r = await TksApi.getClientesResumen();
+        var clientes = (r && r.clientes) || [];
+        if (!clientes.length) {
+            cont.innerHTML = '<p style="opacity:0.6;padding:1rem 0">Sin clientes con tickets todavía.</p>';
+            return;
+        }
+        var esc = TksUI.escapeHtml;
+        var jsq = function (s) { return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;'); };
+        var rows = clientes.map(function (c) {
+            var call = "window.verReporteCliente('" + jsq(c.customer_id) + "','" + jsq(c.customer_name) + "')";
+            return '<tr style="cursor:pointer" onclick="' + call + '">' +
+                '<td>' + esc(c.customer_name || '-') + '</td>' +
+                '<td style="text-align:center"><strong>' + (c.activos || 0) + '</strong></td>' +
+                '<td style="text-align:center">' + (c.este_mes || 0) + '</td>' +
+                '<td style="text-align:center">' + (c.cerrados || 0) + '</td>' +
+                '<td style="text-align:right"><button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="event.stopPropagation();' + call + '"><i class="fas fa-chart-line"></i> Ver reporte</button></td>' +
+                '</tr>';
+        }).join('');
+        cont.innerHTML = '<table class="tks-table"><thead><tr>' +
+            '<th>Cliente</th><th style="text-align:center">Activos</th><th style="text-align:center">Este mes</th><th style="text-align:center">Cerrados</th><th></th>' +
+            '</tr></thead><tbody>' + rows + '</tbody></table>';
+    } catch (e) {
+        cont.innerHTML = '<p style="color:var(--tks-danger)">Error cargando resumen: ' + (e && e.message ? e.message : e) + '</p>';
+    }
+};
+
+window.verReporteCliente = function(customerId, name) {
+    var sel = document.getElementById('tks-atendidos-cliente');
+    if (sel) {
+        var exists = Array.prototype.some.call(sel.options, function (o) { return o.value === (customerId || ''); });
+        if (customerId && !exists) {
+            var opt = document.createElement('option');
+            opt.value = customerId; opt.text = name || customerId;
+            sel.appendChild(opt);
+        }
+        sel.value = customerId || '';
+    }
+    window.generarReporteAtendidos();
+    var out = document.getElementById('tks-atendidos-resultado');
+    if (out && out.scrollIntoView) out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
 
 window.exportarReporteCliente = async function() {

@@ -120,6 +120,7 @@ from ._helpers import (  # noqa: F401
     list_ticketera_mail_templates,
     get_monthly_report_data,
     get_atendidos_report,
+    get_clientes_resumen,
     get_ticketera_mail_template,
     update_ticketera_mail_template,
     get_ticketera_templates,

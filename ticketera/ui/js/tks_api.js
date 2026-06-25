@@ -123,6 +123,7 @@ const TksApi = (() => {
             const query = qs.toString();
             return _fetch(`${BASE}/reports/atendidos${query ? '?' + query : ''}`);
         },
+        getClientesResumen: (requestOpts = null) => _fetch(`${BASE}/reports/clientes`, requestOpts || {}),
         getSlaMetrics: (params = {}, requestOpts = null) => {
             const qs = new URLSearchParams();
             if (params.date_from) qs.set('date_from', params.date_from);

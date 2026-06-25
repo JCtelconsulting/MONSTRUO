@@ -779,6 +779,14 @@ async def reports_atendidos(
     )
 
 
+@router.get("/reports/clientes", response_model=dict)
+async def reports_clientes(
+    sess: dict = Depends(deps.require_permission("tickets:read"))
+):
+    """Resumen por cliente: una fila con tickets activos, creados este mes y cerrados."""
+    return tickets_service.get_clientes_resumen()
+
+
 @router.post("/tickets/{ticket_id}/reply-email", response_model=dict)
 async def reply_ticket_email(
     ticket_id: int,

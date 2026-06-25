@@ -1299,6 +1299,45 @@ def get_atendidos_report(period: str = "day", customer_id: str = None,
     finally:
         conn.close()
 
+def get_clientes_resumen() -> Dict[str, Any]:
+    """Resumen por cliente para la pestaña Reportes: una fila por cliente con
+    tickets activos (no cerrados/resueltos), creados este mes y cerrados/resueltos."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    conn = db.get_conn()
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                COALESCE(NULLIF(TRIM(customer_id), ''), '') AS customer_id,
+                COALESCE(MAX(cliente_nombre), 'Sin Cliente / Directo') AS customer_name,
+                COUNT(*) FILTER (WHERE estado NOT IN ('cerrado', 'resuelto')) AS activos,
+                COUNT(*) FILTER (WHERE created_at::timestamptz >= ?::timestamptz) AS este_mes,
+                COUNT(*) FILTER (WHERE estado IN ('cerrado', 'resuelto')) AS cerrados,
+                COUNT(*) AS total
+            FROM tickets
+            WHERE COALESCE(is_trashed, FALSE) = FALSE
+            GROUP BY COALESCE(NULLIF(TRIM(customer_id), ''), '')
+            ORDER BY activos DESC, cerrados DESC, customer_name ASC
+            """,
+            (month_start,),
+        ).fetchall()
+        clientes = []
+        for r in rows:
+            d = dict(r)
+            clientes.append({
+                "customer_id": str(d.get("customer_id") or "").strip(),
+                "customer_name": str(d.get("customer_name") or "").strip() or "Sin Cliente / Directo",
+                "activos": int(d.get("activos") or 0),
+                "este_mes": int(d.get("este_mes") or 0),
+                "cerrados": int(d.get("cerrados") or 0),
+                "total": int(d.get("total") or 0),
+            })
+        return {"clientes": clientes, "generated_at": db.now_utc_iso()}
+    finally:
+        conn.close()
+
 def get_ticketera_mail_template(template_key: str) -> Dict[str, Any]:
     conn = db.get_conn()
     try:

@@ -5810,37 +5810,19 @@ return `
             <section class="tks-settings-panel">
                 <div class="tks-settings-head">
                     <div>
-                        <h3>Reportes por Cliente</h3>
-                        <p>Exporta el historial de tickets de un cliente en un rango de fechas.</p>
+                        <h3>Reportes por cliente</h3>
+                        <p>Cada cliente en una línea: tickets activos, creados este mes y cerrados. Haz clic en "Ver reporte" para el detalle de ese cliente.</p>
                     </div>
+                    <button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.cargarResumenClientes()"><i class="fas fa-sync"></i> Actualizar</button>
                 </div>
-                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end">
-                    <div class="tks-form-group" style="margin:0;min-width:220px">
-                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
-                        <select class="tks-select" id="tks-reporte-cliente-select" style="min-width:220px">
-                            <option value="">Selecciona un cliente...</option>
-                        </select>
-                    </div>
-                    <div class="tks-form-group" style="margin:0">
-                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
-                        <input type="date" class="tks-input" id="tks-reporte-desde" style="min-width:140px">
-                    </div>
-                    <div class="tks-form-group" style="margin:0">
-                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Hasta</label>
-                        <input type="date" class="tks-input" id="tks-reporte-hasta" style="min-width:140px">
-                    </div>
-                    <button class="tks-btn tks-btn-primary" onclick="window.exportarReporteCliente()" style="align-self:flex-end">
-                        <i class="fas fa-file-export"></i> Exportar CSV
-                    </button>
+                <div id="tks-clientes-resumen-container">
+                    <div style="text-align:center;padding:1.5rem"><i class="fas fa-circle-notch fa-spin"></i> Cargando resumen...</div>
                 </div>
-                <div id="tks-reporte-resultado" style="margin-top:1rem"></div>
-            </section>
 
-            <section class="tks-settings-panel">
-                <div class="tks-settings-head">
+                <div class="tks-settings-head" style="margin-top:1.75rem;border-top:1px solid var(--tks-border);padding-top:1.25rem">
                     <div>
-                        <h3>Atendidos por período</h3>
-                        <p>Cuántos tickets se atendieron (resueltos/cerrados) por día, semana o mes — total y por cliente.</p>
+                        <h3>Reporte general por período</h3>
+                        <p>Tickets atendidos (resueltos/cerrados) agrupados por día, semana o mes. Déjalo en "Todos los clientes" o filtra por uno.</p>
                     </div>
                 </div>
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end">
@@ -5850,6 +5832,12 @@ return `
                             <option value="day">Día</option>
                             <option value="week">Semana</option>
                             <option value="month" selected>Mes</option>
+                        </select>
+                    </div>
+                    <div class="tks-form-group" style="margin:0;min-width:200px">
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
+                        <select class="tks-select" id="tks-atendidos-cliente" style="min-width:200px">
+                            <option value="">Todos los clientes</option>
                         </select>
                     </div>
                     <div class="tks-form-group" style="margin:0">
