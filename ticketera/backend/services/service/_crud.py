@@ -24,7 +24,7 @@ from ticketera.backend.services import roles as ticket_roles
 from ticketera.backend.services import workflow as ticket_workflow
 from ._helpers import *  # noqa: F401,F403
 from ._classify import auto_asignar, clasificar_ticket, incrementar_carga, decrementar_carga
-from ._notifications import programar_notificaciones, notify_client_resolution
+from ._notifications import programar_notificaciones, notify_client_resolution, _get_auto_close_hours
 from ._specialties import list_specialties
 from ._customers import get_client_for_email
 from ._sla import create_evidence_event
@@ -204,9 +204,11 @@ def _evaluate_ticket_sla(conn, ticket_id: int, now_iso: Optional[str] = None) ->
             )
 
     # Auto-cierre opcional para tickets en resuelto tras ventana de seguimiento.
-    if estado == "resuelto" and RESUELTO_AUTO_CLOSE_HOURS > 0 and resolved_dt:
-        auto_close_at = resolved_dt + timedelta(hours=RESUELTO_AUTO_CLOSE_HOURS)
-        if now_dt >= auto_close_at:
+    # Usa la ventana CONFIGURADA (system_settings.ticket_auto_close_time), no un fijo.
+    if estado == "resuelto" and resolved_dt:
+        auto_close_hours = _get_auto_close_hours()
+        auto_close_at = resolved_dt + timedelta(hours=auto_close_hours)
+        if auto_close_hours > 0 and now_dt >= auto_close_at:
             from_sub = normalize_subestado(ticket.get("subestado"), "resuelto")
             update_result = conn.execute(
                 """UPDATE tickets
@@ -227,14 +229,14 @@ def _evaluate_ticket_sla(conn, ticket_id: int, now_iso: Optional[str] = None) ->
                 (
                     ticket_id,
                     from_sub,
-                    f"auto_close_resuelto_timeout_{RESUELTO_AUTO_CLOSE_HOURS}h",
+                    f"auto_close_resuelto_timeout_{auto_close_hours}h",
                     now_iso,
                 ),
             )
             _emit_system_comment(
                 conn,
                 ticket_id,
-                f"[AUTO_CIERRE] Ticket cerrado automáticamente tras {RESUELTO_AUTO_CLOSE_HOURS}h en estado resuelto.",
+                f"[AUTO_CIERRE] Ticket cerrado automáticamente tras {auto_close_hours}h en estado resuelto.",
                 now_iso,
             )
             _recompute_ticket_retention(conn, ticket_id)
@@ -2693,7 +2695,7 @@ def get_ticket_workflow(ticket_id: int) -> Dict[str, Any]:
     return {
         "ticket": ticket,
         "allowed_next": allowed_next,
-        "resuelto_auto_close_hours": RESUELTO_AUTO_CLOSE_HOURS,
+        "resuelto_auto_close_hours": _get_auto_close_hours(),
         "approvals_status": {
             "step1": latest_approvals.get(1, "pending"),
             "step2": latest_approvals.get(2, "pending"),
