@@ -5130,6 +5130,24 @@ return `
             </article>`;
         }).join('');
 
+        // Botones de Decisión de Gerencia (Aprobar/Rechazar). Se definen ACÁ ARRIBA para que
+        // estén disponibles tanto en la vista reducida de gerencia (return temprano de abajo)
+        // como en el flujo normal (admin). Antes vivían más abajo y eran inalcanzables para
+        // el rol gerencia por el return temprano → Diego nunca veía cómo aprobar/rechazar.
+        const gerenciaApprovalHtml = (!isTrashed && t.subestado === 'pendiente_gerencia' && (isGerenciaViewer || roleKey === 'admin'))
+            ? `
+                <div class="tks-status-editor tks-status-editor-v2" style="border:1px solid var(--tks-accent);border-radius:10px;padding:0.75rem;margin-top:0.5rem">
+                    <label class="tks-status-editor-label"><i class="fas fa-user-tie"></i> Decisión de Gerencia</label>
+                    <textarea id="tks-gerencia-note" rows="2" placeholder="Nota (opcional)..." style="width:100%;margin:0.4rem 0;background:var(--tks-bg-secondary);border:1px solid var(--tks-border);border-radius:8px;color:var(--tks-text);padding:0.5rem;font-family:inherit"></textarea>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                        <button class="tks-btn tks-btn-primary" onclick="window.tksGerenciaDecision(${t.id}, 'aprobado')"><i class="fas fa-check"></i> Aprobar</button>
+                        <button class="tks-btn tks-btn-ghost" style="color:var(--tks-danger)" onclick="window.tksGerenciaDecision(${t.id}, 'rechazado')"><i class="fas fa-times"></i> Rechazar</button>
+                    </div>
+                    <div class="tks-status-editor-hint">Solo gerencia/admin puede decidir. Aprobar o rechazar devuelve el ticket a En progreso y registra la nota.</div>
+                </div>
+              `
+            : '';
+
         if (isGerenciaViewer) {
             return `
             <div class="tks-detail-header tks-detail-header-pro">
@@ -5147,6 +5165,7 @@ return `
                             ${feedHtml || '<div class="tks-feed-empty">Sin actividad registrada.</div>'}
                         </div>
                     </div>
+                    ${gerenciaApprovalHtml}
                 </section>
             </div>`;
         }
@@ -5214,20 +5233,6 @@ return `
                 </div>
               `
             : `<div class="tks-readonly-box">${escapeHtml(isTrashed ? 'El ticket está en papelera. Restáuralo para retomar flujo, asignación o correo.' : (blockedReason || 'Solo lectura para gestión de estado.'))}</div>`;
-
-        const gerenciaApprovalHtml = (!isTrashed && t.subestado === 'pendiente_gerencia' && (isGerenciaViewer || roleKey === 'admin'))
-            ? `
-                <div class="tks-status-editor tks-status-editor-v2" style="border:1px solid var(--tks-accent);border-radius:10px;padding:0.75rem;margin-top:0.5rem">
-                    <label class="tks-status-editor-label"><i class="fas fa-user-tie"></i> Decisión de Gerencia</label>
-                    <textarea id="tks-gerencia-note" rows="2" placeholder="Nota (opcional)..." style="width:100%;margin:0.4rem 0;background:var(--tks-bg-secondary);border:1px solid var(--tks-border);border-radius:8px;color:var(--tks-text);padding:0.5rem;font-family:inherit"></textarea>
-                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-                        <button class="tks-btn tks-btn-primary" onclick="window.tksGerenciaDecision(${t.id}, 'aprobado')"><i class="fas fa-check"></i> Aprobar</button>
-                        <button class="tks-btn tks-btn-ghost" style="color:var(--tks-danger)" onclick="window.tksGerenciaDecision(${t.id}, 'rechazado')"><i class="fas fa-times"></i> Rechazar</button>
-                    </div>
-                    <div class="tks-status-editor-hint">Solo gerencia/admin puede decidir. Aprobar o rechazar devuelve el ticket a En progreso y registra la nota.</div>
-                </div>
-              `
-            : '';
 
         const assigneeFallbackLabel = formatAssigneeDisplay(t.asignado_a || '');
         const assigneeControlHtml = canAssignTicket

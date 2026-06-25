@@ -3177,13 +3177,19 @@ window.cargarResumenClientes = async function() {
         var esc = TksUI.escapeHtml;
         var jsq = function (s) { return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;'); };
         var rows = clientes.map(function (c) {
+            var hasId = !!String(c.customer_id || '').trim();
             var call = "window.verReporteCliente('" + jsq(c.customer_id) + "','" + jsq(c.customer_name) + "')";
-            return '<tr style="cursor:pointer" onclick="' + call + '">' +
+            // La fila "Sin Cliente / Directo" (customer_id vacío) no tiene reporte por cliente:
+            // no se puede filtrar el reporte general por "sin cliente", así que no la hacemos accionable.
+            var accion = hasId
+                ? '<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="event.stopPropagation();' + call + '"><i class="fas fa-chart-line"></i> Ver reporte</button>'
+                : '<span style="opacity:.5;font-size:.8rem">Sin cliente asociado</span>';
+            return '<tr' + (hasId ? ' style="cursor:pointer" onclick="' + call + '"' : '') + '>' +
                 '<td>' + esc(c.customer_name || '-') + '</td>' +
                 '<td style="text-align:center"><strong>' + (c.activos || 0) + '</strong></td>' +
                 '<td style="text-align:center">' + (c.este_mes || 0) + '</td>' +
                 '<td style="text-align:center">' + (c.cerrados || 0) + '</td>' +
-                '<td style="text-align:right"><button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="event.stopPropagation();' + call + '"><i class="fas fa-chart-line"></i> Ver reporte</button></td>' +
+                '<td style="text-align:right">' + accion + '</td>' +
                 '</tr>';
         }).join('');
         cont.innerHTML = '<table class="tks-table"><thead><tr>' +
