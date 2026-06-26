@@ -13,6 +13,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from terreneitor.backend import dependencias, modelos, nucleo
+from terreneitor.backend.services import plan_service, proyecto_service
 
 router = APIRouter(
     prefix="/api",
@@ -597,6 +598,62 @@ def crear_trabajo_terreno(
         asig.colaboradores.append(current_user)
     db.commit()
     return {"status": "ok", "plan_id": plan.id, "tareas": len(nombres)}
+
+
+@router.get("/terreno/proyectos")
+def terreno_listar_proyectos(db: Session = Depends(dependencias.get_db)):
+    """Proyectos activos para que el técnico planifique igual que el supervisor."""
+    proyectos = (
+        db.query(modelos.Proyecto)
+        .filter(
+            ~modelos.Proyecto.nombre_pmc.ilike("%dupe%"),
+            ~modelos.Proyecto.nombre_pmc.ilike("%1.4.%"),
+            modelos.Proyecto.estado_proyecto == modelos.EstadoProyectoEnum.ACTIVO,
+        )
+        .order_by(modelos.Proyecto.nombre_pmc)
+        .all()
+    )
+    return [
+        {"id": p.id, "nombre_pmc": p.nombre_pmc, "cliente": p.cliente, "area": p.area}
+        for p in proyectos
+        if p.ruta_base and os.path.exists(p.ruta_base) and "_PAPELERA" not in p.ruta_base
+    ]
+
+
+@router.get("/terreno/proyectos/{proyecto_id}/postes")
+def terreno_postes(proyecto_id: int, db: Session = Depends(dependencias.get_db)):
+    """Postes/items de un proyecto para seleccionar (misma data que el supervisor)."""
+    try:
+        return proyecto_service.get_planning_detail(db, proyecto_id)
+    except LookupError as e:
+        raise HTTPException(404, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.post("/terreno/crear-plan")
+def terreno_crear_plan(
+    payload: dict,
+    db: Session = Depends(dependencias.get_db),
+    current_user: modelos.User = Depends(dependencias.require_session),
+):
+    """Crea un plan desde Terreno con la MISMA lógica que el supervisor (postes reales),
+    auto-asignado al técnico. Reemplaza la lógica vieja de /terreno/crear-trabajo."""
+    item_ids = [int(i) for i in (payload.get("item_ids") or []) if i]
+    if not item_ids:
+        raise HTTPException(400, detail="Debes seleccionar al menos un poste/tarea.")
+    descripcion = (payload.get("descripcion") or "").strip() or "Trabajo de terreno"
+    cliente = " ".join((payload.get("cliente") or "").split()).strip() or None
+    numero = payload.get("numero")
+    plan = plan_service.create_plan_with_items(
+        db,
+        descripcion=descripcion,
+        item_ids=item_ids,
+        usuario_ids=[current_user.id],
+        cliente=cliente,
+        numero=numero,
+    )
+    return {"status": "ok", "plan_id": plan.id}
 
 
 @router.post("/tareas/crear-complemento")

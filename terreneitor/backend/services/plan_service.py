@@ -68,6 +68,50 @@ def _serialize_asignacion(a: modelos.AsignacionPlan) -> dict:
     }
 
 
+def create_plan_with_items(
+    db: Session,
+    *,
+    descripcion: str,
+    item_ids: list[int],
+    usuario_ids: list[int] | None = None,
+    cliente: str | None = None,
+    numero: int | None = None,
+) -> modelos.PlanTrabajo:
+    """Crea un plan a partir de POSTES/ITEMS REALES y una cuadrilla.
+
+    Única fuente de verdad para crear planes: la usan tanto Supervisor como Terreno,
+    para que crear desde cualquiera de los dos produzca exactamente la misma estructura
+    (mismas asignaciones + cuadrilla N:M). Antes Terreno tenía su propia lógica divergente
+    (inventaba tareas genéricas) y generaba inconsistencias.
+    """
+    plan = modelos.PlanTrabajo(
+        descripcion=descripcion,
+        cliente=cliente or None,
+        numero=numero,
+        estado_plan=modelos.EstadoPlanEnum.ABIERTO,
+    )
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+
+    effective_users = list(usuario_ids) if usuario_ids else []
+    principal_id = effective_users[0] if effective_users else None
+    for i_id in item_ids:
+        asig = modelos.AsignacionPlan(
+            plan_id=plan.id,
+            item_id=i_id,
+            usuario_id=principal_id,
+            estado=modelos.EstadoItemEnum.ASIGNADA,
+        )
+        db.add(asig)
+        db.flush()  # para obtener asig.id
+        for u_id in effective_users:
+            db.add(modelos.AsignacionUsuario(asignacion_id=asig.id, usuario_id=u_id))
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
 def delete_plan_cascade(db: Session, plan_id: int) -> None:
     """Borra un plan y todas sus asignaciones + asignaciones-usuarios
     (relacion N:M de cuadrilla). No toca filesystem."""

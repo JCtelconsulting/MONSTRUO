@@ -157,30 +157,15 @@ def create_plan(
     numero: int = Body(None, embed=True),
     db: Session = Depends(dependencias.get_db),
 ):
-    plan = modelos.PlanTrabajo(descripcion=descripcion, cliente=cliente, numero=numero)
-    db.add(plan)
-    db.commit()
-    db.refresh(plan)
-
-    # Cuadrilla: Una sola tarea compartida por varios usuarios
-    effective_users = usuario_ids if usuario_ids and len(usuario_ids) > 0 else []
-
-    for i_id in item_ids:
-        # Creamos la asignación (una sola vez por item)
-        # usuario_id queda como el 'primero' o null para compatibilidad,
-        # pero la verdad está en la tabla intermedia.
-        principal_id = effective_users[0] if effective_users else None
-        asig = modelos.AsignacionPlan(
-            plan_id=plan.id, item_id=i_id, usuario_id=principal_id
-        )
-        db.add(asig)
-        db.flush()  # Para obtener asig.id
-
-        # Vinculamos a todos los miembros de la cuadrilla
-        for u_id in effective_users:
-            db.add(modelos.AsignacionUsuario(asignacion_id=asig.id, usuario_id=u_id))
-
-    db.commit()
+    # Lógica única compartida con Terreno (plan_service.create_plan_with_items).
+    plan = plan_service.create_plan_with_items(
+        db,
+        descripcion=descripcion,
+        item_ids=item_ids,
+        usuario_ids=usuario_ids,
+        cliente=cliente,
+        numero=numero,
+    )
     return {"status": "ok", "plan_id": plan.id}
 
 

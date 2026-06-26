@@ -753,25 +753,23 @@ window.Guia = {
   async crearTrabajo() {
     this.vista = 'crear';
     let clientes = [];
-    try {
-      clientes = await fetchApi('/api/clientes');
-    } catch (e) {}
-    const opts = (clientes || []).map((c) => `<option>${escapeHtml(c.nombre)}</option>`).join('');
+    let proyectos = [];
+    try { clientes = await fetchApi('/api/clientes'); } catch (e) {}
+    try { proyectos = await fetchApi('/api/terreno/proyectos'); } catch (e) {}
+    const cliOpts = (clientes || []).map((c) => `<option>${escapeHtml(c.nombre)}</option>`).join('');
+    const proyOpts = (proyectos || [])
+      .map((p) => `<option value="${p.id}">${escapeHtml(p.nombre_pmc)} · ${escapeHtml(p.cliente || '')}</option>`)
+      .join('');
     this.cont.innerHTML = `<div class="guia-card guia-crear">
       <button class="guia-link" data-act="atras">← Volver</button>
       <h2>Crear un trabajo</h2>
-      <p class="guia-sub">Llena estos datos y se crea con sus tareas.</p>
-      <label class="guia-lbl">Tipo de trabajo</label>
-      <select id="ct-tipo" class="guia-input">
-        <option value="">— Elegir —</option>
-        <option>Instalación</option><option>Retiro</option><option>Traslado</option>
-        <option>Despacho</option><option>Reportabilidad EPP</option>
-        <option>Avance del día</option><option>Visita / Preventa</option>
-        <option>Interposte</option>
-      </select>
-      <label class="guia-lbl">Cliente</label>
+      <p class="guia-sub">Elegí el proyecto y los postes reales (igual que el supervisor).</p>
+      <label class="guia-lbl">Proyecto</label>
+      <select id="ct-proy" class="guia-input"><option value="">— Elegir proyecto —</option>${proyOpts}</select>
+      <div id="ct-postes" style="margin:8px 0"></div>
+      <label class="guia-lbl">Cliente (etiqueta del plan)</label>
       <div style="display:flex; gap:8px">
-        <select id="ct-cliente" class="guia-input" style="flex:1"><option value="">— Elegir —</option>${opts}</select>
+        <select id="ct-cliente" class="guia-input" style="flex:1"><option value="">— Elegir —</option>${cliOpts}</select>
         <button class="guia-btn-mini" data-act="nuevo-cli" title="Agregar cliente">+</button>
       </div>
       <label class="guia-lbl">N° (correlativo del cliente)</label>
@@ -780,21 +778,44 @@ window.Guia = {
       <input id="ct-fecha" class="guia-input" type="date" />
       <button class="guia-btn primary" data-act="crear"><i class="fas fa-check"></i> Crear y empezar</button>
     </div>`;
-    const numEl = () => this.cont.querySelector('#ct-numero');
-    const cliEl = () => this.cont.querySelector('#ct-cliente');
+    const q = (id) => this.cont.querySelector('#' + id);
+    const numEl = () => q('ct-numero');
+    const cliEl = () => q('ct-cliente');
     const actualizarNum = async () => {
       const cli = cliEl()?.value;
-      if (!cli) {
-        numEl().value = '';
-        return;
-      }
+      if (!cli) { numEl().value = ''; return; }
       try {
-        const r = await fetchApi(
-          '/api/planes-trabajo/siguiente-numero?cliente=' + encodeURIComponent(cli)
-        );
+        const r = await fetchApi('/api/planes-trabajo/siguiente-numero?cliente=' + encodeURIComponent(cli));
         numEl().value = r.siguiente;
       } catch (e) {}
     };
+    // Al elegir un proyecto, traemos sus postes reales como checkboxes (misma data que el supervisor).
+    q('ct-proy')?.addEventListener('change', async (e) => {
+      const pid = e.target.value;
+      const cont = q('ct-postes');
+      if (!pid) { cont.innerHTML = ''; return; }
+      cont.innerHTML = '<p class="guia-sub">Cargando postes…</p>';
+      try {
+        const det = await fetchApi('/api/terreno/proyectos/' + pid + '/postes');
+        const grupos = det.grupos || {};
+        const orden = det.grupos_orden || Object.keys(grupos);
+        let html = '<label class="guia-lbl">Postes / tareas</label>';
+        let total = 0;
+        orden.forEach((g) => {
+          (grupos[g] || []).forEach((cat) => {
+            (cat.items || []).forEach((it) => {
+              total++;
+              html += `<label style="display:flex;gap:8px;align-items:center;padding:4px 0">
+                <input type="checkbox" class="ct-poste" value="${it.id}">
+                <span>${escapeHtml(cat.nombre)} · ${escapeHtml(it.nombre)}</span></label>`;
+            });
+          });
+        });
+        cont.innerHTML = total ? html : '<p class="guia-sub">Este proyecto no tiene postes.</p>';
+      } catch (err) {
+        cont.innerHTML = '<p class="guia-sub" style="color:#c00">Error cargando postes: ' + escapeHtml(err.message) + '</p>';
+      }
+    });
     this._on('[data-act="atras"]', () => this.inicio());
     cliEl()?.addEventListener('change', actualizarNum);
     this._on('[data-act="nuevo-cli"]', async () => {
@@ -812,30 +833,24 @@ window.Guia = {
       }
     });
     this._on('[data-act="crear"]', async () => {
-      const v = (id) => (this.cont.querySelector('#' + id)?.value || '').trim();
-      const tipo = v('ct-tipo');
-      const cliente = v('ct-cliente');
-      const numero = parseInt(v('ct-numero')) || null;
-      const fecha = v('ct-fecha');
-      if (!tipo || !cliente) {
-        if (window.showToast) window.showToast('Elige tipo y cliente', 'error');
+      const cliente = (cliEl()?.value || '').trim();
+      const numero = parseInt(numEl()?.value) || null;
+      const fecha = (q('ct-fecha')?.value || '').trim();
+      const postes = [...this.cont.querySelectorAll('.ct-poste:checked')].map((c) => parseInt(c.value));
+      if (postes.length === 0) {
+        if (window.showToast) window.showToast('Elegí el proyecto y al menos un poste', 'error');
         return;
       }
-      const partes = [tipo, cliente];
+      if (!cliente) { if (window.showToast) window.showToast('Elegí un cliente', 'error'); return; }
+      const partes = [cliente];
       if (numero) partes.push('N°' + numero);
-      if (fecha) {
-        const [y, m, d] = fecha.split('-');
-        partes.push(`${d}-${m}-${y}`);
-      }
+      if (fecha) { const [y, m, d] = fecha.split('-'); partes.push(`${d}-${m}-${y}`); }
       const btn = this.cont.querySelector('[data-act="crear"]');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = 'Creando...';
-      }
+      if (btn) { btn.disabled = true; btn.innerHTML = 'Creando...'; }
       try {
-        const r = await fetchApi('/api/terreno/crear-trabajo', {
+        const r = await fetchApi('/api/terreno/crear-plan', {
           method: 'POST',
-          body: { tipo, cliente, numero, descripcion: partes.join(' · ') },
+          body: { item_ids: postes, cliente, numero, descripcion: partes.join(' · ') },
         });
         if (window.showToast) window.showToast('Trabajo creado ✓', 'success');
         await this._cargarMisPlanes();
