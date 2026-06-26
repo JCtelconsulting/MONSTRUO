@@ -810,6 +810,114 @@ def admin_delete_item(
     return gestion_proyectos.delete_project_item(db, item_id)
 
 
+class NombreUpdate(BaseModel):
+    nombre: str
+
+
+@router.patch("/items/{item_id}")
+def admin_rename_item(
+    item_id: int, req: NombreUpdate, db: Session = Depends(dependencias.get_db)
+):
+    """Renombra una tarea (item) de un proyecto puntual. Cambia solo el nombre visible;
+    NO toca la plantilla ni mueve carpetas (las fotos siguen asociadas por id)."""
+    it = db.query(modelos.Item).filter(modelos.Item.id == item_id).first()
+    if not it:
+        raise HTTPException(404, "Tarea no encontrada")
+    nombre = " ".join((req.nombre or "").split()).strip()
+    if not nombre:
+        raise HTTPException(400, "Nombre requerido")
+    it.nombre = nombre
+    db.commit()
+    return {"status": "ok", "id": it.id, "nombre": it.nombre}
+
+
+@router.patch("/categorias/{cat_id}")
+def admin_rename_categoria(
+    cat_id: int, req: NombreUpdate, db: Session = Depends(dependencias.get_db)
+):
+    """Renombra una categoría de un proyecto puntual (no afecta la plantilla)."""
+    cat = db.query(modelos.Categoria).filter(modelos.Categoria.id == cat_id).first()
+    if not cat:
+        raise HTTPException(404, "Categoría no encontrada")
+    nombre = " ".join((req.nombre or "").split()).strip()
+    if not nombre:
+        raise HTTPException(400, "Nombre requerido")
+    cat.nombre = nombre
+    db.commit()
+    return {"status": "ok", "id": cat.id, "nombre": cat.nombre}
+
+
+@router.delete("/categorias/{cat_id}")
+def admin_delete_categoria(
+    cat_id: int, db: Session = Depends(dependencias.get_db)
+):
+    """Borra una categoría de un proyecto y sus tareas (no afecta la plantilla)."""
+    cat = db.query(modelos.Categoria).filter(modelos.Categoria.id == cat_id).first()
+    if not cat:
+        raise HTTPException(404, "Categoría no encontrada")
+    db.delete(cat)  # cascade borra los items
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.patch("/plantillas/{tipo}/renombrar")
+def admin_renombrar_tipo_plantilla(
+    tipo: str, payload: dict = Body(...), db: Session = Depends(dependencias.get_db)
+):
+    """Renombra un tipo de plantilla entero (todas sus tareas pasan al nuevo nombre)."""
+    nuevo = " ".join((payload.get("nuevo") or "").split()).strip().upper()
+    if not nuevo:
+        raise HTTPException(400, "Nuevo nombre requerido")
+    filas = (
+        db.query(modelos.PlantillaTarea)
+        .filter(modelos.PlantillaTarea.tipo == tipo)
+        .all()
+    )
+    if not filas:
+        raise HTTPException(404, "Tipo no encontrado")
+    if (
+        nuevo != tipo
+        and db.query(modelos.PlantillaTarea)
+        .filter(modelos.PlantillaTarea.tipo == nuevo)
+        .count()
+    ):
+        raise HTTPException(409, f"Ya existe un tipo '{nuevo}'")
+    for f in filas:
+        f.tipo = nuevo
+    db.commit()
+    return {"status": "ok", "tipo": nuevo, "tareas": len(filas)}
+
+
+@router.patch("/plantillas/{tipo}/renombrar-nodo")
+def admin_renombrar_nodo_plantilla(
+    tipo: str, payload: dict = Body(...), db: Session = Depends(dependencias.get_db)
+):
+    """Renombra un GRUPO o una CATEGORÍA en TODAS las tareas de un tipo, de una.
+    payload: {nivel:'grupo'|'categoria', viejo, nuevo, grupo?(filtra si nivel=categoria)}"""
+    nivel = (payload.get("nivel") or "").strip()
+    viejo = (payload.get("viejo") or "").strip()
+    nuevo = (payload.get("nuevo") or "").strip()
+    grupo_filtro = (payload.get("grupo") or "").strip()
+    if nivel not in ("grupo", "categoria") or not viejo or not nuevo:
+        raise HTTPException(400, "Parámetros: nivel (grupo|categoria), viejo, nuevo")
+    filas = (
+        db.query(modelos.PlantillaTarea)
+        .filter(modelos.PlantillaTarea.tipo == tipo)
+        .all()
+    )
+    cambiados = 0
+    for f in filas:
+        g, c, i = _parse_ruta_plantilla(f.ruta)
+        if nivel == "grupo" and g == viejo:
+            f.ruta = "/".join([nuevo, c, i])
+            cambiados += 1
+        elif nivel == "categoria" and c == viejo and (not grupo_filtro or g == grupo_filtro):
+            f.ruta = "/".join([g, nuevo, i])
+            cambiados += 1
+    db.commit()
+    return {"status": "ok", "cambiados": cambiados}
+
+
 class MovePhotosRequest(BaseModel):
     src_item_id: int
     dest_item_id: int
