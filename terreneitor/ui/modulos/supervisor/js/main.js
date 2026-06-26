@@ -103,6 +103,27 @@ function setupEventListeners() {
     if (el) el.addEventListener('input', composePlanDesc);
   });
 
+  // Fecha: por defecto HOY (hora local), y al apretar el campo se abre el calendario.
+  const hoyISO = () => new Date().toLocaleDateString('en-CA'); // 'YYYY-MM-DD' local
+  const fechaEl = document.getElementById('plan-fecha');
+  if (fechaEl) {
+    if (!fechaEl.value) {
+      fechaEl.value = hoyISO();
+      composePlanDesc();
+    }
+    fechaEl.addEventListener('click', () => {
+      if (!fechaEl.value) {
+        fechaEl.value = hoyISO();
+        composePlanDesc();
+      }
+      if (typeof fechaEl.showPicker === 'function') {
+        try {
+          fechaEl.showPicker();
+        } catch (e) {}
+      }
+    });
+  }
+
   // Catálogo de clientes (dropdown) + agregar + número correlativo por cliente.
   const cargarClientes = async (seleccionar) => {
     try {
@@ -175,6 +196,9 @@ function setupEventListeners() {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
+      // La fecha vuelve a HOY por defecto (no queda vacía).
+      const _f = document.getElementById('plan-fecha');
+      if (_f) _f.value = new Date().toLocaleDateString('en-CA');
       composePlanDesc();
     } catch (e) {
       alert('Error: ' + e.message);
