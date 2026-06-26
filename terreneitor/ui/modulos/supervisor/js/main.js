@@ -81,12 +81,10 @@ function setupEventListeners() {
   // Arma el nombre del plan a partir de tipo · cliente · N° · fecha.
   const composePlanDesc = () => {
     const v = (id) => (document.getElementById(id)?.value || '').trim();
-    const tipo = v('plan-tipo');
     const cliente = v('plan-cliente');
     const numero = v('plan-numero');
     const fecha = v('plan-fecha'); // YYYY-MM-DD
     const partes = [];
-    if (tipo) partes.push(tipo);
     if (cliente) partes.push(cliente);
     if (numero) partes.push(/^\d+$/.test(numero) ? 'N°' + numero : numero);
     if (fecha) {
@@ -100,7 +98,7 @@ function setupEventListeners() {
     if (prev) prev.textContent = desc ? `Nombre: ${desc}` : '';
     return desc;
   };
-  ['plan-tipo', 'plan-cliente', 'plan-numero', 'plan-fecha'].forEach((id) => {
+  ['plan-cliente', 'plan-numero', 'plan-fecha'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', composePlanDesc);
   });
@@ -173,7 +171,7 @@ function setupEventListeners() {
       alert('Plan creado con éxito.');
       AppState.selectedItems = {};
       SupervisorUI.renderSelectionQueue(AppState.selectedItems, onRemoveTask);
-      ['plan-tipo', 'plan-cliente', 'plan-numero', 'plan-fecha'].forEach((id) => {
+      ['plan-cliente', 'plan-numero', 'plan-fecha'].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
