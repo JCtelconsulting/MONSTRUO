@@ -110,6 +110,19 @@ class Cliente(Base):
     nombre = Column(String, unique=True, nullable=False)
 
 
+class PlantillaTarea(Base):
+    """Plantilla editable de tareas por tipo de trabajo (PMC, OBRA, INTERPOSTE...).
+    Cada fila es una entrada con formato 'GRUPO/CATEGORIA/ITEM'. Si un tipo NO tiene
+    filas aquí, el sistema cae a STRUCTURE_TEMPLATES (código) como red de seguridad,
+    así editar plantillas desde el panel nunca rompe la creación de proyectos."""
+
+    __tablename__ = "plantillas_tareas"
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(String, nullable=False, index=True)
+    ruta = Column(String, nullable=False)  # "GRUPO/CATEGORIA/ITEM"
+    orden = Column(Integer, default=0)
+
+
 class PlanTrabajo(Base):
     __tablename__ = "planes_trabajo"
     id = Column(Integer, primary_key=True, index=True)

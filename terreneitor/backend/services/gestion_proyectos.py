@@ -85,6 +85,39 @@ def get_project_type_from_name(nombre_pmc: str) -> str:
     return ""
 
 
+def get_template_entries(db, tipo):
+    """Tareas de un tipo de trabajo en formato 'GRUPO/CATEGORIA/ITEM'.
+    Primero busca en la tabla editable `plantillas_tareas`; si ese tipo NO tiene
+    filas, cae a STRUCTURE_TEMPLATES (código) como red de seguridad. Así, editar
+    plantillas desde el panel nunca puede dejar un tipo sin tareas."""
+    if db is not None:
+        try:
+            filas = (
+                db.query(modelos.PlantillaTarea)
+                .filter(modelos.PlantillaTarea.tipo == tipo)
+                .order_by(modelos.PlantillaTarea.orden, modelos.PlantillaTarea.id)
+                .all()
+            )
+            if filas:
+                return [f.ruta for f in filas]
+        except Exception:
+            pass
+    return STRUCTURE_TEMPLATES.get(tipo) or []
+
+
+def get_all_template_types(db):
+    """Tipos de trabajo disponibles: los del código + los que existan en la DB."""
+    tipos = set(STRUCTURE_TEMPLATES.keys())
+    if db is not None:
+        try:
+            for (t,) in db.query(modelos.PlantillaTarea.tipo).distinct().all():
+                if t:
+                    tipos.add(t)
+        except Exception:
+            pass
+    return sorted(tipos)
+
+
 def build_project_path(cliente: str, zona: str, nombre_pmc: str) -> str:
     cliente_norm = normalize_segment(cliente)
     zona_norm = normalize_segment(zona)
@@ -110,8 +143,8 @@ def write_project_marker(project_path: str, project: modelos.Proyecto, tipo: str
         pass
 
 
-def create_structure(project_path: str, tipo: str):
-    template = STRUCTURE_TEMPLATES.get(tipo)
+def create_structure(project_path: str, tipo: str, entries=None):
+    template = entries if entries is not None else STRUCTURE_TEMPLATES.get(tipo)
     if not template:
         raise RuntimeError(f"Template no disponible para tipo {tipo}")
     for subfolder in template:
@@ -123,8 +156,10 @@ def create_structure(project_path: str, tipo: str):
             pass
 
 
-def populate_project_from_template(db: Session, project: modelos.Proyecto, tipo: str):
-    template = STRUCTURE_TEMPLATES.get(tipo)
+def populate_project_from_template(
+    db: Session, project: modelos.Proyecto, tipo: str, entries=None
+):
+    template = entries if entries is not None else get_template_entries(db, tipo)
     if not template:
         raise RuntimeError(f"Template no disponible para tipo {tipo}")
     categorias = {}
@@ -150,7 +185,7 @@ def agregar_template_a_proyecto(db: Session, project: modelos.Proyecto, tipo: st
     """Agrega las categorías/tareas de un template a un proyecto YA EXISTENTE, sin duplicar.
     Sirve para sumar una parametrización (ej: Interposte) a un PMC ya creado, de modo que
     esas tareas queden disponibles al planificar. Devuelve cuántas tareas (items) se agregaron."""
-    template = STRUCTURE_TEMPLATES.get(tipo)
+    template = get_template_entries(db, tipo)
     if not template:
         raise RuntimeError(f"Template no disponible para tipo {tipo}")
     existentes = {
@@ -219,7 +254,8 @@ def create_project_and_structure(
     except Exception:
         pass
 
-    create_structure(ruta_base, tipo_norm)
+    entries = get_template_entries(db, tipo_norm)
+    create_structure(ruta_base, tipo_norm, entries)
 
     project = modelos.Proyecto(
         nombre_pmc=nombre_pmc,
@@ -230,7 +266,7 @@ def create_project_and_structure(
     db.add(project)
     try:
         db.flush()
-        populate_project_from_template(db, project, tipo_norm)
+        populate_project_from_template(db, project, tipo_norm, entries)
         db.commit()
         db.refresh(project)
     except Exception as e:

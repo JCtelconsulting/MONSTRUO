@@ -44,7 +44,15 @@
         <button class="side-link" type="button" data-section="section-clientes" data-admin="true">
           <i class="fas fa-id-card-clip"></i> <span>Clientes</span>
         </button>
-        <
+        <button
+          class="side-link"
+          type="button"
+          data-section="section-parametrizaciones"
+          data-admin="true"
+        >
+          <i class="fas fa-sliders"></i> <span>Parametrizaciones</span>
+        </button>
+        <a
           class="side-link"
           href="https://login.telconsulting.cl/dashboard"
           onclick="this.href='https://login.telconsulting.cl'+(location.pathname.startsWith('/dev')?'/dev':'')+'/dashboard'"
@@ -122,6 +130,34 @@
           <div class="projects-grid" id="clientes-list">
             <!-- JS rendered -->
             <div class="empty-state">Cargando clientes...</div>
+          </div>
+        </section>
+
+        <section class="section-block admin-section" id="section-parametrizaciones" hidden>
+          <div class="section-header">
+            <div>
+              <h3>Parametrizaciones</h3>
+              <p>Tareas que trae cada tipo de trabajo al crear un proyecto.</p>
+            </div>
+          </div>
+
+          <div
+            class="param-layout"
+            style="
+              display: grid;
+              grid-template-columns: minmax(220px, 280px) 1fr;
+              gap: 1.5rem;
+              align-items: start;
+            "
+          >
+            <div id="param-tipos" class="projects-grid" style="grid-template-columns: 1fr">
+              <!-- JS rendered: botones por tipo -->
+              <div class="empty-state">Cargando tipos...</div>
+            </div>
+            <div id="param-tareas">
+              <!-- JS rendered: tareas del tipo seleccionado -->
+              <div class="empty-state">Selecciona un tipo de trabajo para ver sus tareas.</div>
+            </div>
           </div>
         </section>
       </div>
@@ -392,6 +428,6 @@
 
     <script src="../_compartido/js/utilidades.js?v=413"></script>
     <script src="../_compartido/js/guarda_rol.js?v=600"></script>
-    <script src="js/portal.js?v=611"></script>
+    <script src="js/portal.js?v=612"></script>
   </body>
 </html>

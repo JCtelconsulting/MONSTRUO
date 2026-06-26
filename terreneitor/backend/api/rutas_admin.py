@@ -12,6 +12,7 @@ from typing import List
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from terreneitor.backend import dependencias, modelos, nucleo
@@ -618,6 +619,132 @@ def admin_agregar_interposte(pid: int, db: Session = Depends(dependencias.get_db
     except RuntimeError as e:
         raise HTTPException(500, detail=str(e)) from e
     return {"status": "ok", "items_agregados": n}
+
+
+# ============== PARAMETRIZACIONES: plantillas de tareas por tipo de trabajo ==============
+# Las tareas de cada tipo (PMC, OBRA, INTERPOSTE...) viven en la tabla editable
+# `plantillas_tareas`. Si un tipo no tiene filas, el sistema cae al código
+# (STRUCTURE_TEMPLATES) — ver gestion_proyectos.get_template_entries.
+
+
+def _parse_ruta_plantilla(ruta: str):
+    partes = [p.strip() for p in (ruta or "").split("/") if p.strip()]
+    while len(partes) < 3:
+        partes.append("")
+    return partes[0], partes[1], partes[2]
+
+
+def _ruta_desde_payload(payload: dict) -> str:
+    ruta = (payload.get("ruta") or "").strip()
+    if not ruta:
+        ruta = "/".join(
+            [
+                (payload.get("grupo") or "").strip(),
+                (payload.get("categoria") or "").strip(),
+                (payload.get("item") or "").strip(),
+            ]
+        )
+    partes = [p.strip() for p in ruta.split("/") if p.strip()]
+    if len(partes) < 3:
+        raise HTTPException(400, "Formato requerido: GRUPO / CATEGORÍA / TAREA")
+    return "/".join(partes[:3])
+
+
+@router.get("/plantillas")
+def admin_listar_plantillas(db: Session = Depends(dependencias.get_db)):
+    """Tipos de trabajo + cuántas tareas tiene cada uno y si ya es editable (está en DB)."""
+    out = []
+    for tipo in gestion_proyectos.get_all_template_types(db):
+        en_db = (
+            db.query(modelos.PlantillaTarea)
+            .filter(modelos.PlantillaTarea.tipo == tipo)
+            .count()
+        )
+        total = len(gestion_proyectos.get_template_entries(db, tipo))
+        out.append({"tipo": tipo, "tareas": total, "editable": en_db > 0})
+    return out
+
+
+@router.post("/plantillas/seed")
+def admin_seed_plantillas(db: Session = Depends(dependencias.get_db)):
+    """Copia los templates del código a la tabla editable. Idempotente: solo crea
+    filas para los tipos que aún no tienen ninguna."""
+    creados = 0
+    for tipo, entries in STRUCTURE_TEMPLATES.items():
+        existe = (
+            db.query(modelos.PlantillaTarea)
+            .filter(modelos.PlantillaTarea.tipo == tipo)
+            .count()
+        )
+        if existe:
+            continue
+        for i, ruta in enumerate(entries):
+            db.add(modelos.PlantillaTarea(tipo=tipo, ruta=ruta, orden=i))
+            creados += 1
+    db.commit()
+    return {"status": "ok", "creados": creados}
+
+
+@router.get("/plantillas/{tipo}")
+def admin_listar_plantilla_tareas(
+    tipo: str, db: Session = Depends(dependencias.get_db)
+):
+    """Tareas (de la tabla editable) de un tipo, con su id para editar/borrar."""
+    filas = (
+        db.query(modelos.PlantillaTarea)
+        .filter(modelos.PlantillaTarea.tipo == tipo)
+        .order_by(modelos.PlantillaTarea.orden, modelos.PlantillaTarea.id)
+        .all()
+    )
+    tareas = []
+    for f in filas:
+        g, c, i = _parse_ruta_plantilla(f.ruta)
+        tareas.append({"id": f.id, "grupo": g, "categoria": c, "item": i, "ruta": f.ruta})
+    return {"tipo": tipo, "tareas": tareas}
+
+
+@router.post("/plantillas/{tipo}")
+def admin_agregar_plantilla_tarea(
+    tipo: str, payload: dict = Body(...), db: Session = Depends(dependencias.get_db)
+):
+    """Agrega una tarea (GRUPO/CATEGORÍA/TAREA) a un tipo de trabajo."""
+    ruta = _ruta_desde_payload(payload)
+    maxorden = (
+        db.query(func.max(modelos.PlantillaTarea.orden))
+        .filter(modelos.PlantillaTarea.tipo == tipo)
+        .scalar()
+    )
+    p = modelos.PlantillaTarea(tipo=tipo, ruta=ruta, orden=(maxorden or 0) + 1)
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return {"id": p.id, "ruta": p.ruta}
+
+
+@router.patch("/plantillas-tarea/{tid}")
+def admin_editar_plantilla_tarea(
+    tid: int, payload: dict = Body(...), db: Session = Depends(dependencias.get_db)
+):
+    """Edita la ruta (GRUPO/CATEGORÍA/TAREA) de una tarea de plantilla."""
+    p = db.query(modelos.PlantillaTarea).filter(modelos.PlantillaTarea.id == tid).first()
+    if not p:
+        raise HTTPException(404, "Tarea no encontrada")
+    p.ruta = _ruta_desde_payload(payload)
+    db.commit()
+    return {"id": p.id, "ruta": p.ruta}
+
+
+@router.delete("/plantillas-tarea/{tid}")
+def admin_borrar_plantilla_tarea(
+    tid: int, db: Session = Depends(dependencias.get_db)
+):
+    """Elimina una tarea de plantilla (no afecta proyectos ya creados)."""
+    p = db.query(modelos.PlantillaTarea).filter(modelos.PlantillaTarea.id == tid).first()
+    if not p:
+        raise HTTPException(404, "Tarea no encontrada")
+    db.delete(p)
+    db.commit()
+    return {"status": "ok"}
 
 
 @router.delete("/proyectos/{pid}")

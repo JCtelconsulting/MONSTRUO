@@ -1307,6 +1307,172 @@ window.sincronizarClientes = async function () {
   }
 };
 
+// --- PARAMETRIZACIONES (plantillas de tipos de trabajo) ---
+let paramTipoActivo = null;
+
+window.loadParametrizaciones = async function () {
+  const container = document.getElementById('param-tipos');
+  if (!container) return;
+  try {
+    const plantillas = await fetchApi('/api/admin/plantillas');
+    if (!Array.isArray(plantillas) || plantillas.length === 0) {
+      container.innerHTML = '<div class="empty-state">No hay tipos de trabajo.</div>';
+      return;
+    }
+    let html = '';
+    plantillas.forEach((p) => {
+      const activo = p.tipo === paramTipoActivo ? ' kpi-green' : '';
+      html += `
+        <button class="project-card param-tipo-btn${activo}" type="button"
+          style="text-align:left; cursor:pointer; border:1px solid ${
+            p.tipo === paramTipoActivo ? 'var(--neon)' : 'rgba(255,255,255,0.08)'
+          };"
+          onclick='window.verPlantillaTipo(${JSON.stringify(p.tipo)})'>
+            <div class="pc-header">
+                <h4>${escapeHtml(p.tipo)}</h4>
+            </div>
+            <div class="pc-meta">
+                <span>${Number(p.tareas) || 0} tareas</span>
+            </div>
+        </button>`;
+    });
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state error">Error: ${escapeHtml(e.message)}</div>`;
+    showToast(e.message, 'error');
+  }
+};
+
+window.verPlantillaTipo = async function (tipo) {
+  const container = document.getElementById('param-tareas');
+  if (!container) return;
+  paramTipoActivo = tipo;
+  // Refrescar el realce de los botones de tipo.
+  window.loadParametrizaciones();
+  try {
+    const data = await fetchApi('/api/admin/plantillas/' + encodeURIComponent(tipo));
+    const tareas = (data && data.tareas) || [];
+
+    let html = `
+      <div class="section-header">
+        <div>
+          <h3>${escapeHtml(data.tipo || tipo)}</h3>
+          <p>Tareas de la plantilla.</p>
+        </div>
+        <div class="header-tools">
+          <button class="btn-principal" onclick='window.agregarPlantillaTarea(${JSON.stringify(
+            tipo
+          )})'>+ Agregar tarea</button>
+        </div>
+      </div>`;
+
+    if (tareas.length === 0) {
+      html += '<div class="empty-state">Esta plantilla no tiene tareas.</div>';
+      container.innerHTML = html;
+      return;
+    }
+
+    // Agrupar visualmente por grupo / categoria.
+    const grupos = {};
+    tareas.forEach((t) => {
+      const g = t.grupo || '(sin grupo)';
+      const c = t.categoria || '(sin categoria)';
+      const key = g + ' || ' + c;
+      if (!grupos[key]) grupos[key] = { grupo: g, categoria: c, items: [] };
+      grupos[key].items.push(t);
+    });
+
+    Object.keys(grupos).forEach((key) => {
+      const blk = grupos[key];
+      html += `
+        <div class="param-grupo" style="margin-bottom:1rem;">
+          <h4 style="margin:0 0 0.5rem 0; color:var(--neon); font-size:0.95rem;">
+            ${escapeHtml(blk.grupo)} <span style="opacity:0.6;">/ ${escapeHtml(
+              blk.categoria
+            )}</span>
+          </h4>
+          <div class="projects-grid" style="grid-template-columns:1fr;">`;
+      blk.items.forEach((t) => {
+        html += `
+            <div class="project-card">
+                <div class="pc-header">
+                    <h4 style="font-size:0.9rem;">${escapeHtml(t.item || '')}</h4>
+                </div>
+                <div class="pc-actions">
+                    <button class="btn-sm" title="Editar"
+                      onclick='window.editarPlantillaTarea(${t.id}, ${JSON.stringify(
+                        t.grupo || ''
+                      )}, ${JSON.stringify(t.categoria || '')}, ${JSON.stringify(
+                        t.item || ''
+                      )}, ${JSON.stringify(tipo)})'><i class="fas fa-edit"></i></button>
+                    <button class="btn-sm btn-danger" title="Borrar"
+                      onclick='window.borrarPlantillaTarea(${t.id}, ${JSON.stringify(
+                        tipo
+                      )})'><i class="fas fa-trash"></i></button>
+                </div>
+            </div>`;
+      });
+      html += '</div></div>';
+    });
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state error">Error: ${escapeHtml(e.message)}</div>`;
+    showToast(e.message, 'error');
+  }
+};
+
+window.agregarPlantillaTarea = async function (tipo) {
+  const g = prompt('Grupo (ej: EDP, INFORME, INTERPOSTE):');
+  if (!g) return;
+  const c = prompt('Categoría (ej: INSTALACIONES):');
+  if (!c) return;
+  const it = prompt('Tarea (ej: 3.27. ANTENA):');
+  if (!it) return;
+  try {
+    await fetchApi('/api/admin/plantillas/' + encodeURIComponent(tipo), {
+      method: 'POST',
+      body: { grupo: g, categoria: c, item: it },
+    });
+    showToast('Tarea agregada', 'success');
+    await window.verPlantillaTipo(tipo);
+    await window.loadParametrizaciones();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+window.editarPlantillaTarea = async function (id, grupo, categoria, item, tipo) {
+  const g = prompt('Grupo:', grupo);
+  if (g === null) return;
+  const c = prompt('Categoría:', categoria);
+  if (c === null) return;
+  const it = prompt('Tarea:', item);
+  if (it === null) return;
+  try {
+    await fetchApi('/api/admin/plantillas-tarea/' + id, {
+      method: 'PATCH',
+      body: { grupo: g, categoria: c, item: it },
+    });
+    showToast('Tarea actualizada', 'success');
+    await window.verPlantillaTipo(tipo);
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+window.borrarPlantillaTarea = async function (id, tipo) {
+  if (!confirm('¿Borrar esta tarea de la plantilla? (no afecta proyectos ya creados)')) return;
+  try {
+    await fetchApi('/api/admin/plantillas-tarea/' + id, { method: 'DELETE' });
+    showToast('Tarea borrada', 'success');
+    await window.verPlantillaTipo(tipo);
+    await window.loadParametrizaciones();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
 window.showTab = function (tabId, btn) {
   document.querySelectorAll('.tab-link').forEach((t) => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
@@ -1350,6 +1516,9 @@ window.showSection = function (sectionId, btn) {
   }
   if (targetId === 'section-clientes') {
     window.loadClientes();
+  }
+  if (targetId === 'section-parametrizaciones') {
+    window.loadParametrizaciones();
   }
 
   target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1435,6 +1604,9 @@ function initPortalNav() {
       }
       if (current.id === 'section-clientes') {
         window.loadClientes();
+      }
+      if (current.id === 'section-parametrizaciones') {
+        window.loadParametrizaciones();
       }
     }
   };
