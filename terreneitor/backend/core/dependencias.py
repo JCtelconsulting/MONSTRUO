@@ -423,14 +423,47 @@ def _session_desde_gateway(request: Request, db: Session):
         user.role = rol_local
         db.commit()
         db.refresh(user)
+    rol_val = getattr(user.role, "value", user.role)
+    # Capacidad de crear planes desde Terreno: el flag explícito, o admin/supervisor (que ya planifican).
+    puede_crear_planes = bool(_module_roles.get("terreneitor_planes")) or str(rol_val).upper() in (
+        "ADMIN",
+        "SUPERVISOR",
+    )
     return {
         "logged": True,
         "email": user.email,
-        "role": getattr(user.role, "value", user.role),
+        "role": rol_val,
         "name": user.name,
         "user_id": user.id,
         "sso": "monstruo",
+        "puede_crear_planes": puede_crear_planes,
     }
+
+
+def puede_crear_planes_flag(db: Session, email: str) -> bool:
+    """True si el usuario tiene la capacidad 'terreneitor_planes' en auth.users.module_roles
+    (habilita crear planes desde Terreno). Se usa para validar el endpoint en el backend."""
+    try:
+        from sqlalchemy import text as _text
+
+        row = db.execute(
+            _text(
+                "SELECT COALESCE(module_roles::text, '{}') FROM auth.users "
+                "WHERE lower(username) = :u AND COALESCE(is_active::int, 0) = 1"
+            ),
+            {"u": (email or "").strip().lower()},
+        ).first()
+    except Exception:
+        return False
+    if not row:
+        return False
+    try:
+        import json as _json
+
+        mr = _json.loads(row[0] or "{}")
+        return bool(isinstance(mr, dict) and mr.get("terreneitor_planes"))
+    except Exception:
+        return False
 
 
 def get_session_data(

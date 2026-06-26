@@ -37,26 +37,38 @@ def _normalize_role_input(raw_role: Optional[str]) -> str:
 MODULE_ROLE_VALUES: Dict[str, Set[str]] = {
     "terreneitor": {"TERRENO", "SUPERVISOR", "GERENCIA", "ADMIN"},
 }
+# Capacidades booleanas extra (NO son roles): {clave -> módulo base que la habilita}.
+MODULE_CAPABILITIES: Dict[str, str] = {
+    "terreneitor_planes": "terreneitor",  # el técnico puede crear planes desde Terreno
+}
 
 
 def _normalize_module_roles(
-    raw: Optional[Dict[str, str]], allowed_modules: Optional[List[str]] = None
-) -> Dict[str, str]:
-    """Normaliza el rol por módulo: solo módulos con rol propio conocido, con un valor
-    válido, y únicamente si el usuario tiene ese módulo habilitado."""
-    out: Dict[str, str] = {}
+    raw: Optional[Dict[str, Any]], allowed_modules: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """Normaliza module_roles: roles por módulo (valor válido + módulo habilitado) y
+    capacidades booleanas (ej: terreneitor_planes). Descarta lo desconocido."""
+    out: Dict[str, Any] = {}
     if not isinstance(raw, dict):
         return out
     mods = {str(m or "").strip().lower() for m in (allowed_modules or [])}
-    for mod, rol in raw.items():
-        mod_k = str(mod or "").strip().lower()
-        rol_v = str(rol or "").strip().upper()
-        valid = MODULE_ROLE_VALUES.get(mod_k)
+    for key, val in raw.items():
+        k = str(key or "").strip().lower()
+        # Capacidad booleana (flag), no un rol.
+        base_mod = MODULE_CAPABILITIES.get(k)
+        if base_mod is not None:
+            on = val is True or str(val).strip().lower() in ("1", "true", "si", "sí", "yes")
+            if on and (allowed_modules is None or base_mod in mods):
+                out[k] = True
+            continue
+        # Rol por módulo.
+        rol_v = str(val or "").strip().upper()
+        valid = MODULE_ROLE_VALUES.get(k)
         if not valid or rol_v not in valid:
             continue
-        if allowed_modules is not None and mod_k not in mods:
+        if allowed_modules is not None and k not in mods:
             continue
-        out[mod_k] = rol_v
+        out[k] = rol_v
     return out
 
 
@@ -82,7 +94,7 @@ class UserCreate(BaseModel):
     secondary_roles: List[str] = Field(default_factory=list)
     allowed_modules: List[str] = Field(default_factory=list)
     fundacion_scope: Dict[str, Any] = Field(default_factory=dict)
-    module_roles: Dict[str, str] = Field(default_factory=dict)  # {"terreneitor": "SUPERVISOR"}
+    module_roles: Dict[str, Any] = Field(default_factory=dict)  # {"terreneitor": "SUPERVISOR", "terreneitor_planes": true}
     organizacion: Optional[str] = None  # 'monstruo' | 'fundacion'
 
 
@@ -93,7 +105,7 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
     allowed_modules: Optional[List[str]] = None
     fundacion_scope: Optional[Dict[str, Any]] = None
-    module_roles: Optional[Dict[str, str]] = None  # {"terreneitor": "SUPERVISOR"}
+    module_roles: Optional[Dict[str, Any]] = None  # {"terreneitor": "SUPERVISOR", "terreneitor_planes": true}
     organizacion: Optional[str] = None
 
 

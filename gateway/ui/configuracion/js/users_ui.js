@@ -5,6 +5,7 @@ const UsersUI = (() => {
     let _users = [];
     let _secondaryRolesDraft = [];
     let _terreneitorRoleDraft = ''; // rol elegido dentro de Terreneitor (module_roles.terreneitor)
+    let _terreneitorPlanesDraft = false; // ¿puede crear planes desde terreno? (module_roles.terreneitor_planes)
     let _tableActionsBound = false;
     let _roleScopes = new Map();
     let _roleScopeItems = [];
@@ -811,8 +812,9 @@ const UsersUI = (() => {
 
             // Combinar rol primario y secundarios en el draft
             _secondaryRolesDraft = normalizeRoleList(user.role, user.secondary_roles);
-            // Rol específico dentro de Terreneitor (si lo tiene)
+            // Rol específico dentro de Terreneitor (si lo tiene) + capacidad de crear planes
             _terreneitorRoleDraft = (user.module_roles && user.module_roles.terreneitor) || '';
+            _terreneitorPlanesDraft = !!(user.module_roles && user.module_roles.terreneitor_planes);
         } else {
             title.textContent = 'Nuevo Usuario';
             userInput.value = '';
@@ -823,6 +825,7 @@ const UsersUI = (() => {
             userModules = ['dashboard'];
             _secondaryRolesDraft = [];
             _terreneitorRoleDraft = '';
+            _terreneitorPlanesDraft = false;
         }
 
         // Renderizar Módulos
@@ -867,10 +870,30 @@ const UsersUI = (() => {
                 });
             }
 
+            // Capacidad extra de Terreneitor: ¿este técnico puede crear planes desde Terreno?
+            let planesWrap = null;
+            if (mod.id === 'terreneitor') {
+                planesWrap = document.createElement('label');
+                planesWrap.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:0.78rem;margin-left:8px;white-space:nowrap';
+                planesWrap.title = 'Habilita el botón "Crear un trabajo" en la pantalla de Terreno para este usuario.';
+                const planesChk = document.createElement('input');
+                planesChk.type = 'checkbox';
+                planesChk.id = 'terreneitorPlanesChk';
+                planesChk.checked = _terreneitorPlanesDraft === true;
+                planesChk.addEventListener('click', (e) => e.stopPropagation());
+                planesChk.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    _terreneitorPlanesDraft = planesChk.checked;
+                });
+                planesWrap.appendChild(planesChk);
+                planesWrap.appendChild(document.createTextNode('Crea planes'));
+            }
+
             const syncCheckedState = () => {
                 div.classList.toggle('is-checked', Boolean(input.checked));
                 mark.textContent = input.checked ? '✓' : '';
                 if (roleSelect) roleSelect.style.display = input.checked ? '' : 'none';
+                if (planesWrap) planesWrap.style.display = input.checked ? 'flex' : 'none';
             };
             syncCheckedState();
             input.addEventListener('change', syncCheckedState);
@@ -881,6 +904,7 @@ const UsersUI = (() => {
             div.addEventListener('click', (evt) => {
                 if (evt.target === label) return;
                 if (roleSelect && evt.target === roleSelect) return;
+                if (planesWrap && (evt.target === planesWrap || planesWrap.contains(evt.target))) return;
                 toggleModule();
             });
             label.addEventListener('click', (evt) => {
@@ -893,6 +917,7 @@ const UsersUI = (() => {
             div.appendChild(label);
             div.appendChild(mark);
             if (roleSelect) div.appendChild(roleSelect);
+            if (planesWrap) div.appendChild(planesWrap);
             container.appendChild(div);
         });
 
@@ -955,8 +980,9 @@ const UsersUI = (() => {
 
         // Rol por módulo (hoy solo Terreneitor): solo si el módulo está habilitado y se eligió rol.
         const moduleRoles = {};
-        if (allowedModules.includes('terreneitor') && _terreneitorRoleDraft) {
-            moduleRoles.terreneitor = _terreneitorRoleDraft;
+        if (allowedModules.includes('terreneitor')) {
+            if (_terreneitorRoleDraft) moduleRoles.terreneitor = _terreneitorRoleDraft;
+            if (_terreneitorPlanesDraft) moduleRoles.terreneitor_planes = true;
         }
 
         // Mapear roles: el primero es 'role', el resto son 'secondary_roles'

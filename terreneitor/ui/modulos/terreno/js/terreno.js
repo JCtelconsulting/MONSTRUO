@@ -531,8 +531,10 @@ window.Guia = {
     if (planesDisp)
       h += `<button class="guia-btn" data-act="tomar"><i class="fas fa-hand-pointer"></i> Tomar un trabajo <span class="guia-pill">${planesDisp}</span></button>`;
     if (!total && !planesDisp)
-      h += `<p class="guia-vacio">No tienes tareas asignadas. Toma o crea un trabajo.</p>`;
-    h += `<button class="guia-btn" data-act="crear"><i class="fas fa-plus"></i> Crear un trabajo</button>`;
+      h += `<p class="guia-vacio">No tienes tareas asignadas.${window.__meCrearPlanes ? ' Toma o crea un trabajo.' : ' Toma un trabajo.'}</p>`;
+    // Botón de crear plan SOLO para técnicos habilitados (capacidad terreneitor_planes) o admin/supervisor.
+    if (window.__meCrearPlanes)
+      h += `<button class="guia-btn" data-act="crear"><i class="fas fa-plus"></i> Crear un trabajo</button>`;
     h += `</div>`;
     this.cont.innerHTML = h;
     this._on('[data-act="mis"]', () => this.listaPlanes());
@@ -1362,9 +1364,12 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchApi('/auth/whoami')
     .then((u) => {
       window.__meRole = String(u?.role || '').toUpperCase();
+      window.__meCrearPlanes = u?.puede_crear_planes === true;
       if (u.logged && document.getElementById('who')) {
         document.getElementById('who').textContent = `${u.name} (${u.role})`;
       }
+      // El flag llega async; si ya estamos en el menú de inicio, re-render para reflejar el botón.
+      if (window.Guia && window.Guia.vista === 'inicio') window.Guia.inicio();
     })
     .catch(() => handleAuthExpired());
   if (typeof initLogout === 'function') {

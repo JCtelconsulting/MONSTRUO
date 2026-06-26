@@ -639,6 +639,11 @@ def terreno_crear_plan(
 ):
     """Crea un plan desde Terreno con la MISMA lógica que el supervisor (postes reales),
     auto-asignado al técnico. Reemplaza la lógica vieja de /terreno/crear-trabajo."""
+    rol = str(getattr(current_user.role, "value", current_user.role)).upper()
+    if rol not in ("ADMIN", "SUPERVISOR") and not dependencias.puede_crear_planes_flag(
+        db, current_user.email
+    ):
+        raise HTTPException(403, detail="No tenés permiso para crear planes desde Terreno.")
     item_ids = [int(i) for i in (payload.get("item_ids") or []) if i]
     if not item_ids:
         raise HTTPException(400, detail="Debes seleccionar al menos un poste/tarea.")
