@@ -200,9 +200,11 @@ export const SupervisorUI = {
         if (!c.items.length) return;
         const h = document.createElement('div');
         h.className = 'category-header collapsed';
-        h.innerHTML = `<span>${escapeHtml(g)} / ${escapeHtml(c.nombre)}</span> <small>(${
-          c.items.length
-        })</small>`;
+        const _label =
+          String(g).toUpperCase() === String(c.nombre).toUpperCase()
+            ? escapeHtml(c.nombre)
+            : `${escapeHtml(g)} / ${escapeHtml(c.nombre)}`;
+        h.innerHTML = `<span>${_label}</span> <small>(${c.items.length})</small>`;
         h.onclick = () => this.toggleAcordeon(h);
         il.appendChild(h);
 

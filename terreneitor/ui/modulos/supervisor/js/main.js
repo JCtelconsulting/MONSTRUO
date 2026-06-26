@@ -1,5 +1,5 @@
 import { SupervisorAPI } from './api.js';
-import { SupervisorUI } from './ui.js';
+import { SupervisorUI } from './ui.js?v=1.2.0';
 const ENVP = window.location.pathname.startsWith('/dev') ? '/dev' : '';
 
 const AppState = {
