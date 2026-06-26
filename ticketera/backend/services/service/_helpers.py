@@ -257,6 +257,9 @@ ROLE_SPECIALTY_FALLBACK = {
     "sistemas": "sistemas",
     "implementaciones": "ejecucion",
     "ops": "general",
+    # Bodega: seleccionable manualmente en los tickets (la UI lo muestra como "Bodega").
+    # No es rol técnico, así que NO entra en la auto-asignación por categoría.
+    "warehouse": "warehouse",
 }
 
 AUTO_REPLY_SLA_MINUTES = 30
