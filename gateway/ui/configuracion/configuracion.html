@@ -1100,6 +1100,8 @@
                     Ticketera</button>
                 <button class="tab-btn" data-target="pane-gta"><i class="fas fa-tasks"></i>
                     GTA</button>
+                <button class="tab-btn" data-target="pane-terreneitor"><i class="fas fa-hard-hat"></i>
+                    Terreneitor</button>
             </div>
 
             <!-- ========================================================= -->
@@ -1363,6 +1365,56 @@
                 </div>
             </div> <!-- END pane-gta -->
 
+            <!-- ========================================================= -->
+            <!-- PESTAÑA: TERRENEITOR                                      -->
+            <!-- ========================================================= -->
+            <div id="pane-terreneitor" class="view-section">
+                <div class="cfg-subtabs" role="tablist">
+                    <button class="cfg-subtab active" data-terreneitor-sub="proyectos" type="button"><i class="fas fa-diagram-project"></i> Proyectos</button>
+                    <button class="cfg-subtab" data-terreneitor-sub="clientes" type="button"><i class="fas fa-id-card-clip"></i> Clientes</button>
+                    <button class="cfg-subtab" data-terreneitor-sub="parametrizaciones" type="button"><i class="fas fa-sliders"></i> Parametrizaciones</button>
+                </div>
+
+                <!-- PROYECTOS -->
+                <div class="cfg-terreneitor-subpane" data-terreneitor-pane="proyectos">
+                    <div class="panel cfg-panel">
+                        <div class="cfg-panel-row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                            <div><h3 class="cfg-panel-title">Proyectos</h3><p class="cfg-panel-subtitle">Obras/proyectos de Terreneitor.</p></div>
+                            <div class="cfg-toolbar"><button class="btn-primary" id="terrBtnNuevoProyecto" type="button">+ Nuevo proyecto</button></div>
+                        </div>
+                        <div class="cfg-table-wrap">
+                            <table class="cfg-table"><thead><tr><th>Proyecto</th><th>Cliente</th><th>Zona</th><th>Estado</th><th class="ta-right">Acciones</th></tr></thead>
+                            <tbody id="terrProyectosBody"><tr><td colspan="5" class="cfg-table-empty">Cargando…</td></tr></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CLIENTES -->
+                <div class="cfg-terreneitor-subpane" data-terreneitor-pane="clientes" hidden>
+                    <div class="panel cfg-panel">
+                        <div class="cfg-panel-row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                            <div><h3 class="cfg-panel-title">Clientes</h3><p class="cfg-panel-subtitle">Catálogo de clientes para proyectos y planes.</p></div>
+                            <div class="cfg-toolbar"><button class="btn-primary" id="terrBtnSincClientes" type="button" style="margin-right:8px;">Sincronizar con proyectos</button><button class="btn-primary" id="terrBtnNuevoCliente" type="button">+ Nuevo cliente</button></div>
+                        </div>
+                        <div class="cfg-table-wrap">
+                            <table class="cfg-table"><thead><tr><th>Cliente</th><th class="ta-right">Acciones</th></tr></thead>
+                            <tbody id="terrClientesBody"><tr><td colspan="2" class="cfg-table-empty">Cargando…</td></tr></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PARAMETRIZACIONES -->
+                <div class="cfg-terreneitor-subpane" data-terreneitor-pane="parametrizaciones" hidden>
+                    <div class="panel cfg-panel">
+                        <div class="cfg-panel-row"><div><h3 class="cfg-panel-title">Parametrizaciones</h3><p class="cfg-panel-subtitle">Tareas que trae cada tipo de trabajo al crear un proyecto.</p></div></div>
+                        <div style="display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:18px;align-items:start;">
+                            <div id="terrParamTipos"><div class="cfg-table-empty">Cargando…</div></div>
+                            <div id="terrParamTareas"><div class="cfg-table-empty">Elegí un tipo de trabajo.</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- END pane-terreneitor -->
+
         </div>
     </main>
 
@@ -1572,6 +1624,7 @@
     <script src="js/users_ui.js?v=ASSET_VERSION"></script>
     <script src="js/gta_areas_ui.js?v=ASSET_VERSION"></script>
     <script src="js/gta_membresias_ui.js?v=ASSET_VERSION"></script>
+    <script src="js/terreneitor_ui.js?v=ASSET_VERSION"></script>
     <script>
         // ===================================================================
         // CFG TICKETERA
