@@ -1382,6 +1382,12 @@
                             <div><h3 class="cfg-panel-title">Proyectos</h3><p class="cfg-panel-subtitle">Obras/proyectos de Terreneitor.</p></div>
                             <div class="cfg-toolbar"><button class="btn-primary" id="terrBtnNuevoProyecto" type="button">+ Nuevo proyecto</button></div>
                         </div>
+                        <div class="cfg-toolbar" style="margin:8px 0 12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                            <input type="search" id="terrProyFiltro" class="cfg-input input-dark" placeholder="Buscar…" style="min-width:200px;">
+                            <select id="terrFiltroCliente" class="cfg-input input-dark" style="min-width:150px;"></select>
+                            <select id="terrFiltroZona" class="cfg-input input-dark" style="min-width:150px;"></select>
+                            <select id="terrFiltroEstado" class="cfg-input input-dark" style="min-width:150px;"></select>
+                        </div>
                         <div class="cfg-table-wrap">
                             <table class="cfg-table"><thead><tr><th>Proyecto</th><th>Cliente</th><th>Zona</th><th>Estado</th><th class="ta-right">Acciones</th></tr></thead>
                             <tbody id="terrProyectosBody"><tr><td colspan="5" class="cfg-table-empty">Cargando…</td></tr></tbody></table>
@@ -1616,6 +1622,42 @@
                     <button type="button" class="btn-primary" id="btnSaveRolePerms">Guardar cambios</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ===== Modales Terreneitor (genéricos) ===== -->
+    <div id="terrModal" class="cfg-modal-overlay" aria-hidden="true">
+        <div class="cfg-modal-card" style="width:min(560px,100%)">
+            <div class="cfg-modal-header"><h3 id="terrModalTitle">Editar</h3>
+                <button type="button" class="cfg-modal-close" id="terrModalClose">&times;</button></div>
+            <form id="terrModalForm" autocomplete="off">
+                <div id="terrModalBody"></div>
+                <div class="cfg-modal-actions">
+                    <button type="button" class="btn-secondary" id="terrModalCancel">Cancelar</button>
+                    <button type="submit" class="btn-primary" id="terrModalSave">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="terrConfirm" class="cfg-modal-overlay" aria-hidden="true">
+        <div class="cfg-modal-card" style="width:min(440px,100%)">
+            <div class="cfg-modal-header"><h3 id="terrConfirmTitle">Confirmar</h3>
+                <button type="button" class="cfg-modal-close" id="terrConfirmClose">&times;</button></div>
+            <p id="terrConfirmMsg" style="margin:6px 0 18px;"></p>
+            <div class="cfg-modal-actions">
+                <button type="button" class="btn-secondary" id="terrConfirmNo">Cancelar</button>
+                <button type="button" class="btn-primary" id="terrConfirmYes">Sí, continuar</button>
+            </div>
+        </div>
+    </div>
+    <div id="terrEstructuraModal" class="cfg-modal-overlay" aria-hidden="true">
+        <div class="cfg-modal-card" style="width:min(820px,100%)">
+            <div class="cfg-modal-header"><h3 id="terrEstructuraTitle">Estructura del proyecto</h3>
+                <button type="button" class="cfg-modal-close" id="terrEstructuraClose">&times;</button></div>
+            <p class="cfg-panel-subtitle" style="margin-top:0;">Editás SOLO este proyecto. No afecta la parametrización original.</p>
+            <div style="margin-bottom:12px;"><button type="button" class="btn-primary" id="terrEstrAddCat">+ Agregar categoría/tarea</button></div>
+            <div id="terrEstructuraBody"><div class="cfg-table-empty">Cargando…</div></div>
+            <div class="cfg-modal-actions"><button type="button" class="btn-secondary" id="terrEstructuraCerrar">Cerrar</button></div>
         </div>
     </div>
 
