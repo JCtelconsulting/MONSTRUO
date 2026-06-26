@@ -480,6 +480,52 @@ def crear_cliente(
     return {"id": c.id, "nombre": c.nombre, "creado": True}
 
 
+@router.patch("/clientes/{cliente_id}")
+def editar_cliente(cliente_id: int, payload: dict, db: Session = Depends(dependencias.get_db)):
+    """Renombra un cliente del catálogo."""
+    c = db.query(modelos.Cliente).filter(modelos.Cliente.id == cliente_id).first()
+    if not c:
+        raise HTTPException(404, "Cliente no encontrado")
+    nombre = " ".join((payload.get("nombre") or "").split()).strip()
+    if not nombre:
+        raise HTTPException(400, "Nombre requerido")
+    c.nombre = nombre
+    db.commit()
+    return {"id": c.id, "nombre": c.nombre}
+
+
+@router.delete("/clientes/{cliente_id}")
+def borrar_cliente(cliente_id: int, db: Session = Depends(dependencias.get_db)):
+    """Elimina un cliente del catálogo (no toca proyectos ni planes ya creados)."""
+    c = db.query(modelos.Cliente).filter(modelos.Cliente.id == cliente_id).first()
+    if not c:
+        raise HTTPException(404, "Cliente no encontrado")
+    db.delete(c)
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/clientes/sincronizar")
+def sincronizar_clientes(db: Session = Depends(dependencias.get_db)):
+    """Carga al catálogo los clientes que ya usan los proyectos (SONDA, RICOH, etc.),
+    sin duplicar (case-insensitive). Devuelve cuántos se agregaron."""
+    reales = [
+        r[0]
+        for r in db.query(modelos.Proyecto.cliente).distinct().all()
+        if r[0] and str(r[0]).strip()
+    ]
+    existentes = {c.nombre.strip().lower() for c in db.query(modelos.Cliente).all()}
+    agregados = 0
+    for nom in reales:
+        nom = " ".join(str(nom).split()).strip()
+        if nom and nom.lower() not in existentes:
+            db.add(modelos.Cliente(nombre=nom))
+            existentes.add(nom.lower())
+            agregados += 1
+    db.commit()
+    return {"status": "ok", "agregados": agregados}
+
+
 @router.get("/planes-trabajo/siguiente-numero")
 def siguiente_numero(cliente: str, db: Session = Depends(dependencias.get_db)):
     """Próximo número correlativo para ese cliente (evita numeración a mano)."""

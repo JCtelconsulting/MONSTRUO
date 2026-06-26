@@ -38,30 +38,13 @@
         </button>
       </div>
       <nav class="side-nav">
-        <button
-          class="side-link active"
-          type="button"
-          data-section="section-general"
-          id="nav-general"
-        >
-          <i class="fas fa-home"></i> <span>Accesos</span>
-        </button>
-        <button
-          class="side-link"
-          type="button"
-          data-section="section-admin"
-          data-admin="true"
-          id="nav-admin"
-        >
-          <i class="fas fa-toolbox"></i> <span>Administracion</span>
-        </button>
-        <button class="side-link" type="button" data-section="section-users" data-admin="true">
-          <i class="fas fa-users"></i> <span>Usuarios</span>
-        </button>
         <button class="side-link" type="button" data-section="section-projects" data-admin="true">
           <i class="fas fa-diagram-project"></i> <span>Proyectos</span>
         </button>
-        <a
+        <button class="side-link" type="button" data-section="section-clientes" data-admin="true">
+          <i class="fas fa-id-card-clip"></i> <span>Clientes</span>
+        </button>
+        <
           class="side-link"
           href="https://login.telconsulting.cl/dashboard"
           onclick="this.href='https://login.telconsulting.cl'+(location.pathname.startsWith('/dev')?'/dev':'')+'/dashboard'"
@@ -90,116 +73,7 @@
 
     <main>
       <div class="main-inner">
-        <section class="section-block" id="section-general">
-          <div id="portal-links" class="gate">
-            <a href="../terreno/" class="card card-terreno">
-              <i class="fas fa-hard-hat"></i>
-              <h2>Terreno</h2>
-              <p>Ejecución y Captura</p>
-            </a>
-            <a href="../supervisor/" class="card card-supervisor">
-              <i class="fas fa-user-astronaut"></i>
-              <h2>Supervisión</h2>
-              <p>Planificación y Control</p>
-            </a>
-            <a href="../gerencia/" class="card card-gerencia">
-              <i class="fas fa-chart-line"></i>
-              <h2>Gerencia</h2>
-              <p>Indicadores</p>
-            </a>
-          </div>
-        </section>
-
-        <section class="section-block admin-section" id="section-admin" hidden>
-          <div class="section-header">
-            <div>
-              <h3>Panel administrador</h3>
-              <p>Monitoreo de recursos y estado del sistema.</p>
-            </div>
-          </div>
-          <!-- System Stats Widget -->
-          <div class="system-stats-grid">
-            <div class="stat-card">
-              <div class="stat-icon cpu"><i class="fas fa-microchip"></i></div>
-              <div class="stat-info">
-                <h4>CPU Load</h4>
-                <div class="progress-bar">
-                  <div id="stat-cpu-bar" style="width: 0%"></div>
-                </div>
-                <span id="stat-cpu-val">0%</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon ram"><i class="fas fa-memory"></i></div>
-              <div class="stat-info">
-                <h4>Memoria RAM</h4>
-                <div class="progress-bar">
-                  <div id="stat-ram-bar" style="width: 0%"></div>
-                </div>
-                <span id="stat-ram-val">0 / 0 GB</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon disk"><i class="fas fa-hdd"></i></div>
-              <div class="stat-info">
-                <h4>Almacenamiento</h4>
-                <div class="progress-bar">
-                  <div id="stat-disk-bar" style="width: 0%"></div>
-                </div>
-                <span id="stat-disk-val">0 / 0 GB</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon uptime"><i class="fas fa-clock"></i></div>
-              <div class="stat-info">
-                <h4>Uptime</h4>
-                <span id="stat-uptime-val" class="stat-big-text">--</span>
-                <small>Servicio Activo</small>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div id="stat-drive-icon" class="stat-icon drive"><i class="fas fa-cloud"></i></div>
-              <div class="stat-info">
-                <h4>Conexion Drive</h4>
-                <span id="stat-drive-val" class="stat-big-text">--</span>
-                <small id="stat-drive-detail">Verificando...</small>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div id="stat-temp-icon" class="stat-icon temp">
-                <i class="fas fa-temperature-high"></i>
-              </div>
-              <div class="stat-info">
-                <h4>Temperatura Servidor</h4>
-                <span id="stat-temp-val" class="stat-big-text">--</span>
-                <small id="stat-temp-detail">Sin lectura</small>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="section-block admin-section" id="section-users" hidden>
-          <div class="section-header">
-            <div>
-              <h3>Usuarios</h3>
-              <p>Gestion de accesos, roles y claves.</p>
-            </div>
-            <div class="header-tools">
-              <button
-                class="btn-principal"
-                onclick="document.getElementById('modal-create-user').style.display='flex'"
-              >
-                + Nuevo Usuario
-              </button>
-            </div>
-          </div>
-          <div class="projects-grid" id="users-list">
-            <!-- JS Rendered Cards -->
-            <div class="empty-state">Cargando usuarios...</div>
-          </div>
-        </section>
-
-        <section class="section-block admin-section" id="section-projects" hidden>
+        <section class="section-block admin-section" id="section-projects">
           <div class="section-header">
             <div>
               <h3>Proyectos</h3>
@@ -226,6 +100,28 @@
           <div class="projects-grid" id="projects-list">
             <!-- JS rendered -->
             <div class="empty-state">Cargando proyectos...</div>
+          </div>
+        </section>
+
+        <section class="section-block admin-section" id="section-clientes" hidden>
+          <div class="section-header">
+            <div>
+              <h3>Clientes</h3>
+              <p>Gestion de clientes para proyectos y planes.</p>
+            </div>
+            <div class="header-tools">
+              <button class="btn-principal" onclick="window.sincronizarClientes()">
+                <i class="fas fa-sync"></i> Sincronizar con proyectos
+              </button>
+              <button class="btn-principal" onclick="window.crearClientePrompt()">
+                + Nuevo Cliente
+              </button>
+            </div>
+          </div>
+
+          <div class="projects-grid" id="clientes-list">
+            <!-- JS rendered -->
+            <div class="empty-state">Cargando clientes...</div>
           </div>
         </section>
       </div>
@@ -496,6 +392,6 @@
 
     <script src="../_compartido/js/utilidades.js?v=413"></script>
     <script src="../_compartido/js/guarda_rol.js?v=600"></script>
-    <script src="js/portal.js?v=610"></script>
+    <script src="js/portal.js?v=611"></script>
   </body>
 </html>

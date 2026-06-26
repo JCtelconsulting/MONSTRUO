@@ -311,7 +311,8 @@ async function fetchApi(url, options = {}) {
 
 // --- FUNCIONES GLOBALES ---
 window.loadAdminStats = async function (force = false) {
-  if (document.getElementById('section-admin').hidden) {
+  const _adminSec = document.getElementById('section-admin');
+  if (!_adminSec || _adminSec.hidden) {
     clearAdminStatsTimer();
     return;
   }
@@ -1223,6 +1224,89 @@ window.createUser = async function (e) {
   }
 };
 
+// --- CLIENTES ---
+window.loadClientes = async function () {
+  const container = document.getElementById('clientes-list');
+  if (!container) return;
+  try {
+    const clientes = await fetchApi('/api/clientes');
+    if (!Array.isArray(clientes) || clientes.length === 0) {
+      container.innerHTML = '<div class="empty-state">No hay clientes registrados.</div>';
+      return;
+    }
+    let html = '';
+    clientes.forEach((c) => {
+      html += `
+        <div class="project-card">
+            <div class="pc-header">
+                <h4>${escapeHtml(c.nombre)}</h4>
+            </div>
+            <div class="pc-meta">
+                <span style="opacity:0.6; font-size:0.8em;">ID: ${c.id}</span>
+            </div>
+            <div class="pc-actions">
+                <button class="btn-sm" title="Editar" onclick='window.editarCliente(${c.id}, ${JSON.stringify(
+                  c.nombre
+                )})'><i class="fas fa-edit"></i></button>
+                <button class="btn-sm btn-danger" title="Borrar" onclick='window.borrarCliente(${c.id}, ${JSON.stringify(
+                  c.nombre
+                )})'><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state error">Error: ${escapeHtml(e.message)}</div>`;
+    showToast(e.message, 'error');
+  }
+};
+
+window.crearClientePrompt = async function () {
+  const n = prompt('Nombre del cliente:');
+  if (!n || !n.trim()) return;
+  try {
+    await fetchApi('/api/clientes', { method: 'POST', body: { nombre: n.trim() } });
+    showToast('Cliente creado', 'success');
+    await window.loadClientes();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+window.editarCliente = async function (id, nombre) {
+  const n = prompt('Nuevo nombre:', nombre);
+  if (!n || !n.trim()) return;
+  try {
+    await fetchApi('/api/clientes/' + id, { method: 'PATCH', body: { nombre: n.trim() } });
+    showToast('Cliente actualizado', 'success');
+    await window.loadClientes();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+window.borrarCliente = async function (id, nombre) {
+  if (!confirm('¿Borrar el cliente ' + nombre + '? (no afecta proyectos ni planes ya creados)'))
+    return;
+  try {
+    await fetchApi('/api/clientes/' + id, { method: 'DELETE' });
+    showToast('Cliente borrado', 'success');
+    await window.loadClientes();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+window.sincronizarClientes = async function () {
+  try {
+    const r = await fetchApi('/api/clientes/sincronizar', { method: 'POST' });
+    showToast('Sincronizado: ' + (r.agregados || 0) + ' clientes nuevos', 'success');
+    await window.loadClientes();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
 window.showTab = function (tabId, btn) {
   document.querySelectorAll('.tab-link').forEach((t) => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
@@ -1261,14 +1345,11 @@ window.showSection = function (sectionId, btn) {
   if (activeBtn) activeBtn.classList.add('active');
   portalActiveSection = targetId;
 
-  if (targetId === 'section-users') {
-    window.loadUsers();
-  }
   if (targetId === 'section-projects') {
     window.loadProjects();
   }
-  if (targetId === 'section-admin') {
-    window.loadAdminStats(true);
+  if (targetId === 'section-clientes') {
+    window.loadClientes();
   }
 
   target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1349,16 +1430,11 @@ function initPortalNav() {
       lastScrollSection = current.id;
       portalActiveSection = current.id;
       setActive(current.id);
-      if (current.id === 'section-users') {
-        window.loadUsers();
-      }
       if (current.id === 'section-projects') {
         window.loadProjects();
       }
-      if (current.id === 'section-admin') {
-        window.loadAdminStats(true);
-      } else {
-        clearAdminStatsTimer();
+      if (current.id === 'section-clientes') {
+        window.loadClientes();
       }
     }
   };
@@ -1428,11 +1504,10 @@ document.addEventListener('DOMContentLoaded', () => {
         initPortalNav();
 
         if (window.isAdmin) {
-          // Cargar los datos de todas las secciones (estan todas visibles).
-          window.loadAdminStats(true);
+          // Proyectos es la seccion por defecto; Clientes carga al pie.
+          window.loadProjects(true);
           setTimeout(() => {
-            window.loadUsers();
-            window.loadProjects();
+            window.loadClientes();
           }, 350);
         }
       } else {
