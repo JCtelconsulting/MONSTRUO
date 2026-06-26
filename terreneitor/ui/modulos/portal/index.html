@@ -374,6 +374,14 @@
             <small style="color: var(--text-muted)">Edición avanzada de carpetas y fotos</small>
           </div>
           <button
+            class="btn-sm"
+            style="margin-left: auto; margin-right: 0.5rem"
+            onclick="window.agregarInterposte()"
+            title="Suma las tareas del Interposte (Previo, Excavación, Hormigón, Conexiones, Aplomado, Terminaciones) a este proyecto."
+          >
+            <i class="fas fa-plus"></i> Agregar Interposte
+          </button>
+          <button
             class="modal-close-btn"
             onclick="document.getElementById('modal-structure-editor').style.display='none'"
           >
@@ -488,6 +496,6 @@
 
     <script src="../_compartido/js/utilidades.js?v=413"></script>
     <script src="../_compartido/js/guarda_rol.js?v=600"></script>
-    <script src="js/portal.js?v=604"></script>
+    <script src="js/portal.js?v=610"></script>
   </body>
 </html>

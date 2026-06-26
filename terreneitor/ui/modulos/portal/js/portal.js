@@ -763,6 +763,28 @@ window.openStructureEditor = async function (projectId) {
   await window.refreshStructure();
 };
 
+window.agregarInterposte = async function () {
+  const pid = window.currentProjectId;
+  if (!pid) return;
+  if (
+    !confirm(
+      '¿Agregar la parametrización Interposte (Previo, Excavación, Hormigón, Conexiones, Aplomado, Terminaciones) a este proyecto?'
+    )
+  )
+    return;
+  try {
+    const r = await fetchApi(`/api/admin/proyectos/${pid}/agregar-interposte`, { method: 'POST' });
+    const n = (r && r.items_agregados) || 0;
+    const msg = n > 0 ? `Interposte agregado (${n} tareas) ✓` : 'El Interposte ya estaba en este proyecto';
+    if (window.showToast) window.showToast(msg, 'success');
+    else alert(msg);
+    await window.refreshStructure();
+  } catch (e) {
+    if (window.showToast) window.showToast('No se pudo agregar Interposte: ' + e.message, 'error');
+    else alert('No se pudo agregar Interposte: ' + e.message);
+  }
+};
+
 window.refreshStructure = async function () {
   const pid = window.currentProjectId;
   if (!pid) return;

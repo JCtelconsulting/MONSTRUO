@@ -606,6 +606,20 @@ def crear_nuevo_proyecto(
     return {"status": "ok", "id": project.id}
 
 
+@router.post("/proyectos/{pid}/agregar-interposte")
+def admin_agregar_interposte(pid: int, db: Session = Depends(dependencias.get_db)):
+    """Agrega la parametrización Interposte (sus fases/tareas) a un PMC existente, para que
+    el Interposte quede como un grupo de tareas elegible al planificar ese proyecto."""
+    project = db.query(modelos.Proyecto).filter(modelos.Proyecto.id == pid).first()
+    if not project:
+        raise HTTPException(404, detail="Proyecto no encontrado")
+    try:
+        n = gestion_proyectos.agregar_template_a_proyecto(db, project, "INTERPOSTE")
+    except RuntimeError as e:
+        raise HTTPException(500, detail=str(e)) from e
+    return {"status": "ok", "items_agregados": n}
+
+
 @router.delete("/proyectos/{pid}")
 def admin_delete_proyecto(
     pid: int, db: Session = Depends(dependencias.get_db)

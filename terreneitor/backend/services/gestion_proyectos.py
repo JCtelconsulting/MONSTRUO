@@ -146,6 +146,46 @@ def populate_project_from_template(db: Session, project: modelos.Proyecto, tipo:
         db.add(modelos.Item(nombre=item_name, ruta_item=item_path, categoria_id=cat.id))
 
 
+def agregar_template_a_proyecto(db: Session, project: modelos.Proyecto, tipo: str) -> int:
+    """Agrega las categorías/tareas de un template a un proyecto YA EXISTENTE, sin duplicar.
+    Sirve para sumar una parametrización (ej: Interposte) a un PMC ya creado, de modo que
+    esas tareas queden disponibles al planificar. Devuelve cuántas tareas (items) se agregaron."""
+    template = STRUCTURE_TEMPLATES.get(tipo)
+    if not template:
+        raise RuntimeError(f"Template no disponible para tipo {tipo}")
+    existentes = {
+        (c.nombre or "").upper(): c
+        for c in db.query(modelos.Categoria)
+        .filter(modelos.Categoria.proyecto_id == project.id)
+        .all()
+    }
+    agregados = 0
+    for entry in template:
+        parts = [p.strip() for p in entry.split("/") if p.strip()]
+        if len(parts) < 3:
+            continue
+        group_dir, category_dir, item_dir = parts[0], parts[1], parts[2]
+        cat_name = category_dir.upper()
+        item_name = item_dir.upper()
+        cat = existentes.get(cat_name)
+        if not cat:
+            cat = modelos.Categoria(nombre=cat_name, proyecto_id=project.id)
+            db.add(cat)
+            db.flush()
+            existentes[cat_name] = cat
+        ya = (
+            db.query(modelos.Item)
+            .filter(modelos.Item.categoria_id == cat.id, modelos.Item.nombre == item_name)
+            .first()
+        )
+        if not ya:
+            item_path = os.path.join(project.ruta_base or "", group_dir, category_dir, item_dir)
+            db.add(modelos.Item(nombre=item_name, ruta_item=item_path, categoria_id=cat.id))
+            agregados += 1
+    db.commit()
+    return agregados
+
+
 def create_project_and_structure(
     db: Session, cliente: str, zona: str, tipo: str, nombre: str
 ):
