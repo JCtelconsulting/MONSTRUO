@@ -2782,6 +2782,12 @@ return {
     };
 })();
 
+// Exponer TksMain en window: los wrappers globales (window.tksGerenciaDecision,
+// window.tksOpenDetail, etc.) chequean `window.TksMain`, pero TksMain es un `const`
+// de módulo y NO crea propiedad en window -> el chequeo daba undefined y el botón
+// Aprobar/Rechazar de gerencia no hacía nada. Con esto, los wrappers funcionan.
+window.TksMain = TksMain;
+
 async function loadCustomer360(customerId, ticketId) {
     const container = document.querySelector('.tks-customer-360-container');
     const loading = document.getElementById('tks-c360-loading');
