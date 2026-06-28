@@ -624,7 +624,13 @@ def list_tickets(
             params.append(severidad.lower())
 
         if customer_id:
-            where_clauses.append("LOWER(COALESCE(customer_id, '')) = ?")
+            # Match por id O por nombre: los clientes de reglas no traen id de Laudus, así que
+            # el ticket tiene cliente_nombre pero customer_id vacío. El selector pasa el nombre
+            # como valor en esos casos, por eso comparamos contra ambos campos.
+            where_clauses.append(
+                "(LOWER(COALESCE(customer_id, '')) = ? OR LOWER(COALESCE(cliente_nombre, '')) = ?)"
+            )
+            params.append(customer_id.strip().lower())
             params.append(customer_id.strip().lower())
 
         if created_after:

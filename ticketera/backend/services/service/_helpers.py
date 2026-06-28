@@ -1321,15 +1321,15 @@ def get_clientes_resumen() -> Dict[str, Any]:
         rows = conn.execute(
             """
             SELECT
-                COALESCE(NULLIF(TRIM(customer_id), ''), '') AS customer_id,
-                COALESCE(MAX(cliente_nombre), 'Sin Cliente / Directo') AS customer_name,
+                COALESCE(NULLIF(TRIM(customer_id), ''), NULLIF(TRIM(cliente_nombre), ''), '') AS cliente_key,
+                COALESCE(MAX(NULLIF(TRIM(cliente_nombre), '')), 'Sin Cliente / Directo') AS customer_name,
                 COUNT(*) FILTER (WHERE estado NOT IN ('cerrado', 'resuelto')) AS activos,
                 COUNT(*) FILTER (WHERE created_at::timestamptz >= ?::timestamptz) AS este_mes,
                 COUNT(*) FILTER (WHERE estado IN ('cerrado', 'resuelto')) AS cerrados,
                 COUNT(*) AS total
             FROM tickets
             WHERE COALESCE(is_trashed, FALSE) = FALSE
-            GROUP BY COALESCE(NULLIF(TRIM(customer_id), ''), '')
+            GROUP BY COALESCE(NULLIF(TRIM(customer_id), ''), NULLIF(TRIM(cliente_nombre), ''), '')
             ORDER BY activos DESC, cerrados DESC, customer_name ASC
             """,
             (month_start,),
@@ -1338,7 +1338,7 @@ def get_clientes_resumen() -> Dict[str, Any]:
         for r in rows:
             d = dict(r)
             clientes.append({
-                "customer_id": str(d.get("customer_id") or "").strip(),
+                "customer_id": str(d.get("cliente_key") or "").strip(),
                 "customer_name": str(d.get("customer_name") or "").strip() or "Sin Cliente / Directo",
                 "activos": int(d.get("activos") or 0),
                 "este_mes": int(d.get("este_mes") or 0),
