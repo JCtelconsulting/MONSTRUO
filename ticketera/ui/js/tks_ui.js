@@ -5758,7 +5758,7 @@ return `
         </div>`;
     }
 
-    function renderArchivosView() {
+    function renderArchivosView(isAdmin = false) {
         return `
         <div class="tks-settings-shell">
             <section class="tks-settings-panel">
@@ -5776,6 +5776,7 @@ return `
                             <option value="">Todos los clientes</option>
                         </select>
                     </div>
+                    ${isAdmin ? `
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Área</label>
                         <select class="tks-select" id="tks-arch-filter-cat" style="min-width:140px" onchange="window.loadArchivados()">
@@ -5790,6 +5791,7 @@ return `
                             <option value="implementaciones">Implementaciones</option>
                         </select>
                     </div>
+                    ` : ''}
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
                         <input type="date" class="tks-input" id="tks-arch-filter-desde" style="min-width:140px" onchange="window.loadArchivados()">
@@ -5808,6 +5810,7 @@ return `
                 </div>
             </section>
 
+            ${isAdmin ? `
             <section class="tks-settings-panel">
                 <div class="tks-settings-head">
                     <div>
@@ -5841,6 +5844,7 @@ return `
                 </div>
                 <div id="tks-atendidos-resultado" style="margin-top:1rem"></div>
             </section>
+            ` : ''}
         </div>
         `;
     }

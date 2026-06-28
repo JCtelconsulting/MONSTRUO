@@ -1178,6 +1178,14 @@
     flex-direction: column;
 }
 
+/* En Archivados el layout envuelve cuadros (settings-panel) que ya tienen su propio marco;
+   sin esto, el fondo+borde del layout se ve como un "cuadro por detrás" uniendo los cuadros. */
+.tks-list-layout--flush {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
 .tks-list-panel {
     width: 100%;
     height: auto;

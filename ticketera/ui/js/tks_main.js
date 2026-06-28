@@ -976,30 +976,22 @@ return {
         if (!container) return;
         resetDraftState();
         if (sessionCtx.isScopedTech) {
-            filters.asignado_a = sessionCtx.user || null;
-            filters.q = '';
-            filters.status = null;
+            // El backend ya acota al técnico (su área + sus asignados). No forzamos
+            // estado ni búsqueda: el técnico filtra por estado y busca como el admin.
+            // Solo se omite el filtro de ÁREA (su área es fija).
             filters.categoria = null;
             filters.severidad = null;
         }
-        const showListFilters = !sessionCtx.isScopedTech;
-        const toolbarHtml = showListFilters
-            ? `
+        const showListFilters = !sessionCtx.isScopedTech;  // controla SOLO los filtros de área
+        const toolbarHtml = `
                 <div class="tks-toolbar">
                     <input class="tks-search" id="tks-search-input" placeholder="🔍 Buscar tickets por título, código o cliente..." value="${filters.q}">
                     <button class="tks-btn tks-btn-ghost tks-btn-icon" onclick="TksMain.refreshList()" title="Recargar"><i class="fas fa-sync-alt"></i></button>
                 </div>
-            `
-            : `
-                <div class="tks-toolbar">
-                    <div class="tks-toolbar-note">
-                        Mostrando los tickets de tu área y los asignados a ti
-                    </div>
-                    <button class="tks-btn tks-btn-ghost tks-btn-icon" onclick="TksMain.refreshList()" title="Recargar"><i class="fas fa-sync-alt"></i></button>
-                </div>
             `;
-        const statusFiltersHtml = showListFilters
-            ? `
+        // Los filtros de ESTADO (Todos/Abiertos/En Progreso/Resueltos/Papelera) los ve todo el
+        // mundo, incluido el técnico. Los filtros de ÁREA solo el admin (el área del técnico es fija).
+        const statusFiltersHtml = `
                 <div class="tks-filter-row tks-filter-row--status" id="tks-filters">
                     <button class="tks-filter-chip ${!filters.status ? 'active' : ''}" data-filter-status="">Todos</button>
                     <button class="tks-filter-chip ${filters.status === 'abierto' ? 'active' : ''}" data-filter-status="abierto">Abiertos</button>
@@ -1007,8 +999,7 @@ return {
                     <button class="tks-filter-chip ${filters.status === 'resuelto' ? 'active' : ''}" data-filter-status="resuelto">Resueltos</button>
                     <button class="tks-filter-chip ${filters.status === 'papelera' ? 'active' : ''}" data-filter-status="papelera">Papelera</button>
                 </div>
-            `
-            : '';
+            `;
         const categoryFiltersHtml = showListFilters
             ? `
                 <div class="tks-filter-row" id="tks-cat-filters">
@@ -2242,15 +2233,18 @@ return { ticket, permissions };
         // detalle de un archivado ACÁ MISMO, sin saltar a la pestaña Lista (reusa openDetail/
         // closeDetail: openDetail oculta la tabla y muestra el detalle; "volver" la restaura).
         container.innerHTML = `
-            <div class="tks-list-layout">
+            <div class="tks-list-layout tks-list-layout--flush">
                 <div class="tks-list-panel" id="tks-list-panel">
-                    ${TksUI.renderArchivosView()}
+                    ${TksUI.renderArchivosView(sessionCtx.isAdmin)}
                 </div>
                 <div class="tks-full-detail-view" id="tks-detail-panel"></div>
             </div>`;
         // Poblar select de clientes y luego cargar tickets
         window.cargarClientesSelect('tks-arch-filter-cliente').then(() => window.loadArchivados());
-        window.cargarClientesSelect('tks-atendidos-cliente').then(() => window.generarReporteAtendidos());
+        // El panel de reportes solo existe para gestión (admin/encargado de mesa); el técnico no lo ve.
+        if (sessionCtx.isAdmin) {
+            window.cargarClientesSelect('tks-atendidos-cliente').then(() => window.generarReporteAtendidos());
+        }
     }
 
     // ---- OPS ----
