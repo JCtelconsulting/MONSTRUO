@@ -273,6 +273,28 @@ async def list_solicitudes(
         conn.close()
 
 
+def _gta_area_de_rol(role: str) -> str:
+    """LEAK-02: mapeo rol->área (mismo criterio que el LIST /solicitudes)."""
+    area_map = {
+        "redes": "redes", "sistemas": "sistemas", "finance": "finanzas",
+        "warehouse": "bodega", "ops": "sistemas",
+    }
+    return area_map.get((role or "").lower(), "")
+
+
+def _gta_puede_ver_solicitud(user: dict, row) -> bool:
+    """LEAK-02 (auditoría 2026-06-28): aislamiento por área en la lectura por-id,
+    igual que el LIST. admin/gerencia ven todo; el resto solo lo propio o lo de su
+    área. Cierra la fuga horizontal entre áreas con permiso gta:read."""
+    role = (user.get("role") or "").lower()
+    if role in ("admin", "gerencia"):
+        return True
+    user_area = _gta_area_de_rol(role)
+    return (row["creado_por"] == user.get("username")) or bool(
+        user_area and row["area"] == user_area
+    )
+
+
 @router.get("/solicitudes/{sid}")
 async def get_solicitud(sid: int, user: dict = Depends(deps.require_permission("gta:read"))):
     conn = db.get_conn()
@@ -285,6 +307,9 @@ async def get_solicitud(sid: int, user: dict = Depends(deps.require_permission("
             [sid],
         ).fetchone()
         if not row:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        # LEAK-02: no revelar existencia entre áreas -> 404 si está fuera de scope
+        if not _gta_puede_ver_solicitud(user, row):
             raise HTTPException(status_code=404, detail="Solicitud no encontrada")
         return dict(row)
     finally:
