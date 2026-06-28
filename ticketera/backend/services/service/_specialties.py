@@ -22,6 +22,7 @@ from plataforma.core import email as email_sender, jobs_engine, google_chat
 from plataforma.core.config import settings as app_settings
 from ticketera.backend.services import roles as ticket_roles
 from ticketera.backend.services import workflow as ticket_workflow
+from plataforma.core import organigrama
 from ._helpers import *  # noqa: F401,F403
 
 logger = logging.getLogger(__name__)
@@ -38,54 +39,31 @@ def _resolve_role_specialties(role_value: Any, secondary_roles_value: Any) -> Li
     return out
 
 
-# Mapeo de especialidad (área del usuario) -> categoría de ticket. Las especialidades
-# que no aparecen aquí (p.ej. 'general' de ops) no acotan por categoría: ese usuario
-# verá solo los tickets asignados a él.
-SPECIALTY_TO_CATEGORIA = {
-    "redes": "redes",
-    "sistemas": "sistemas",
-    "ejecucion": "ejecucion",
-    "warehouse": "bodega",
-}
-
-# Categorías de ticket válidas: un rol que ya es una categoría (p.ej. 'gerencia')
-# acota directamente a esa categoría.
-_CATEGORIAS_TICKET = {"redes", "sistemas", "ejecucion", "bodega", "gerencia"}
-
-# Roles no técnicos que igualmente se acotan por área (gerencia ve solo su área).
-_ROLES_ACOTADOS_EXTRA = {"gerencia"}
-
-
 def categorias_visibles_para_roles(roles: Any) -> Optional[List[str]]:
     """Categorías (áreas) que un usuario puede ver en Lista/Archivados.
 
-    - None  => ve TODO (admin / encargado de mesa).
-    - lista => acotado a esas categorías (además de los tickets asignados a él).
-    - []    => sin área mapeable: verá solo los tickets asignados a él.
+    - None  => ve TODO (admin / encargado de mesa, o rol sin área conocida).
+    - lista => acotado a esas áreas (además de los tickets asignados a él).
+    - []    => solo área 'general'/sin-área (p.ej. ops): verá solo sus asignados.
 
-    Liga la visibilidad al ÁREA, no a la persona: si cambia el personal de un
-    área, la vista sigue funcionando sin reconfigurar nada.
+    Liga la visibilidad al ÁREA canónica (plataforma.core.organigrama), no a la persona:
+    si cambia el personal de un área, la vista sigue funcionando sin reconfigurar nada.
     """
     normalized = _normalize_roles(roles)
     # Gestión global (admin / encargado de mesa) ve todo.
     if any(r in ticket_roles.ROLES_ADMIN_GESTION for r in normalized):
         return None
-    # Solo se acota por área a roles técnicos o de gerencia. Cualquier otro rol
-    # (desconocido / lectura) conserva el comportamiento previo: ve todo.
-    acota = any(
-        (r in ROLES_TECNICOS_SET) or (r in _ROLES_ACOTADOS_EXTRA)
-        for r in normalized
-    )
-    if not acota:
+    # Área canónica de cada rol (descarta los que no mapean a ninguna).
+    areas = [a for a in (organigrama.rol_a_area(r) for r in normalized) if a]
+    if not areas:
+        # Ningún rol mapea a un área conocida (rol desconocido / lectura): ve todo.
         return None
+    # Acota a las áreas concretas. 'general' (sin área) no acota a un área específica:
+    # si el usuario solo tiene esa, la lista queda vacía => verá solo sus asignados.
     cats: List[str] = []
-    for role in normalized:
-        spec = ROLE_SPECIALTY_FALLBACK.get(role)
-        cat = SPECIALTY_TO_CATEGORIA.get(spec) if spec else None
-        if not cat and role in _CATEGORIAS_TICKET:
-            cat = role
-        if cat and cat not in cats:
-            cats.append(cat)
+    for a in areas:
+        if a != organigrama.SIN_AREA and a not in cats:
+            cats.append(a)
     return cats
 
 def _active_ticket_load_map(conn) -> Dict[str, int]:

@@ -22,7 +22,28 @@ const TksMain = (() => {
     let notifAbortController = null;
     const DEFAULT_LIST_LIMIT = 50;
     const CACHE_TTL_MS = 15000;
-    const DEFAULT_TICKETERA_CATEGORIES = Object.freeze(['bodega', 'ejecucion', 'general', 'gerencia', 'redes', 'sistemas']);
+    // Espejo del catálogo canónico de áreas (plataforma/core/organigrama.py). DEBE coincidir.
+    // El backend manda las áreas DISPONIBLES (con usuarios) vía /areas; esto da etiqueta/emoji
+    // y permite clasificar un rol de área como técnico con scope.
+    const AREA_META = Object.freeze({
+        comercial:      { label: 'Comercial',      emoji: '🤝' },
+        preventa:       { label: 'Preventa',       emoji: '📋' },
+        sistemas:       { label: 'Sistemas',       emoji: '💻' },
+        redes:          { label: 'Redes',          emoji: '🌐' },
+        bodega:         { label: 'Bodega',         emoji: '📦' },
+        proveedores:    { label: 'Proveedores',    emoji: '🚚' },
+        finanzas:       { label: 'Finanzas',       emoji: '💰' },
+        capital_humano: { label: 'Capital Humano', emoji: '👥' },
+        gerencia:       { label: 'Gerencia',       emoji: '👔' },
+    });
+    const AREA_SIN_ASIGNAR = 'general';
+    const AREA_SIN_ASIGNAR_LABEL = 'Sin área asignada';
+    // Fallback si el backend no responde /areas (degradado: catálogo completo + sin-área).
+    const DEFAULT_TICKETERA_CATEGORIES = Object.freeze([...Object.keys(AREA_META), AREA_SIN_ASIGNAR]);
+    // Áreas para ASIGNAR (con usuarios) y para FILTRAR (con usuarios o con tickets). Cargadas
+    // del backend en init; el fallback degradado es el catálogo completo.
+    let availableAreas = [...DEFAULT_TICKETERA_CATEGORIES];
+    let availableAreasFiltro = [...DEFAULT_TICKETERA_CATEGORIES];
     const cache = {
         dashboard: null,
         assignment: null,
@@ -33,7 +54,9 @@ const TksMain = (() => {
     };
     const ROLE_ADMIN = 'admin';
     const ROLE_MESA_MANAGER = 'encargado_mesa';
-    const ROLE_TECH = new Set(['ops', 'redes', 'sistemas', 'implementaciones', 'gerencia', ROLE_MESA_MANAGER]);
+    // Un usuario de cualquier área del catálogo es "técnico" de su área (opera sus tickets,
+    // ve su área con scope). + roles legacy (ops/implementaciones) y el encargado de mesa.
+    const ROLE_TECH = new Set([...Object.keys(AREA_META), 'ops', 'implementaciones', ROLE_MESA_MANAGER]);
     const ROLE_GERENCIA = 'gerencia';
     const ROLE_MANAGEMENT = new Set([ROLE_ADMIN, ROLE_MESA_MANAGER]);
     const ROLE_DISPATCH = new Set(['ops', ROLE_MESA_MANAGER]);
@@ -95,6 +118,32 @@ const TksMain = (() => {
 
     function errorHtml(err) {
         return TksUI.escapeHtml(errorMessage(err));
+    }
+
+    // Etiqueta de un área desde el catálogo espejo (AREA_META). 'general' => Sin área asignada.
+    function categoryLabel(cat) {
+        const key = String(cat || '').trim().toLowerCase();
+        if (!key || key === AREA_SIN_ASIGNAR) return AREA_SIN_ASIGNAR_LABEL;
+        return (AREA_META[key] && AREA_META[key].label) || key;
+    }
+    // Etiqueta con emoji para chips/filtros.
+    function categoryChipLabel(cat) {
+        const key = String(cat || '').trim().toLowerCase();
+        if (key === AREA_SIN_ASIGNAR) return '📭 ' + AREA_SIN_ASIGNAR_LABEL;
+        const meta = AREA_META[key];
+        return meta ? `${meta.emoji} ${meta.label}` : categoryLabel(key);
+    }
+    // Carga las áreas disponibles (con usuarios) del backend. Las usan los selectores y filtros.
+    async function loadAvailableAreas() {
+        try {
+            const data = await fetchApi('/api/tks/areas');
+            if (data && Array.isArray(data.categories) && data.categories.length) {
+                availableAreas = data.categories;
+            }
+            if (data && Array.isArray(data.categories_filtro) && data.categories_filtro.length) {
+                availableAreasFiltro = data.categories_filtro;
+            }
+        } catch (e) { /* fallback: DEFAULT_TICKETERA_CATEGORIES */ }
     }
 
     function normalizeMessageSettingsData(rawData) {
@@ -815,6 +864,7 @@ return {
         isInitialized = true;
 
         await loadSessionContext();
+        await loadAvailableAreas();
         bindTabs();
         applyRoleView();
         const initialTab = 'dashboard';
@@ -1004,12 +1054,7 @@ return {
             ? `
                 <div class="tks-filter-row" id="tks-cat-filters">
                     <button class="tks-filter-chip ${!filters.categoria ? 'active' : ''}" data-filter-cat="">Todas las áreas</button>
-                    <button class="tks-filter-chip ${filters.categoria === 'redes' ? 'active' : ''}" data-filter-cat="redes">🌐 Redes</button>
-                    <button class="tks-filter-chip ${filters.categoria === 'sistemas' ? 'active' : ''}" data-filter-cat="sistemas">💻 Sistemas</button>
-                    <button class="tks-filter-chip ${filters.categoria === 'ejecucion' ? 'active' : ''}" data-filter-cat="ejecucion">🔧 Ejecución</button>
-                    <button class="tks-filter-chip ${filters.categoria === 'bodega' ? 'active' : ''}" data-filter-cat="bodega">📦 Bodega</button>
-                    <button class="tks-filter-chip ${filters.categoria === 'gerencia' ? 'active' : ''}" data-filter-cat="gerencia">👔 Gerencia</button>
-                    <button class="tks-filter-chip ${filters.categoria === 'general' ? 'active' : ''}" data-filter-cat="general">📭 Sin área asignada</button>
+                    ${availableAreasFiltro.map(cat => `<button class="tks-filter-chip ${filters.categoria === cat ? 'active' : ''}" data-filter-cat="${cat}">${categoryChipLabel(cat)}</button>`).join('')}
                 </div>
             `
             : '';
@@ -2498,6 +2543,15 @@ return {
             if (window.showToast) window.showToast('Tu rol es de solo lectura para creación de tickets', 'warning');
             return;
         }
+        // Poblar el selector de área con las áreas DISPONIBLES (con usuarios) + Sin área.
+        const sel = el('tks-new-cat');
+        if (sel) {
+            const opts = [`<option value="">${AREA_SIN_ASIGNAR_LABEL}</option>`];
+            availableAreas.filter(a => a !== AREA_SIN_ASIGNAR).forEach(a => {
+                opts.push(`<option value="${a}">${categoryChipLabel(a)}</option>`);
+            });
+            sel.innerHTML = opts.join('');
+        }
         const modal = el('tks-create-modal');
         if (modal) modal.classList.add('open');
     }
@@ -2799,6 +2853,9 @@ return {
         closeAssociateModal,
         searchClients,
         selectClient,
+        getAvailableAreas: () => [...availableAreas],
+        getAvailableAreasFiltro: () => [...availableAreasFiltro],
+        categoryLabel,
     };
 })();
 

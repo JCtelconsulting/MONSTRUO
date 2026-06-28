@@ -374,6 +374,24 @@ async def delete_ticketera_routing_rule(
     return {"ok": True, "deleted": True, "rule_id": int(rule_id)}
 
 
+@router.get("/areas", response_model=dict)
+async def get_ticketera_areas(
+    sess: dict = Depends(deps.require_permission("tickets:read")),
+):
+    """Áreas DISPONIBLES (con usuarios) + etiquetas del catálogo canónico. Cualquier usuario
+    con acceso a tickets lo consume para poblar selectores y filtros sin hardcodear áreas."""
+    from plataforma.core import organigrama
+    labels = dict(organigrama.AREAS)
+    labels[organigrama.SIN_AREA] = organigrama.SIN_AREA_LABEL
+    return {
+        # 'categories' = áreas para ASIGNAR (con usuarios). 'categories_filtro' = para FILTRAR
+        # (con usuarios o con tickets), así un ticket en un área sin gente sigue siendo filtrable.
+        "categories": tickets_service.categorias_disponibles(),
+        "categories_filtro": tickets_service.categorias_para_filtro(),
+        "labels": labels,
+    }
+
+
 # ==========================================================================
 # ENDPOINTS DE TICKETS
 # ==========================================================================

@@ -214,17 +214,24 @@ const TksUI = (() => {
     return { class: 'tks-sla-ok', label: `${Math.round(diffH)}h restantes` };
     }
 
+    // Etiquetas de áreas = catálogo canónico (plataforma/core/organigrama.py). 'ejecucion' se
+    // mantiene solo para mostrar tickets viejos (área legacy). Las áreas que se OFRECEN salen
+    // del backend (/areas, solo las que tienen usuarios); esto es para mostrar etiquetas.
     const CATEGORY_LABELS = Object.freeze({
-        redes: 'Redes',
+        comercial: 'Comercial',
+        preventa: 'Preventa',
         sistemas: 'Sistemas',
-        ejecucion: 'Ejecución',
+        redes: 'Redes',
         bodega: 'Bodega',
+        proveedores: 'Proveedores',
+        finanzas: 'Finanzas',
+        capital_humano: 'Capital Humano',
         gerencia: 'Gerencia',
         general: 'Sin área asignada',
+        ejecucion: 'Ejecución',
     });
-    // Fuente ÚNICA de áreas del frontend: las claves de CATEGORY_LABELS, en este orden.
-    // Debe coincidir con CATEGORIAS_ASIGNABLES del backend (verificado en tests/deploy).
-    const AREAS_ASIGNABLES_KEYS = Object.keys(CATEGORY_LABELS);
+    // Fallback si el backend no entregó las áreas disponibles.
+    const AREAS_ASIGNABLES_KEYS = Object.keys(CATEGORY_LABELS).filter(c => c !== 'ejecucion');
 
     const ROLE_CAPABILITY_LABELS = Object.freeze({
         admin: 'Admin',
@@ -5269,7 +5276,12 @@ return `
         const categoriaActual = String(t.categoria || 'general').trim().toLowerCase();
         const ticketTieneAsignado = String(t.asignado_a || '').trim() !== '';
         const ticketArchivado = ['cerrado', 'resuelto'].includes(String(t.estado || '').trim().toLowerCase());
-        const AREAS_ASIGNABLES = AREAS_ASIGNABLES_KEYS;
+        // Áreas ofrecidas para mover = las DISPONIBLES (con usuarios) del backend. Si el ticket
+        // ya está en un área no disponible (legacy), se agrega al inicio para no perderla.
+        const _disponibles = (window.TksMain && TksMain.getAvailableAreas && TksMain.getAvailableAreas()) || AREAS_ASIGNABLES_KEYS;
+        const AREAS_ASIGNABLES = (!categoriaActual || _disponibles.includes(categoriaActual))
+            ? _disponibles
+            : [categoriaActual, ..._disponibles];
         // Editable si no está asignado, O si está archivado (cerrado/resuelto): ahí se puede
         // reclasificar para dejar ordenado el histórico, aunque tenga a alguien asignado.
         const categoriaControlHtml = (canAssignTicket && (!ticketTieneAsignado || ticketArchivado))
@@ -5277,7 +5289,7 @@ return `
                 <div class="tks-assignee-control in-customer">
                     <label class="tks-status-editor-label">Área</label>
                     <select class="tks-select" id="tks-categoria-select" onchange="TksMain.applyCategoriaChange(${t.id})">
-                        ${AREAS_ASIGNABLES.map(c => `<option value="${c}"${c === categoriaActual ? ' selected' : ''}>${catLabel(c)}</option>`).join('')}
+                        ${AREAS_ASIGNABLES.map(c => `<option value="${escapeHtml(c)}"${c === categoriaActual ? ' selected' : ''}>${catLabel(c)}</option>`).join('')}
                     </select>
                     <div class="tks-status-editor-hint">Cambia el área y el ticket se mueve de inmediato.</div>
                 </div>
@@ -5682,7 +5694,7 @@ return `
     function renderMessageTemplates(data, options = {}) {
         const categories = Array.isArray(data?.categories) && data.categories.length
             ? data.categories
-            : ['redes', 'sistemas', 'ejecucion', 'bodega', 'gerencia', 'general'];
+            : ((window.TksMain && TksMain.getAvailableAreas && TksMain.getAvailableAreas()) || AREAS_ASIGNABLES_KEYS);
         const mailTemplates = Array.isArray(data?.mailTemplates) ? data.mailTemplates : [];
         const routingRules = Array.isArray(data?.routingRules) ? data.routingRules : [];
         const editingRule = options?.editingRule || null;
@@ -5793,12 +5805,7 @@ return `
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Área</label>
                         <select class="tks-select" id="tks-arch-filter-cat" style="min-width:140px" onchange="window.loadArchivados()">
                             <option value="">Todas</option>
-                            <option value="redes">Redes</option>
-                            <option value="sistemas">Sistemas</option>
-                            <option value="ejecucion">Ejecución</option>
-                            <option value="bodega">Bodega</option>
-                            <option value="gerencia">Gerencia</option>
-                            <option value="general">Sin área asignada</option>
+                            ${((window.TksMain && TksMain.getAvailableAreasFiltro && TksMain.getAvailableAreasFiltro()) || AREAS_ASIGNABLES_KEYS).map(c => `<option value="${escapeHtml(c)}">${catLabel(c)}</option>`).join('')}
                         </select>
                     </div>
                     ` : ''}
@@ -5927,12 +5934,8 @@ return `
                         <div class="tks-form-group">
                             <label>Área</label>
                             <select class="tks-select" id="tks-new-cat">
+                                <!-- Poblado por TksMain.openCreateModal() con las áreas disponibles. -->
                                 <option value="">Sin área asignada</option>
-                                <option value="redes">🌐 Redes</option>
-                                <option value="sistemas">💻 Sistemas</option>
-                                <option value="ejecucion">🔧 Ejecución</option>
-                                <option value="bodega">📦 Bodega</option>
-                                <option value="gerencia">👔 Gerencia</option>
                             </select>
                         </div>
                     </div>

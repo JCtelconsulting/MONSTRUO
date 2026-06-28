@@ -25,6 +25,7 @@ from plataforma.core import email as email_sender, jobs_engine, google_chat
 from plataforma.core.config import settings as app_settings
 from ticketera.backend.services import roles as ticket_roles
 from ticketera.backend.services import workflow as ticket_workflow
+from plataforma.core import organigrama
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,8 @@ __all__ = [
     "_tokenize_email_values",
     "_ttr_due_iso",
     "_upsert_system_setting",
+    "categorias_disponibles",
+    "categorias_para_filtro",
     "delete_ticketera_routing_rule",
     "estado_from_subestado",
     "get_monthly_report_data",
@@ -238,10 +241,12 @@ __all__ = [
 # ==========================================================================
 # CONSTANTES
 # ==========================================================================
-CATEGORIAS_VALIDAS = {"redes", "sistemas", "ejecucion", "admin", "general", "bodega", "gerencia"}
-# Áreas SELECCIONABLES en la UI (sin 'admin', que no es un área operativa; 'general' = Sin área
-# asignada). CATEGORIAS_VALIDAS se mantiene amplio solo para VALIDAR datos ya existentes.
-CATEGORIAS_ASIGNABLES = ["redes", "sistemas", "ejecucion", "bodega", "gerencia", "general"]
+# Áreas asignables = catálogo CANÓNICO de la empresa (plataforma.core.organigrama) + 'general'
+# (Sin área asignada). Una sola fuente de verdad compartida por todos los módulos.
+CATEGORIAS_ASIGNABLES = organigrama.slugs_areas() + [organigrama.SIN_AREA]
+# CATEGORIAS_VALIDAS se mantiene amplio (incluye legacy: admin/ejecucion/pmo) solo para VALIDAR
+# datos ya existentes; NO es lo que se ofrece en la UI.
+CATEGORIAS_VALIDAS = set(CATEGORIAS_ASIGNABLES) | {"admin", "ejecucion", "pmo"}
 ESTADOS_VALIDOS = {"abierto", "en_progreso", "resuelto", "cerrado"}
 MAIN_STATUS_SEQUENCE = ("abierto", "en_progreso", "resuelto", "cerrado")
 SEVERIDADES_VALIDAS = {"baja", "media", "alta", "critica"}
@@ -255,15 +260,14 @@ TIPOS_TICKET_VALIDOS = ticket_workflow.TIPOS_TICKET_VALIDOS
 SUBESTADOS_VALIDOS = ticket_workflow.SUBESTADOS_VALIDOS
 SUBESTADOS_ESPERA = ticket_workflow.SUBESTADOS_ESPERA
 SUBESTADOS_LEGACY_MAP = ticket_workflow.SUBESTADOS_LEGACY_MAP
-ROLE_SPECIALTY_FALLBACK = {
-    "redes": "redes",
-    "sistemas": "sistemas",
-    "implementaciones": "ejecucion",
-    "ops": "general",
-    # Bodega: seleccionable manualmente en los tickets (la UI lo muestra como "Bodega").
-    # No es rol técnico, así que NO entra en la auto-asignación por categoría.
-    "warehouse": "warehouse",
-}
+# rol/especialidad -> área canónica. Cada área del organigrama mapea a sí misma; el resto
+# son alias legacy. Fuente: plataforma.core.organigrama.
+ROLE_SPECIALTY_FALLBACK = {area: area for area in organigrama.slugs_areas()}
+ROLE_SPECIALTY_FALLBACK.update({
+    "warehouse": "bodega",
+    "ops": organigrama.SIN_AREA,
+    "implementaciones": organigrama.SIN_AREA,
+})
 
 AUTO_REPLY_SLA_MINUTES = 30
 ASSIGNMENT_SLA_MINUTES = 60
@@ -1613,12 +1617,86 @@ def delete_ticketera_routing_rule(rule_id: int) -> bool:
     finally:
         conn.close()
 
+def _areas_con_usuarios(conn) -> set:
+    """Áreas (del organigrama) que tienen al menos un usuario activo de la ticketera.
+
+    Recorre el rol y los roles secundarios de cada usuario con acceso a tks y los traduce
+    a su área canónica. Así el catálogo es completo, pero solo 'existen' las áreas con gente.
+    """
+    rows = conn.execute(
+        "SELECT role, secondary_roles FROM users WHERE COALESCE(is_active, 1) = 1 "
+        "AND COALESCE(allowed_modules, '') LIKE ?",
+        ('%"tks"%',),
+    ).fetchall()
+    areas: set = set()
+    for row in rows:
+        roles_usuario = list(_normalize_roles([row.get("role")]))
+        try:
+            roles_usuario += list(_normalize_roles(json.loads(row.get("secondary_roles") or "[]")))
+        except Exception:
+            pass
+        for r in roles_usuario:
+            area = organigrama.rol_a_area(r)
+            if area:
+                areas.add(area)
+    return areas
+
+
+def categorias_disponibles() -> List[str]:
+    """Áreas que la ticketera MUESTRA: las del catálogo que tienen >=1 usuario, en el orden
+    canónico, + 'general' (Sin área) al final, siempre disponible. Un área sin usuarios NO
+    aparece, para que ningún ticket quede perdido en un área que nadie atiende."""
+    conn = db.get_conn()
+    try:
+        con_users = _areas_con_usuarios(conn)
+    finally:
+        conn.close()
+    out = [a for a in organigrama.slugs_areas() if a in con_users]
+    out.append(organigrama.SIN_AREA)
+    return out
+
+
+def _areas_con_tickets(conn) -> set:
+    """Áreas presentes en tickets no eliminados. Para que un ticket en un área SIN usuarios
+    siga siendo filtrable/reclasificable (no quede perdido)."""
+    rows = conn.execute(
+        "SELECT DISTINCT LOWER(categoria) AS categoria FROM tickets "
+        "WHERE COALESCE(is_trashed, FALSE) = FALSE AND COALESCE(categoria, '') <> ''"
+    ).fetchall()
+    out: set = set()
+    for row in rows:
+        c = str(row.get("categoria") or "").strip().lower()
+        if c:
+            out.add(c)
+    return out
+
+
+def categorias_para_filtro() -> List[str]:
+    """Áreas para FILTRAR en Lista/Archivados: las del catálogo con usuarios O con tickets, en
+    orden canónico; + cualquier categoría legacy presente en tickets (p.ej. 'ejecucion'); +
+    'general' al final. Más amplio que categorias_disponibles (que es solo para ASIGNAR)."""
+    conn = db.get_conn()
+    try:
+        presentes = _areas_con_usuarios(conn) | _areas_con_tickets(conn)
+        con_tickets = _areas_con_tickets(conn)
+    finally:
+        conn.close()
+    out = [a for a in organigrama.slugs_areas() if a in presentes]
+    for c in sorted(con_tickets):  # legacy con tickets pero fuera del catálogo
+        if c not in organigrama.AREAS and c != organigrama.SIN_AREA and c not in out:
+            out.append(c)
+    out.append(organigrama.SIN_AREA)
+    return out
+
+
 def get_ticketera_admin_config() -> Dict[str, Any]:
     return {
         "templates": get_ticketera_templates(),
         "mail_templates": list_ticketera_mail_templates(),
         "routing_rules": list_ticketera_routing_rules(),
-        "categories": list(CATEGORIAS_ASIGNABLES),
+        # Solo las áreas con usuarios (+ general). El catálogo completo está en CATEGORIAS_ASIGNABLES.
+        "categories": categorias_disponibles(),
+        "categories_catalogo": list(CATEGORIAS_ASIGNABLES),
     }
 
 def _resolve_routing_category_for_email(conn, origen_email: Optional[str]) -> Optional[str]:
