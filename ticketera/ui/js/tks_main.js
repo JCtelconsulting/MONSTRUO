@@ -278,7 +278,7 @@ return {
             ops: 'Mesa',
             encargado_mesa: 'Encargado Mesa',
             redes: 'Redes',
-            sistemas: 'Plataformas',
+            sistemas: 'Sistemas',
             implementaciones: 'Implementaciones',
             ejecucion: 'Ejecución',
             general: 'General',

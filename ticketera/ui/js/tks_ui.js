@@ -218,10 +218,13 @@ const TksUI = (() => {
         redes: 'Redes',
         sistemas: 'Sistemas',
         ejecucion: 'Ejecución',
-        general: 'Sin área asignada',
         bodega: 'Bodega',
         gerencia: 'Gerencia',
+        general: 'Sin área asignada',
     });
+    // Fuente ÚNICA de áreas del frontend: las claves de CATEGORY_LABELS, en este orden.
+    // Debe coincidir con CATEGORIAS_ASIGNABLES del backend (verificado en tests/deploy).
+    const AREAS_ASIGNABLES_KEYS = Object.keys(CATEGORY_LABELS);
 
     const ROLE_CAPABILITY_LABELS = Object.freeze({
         admin: 'Admin',
@@ -5266,7 +5269,7 @@ return `
         const categoriaActual = String(t.categoria || 'general').trim().toLowerCase();
         const ticketTieneAsignado = String(t.asignado_a || '').trim() !== '';
         const ticketArchivado = ['cerrado', 'resuelto'].includes(String(t.estado || '').trim().toLowerCase());
-        const AREAS_ASIGNABLES = ['redes', 'sistemas', 'ejecucion', 'bodega', 'gerencia', 'general'];
+        const AREAS_ASIGNABLES = AREAS_ASIGNABLES_KEYS;
         // Editable si no está asignado, O si está archivado (cerrado/resuelto): ahí se puede
         // reclasificar para dejar ordenado el histórico, aunque tenga a alguien asignado.
         const categoriaControlHtml = (canAssignTicket && (!ticketTieneAsignado || ticketArchivado))
