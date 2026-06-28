@@ -19,13 +19,12 @@ Este README es el punto de entrada: en 5 minutos te sitúas.
 | GTA | vía gateway · /gta | 9012 | [gta/ESTADO.md](gta/ESTADO.md) |
 | Configuración | config.telconsulting.cl/dev | 9001 | — |
 | ERP · CRM · Bodega | compose único | 9009 · 9008 · 9007 | activos (ERP=Laudus/SII, Bodega=kardex, CRM) |
-| PMO · IA · Zabbix | compose único | 9010 · 9011 · 9013 | placeholders en construcción |
 
 ## Cómo se levanta
 
 ```bash
 # Compose ÚNICO: todos los módulos en un solo stack
-# (db + gateway + ticketera + fundacion + terreneitor + gta + erp/crm/bodega/pmo/ia/zabbix)
+# (db + gateway + ticketera + fundacion + terreneitor + gta + erp/crm/bodega)
 docker compose --env-file plataforma/ops/env/.env.server.dev up -d --build
 
 # Rebuild de containers puntuales (maneja ASSET_VERSION para cache-busting):

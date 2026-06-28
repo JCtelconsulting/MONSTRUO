@@ -27,9 +27,9 @@ Desde 2026-06-12 todo el ecosistema (Monstruo + Terreneitor) usa la identidad
 - Estados funcionales tipo semáforo se mantienen (hecho=dorado/ok, error=rojo,
   aviso=naranjo/amarillo, neutro=gris). No inventar colores nuevos.
 
-## Fuente oficial de UX: patrones PMO + ERP
+## Fuente oficial de UX: patrones ERP
 
-PMO y ERP son la referencia canónica de UX para Monstruo. No se aceptan
+ERP es la referencia canónica de UX para Monstruo. No se aceptan
 variantes visuales paralelas.
 
 | Pieza | Patrón |
@@ -212,7 +212,7 @@ estilos nativos del navegador (toasts oscuros, skeletons, badges de estado).
 ### Reglas no negociables
 
 1. **NO** poner líneas en blanco ni comentarios entre `</div class="...module-shell-header">` y `<div class="tab-bar">`. El selector que aplica el espaciado correcto es `.module-tabs-header + .tab-bar` (combinador adyacente). Si los separas con un comentario HTML como `<!-- TABS -->` el combinador SIGUE funcionando porque los comentarios HTML no rompen la adyacencia, pero **un nodo elemento intermedio sí la rompe**. Mantener los comentarios solo encima del bloque, nunca como hermano elemento.
-2. **NO** agregar la clase `module-shell-content-fill` a menos que el módulo necesite que el contenido ocupe altura completa con flex column (drawer fullscreen, kanban). Ticketera, GTA, ERP y PMO usan **solo** `module-shell-content`.
+2. **NO** agregar la clase `module-shell-content-fill` a menos que el módulo necesite que el contenido ocupe altura completa con flex column (drawer fullscreen, kanban). Ticketera, GTA y ERP usan **solo** `module-shell-content`.
 3. **NO** poner `style="flex:1; overflow:auto; display:flex; flex-direction:column"` inline en `#tab-content`. Esos estilos no van — el contenedor se rige por el flujo natural.
 4. **NO** redefinir `.tab-bar` ni `.tab-btn` en el CSS del módulo. Si necesitas variantes específicas, crea una clase scope (`.tks-tab-bar`, `.gta-tab-bar`) y SOLO modifica color de acento o iconografía.
 
@@ -328,7 +328,7 @@ Grid de formulario:
 
 ## 8. MODALES / DIÁLOGOS
 
-Usar `.modal-backdrop` + `.modal-content` del CSS global. Para modales más simples, usar `<dialog>` nativo con el estilo del bloque PMO/ERP:
+Usar `.modal-backdrop` + `.modal-content` del CSS global. Para modales más simples, usar `<dialog>` nativo con el estilo del bloque ERP:
 
 ```html
 <div class="modal-backdrop" id="modal-xxx" style="display:none;">
@@ -478,10 +478,7 @@ MODULO/
 | **bodega** | 9007 | `backend/` | `ui/` | WMS — inventario, catálogo, stock |
 | **crm** | 9008 | `backend/` | `ui/` | Clientes, interacciones, cuenta corriente |
 | **erp** | 9009 | `backend/` | `ui/` | Facturación, cobranza, integración Laudus |
-| **pmo** | 9010 | `backend/` | `ui/` | Pendiente de desarrollo |
-| **ia** | 9011 | `backend/` | `ui/` | Pendiente de desarrollo |
 | **gta** | 9012 | `backend/` | `ui/` | Gestión de tareas automatizada |
-| **zabbix** | 9013 | `backend/` | `ui/` | Proxy monitoreo infraestructura |
 
 ---
 
@@ -541,10 +538,7 @@ Tocar **5 lugares** en este orden:
 | 9007 | bodega | `BODEGA_PORT` |
 | 9008 | crm | `CRM_PORT` |
 | 9009 | erp | `ERP_PORT` |
-| 9010 | pmo | `PMO_PORT` |
-| 9011 | ia | `IA_PORT` |
 | 9012 | gta | `GTA_PORT` |
-| 9013 | zabbix | `ZABBIX_PORT` |
 
 ---
 

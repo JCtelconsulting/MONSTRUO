@@ -271,10 +271,7 @@ SERVICES_MAP = {
     "bodega":    f"http://bodega:{os.getenv('BODEGA_PORT', '9007')}",
     "crm":       f"http://crm:{os.getenv('CRM_PORT', '9008')}",
     "erp":       f"http://erp:{os.getenv('ERP_PORT', '9009')}",
-    "pmo":       f"http://pmo:{os.getenv('PMO_PORT', '9010')}",
-    "ia":        f"http://ia:{os.getenv('IA_PORT', '9011')}",
     "gta":       f"http://gta:{os.getenv('GTA_PORT', '9012')}",
-    "zabbix":    f"http://zabbix:{os.getenv('ZABBIX_PORT', '9013')}",
     "terreneitor": f"http://terreneitor:{os.getenv('TERRENEITOR_PORT', '8005')}",
 }
 
@@ -284,9 +281,6 @@ SERVICE_API_PREFIX = {
     "erp": None,
     "bodega": None,
     "crm": None,
-    "pmo": "pmo",
-    "ia": "ultron",
-    "zabbix": "zabbix",
     "fundacion": "fundacion",
     "gta": "gta",
 }

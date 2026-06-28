@@ -93,9 +93,7 @@ const UsersUI = (() => {
             permissions: [
                 'Dashboard: lectura',
                 'Ticketera: lectura',
-                'Ticketera: gestion operativa',
-                'PMO: lectura',
-                'PMO: edicion'
+                'Ticketera: gestion operativa'
             ]
         },
         finance: {
@@ -123,7 +121,6 @@ const UsersUI = (() => {
             permissions: [
                 'Dashboard: lectura',
                 'Ticketera: lectura',
-                'PMO: lectura',
                 'Finanzas: lectura',
                 'Auditoria: lectura',
                 'Reportes: lectura'
@@ -178,12 +175,9 @@ const UsersUI = (() => {
     const MODULES = [
         { id: 'dashboard', label: 'Dashboard' },
         { id: 'tks', label: 'Ticketera' },
-        { id: 'pmo', label: 'Proyectos (PMO)' },
         { id: 'erp', label: 'ERP & Finanzas' },
         { id: 'crm', label: 'CRM' },
         { id: 'bodega', label: 'Bodega' },
-        { id: 'ia', label: 'IA (Ultron)' },
-        { id: 'zabbix', label: 'Zabbix' },
         { id: 'fundacion', label: 'Fundación' },
         { id: 'gta', label: 'GTA (Tareas por Áreas)' },
         { id: 'terreneitor', label: 'Terreneitor' },
@@ -201,7 +195,6 @@ const UsersUI = (() => {
         acceso_total_del_sistema: 0,
         dashboard: 10,
         ticketera: 20,
-        pmo: 30,
         crm: 40,
         bodega: 50,
         facturacion: 60,
@@ -233,7 +226,6 @@ const UsersUI = (() => {
     const KNOWN_SCOPE_MODULES = new Set([
         'dashboard',
         'ticketera',
-        'pmo',
         'crm',
         'bodega',
         'facturacion',
@@ -322,8 +314,6 @@ const UsersUI = (() => {
             'crm:write': 'CRM: edicion',
             'bodega:read': 'Bodega: lectura',
             'bodega:write': 'Bodega: edicion',
-            'pmo:read': 'PMO: lectura',
-            'pmo:write': 'PMO: edicion',
             'reports:read': 'Reportes: lectura',
             'fundacion:read': 'Fundacion: lectura',
             'fundacion:write': 'Fundacion: escritura',
@@ -562,9 +552,9 @@ const UsersUI = (() => {
             'tickets:compliance': 1, 'audit:read': 1, 'audit:export': 1,
             'invoice:read': 1, 'invoice:sync': 1, 'invoice:write': 1, 'invoice:void': 1,
             'payment:write': 1, 'crm:read': 1, 'crm:write': 1, 'bodega:read': 1,
-            'bodega:write': 1, 'pmo:read': 1, 'pmo:write': 1, 'finanzas:read': 1,
+            'bodega:write': 1, 'finanzas:read': 1,
             'reports:read': 1, 'fundacion:read': 1, 'fundacion:write': 1,
-            'admin.settings': 1, 'zabbix:read': 1, 'ia:read': 1, 'gta:read': 1, 'gta:write': 1,
+            'admin.settings': 1, 'gta:read': 1, 'gta:write': 1,
         }).map(id => ({ id, label: permissionFallbackLabel(id) }));
     }
 

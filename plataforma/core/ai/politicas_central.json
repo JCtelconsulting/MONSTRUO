@@ -13,8 +13,7 @@
     {"id": "conciliacion", "nombre": "IA Conciliacion", "tipo": "modulo"},
     {"id": "reportes", "nombre": "IA Reportes", "tipo": "modulo"},
     {"id": "configuracion", "nombre": "IA Configuracion", "tipo": "modulo"},
-    {"id": "integraciones", "nombre": "IA Integraciones", "tipo": "modulo"},
-    {"id": "zabbix", "nombre": "IA Zabbix", "tipo": "modulo"}
+    {"id": "integraciones", "nombre": "IA Integraciones", "tipo": "modulo"}
   ],
   "reglas_por_modulo": {
     "bodega": {

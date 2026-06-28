@@ -10,7 +10,7 @@ Rebuildea los containers DEV indicados con `ASSET_VERSION` igual al SHA actual y
 
 ## Args
 
-`$ARGUMENTS` = lista de containers separados por espacio (`gateway`, `gta`, `ticketera`, `fundacion`, `crm`, `erp`, `bodega`, `pmo`, `ia`, `zabbix`).
+`$ARGUMENTS` = lista de containers separados por espacio (`gateway`, `gta`, `ticketera`, `fundacion`, `crm`, `erp`, `bodega`).
 
 ## Pasos
 
@@ -39,10 +39,7 @@ Rebuildea los containers DEV indicados con `ASSET_VERSION` igual al SHA actual y
 | bodega | 9007 |
 | crm | 9008 |
 | erp | 9009 |
-| pmo | 9010 |
-| ia | 9011 |
 | gta | 9012 |
-| zabbix | 9013 |
 
 ## Salida esperada
 

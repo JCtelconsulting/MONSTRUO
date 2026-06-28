@@ -103,9 +103,7 @@ Convención `<dominio>:<acción>`. Ejemplos:
 - `bodega:read`, `bodega:write`, `bodega:ai`
 - `tickets:read`, `tickets:write`, `tickets:compliance`
 - `gta:read`, `gta:write`
-- `pmo:read`, `pmo:write`
 - `admin.settings`, `admin.prompts`
-- `ai:use`, `ai:train`, `ai:audit`
 
 ### Reglas duras
 
@@ -128,9 +126,6 @@ Login único por gateway, sesión heredada por todas las apps.
 | **erp** | ✅ Producción | Facturación DTE, conciliación bancaria, cobranza |
 | **bodega** | ✅ Producción | Catálogo, stock, movimientos, IA dedupe/categorización |
 | **fundacion** | ✅ Producción | Módulo Fundación (sedes, planificación, scope por usuario) |
-| **pmo** | 🟡 Fase 1 | Gestión de proyectos (dashboard + modelo de datos) |
-| **ia** | 🟡 En desarrollo | ULTRON central + agentes por módulo (parcialmente operativo) |
-| **zabbix** | 🟡 Integrado | Monitoreo. Auto-creación de tickets aún no implementada |
 
 ### Especificación por app
 

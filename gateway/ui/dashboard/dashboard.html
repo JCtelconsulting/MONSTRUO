@@ -347,15 +347,12 @@
       const local = (port, path = '/') => `${window.location.protocol}//${window.location.hostname}:${port}${path}`;
       const MODS = [
         { id: 'tks', label: 'Ticketera', desc: 'Mesa de ayuda y soporte', icon: 'fa-ticket-alt', url: isProd ? `https://ticketera.telconsulting.cl${pfx}/` : local(9005) },
-        { id: 'pmo', label: 'Proyectos (PMO)', desc: 'Oficina técnica', icon: 'fa-helmet-safety', url: isProd ? `https://pmo.telconsulting.cl${pfx}/` : local(9009) },
         { id: 'erp', label: 'ERP & Finanzas', desc: 'Facturación y pagos', icon: 'fa-file-invoice-dollar', url: isProd ? `https://erp.telconsulting.cl${pfx}/` : local(9006) },
         { id: 'crm', label: 'CRM', desc: 'Clientes y cuentas', icon: 'fa-id-card', url: isProd ? `https://crm.telconsulting.cl${pfx}/` : local(9008) },
         { id: 'bodega', label: 'Bodega', desc: 'Inventario (WMS)', icon: 'fa-warehouse', url: isProd ? `https://bodega.telconsulting.cl${pfx}/` : local(9007) },
         { id: 'terreneitor', label: 'Terreneitor', desc: 'Informes de terreno con fotos', icon: 'fa-camera', url: isProd ? `https://terreneitor.telconsulting.cl${pfx}/` : local(8005) },
         { id: 'fundacion', label: 'Fundación', desc: 'Acompañando Pasos', icon: 'fa-hands-helping', url: isProd ? `https://login.telconsulting.cl${pfx}/fundacion` : local(9001, '/fundacion') },
         { id: 'gta', label: 'GTA', desc: 'Tareas por áreas', icon: 'fa-list-check', url: isProd ? `https://login.telconsulting.cl${pfx}/gta` : local(9001, '/gta') },
-        { id: 'ia', label: 'IA (Ultron)', desc: 'Asistente inteligente', icon: 'fa-robot', url: isProd ? `https://ia.telconsulting.cl${pfx}/` : local(9010) },
-        { id: 'zabbix', label: 'Zabbix', desc: 'Monitoreo de red', icon: 'fa-signal', url: isProd ? `https://zabbix.telconsulting.cl${pfx}/` : local(9011) },
         { id: 'config', label: 'Configuración', desc: 'Usuarios y parámetros', icon: 'fa-cog', url: isProd ? `https://config.telconsulting.cl${pfx}/` : local(9001, '/configuracion') },
       ];
       let allowed = [];

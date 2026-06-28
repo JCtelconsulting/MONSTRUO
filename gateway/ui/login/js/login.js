@@ -7,12 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const DOMINIOS = {
     login: 'https://login.telconsulting.cl',
     erp: 'https://erp.telconsulting.cl',
-    pmo: 'https://pmo.telconsulting.cl',
     crm: 'https://crm.telconsulting.cl',
     bodega: 'https://bodega.telconsulting.cl',
     ticketera: 'https://ticketera.telconsulting.cl',
-    ia: 'https://ia.telconsulting.cl',
-    zabbix: 'https://zabbix.telconsulting.cl',
     config: 'https://config.telconsulting.cl',
   };
 

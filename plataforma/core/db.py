@@ -180,18 +180,18 @@ def get_conn():
     if _pool is not None:
         conn = _pool.getconn()
         pg_conn = PgConn(conn, use_psycopg3=True, pool=_pool)
-        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, pmo, ia, ops, fundacion, public;")
+        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, fundacion, public;")
         return pg_conn
 
     if _HAVE_PSYCOPG3:
         conn = psycopg.connect(db_url, row_factory=dict_row)
         pg_conn = PgConn(conn, use_psycopg3=True)
-        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, pmo, ia, ops, fundacion, public;")
+        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, fundacion, public;")
         return pg_conn
     if _HAVE_PSYCOPG2:
         conn = psycopg2.connect(db_url)
         pg_conn = PgConn(conn, use_psycopg3=False)
-        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, pmo, ia, ops, fundacion, public;")
+        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, fundacion, public;")
         return pg_conn
 
     raise RuntimeError("PostgreSQL driver not installed. Install psycopg or psycopg2.")
@@ -327,7 +327,6 @@ def init_db() -> None:
             "bodega",
             "core",
             "cat",
-            "pmo",
             "ia",
             "ops",
             "fundacion",
@@ -992,43 +991,6 @@ def init_db() -> None:
             )
         except Exception as _e:
             logger.warning("[DB-MIGRATION] WARN backfill ticket_notifications: %s", _e)
-
-        # --- PMO (Proyectos y Bitacora) ---
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS pmo.pmo_proyectos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            cliente_nombre TEXT,
-            presupuesto_venta REAL DEFAULT 0,
-            fecha_inicio TEXT,
-            fecha_fin_estimada TEXT,
-            estado TEXT DEFAULT 'borrador',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP::text,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP::text
-        );
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pmo_proyectos_estado ON pmo.pmo_proyectos(estado);"
-        )
-
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS pmo.pmo_bitacora_ia (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            proyecto_id INTEGER NOT NULL,
-            origen TEXT DEFAULT 'manual',
-            contenido_raw TEXT,
-            estado_procesamiento TEXT DEFAULT 'pendiente',
-            resumen_ia TEXT,
-            acciones_json TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP::text,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP::text,
-            FOREIGN KEY(proyecto_id) REFERENCES pmo_proyectos(id)
-        );
-        """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_pmo_bitacora_proyecto ON pmo.pmo_bitacora_ia(proyecto_id);"
-        )
-
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS tks.ticket_notification_attempts (
@@ -2699,15 +2661,11 @@ def init_db() -> None:
                         "crm:write": "CRM: edición",
                         "bodega:read": "Bodega: lectura",
                         "bodega:write": "Bodega: edición",
-                        "pmo:read": "PMO: lectura",
-                        "pmo:write": "PMO: edición",
                         "finanzas:read": "Finanzas: lectura",
                         "reports:read": "Reportes: lectura",
                         "fundacion:read": "Fundación: lectura",
                         "fundacion:write": "Fundación: escritura",
                         "admin.settings": "Configuración administrativa",
-                        "zabbix:read": "Zabbix: lectura",
-                        "ia:read": "IA: lectura",
                         "gta:read": "GTA: lectura",
                         "gta:write": "GTA: gestión",
                     }

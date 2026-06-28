@@ -14,10 +14,7 @@
 #   9007  bodega
 #   9008  crm
 #   9009  erp
-#   9010  pmo
-#   9011  ia
 #   9012  gta
-#   9013  zabbix
 
 # Nombre del proyecto fijo: evita que Docker derive el nombre del directorio
 # y cree una red diferente a la esperada (monstruo-dev_default vs monstruo_dev_default).
@@ -192,54 +189,6 @@ services:
     restart: unless-stopped
     command: [ "uvicorn", "erp.backend.main:app", "--host", "0.0.0.0", "--port", "9009" ]
 
-  pmo:
-    build:
-      context: .
-      dockerfile: ./pmo/Dockerfile
-      args:
-        APP_UID: ${APP_UID:-1000}
-        APP_GID: ${APP_GID:-1000}
-    container_name: ${STACK_NAME:-monstruo-dev}-pmo
-    env_file:
-      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
-    ports:
-      - "${PMO_PORT:-9010}:9010"
-    environment:
-      - PYTHONPATH=/app:/app/plataforma
-      - ASSET_VERSION=${ASSET_VERSION:-}
-      - PORT=9010
-      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
-    depends_on:
-      - db
-    mem_limit: 256m
-    mem_reservation: 96m
-    restart: unless-stopped
-    command: [ "uvicorn", "pmo.backend.main:app", "--host", "0.0.0.0", "--port", "9010" ]
-
-  ia:
-    build:
-      context: .
-      dockerfile: ./ia/Dockerfile
-      args:
-        APP_UID: ${APP_UID:-1000}
-        APP_GID: ${APP_GID:-1000}
-    container_name: ${STACK_NAME:-monstruo-dev}-ia
-    env_file:
-      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
-    ports:
-      - "${IA_PORT:-9011}:9011"
-    environment:
-      - PYTHONPATH=/app:/app/plataforma
-      - ASSET_VERSION=${ASSET_VERSION:-}
-      - PORT=9011
-      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
-    depends_on:
-      - db
-    mem_limit: 256m
-    mem_reservation: 96m
-    restart: unless-stopped
-    command: [ "uvicorn", "ia.backend.main:app", "--host", "0.0.0.0", "--port", "9011" ]
-
   gta:
     build:
       context: .
@@ -294,27 +243,3 @@ services:
     mem_reservation: 128m
     restart: unless-stopped
     command: [ "uvicorn", "terreneitor.backend.main:app", "--host", "0.0.0.0", "--port", "8005" ]
-
-  zabbix:
-    build:
-      context: .
-      dockerfile: ./zabbix/Dockerfile
-      args:
-        APP_UID: ${APP_UID:-1000}
-        APP_GID: ${APP_GID:-1000}
-    container_name: ${STACK_NAME:-monstruo-dev}-zabbix
-    env_file:
-      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
-    ports:
-      - "${ZABBIX_PORT:-9013}:9013"
-    environment:
-      - PYTHONPATH=/app:/app/plataforma
-      - ASSET_VERSION=${ASSET_VERSION:-}
-      - PORT=9013
-      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
-    depends_on:
-      - db
-    mem_limit: 256m
-    mem_reservation: 96m
-    restart: unless-stopped
-    command: [ "uvicorn", "zabbix.backend.main:app", "--host", "0.0.0.0", "--port", "9013" ]

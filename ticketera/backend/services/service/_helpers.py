@@ -244,9 +244,9 @@ __all__ = [
 # Áreas asignables = catálogo CANÓNICO de la empresa (plataforma.core.organigrama) + 'general'
 # (Sin área asignada). Una sola fuente de verdad compartida por todos los módulos.
 CATEGORIAS_ASIGNABLES = organigrama.slugs_areas() + [organigrama.SIN_AREA]
-# CATEGORIAS_VALIDAS se mantiene amplio (incluye legacy: admin/ejecucion/pmo) solo para VALIDAR
+# CATEGORIAS_VALIDAS se mantiene amplio (incluye legacy: admin/ejecucion) solo para VALIDAR
 # datos ya existentes; NO es lo que se ofrece en la UI.
-CATEGORIAS_VALIDAS = set(CATEGORIAS_ASIGNABLES) | {"admin", "ejecucion", "pmo"}
+CATEGORIAS_VALIDAS = set(CATEGORIAS_ASIGNABLES) | {"admin", "ejecucion"}
 ESTADOS_VALIDOS = {"abierto", "en_progreso", "resuelto", "cerrado"}
 MAIN_STATUS_SEQUENCE = ("abierto", "en_progreso", "resuelto", "cerrado")
 SEVERIDADES_VALIDAS = {"baja", "media", "alta", "critica"}

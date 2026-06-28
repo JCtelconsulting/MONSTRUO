@@ -81,9 +81,6 @@ def main() -> int:
         "bodega":    ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
         "crm":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
         "erp":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
-        "pmo":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
-        "ia":        ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
-        "zabbix":    ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
     }
     for app, files in app_contract.items():
         for rel in files:

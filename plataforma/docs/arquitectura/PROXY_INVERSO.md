@@ -34,8 +34,6 @@ Configuración activa en `/etc/nginx/sites-enabled/`:
 | `monstruo_dev_base_app` | `192.168.60.8:9001` |
 | `monstruo_dev_ticketera_api` | `192.168.60.8:9005` |
 | `monstruo_dev_fundacion_api` | `192.168.60.8:9006` |
-| `monstruo_dev_ia_app` | `192.168.20.228:18789` |
-| `monstruo_dev_ia_oficina` | `192.168.20.228:8000` |
 
 > **Nota importante**: PROD ya usa `9001/9005/9006`. La migración desde `9000` (modelo viejo) ya se completó en el proxy. Confirmar que las apps en `192.168.60.5` también escuchen en esos puertos.
 
@@ -48,12 +46,9 @@ Configuración activa en `/etc/nginx/sites-enabled/`:
 | `ticketera.telconsulting.cl` | PROD `/` → app+api ticketera. DEV `/dev/` → base + api+tks + fundacion |
 | `login.telconsulting.cl` | PROD `/` → login. DEV `/dev/` → base + auth/google + sesion + tks + fundacion |
 | `config.telconsulting.cl` | PROD `/` → config. DEV `/dev/` → base + tks |
-| `ia.telconsulting.cl` | DEV `/dev/` → ia-app, `/dev/oficina/` → ia-oficina |
-| `pmo.telconsulting.cl` | reservado para apps futuras (declarado en proxy, app aún no productiva) |
 | `erp.telconsulting.cl` | reservado para apps futuras |
 | `crm.telconsulting.cl` | reservado para apps futuras |
 | `bodega.telconsulting.cl` | reservado para apps futuras |
-| `zabbix.telconsulting.cl` | reservado para apps futuras |
 | `monitoreo.telconsulting.cl` | reservado para apps futuras |
 
 ### Terreneitor (`terreneitor.conf`)
@@ -127,4 +122,4 @@ ssh root@192.168.60.6 "nginx -t && systemctl reload nginx"
 
 ## Pendientes conocidos
 
-- Cuando las apps futuras (`pmo`, `erp`, `crm`, `bodega`, `zabbix`, `monitoreo`) entren en operación, completar sus bloques `proxy_pass` en `monstruo.conf` y actualizar este doc.
+- Cuando las apps futuras (`erp`, `crm`, `bodega`, `monitoreo`) entren en operación, completar sus bloques `proxy_pass` en `monstruo.conf` y actualizar este doc.
