@@ -2636,9 +2636,11 @@ return {
                 })
             });
 
-            // 2. Si estamos en un ticket específico, actualizarlo de inmediato (incluso si no tiene email)
-            if (cache.detail && cache.detail.id) {
-                await fetchApi(`/api/tks/tickets/${cache.detail.id}`, {
+            // 2. Si hay un ticket abierto, actualizarlo de inmediato (incluso si no tiene email).
+            //    Usamos selectedTicketId; cache.detail NUNCA se setea, por eso antes ni el PATCH
+            //    ni el refresh corrían y había que recargar a mano.
+            if (selectedTicketId) {
+                await fetchApi(`/api/tks/tickets/${selectedTicketId}`, {
                     method: 'PATCH',
                     body: JSON.stringify({
                         customer_id: custId,
@@ -2650,11 +2652,12 @@ return {
             if (window.showToast) window.showToast('Vinculación exitosa', 'success');
             closeAssociateModal();
             
-            // Refrescar según donde estemos: recargar el detalle del ticket para que el
-            // botón pase de "Vincular" a "Cambiar" y se vea el cliente recién asignado.
-            // (Antes llamaba showDetail(), que no existe → ReferenceError y no refrescaba.)
-            if (cache.detail && cache.detail.id) {
-                openDetail(cache.detail.id, { preserveTab: true });
+            // Refrescar al instante: el detalle abierto (sea en Lista o en Archivados) para que
+            // el botón pase a "Cambiar Cliente" y se vea el cliente recién vinculado, y la lista
+            // por detrás. openDetail recarga datos frescos; clearDataCache invalida la lista.
+            clearDataCache();
+            if (selectedTicketId && el('tks-detail-panel')) {
+                openDetail(selectedTicketId, { preserveTab: true });
             } else {
                 refreshList();
             }
