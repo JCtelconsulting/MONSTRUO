@@ -321,7 +321,7 @@ async def get_solicitud(sid: int, user: dict = Depends(deps.require_permission("
 async def create_solicitud(
     solicitud: SolicitudCreate,
     request: Request,
-    user: dict = Depends(deps.require_permission("gta:read")),
+    user: dict = Depends(deps.require_permission("gta:write")),
 ):
     conn = db.get_conn()
     try:
@@ -355,7 +355,7 @@ async def create_solicitud(
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno")
     finally:
         conn.close()
 
@@ -364,7 +364,7 @@ async def create_solicitud(
 async def update_solicitud(
     sid: int,
     update: SolicitudUpdate,
-    user: dict = Depends(deps.require_permission("gta:read")),
+    user: dict = Depends(deps.require_permission("gta:write")),
 ):
     conn = db.get_conn()
     try:
@@ -385,7 +385,7 @@ async def update_solicitud(
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno")
     finally:
         conn.close()
 
@@ -394,7 +394,7 @@ async def update_solicitud(
 async def completar_paso(
     sid: int,
     paso_idx: int,
-    user: dict = Depends(deps.require_permission("gta:read")),
+    user: dict = Depends(deps.require_permission("gta:write")),
 ):
     return await _toggle_paso(sid, paso_idx, {"completado": True, "bloqueado": False})
 
@@ -404,7 +404,7 @@ async def bloquear_paso(
     sid: int,
     paso_idx: int,
     body: Dict[str, Any],
-    user: dict = Depends(deps.require_permission("gta:read")),
+    user: dict = Depends(deps.require_permission("gta:write")),
 ):
     return await _toggle_paso(sid, paso_idx, {"completado": False, "bloqueado": True, "motivo": body.get("motivo", "")})
 
@@ -442,7 +442,7 @@ async def _toggle_paso(sid: int, paso_idx: int, new_state: dict):
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno")
     finally:
         conn.close()
 
@@ -463,7 +463,7 @@ async def get_comentarios(sid: int, user: dict = Depends(deps.require_permission
 async def add_comentario(
     sid: int,
     body: Dict[str, Any],
-    user: dict = Depends(deps.require_permission("gta:read")),
+    user: dict = Depends(deps.require_permission("gta:write")),
 ):
     texto = (body.get("texto") or "").strip()
     if not texto:
@@ -479,7 +479,7 @@ async def add_comentario(
         return {"ok": True, "id": new_id}
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno")
     finally:
         conn.close()
 
@@ -518,7 +518,7 @@ async def list_quiebres(
 async def create_quiebre(
     quiebre: QuiebreCreate,
     request: Request,
-    user: dict = Depends(deps.require_permission("gta:read")),
+    user: dict = Depends(deps.require_permission("gta:write")),
 ):
     conn = db.get_conn()
     try:
@@ -533,7 +533,7 @@ async def create_quiebre(
         return {"ok": True, "id": new_id}
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno")
     finally:
         conn.close()
 
@@ -561,7 +561,7 @@ async def resolver_quiebre(
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error interno")
     finally:
         conn.close()
 
@@ -657,7 +657,7 @@ async def get_preview_text(
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error extrayendo texto: {e}")
+        raise HTTPException(status_code=500, detail="No se pudo extraer texto del documento")
 
 
 # ── Flujos cross-área ──────────────────────────────────────────────────────
