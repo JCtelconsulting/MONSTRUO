@@ -16,7 +16,12 @@ from terreneitor.backend.utils.logger import log
 router = APIRouter(
     prefix="/api/gerencia",
     tags=["Gerencia"],
-    dependencies=[Depends(dependencias.require_session)],
+    # LEAK-04 (auditoría 2026-06-28): TODO el panel de gerencia (dashboards, KPIs,
+    # informes y su descarga, validación de fotos) es de gestión. Antes exigía solo
+    # require_session, así que TERRENO podía listar/descargar informes confidenciales
+    # y ver KPIs por estas rutas paralelas. Ahora require_gestion (ADMIN/GERENCIA/
+    # SUPERVISOR); TERRENO no usa este panel, así que no se rompe ningún flujo.
+    dependencies=[Depends(dependencias.require_gestion)],
 )
 
 

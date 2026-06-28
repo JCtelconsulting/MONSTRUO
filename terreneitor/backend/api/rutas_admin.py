@@ -401,6 +401,10 @@ def admin_get_users(db: Session = Depends(dependencias.get_db)):
 def admin_create_user(
     req: modelos.UserCreate, db: Session = Depends(dependencias.get_db)
 ):
+    # AUTHN-05 (extensión 2026-06-28): misma política de longitud mínima que el
+    # cambio de clave self-service, para que un admin no siembre claves cortas.
+    if not req.password or len(req.password) < 8:
+        raise HTTPException(400, detail="La contraseña debe tener al menos 8 caracteres")
     try:
         return usuario_service.create_user(
             db, req.email, req.name, req.role, req.password
