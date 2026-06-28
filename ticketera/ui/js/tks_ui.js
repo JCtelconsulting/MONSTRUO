@@ -5269,11 +5269,11 @@ return `
                     <div class="tks-customer-mini">
                         <div><span>Nombre</span><strong>${escapeHtml(clientName)}</strong></div>
                         <div><span>Email</span><strong>${escapeHtml(originEmail || '-')}</strong></div>
-                        <div><span>ID Cliente</span><strong>${escapeHtml(customerId || 'Sin asociar')}</strong></div>
+                        <div><span>ID Cliente</span><strong>${escapeHtml(customerId || '—')}</strong></div>
                     </div>
                     <div class="tks-customer-link" style="margin-top: 0.5rem;">
                         <button class="tks-btn tks-btn-primary tks-btn-sm" onclick="TksMain.openAssociateClientModal('${originEmailForJs}')">
-                            <i class="fas fa-link"></i> ${customerId ? 'Cambiar Cliente' : 'Vincular Cliente'}
+                            <i class="fas fa-link"></i> ${(customerId || (clientNameRaw && clientNameRaw !== 'Desconocido')) ? 'Cambiar Cliente' : 'Vincular Cliente'}
                         </button>
                     </div>
                     ${assigneeControlHtml}
