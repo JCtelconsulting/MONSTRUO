@@ -267,7 +267,7 @@ app.include_router(ops.router)
 SERVICES_MAP = {
     "ticketera": f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
     "tks":       f"http://ticketera:{os.getenv('TICKETERA_PORT', '9005')}",
-    "fundacion": f"http://fundacion:{os.getenv('FUNDACION_PORT', '9006')}",
+    # Fundación SEPARADA: vive en su propio stack (/srv/fundacion_dev), ya no aquí.
     "bodega":    f"http://bodega:{os.getenv('BODEGA_PORT', '9007')}",
     "crm":       f"http://crm:{os.getenv('CRM_PORT', '9008')}",
     "erp":       f"http://erp:{os.getenv('ERP_PORT', '9009')}",
@@ -281,7 +281,6 @@ SERVICE_API_PREFIX = {
     "erp": None,
     "bodega": None,
     "crm": None,
-    "fundacion": "fundacion",
     "gta": "gta",
 }
 
@@ -567,22 +566,8 @@ async def shared_static(asset_path: str):
     return _serve_static_file(ui_dir / "shared" / "ui", asset_path)
 
 
-@app.get("/fundacion")
-async def fundacion_root(request: Request):
-    return RedirectResponse(_prefixed_path(request, "/fundacion/"), status_code=302)
-
-
-@app.get("/fundacion/")
-async def fundacion_root_slash():
-    index_path = fundacion_ui_dir / "fundacion.html"
-    if not index_path.exists():
-        raise HTTPException(status_code=404, detail="fundacion_ui_not_found")
-    return HTMLResponse(inject_asset_version(index_path.read_text(encoding="utf-8")))
-
-
-@app.get("/fundacion/fundacion.html")
-async def fundacion_canonical_redirect(request: Request):
-    return RedirectResponse(_prefixed_path(request, "/fundacion/"), status_code=302)
+# Fundación SEPARADA: su UI y rutas viven en su propio stack (/srv/fundacion_dev),
+# servidas por fundacion.telconsulting.cl. El gateway de Monstruo ya no la sirve.
 
 
 @app.get("/gta")
@@ -601,11 +586,6 @@ async def gta_root_slash():
 @app.get("/gta/gta.html")
 async def gta_canonical_redirect(request: Request):
     return RedirectResponse(_prefixed_path(request, "/gta/"), status_code=302)
-
-
-@app.get("/fundacion/{asset_path:path}")
-async def fundacion_static(asset_path: str):
-    return _serve_static_file(fundacion_ui_dir, asset_path)
 
 
 @app.get("/gta/{asset_path:path}")

@@ -90,32 +90,8 @@ services:
     restart: unless-stopped
     command: [ "uvicorn", "ticketera.backend.main:app", "--host", "0.0.0.0", "--port", "9005" ]
 
-  fundacion:
-    build:
-      context: .
-      dockerfile: ./fundacion/Dockerfile
-      args:
-        APP_UID: ${APP_UID:-1000}
-        APP_GID: ${APP_GID:-1000}
-    container_name: ${STACK_NAME:-monstruo-dev}-fundacion
-    env_file:
-      - ${ENV_FILE:-plataforma/ops/env/.env.server.dev}
-    ports:
-      - "${FUNDACION_PORT:-9006}:9006"
-    environment:
-      - PYTHONPATH=/app:/app/plataforma
-      - ASSET_VERSION=${ASSET_VERSION:-}
-      - PORT=9006
-      - DB_URL=postgresql://${POSTGRES_USER:-monstruo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_required}@db:5432/${POSTGRES_DB:-monstruo_dev}
-      - FUNDACION_DRIVE_SA_PATH=/run/secrets/monstruo-fundacion-drive.json
-    volumes:
-      - ./plataforma/ops/secrets:/run/secrets:ro
-    depends_on:
-      - db
-    mem_limit: 256m
-    mem_reservation: 96m
-    restart: unless-stopped
-    command: [ "uvicorn", "fundacion.backend.main:app", "--host", "0.0.0.0", "--port", "9006" ]
+  # Fundación SEPARADA a su propio stack en /srv/fundacion_dev (Postgres, login e
+  # infra propios). Ya no se construye ni se sirve desde el monorepo de Monstruo.
 
   bodega:
     build:
