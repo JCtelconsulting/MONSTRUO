@@ -942,6 +942,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.42rem;
+    /* Tope de altura con scroll interno: con muchos tickets en cola, antes crecía sin fin
+       y scrolleaba la página entera del Resumen. */
+    max-height: 48vh;
+    overflow-y: auto;
 }
 
 .tks-assign-queue-item {
