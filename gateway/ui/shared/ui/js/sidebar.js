@@ -81,10 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     (async () => {
         let allowed = [];
+        let isAdmin = false;
         try {
             const data = await window.fetchApi('/api/sesion');
             if (data.ok) {
                 allowed = data.allowed_modules || [];
+                isAdmin = String(data.role || '').toUpperCase() === 'ADMIN';
 
                 const whoEl = document.getElementById('who');
                 if (whoEl) {
@@ -215,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof window.initModal === 'function') window.initModal();
         if (typeof window.initLogout === 'function') window.initLogout();
 
-        if (isProdHost && !footerContainer.querySelector('.btn-env')) {
+        if (isProdHost && isAdmin && !footerContainer.querySelector('.btn-env')) {
             const isDev = envPrefix === '/dev';
             const btnEnv = document.createElement('button');
             btnEnv.className = 'btn-env';

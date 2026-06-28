@@ -126,6 +126,9 @@ function renderEnvironmentIndicators() {
   const existing = container.querySelectorAll('.env-indicator-group');
   existing.forEach((e) => e.remove());
 
+  // Solo los admin pueden cambiar de entorno (prod/dev); los demás no ven el botón.
+  if (!window.isAdmin) return;
+
   const group = document.createElement('div');
   group.className = 'env-indicator-group footer-buttons-container';
   group.style.marginTop = 'auto';
