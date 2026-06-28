@@ -854,7 +854,10 @@ def update_ticket(
     if "categoria" in normalized_updates:
         _asig_actual = str(current.get("asignado_a") or "").strip()
         _desasigna = "asignado_a" in normalized_updates and not normalized_updates.get("asignado_a")
-        if _asig_actual and not _desasigna:
+        _archivado = str(current.get("estado") or "").strip().lower() in ("cerrado", "resuelto")
+        # Un ticket ARCHIVADO (cerrado/resuelto) sí se puede reclasificar aunque esté asignado:
+        # sirve para corregir el área y dejar ordenado el histórico.
+        if _asig_actual and not _desasigna and not _archivado:
             normalized_updates.pop("categoria", None)
             logger.info(
                 "[update_ticket] cambio de área ignorado: ticket %s está asignado a '%s'",

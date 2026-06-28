@@ -5266,8 +5266,11 @@ return `
 
         const categoriaActual = String(t.categoria || 'general').trim().toLowerCase();
         const ticketTieneAsignado = String(t.asignado_a || '').trim() !== '';
+        const ticketArchivado = ['cerrado', 'resuelto'].includes(String(t.estado || '').trim().toLowerCase());
         const AREAS_ASIGNABLES = ['redes', 'sistemas', 'ejecucion', 'bodega', 'gerencia', 'admin', 'general'];
-        const categoriaControlHtml = (canAssignTicket && !ticketTieneAsignado)
+        // Editable si no está asignado, O si está archivado (cerrado/resuelto): ahí se puede
+        // reclasificar para dejar ordenado el histórico, aunque tenga a alguien asignado.
+        const categoriaControlHtml = (canAssignTicket && (!ticketTieneAsignado || ticketArchivado))
             ? `
                 <div class="tks-assignee-control in-customer">
                     <label class="tks-status-editor-label">Área</label>
