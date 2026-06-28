@@ -406,6 +406,15 @@ def create_ticket(
     try:
         now = db.now_utc_iso()
 
+        # En DEV los tickets de prueba se crean sin correo y se ven distintos (la celda de
+        # cliente queda más corta). Les ponemos un correo placeholder único para que se vean
+        # parejos. NUNCA en producción (ahí un manual sin correo queda tal cual).
+        if not origen_email:
+            from plataforma.core.config import settings as _app_settings  # noqa: PLC0415
+            if str(getattr(_app_settings, "ENV_TYPE", "dev") or "dev").strip().lower() != "prod":
+                import uuid as _uuid  # noqa: PLC0415
+                origen_email = f"test-{_uuid.uuid4().hex[:8]}@example.com"
+
         # Auto-resolver cliente por email si existe mapeo
         if origen_email:
             # Primero buscamos si hay asociación explícita
