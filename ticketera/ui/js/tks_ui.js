@@ -5264,6 +5264,25 @@ return `
                 </div>
             `;
 
+        const categoriaActual = String(t.categoria || 'general').trim().toLowerCase();
+        const AREAS_ASIGNABLES = ['redes', 'sistemas', 'ejecucion', 'bodega', 'gerencia', 'admin', 'general'];
+        const categoriaControlHtml = canAssignTicket
+            ? `
+                <div class="tks-assignee-control in-customer">
+                    <label class="tks-status-editor-label">Área</label>
+                    <select class="tks-select" id="tks-categoria-select" onchange="TksMain.applyCategoriaChange(${t.id})">
+                        ${AREAS_ASIGNABLES.map(c => `<option value="${c}"${c === categoriaActual ? ' selected' : ''}>${catLabel(c)}</option>`).join('')}
+                    </select>
+                    <div class="tks-status-editor-hint">Cambia el área y el ticket se mueve de inmediato.</div>
+                </div>
+            `
+            : `
+                <div class="tks-assignee-control readonly in-customer">
+                    <label class="tks-status-editor-label">Área</label>
+                    <div class="tks-assignee-readonly">${catLabel(categoriaActual)}</div>
+                </div>
+            `;
+
         const topCardsHtml = `
             <div class="tks-detail-top-cards">
                 <div class="tks-side-card tks-top-card">
@@ -5302,6 +5321,7 @@ return `
                             <i class="fas fa-link"></i> ${(customerId || (clientNameRaw && clientNameRaw !== 'Desconocido')) ? 'Cambiar Cliente' : 'Vincular Cliente'}
                         </button>
                     </div>
+                    ${categoriaControlHtml}
                     ${assigneeControlHtml}
                 </div>
             </div>`;

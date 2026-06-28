@@ -467,13 +467,11 @@ def create_ticket(
         refs = _merge_reference_chain(email_references, thread_id)
         notify_emails_csv = _serialize_notify_emails(notify_emails, strict=True)
 
-        # Auto-asignar (no-crítico: si falla, ticket se crea sin asignar)
+        # Auto-asignación a PERSONA deshabilitada (decisión de producto): los tickets
+        # quedan SIN asignar; un humano los toma (claim) o un despachador los asigna.
+        # Se conserva el parámetro auto_assign por compatibilidad, pero se ignora.
+        # La auto-detección del ÁREA/categoría se mantiene aparte (clasificar_ticket).
         asignado_a = None
-        if auto_assign:
-            try:
-                asignado_a = auto_asignar(categoria)
-            except Exception as e:
-                logger.warning(f"[create_ticket] auto_asignar falló para categoría '{categoria}': {e}")
 
         if explicit_subestado:
             subestado = normalize_subestado(explicit_subestado, "recibido")

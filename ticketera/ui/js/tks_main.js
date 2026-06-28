@@ -1769,6 +1769,30 @@ return {
         }
     }
 
+    async function applyCategoriaChange(ticketId) {
+        const perms = getSelectedTicketPermissions(ticketId);
+        if (perms && !perms.canAssignTicket) {
+            if (window.showToast) window.showToast(perms.blockedReason || 'No tienes permiso para mover este ticket de área', 'warning');
+            return;
+        }
+        const select = document.getElementById('tks-categoria-select');
+        if (!select) return;
+        const value = String(select.value || '').trim().toLowerCase();
+        if (!value) return;
+        try {
+            await TksApi.updateTicket(ticketId, { categoria: value });
+            clearDataCache();
+            const selectedLabel = String(select.options?.[select.selectedIndex]?.textContent || '').trim() || value;
+            if (window.showToast) window.showToast(`Ticket movido a ${selectedLabel}`, 'success');
+            refreshTicketAfterMutation(ticketId);
+            if (currentTab === 'lista') {
+                scheduleDetailFeedRefresh(ticketId);
+            }
+        } catch (e) {
+            if (window.showToast) window.showToast(`Error moviendo de área: ${e.message}`, 'error');
+        }
+    }
+
     function switchComposerMode(modeKey) {
         const panel = el('tks-detail-panel');
         if (!panel) return;
@@ -2761,6 +2785,7 @@ return {
         applyStatusChange,
         toggleAssigneePicker,
         applyAssigneeChange,
+        applyCategoriaChange,
         saveNotifyEmails,
         changeStatus,
         transitionSubestado,
