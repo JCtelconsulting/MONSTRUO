@@ -123,58 +123,79 @@ def bulk_assign_customer_by_email(
 
 
 def search_customers(q: str = "", limit: int = 0) -> List[Dict[str, Any]]:
-    """Busca clientes en laudus_customers; con limit=0 devuelve todos."""
+    """Clientes para vincular a tickets. Unifica TRES fuentes para que aparezcan TODOS
+    los clientes conocidos (no solo los del ERP Laudus, que puede estar vacío):
+      1) erp.laudus_customers — clientes del ERP (con id, razón social, RUT).
+      2) customer_name de las reglas de enrutamiento (clientes creados ahí).
+      3) cliente_nombre ya usado en tickets.
+    Dedup por nombre (case-insensitive); el de Laudus gana si hay duplicado (conserva su id).
+    Para clientes sin id de Laudus, el id es el propio nombre (sirve para asociar el ticket)."""
     try:
         raw_limit = int(limit or 0)
     except Exception:
         raw_limit = 0
     limit = max(0, min(raw_limit, 5000))
-    query = str(q or "").strip()
+    query = str(q or "").strip().lower()
 
     conn = db.get_conn()
     try:
-        if query and limit > 0:
-            wildcard = f"%{query}%"
-            rows = conn.execute(
-                """
-                SELECT laudus_customer_id as id, name, legal_name, vat_id
-                FROM laudus_customers
-                WHERE name ILIKE ? OR legal_name ILIKE ? OR vat_id ILIKE ?
-                ORDER BY COALESCE(name, legal_name, '') ASC
-                LIMIT ?
-                """,
-                (wildcard, wildcard, wildcard, limit),
-            ).fetchall()
-        elif query:
-            wildcard = f"%{query}%"
-            rows = conn.execute(
-                """
-                SELECT laudus_customer_id as id, name, legal_name, vat_id
-                FROM laudus_customers
-                WHERE name ILIKE ? OR legal_name ILIKE ? OR vat_id ILIKE ?
-                ORDER BY COALESCE(name, legal_name, '') ASC
-                """,
-                (wildcard, wildcard, wildcard),
-            ).fetchall()
-        elif limit > 0:
-            rows = conn.execute(
-                """
-                SELECT laudus_customer_id as id, name, legal_name, vat_id
-                FROM laudus_customers
-                ORDER BY COALESCE(name, legal_name, '') ASC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """
-                SELECT laudus_customer_id as id, name, legal_name, vat_id
-                FROM laudus_customers
-                ORDER BY COALESCE(name, legal_name, '') ASC
-                """
-            ).fetchall()
-        return [dict(r) for r in rows]
+        out: Dict[str, Dict[str, Any]] = {}
+
+        def add(cid, name, legal=None, vat=None):
+            name = str(name or "").strip()
+            if not name:
+                return
+            key = name.lower()
+            if key in out:
+                return
+            cid_s = str(cid).strip() if cid not in (None, "") else ""
+            out[key] = {
+                "id": cid_s or name,
+                "name": name,
+                "legal_name": legal,
+                "vat_id": vat,
+            }
+
+        # 1) ERP Laudus (fuente principal cuando hay sync). Tolerante si la tabla no existe.
+        try:
+            for r in conn.execute(
+                "SELECT laudus_customer_id AS id, name, legal_name, vat_id FROM erp.laudus_customers"
+            ).fetchall():
+                add(r.get("id"), r.get("name"), r.get("legal_name"), r.get("vat_id"))
+        except Exception:
+            pass
+        # 2) Clientes definidos en las reglas de enrutamiento.
+        try:
+            for r in conn.execute(
+                "SELECT customer_id, customer_name FROM tks.ticket_config_email_routes "
+                "WHERE COALESCE(TRIM(customer_name), '') <> ''"
+            ).fetchall():
+                add(r.get("customer_id"), r.get("customer_name"))
+        except Exception:
+            pass
+        # 3) Clientes ya usados en tickets.
+        try:
+            for r in conn.execute(
+                "SELECT DISTINCT customer_id, cliente_nombre FROM tks.tickets "
+                "WHERE COALESCE(TRIM(cliente_nombre), '') <> ''"
+            ).fetchall():
+                add(r.get("customer_id"), r.get("cliente_nombre"))
+        except Exception:
+            pass
+
+        items = list(out.values())
+        if query:
+            items = [
+                c
+                for c in items
+                if query in c["name"].lower()
+                or query in str(c.get("legal_name") or "").lower()
+                or query in str(c.get("vat_id") or "").lower()
+            ]
+        items.sort(key=lambda c: c["name"].lower())
+        if limit > 0:
+            items = items[:limit]
+        return items
     finally:
         conn.close()
 
