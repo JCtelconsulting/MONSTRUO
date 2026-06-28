@@ -22,7 +22,7 @@ const TksMain = (() => {
     let notifAbortController = null;
     const DEFAULT_LIST_LIMIT = 50;
     const CACHE_TTL_MS = 15000;
-    const DEFAULT_TICKETERA_CATEGORIES = Object.freeze(['admin', 'bodega', 'ejecucion', 'general', 'gerencia', 'redes', 'sistemas']);
+    const DEFAULT_TICKETERA_CATEGORIES = Object.freeze(['bodega', 'ejecucion', 'general', 'gerencia', 'redes', 'sistemas']);
     const cache = {
         dashboard: null,
         assignment: null,
@@ -1007,9 +1007,9 @@ return {
                     <button class="tks-filter-chip ${filters.categoria === 'redes' ? 'active' : ''}" data-filter-cat="redes">🌐 Redes</button>
                     <button class="tks-filter-chip ${filters.categoria === 'sistemas' ? 'active' : ''}" data-filter-cat="sistemas">💻 Sistemas</button>
                     <button class="tks-filter-chip ${filters.categoria === 'ejecucion' ? 'active' : ''}" data-filter-cat="ejecucion">🔧 Ejecución</button>
-                    <button class="tks-filter-chip ${filters.categoria === 'admin' ? 'active' : ''}" data-filter-cat="admin">📋 Admin</button>
                     <button class="tks-filter-chip ${filters.categoria === 'bodega' ? 'active' : ''}" data-filter-cat="bodega">📦 Bodega</button>
                     <button class="tks-filter-chip ${filters.categoria === 'gerencia' ? 'active' : ''}" data-filter-cat="gerencia">👔 Gerencia</button>
+                    <button class="tks-filter-chip ${filters.categoria === 'general' ? 'active' : ''}" data-filter-cat="general">📭 Sin área asignada</button>
                 </div>
             `
             : '';

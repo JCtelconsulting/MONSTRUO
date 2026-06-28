@@ -219,7 +219,7 @@ const TksUI = (() => {
         sistemas: 'Sistemas',
         ejecucion: 'Ejecución',
         admin: 'Admin',
-        general: 'General',
+        general: 'Sin área asignada',
         bodega: 'Bodega',
         gerencia: 'Gerencia',
     });
@@ -5267,7 +5267,7 @@ return `
         const categoriaActual = String(t.categoria || 'general').trim().toLowerCase();
         const ticketTieneAsignado = String(t.asignado_a || '').trim() !== '';
         const ticketArchivado = ['cerrado', 'resuelto'].includes(String(t.estado || '').trim().toLowerCase());
-        const AREAS_ASIGNABLES = ['redes', 'sistemas', 'ejecucion', 'bodega', 'gerencia', 'admin', 'general'];
+        const AREAS_ASIGNABLES = ['redes', 'sistemas', 'ejecucion', 'bodega', 'gerencia', 'general'];
         // Editable si no está asignado, O si está archivado (cerrado/resuelto): ahí se puede
         // reclasificar para dejar ordenado el histórico, aunque tenga a alguien asignado.
         const categoriaControlHtml = (canAssignTicket && (!ticketTieneAsignado || ticketArchivado))
@@ -5787,11 +5787,9 @@ return `
                             <option value="redes">Redes</option>
                             <option value="sistemas">Sistemas</option>
                             <option value="ejecucion">Ejecución</option>
-                            <option value="admin">Admin</option>
-                            <option value="general">General</option>
                             <option value="bodega">Bodega</option>
                             <option value="gerencia">Gerencia</option>
-                            <option value="implementaciones">Implementaciones</option>
+                            <option value="general">Sin área asignada</option>
                         </select>
                     </div>
                     ` : ''}
@@ -5924,7 +5922,6 @@ return `
                                 <option value="redes">🌐 Redes</option>
                                 <option value="sistemas">💻 Sistemas</option>
                                 <option value="ejecucion">🔧 Ejecución</option>
-                                <option value="admin">📋 Admin</option>
                                 <option value="bodega">📦 Bodega</option>
                                 <option value="gerencia">👔 Gerencia</option>
                             </select>
