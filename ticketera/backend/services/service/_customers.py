@@ -216,16 +216,33 @@ def get_client_for_email(email: str) -> Optional[Dict[str, Any]]:
 # DIRECTORIO DE CLIENTES
 # ==========================================================================
 
-def get_directorio_clientes(q: Optional[str] = None) -> Dict[str, Any]:
+def get_directorio_clientes(
+    q: Optional[str] = None,
+    scope_categorias: Optional[List[str]] = None,
+    asignado_a: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Retorna la lista de clientes que tienen tickets registrados,
     con conteos por estado para el panel lateral del Directorio.
     """
     conn = db.get_conn()
     try:
+        # LEAK-03 (extensión 2026-06-28): mismo scope por área que la Lista, para no
+        # enumerar clientes/conteos de áreas ajenas. admin/encargado_mesa: scope None.
+        scope_sql = ""
+        scope_params: List[Any] = []
+        if asignado_a and scope_categorias is not None:
+            if scope_categorias:
+                ph = ", ".join(["?" for _ in scope_categorias])
+                scope_sql = f" AND (LOWER(COALESCE(t.categoria, '')) IN ({ph}) OR t.asignado_a = ?)"
+                scope_params = [str(c).strip().lower() for c in scope_categorias] + [asignado_a]
+            else:
+                scope_sql = " AND t.asignado_a = ?"
+                scope_params = [asignado_a]
+
         # Clientes conocidos (con nombre) que tienen tickets
         rows = conn.execute(
-            """
+            f"""
             SELECT
                 t.customer_id,
                 COALESCE(t.customer_id, 'sin_cliente') as id,
@@ -241,10 +258,11 @@ def get_directorio_clientes(q: Optional[str] = None) -> Dict[str, Any]:
             FROM tickets t
             LEFT JOIN ticket_config_client_emails cce
                 ON LOWER(t.origen_email) = LOWER(cce.email)
-            WHERE t.customer_id IS NOT NULL AND t.customer_id != ''
+            WHERE t.customer_id IS NOT NULL AND t.customer_id != ''{scope_sql}
             GROUP BY t.customer_id
             ORDER BY activos DESC, total DESC
-            """
+            """,
+            scope_params,
         ).fetchall()
 
         clientes = []
@@ -270,6 +288,8 @@ def get_directorio_metricas(
     customer_id: Optional[str] = None,
     created_after: Optional[str] = None,
     created_before: Optional[str] = None,
+    scope_categorias: Optional[List[str]] = None,
+    asignado_a: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     KPIs de un cliente en un rango de fechas para el encabezado
@@ -279,6 +299,18 @@ def get_directorio_metricas(
     try:
         where = ["1=1"]
         params: List[Any] = []
+
+        # LEAK-03 (extensión 2026-06-28): mismo scope por área que la Lista, para que
+        # los KPIs no agreguen tickets de áreas ajenas. admin/encargado_mesa pasan
+        # scope_categorias=None (sin acotar).
+        if asignado_a and scope_categorias is not None:
+            if scope_categorias:
+                ph = ", ".join(["?" for _ in scope_categorias])
+                where.append(f"(LOWER(COALESCE(categoria, '')) IN ({ph}) OR asignado_a = ?)")
+                params.extend([str(c).strip().lower() for c in scope_categorias] + [asignado_a])
+            else:
+                where.append("asignado_a = ?")
+                params.append(asignado_a)
 
         if customer_id:
             where.append("LOWER(COALESCE(customer_id, '')) = ?")

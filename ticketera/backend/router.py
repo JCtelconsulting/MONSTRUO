@@ -1034,7 +1034,18 @@ async def get_directorio_clientes(
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     """Lista de clientes con conteo de tickets para el panel lateral del Directorio."""
-    return tickets_service.get_directorio_clientes(q=q)
+    # LEAK-03 (extensión): scope por área igual que la Lista (admin/encargado ven todo).
+    roles = _normalize_session_roles(sess)
+    area_scope = tickets_service.categorias_visibles_para_roles(roles)
+    if area_scope is None:
+        scoped_asignado = None
+        scope_categorias = None
+    else:
+        scoped_asignado = _normalize_session_user(sess) or "__no_user__"
+        scope_categorias = area_scope
+    return tickets_service.get_directorio_clientes(
+        q=q, asignado_a=scoped_asignado, scope_categorias=scope_categorias,
+    )
 
 
 @router.get("/directorio/tickets", response_model=dict)
@@ -1085,10 +1096,21 @@ async def get_directorio_metricas(
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     """KPIs de un cliente en un rango de fechas para el encabezado del Directorio."""
+    # LEAK-03 (extensión): scope por área igual que la Lista (admin/encargado ven todo).
+    roles = _normalize_session_roles(sess)
+    area_scope = tickets_service.categorias_visibles_para_roles(roles)
+    if area_scope is None:
+        scoped_asignado = None
+        scope_categorias = None
+    else:
+        scoped_asignado = _normalize_session_user(sess) or "__no_user__"
+        scope_categorias = area_scope
     return tickets_service.get_directorio_metricas(
         customer_id=customer_id,
         created_after=created_after,
         created_before=created_before,
+        asignado_a=scoped_asignado,
+        scope_categorias=scope_categorias,
     )
 
 
