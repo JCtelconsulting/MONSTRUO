@@ -3158,10 +3158,12 @@
 .tks-ticket-title {
     font-weight: 500;
     color: var(--tks-text);
-    max-width: 300px; /* Reducido para evitar ancho excesivo */
-    /* inline-block para que max-width + overflow (fade-overflow) recorten de verdad;
-       sin esto el <a> es inline, ignora el max-width y el título se desborda/encima. */
-    display: inline-block;
+    /* Usa TODO el ancho de su celda (la tabla es table-layout:fixed, así que la celda ya
+       tiene un ancho definido). block + max-width:100% + overflow (fade-overflow) recortan
+       recién al borde de la columna, no antes. Antes un max-width:300px fijo lo cortaba
+       dejando espacio sin usar. */
+    display: block;
+    max-width: 100%;
     vertical-align: middle;
 }
 
