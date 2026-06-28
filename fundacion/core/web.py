@@ -55,19 +55,18 @@ def build_login_redirect_url(
     request: Request,
     *,
     root_path: str = "",
-    local_gateway_port: int = 9001,
-    local_login_path: str = "/",
+    local_gateway_port: int = 9001,  # ignorado: Fundación tiene login propio
+    local_login_path: str = "/login",
 ) -> str:
-    prefix = get_public_prefix(request, root_path=root_path)
-    forwarded_host = (request.headers.get("x-forwarded-host") or "").split(",", 1)[0].strip()
-    host = (forwarded_host or request.headers.get("host") or request.url.hostname or "").split(":")[0].strip().lower()
-    login_path = local_login_path if local_login_path.startswith("/") else f"/{local_login_path}"
-    if host.endswith(".telconsulting.cl"):
-        return f"https://login.telconsulting.cl{prefix}{login_path}"
+    """Redirige al login PROPIO de Fundación (mismo servicio/host).
 
-    scheme = request.url.scheme or "http"
-    local_host = request.url.hostname or "127.0.0.1"
-    return f"{scheme}://{local_host}:{local_gateway_port}{prefix}{login_path}"
+    Separación: Fundación ya NO salta al gateway de Monstruo. Devuelve un path
+    relativo ``{prefix}/login`` que sirve este mismo servicio, así funciona igual
+    en local (localhost:9006), detrás de nginx (/dev) y en fundacion.telconsulting.cl.
+    """
+    prefix = get_public_prefix(request, root_path=root_path)
+    login_path = local_login_path if local_login_path.startswith("/") else f"/{local_login_path}"
+    return f"{prefix}{login_path}"
 
 
 def redirect_to_login(

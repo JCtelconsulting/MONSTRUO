@@ -131,7 +131,7 @@ def get_user_fundacion_scope(username: str) -> Dict[str, Any]:
     conn = db.get_conn()
     try:
         row = conn.execute(
-            "SELECT fundacion_scope FROM users WHERE username = ?",
+            "SELECT fundacion_scope FROM fundacion.users WHERE username = ?",
             (str(username or "").strip(),),
         ).fetchone()
         if not row:
@@ -149,7 +149,7 @@ def get_user_display_name(username: str) -> str:
     conn = db.get_conn()
     try:
         row = conn.execute(
-            "SELECT first_name, last_name FROM users WHERE username = ?",
+            "SELECT first_name, last_name FROM fundacion.users WHERE username = ?",
             (str(username or "").strip(),),
         ).fetchone()
         if not row:
@@ -214,7 +214,7 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
     conn = db.get_conn()
     try:
         row = conn.execute(
-            "SELECT username, password_hash, role, secondary_roles, is_active FROM users WHERE username=?",
+            "SELECT username, password_hash, role, secondary_roles, is_active FROM fundacion.users WHERE username=?",
             (username.strip(),)
         ).fetchone()
         
@@ -248,13 +248,13 @@ def create_user(username: str, password: str, role: str, secondary_roles: Option
     
     conn = db.get_conn()
     try:
-        exists = conn.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone()
+        exists = conn.execute("SELECT 1 FROM fundacion.users WHERE username=?", (username,)).fetchone()
         if exists:
             # Silent fail or raise? Raise allows API to handle 409
             raise RuntimeError("Usuario ya existe")
             
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, secondary_roles, is_active, created_at) VALUES (?, ?, ?, ?, 1, ?)",
+            "INSERT INTO fundacion.users (username, password_hash, role, secondary_roles, is_active, created_at) VALUES (?, ?, ?, ?, 1, ?)",
             (username, hashed_pw, role, json.dumps(normalized_secondary), db.now_utc_iso())
         )
         conn.commit()
@@ -270,7 +270,7 @@ def get_effective_allowed_modules(username: str, roles: List[str]) -> List[str]:
     try:
         # 1. Intentar obtener el override explícito
         row = conn.execute(
-            "SELECT allowed_modules FROM users WHERE username = ?", (username,)
+            "SELECT allowed_modules FROM fundacion.users WHERE username = ?", (username,)
         ).fetchone()
 
         if row and row.get("allowed_modules"):

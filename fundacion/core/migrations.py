@@ -119,12 +119,10 @@ def run_migrations() -> None:
     conn = db.get_conn()
     try:
         _ensure_log_table(conn)
-        # 1) Migraciones del core (clave = filename, retrocompatible).
+        # Separación: Fundación corre SOLO sus propias migraciones (fundacion/migrations).
+        # No descubre otros módulos del repo — su DB es propia (fase 3) y su ciclo de
+        # vida es independiente del de Monstruo.
         _apply_migration_dir(conn, MIGRATIONS_DIR, key_prefix="")
-        # 2) Migraciones por módulo: <repo>/<modulo>/migrations/*.sql
-        #    (clave = "<modulo>/<filename>", para no colisionar números).
-        for mdir, prefix in _module_migration_dirs():
-            _apply_migration_dir(conn, mdir, key_prefix=prefix)
     finally:
         conn.close()
 

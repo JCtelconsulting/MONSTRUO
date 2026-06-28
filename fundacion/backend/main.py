@@ -3,9 +3,8 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import httpx
 from fastapi import Cookie, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response as FastAPIResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from fundacion.core.env_loader import load_runtime_env
@@ -17,6 +16,7 @@ from fundacion.backend import router as fundacion_router
 from fundacion.backend.routers import sync as sync_router
 from fundacion.backend.routers import reportes as reportes_router
 from fundacion.backend.routers import sesiones as sesiones_router
+from fundacion.backend.auth.router import router as auth_router
 from fundacion.core import db, deps
 from fundacion.core.web import build_login_redirect_url
 
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Monstruo - Fundación API", version="1.0", lifespan=lifespan)
+app = FastAPI(title="Fundación API", version="2.0", lifespan=lifespan)
 
 ui_dir = repo_root / "fundacion" / "ui"
 app.mount("/static", StaticFiles(directory=str(ui_dir)), name="fundacion_static")
@@ -38,36 +38,12 @@ shared_ui_dir = ui_dir / "shared"
 if shared_ui_dir.exists():
     app.mount("/shared", StaticFiles(directory=str(shared_ui_dir)), name="shared_static")
 
+# Routers propios de Fundación: app + login propio (sin proxy al gateway).
 app.include_router(fundacion_router.router)
 app.include_router(sync_router.router)
 app.include_router(reportes_router.router)
 app.include_router(sesiones_router.router)
-
-
-async def _proxy_to_gateway(target_path: str, request: Request) -> FastAPIResponse:
-    async with httpx.AsyncClient() as client:
-        content = await request.body()
-        headers = dict(request.headers)
-        headers.pop("host", None)
-        response = await client.request(
-            request.method,
-            f"http://gateway:9001{target_path}",
-            content=content,
-            headers=headers,
-            params=request.query_params,
-            timeout=30.0,
-        )
-        passthrough_headers = {
-            key: value
-            for key, value in response.headers.items()
-            if key.lower() not in {"content-length", "transfer-encoding", "connection", "content-encoding"}
-        }
-        return FastAPIResponse(
-            content=response.content,
-            status_code=response.status_code,
-            headers=passthrough_headers,
-            media_type=response.headers.get("content-type"),
-        )
+app.include_router(auth_router)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -86,14 +62,31 @@ async def get_index(
     return HTMLResponse(inject_asset_version(index_path.read_text(encoding="utf-8")))
 
 
-@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
-async def gateway_api_proxy(path: str, request: Request):
-    return await _proxy_to_gateway(f"/api/{path}", request)
+# ── Login propio (UI) ────────────────────────────────────────────────────
+# Las rutas exactas /login y /login/ se registran ANTES del mount /login para
+# que tengan precedencia; el mount sirve los assets (/login/css, /login/js).
+login_dir = ui_dir / "login"
 
 
-@app.api_route("/auth/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
-async def gateway_auth_proxy(path: str, request: Request):
-    return await _proxy_to_gateway(f"/auth/{path}", request)
+@app.get("/login", response_class=HTMLResponse)
+@app.get("/login/", response_class=HTMLResponse)
+async def login_page():
+    page = login_dir / "login.html"
+    if not page.exists():
+        raise HTTPException(status_code=404, detail="login UI not found")
+    return HTMLResponse(inject_asset_version(page.read_text(encoding="utf-8")))
+
+
+if login_dir.exists():
+    app.mount("/login", StaticFiles(directory=str(login_dir)), name="login_static")
+
+
+# ── Telemetría de errores del cliente (sink, no rompe la consola) ────────
+@app.post("/api/ops/client-errors")
+async def client_errors_sink(request: Request):
+    # Compat con shared/js/utilidades.js. Fundación no persiste estos errores
+    # (eso era del módulo ops de Monstruo); se aceptan y descartan.
+    return {"ok": True}
 
 
 @app.get("/health")
