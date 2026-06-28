@@ -33,7 +33,7 @@ const TksMain = (() => {
     };
     const ROLE_ADMIN = 'admin';
     const ROLE_MESA_MANAGER = 'encargado_mesa';
-    const ROLE_TECH = new Set(['ops', 'redes', 'sistemas', 'implementaciones', ROLE_MESA_MANAGER]);
+    const ROLE_TECH = new Set(['ops', 'redes', 'sistemas', 'implementaciones', 'gerencia', ROLE_MESA_MANAGER]);
     const ROLE_GERENCIA = 'gerencia';
     const ROLE_MANAGEMENT = new Set([ROLE_ADMIN, ROLE_MESA_MANAGER]);
     const ROLE_DISPATCH = new Set(['ops', ROLE_MESA_MANAGER]);

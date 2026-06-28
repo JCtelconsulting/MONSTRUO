@@ -3287,11 +3287,16 @@ def get_ticket_attachment_for_download(ticket_id: int, attachment_id: int) -> Di
         raise ValueError("Archivo adjunto no disponible")
 
     item["resolved_path"] = str(path.resolve())
-    item["content_type"] = (
-        str(item.get("content_type") or "").strip()
-        or mimetypes.guess_type(path.name)[0]
-        or "application/octet-stream"
-    )
+    # Si lo guardado es genérico o vacío, derivamos el tipo por la extensión del
+    # archivo: así el navegador renderiza imágenes/PDF/etc. inline (con un
+    # content-type concreto) en vez de tratarlos como descarga binaria.
+    _stored_ct = str(item.get("content_type") or "").strip().lower()
+    if _stored_ct and _stored_ct != "application/octet-stream":
+        item["content_type"] = _stored_ct
+    else:
+        item["content_type"] = (
+            mimetypes.guess_type(path.name)[0] or _stored_ct or "application/octet-stream"
+        )
     return item
 
 def get_timeline(ticket_id: int, limit: int = 120, include_emails: bool = False) -> List[Dict[str, Any]]:
