@@ -70,17 +70,24 @@ def _ensure_ticket_read_scope(
     current = ticket or tickets_service.get_ticket(ticket_id)
     if not current:
         raise HTTPException(status_code=404, detail="Ticket no encontrado")
-    if not _is_tech_session(sess):
+
+    # Mismo criterio que la lista (list_tickets): admin/encargado de mesa ven todo; el resto
+    # (técnicos, gerencia) ve los tickets de su(s) área(s) O los asignados a él. Antes el detalle
+    # solo permitía los asignados, así que un ticket del área (visible en la lista) daba 403.
+    roles = _normalize_session_roles(sess)
+    area_scope = tickets_service.categorias_visibles_para_roles(roles)
+    if area_scope is None:
         return current
 
     user = _normalize_session_user(sess)
     assignee = str(current.get("asignado_a") or "").strip().lower()
-    if not user or assignee != user:
-        raise HTTPException(
-            status_code=403,
-            detail="Los técnicos solo pueden ver tickets asignados a su usuario.",
-        )
-    return current
+    categoria = str(current.get("categoria") or "").strip().lower()
+    if (categoria and categoria in area_scope) or (user and assignee == user):
+        return current
+    raise HTTPException(
+        status_code=403,
+        detail="No tienes permiso para ver este ticket (fuera de tu área).",
+    )
 
 
 def _require_ticketera_message_editor(
