@@ -239,6 +239,9 @@ __all__ = [
 # CONSTANTES
 # ==========================================================================
 CATEGORIAS_VALIDAS = {"redes", "sistemas", "ejecucion", "admin", "general", "bodega", "gerencia"}
+# Áreas SELECCIONABLES en la UI (sin 'admin', que no es un área operativa; 'general' = Sin área
+# asignada). CATEGORIAS_VALIDAS se mantiene amplio solo para VALIDAR datos ya existentes.
+CATEGORIAS_ASIGNABLES = ["redes", "sistemas", "ejecucion", "bodega", "gerencia", "general"]
 ESTADOS_VALIDOS = {"abierto", "en_progreso", "resuelto", "cerrado"}
 MAIN_STATUS_SEQUENCE = ("abierto", "en_progreso", "resuelto", "cerrado")
 SEVERIDADES_VALIDAS = {"baja", "media", "alta", "critica"}
@@ -1615,7 +1618,7 @@ def get_ticketera_admin_config() -> Dict[str, Any]:
         "templates": get_ticketera_templates(),
         "mail_templates": list_ticketera_mail_templates(),
         "routing_rules": list_ticketera_routing_rules(),
-        "categories": sorted(CATEGORIAS_VALIDAS),
+        "categories": list(CATEGORIAS_ASIGNABLES),
     }
 
 def _resolve_routing_category_for_email(conn, origen_email: Optional[str]) -> Optional[str]:
