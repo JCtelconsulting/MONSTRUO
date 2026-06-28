@@ -597,8 +597,14 @@ def list_tickets(
     customer_id: Optional[str] = None,
     created_after: Optional[str] = None,
     created_before: Optional[str] = None,
+    scope_categorias: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Listar tickets con filtros avanzados. Retorna {items, total}."""
+    """Listar tickets con filtros avanzados. Retorna {items, total}.
+
+    scope_categorias acota la visibilidad por ÁREA (categoría): cuando se pasa
+    junto con asignado_a, el usuario ve los tickets de su(s) categoría(s) O los
+    asignados a él. None = sin acotar por área.
+    """
     conn = db.get_conn()
     try:
         # Protección simple para evitar cargas excesivas en UI.
@@ -626,7 +632,17 @@ def list_tickets(
             params.append(categoria.lower())
 
         if asignado_a:
-            if ver_resueltos:
+            if scope_categorias is not None:
+                # Scope por área: ve los tickets de su(s) categoría(s) O los asignados a él.
+                clause = "asignado_a = ?"
+                extra = [asignado_a]
+                if scope_categorias:
+                    ph = ", ".join(["?" for _ in scope_categorias])
+                    clause = f"LOWER(COALESCE(categoria, '')) IN ({ph}) OR asignado_a = ?"
+                    extra = [str(c).strip().lower() for c in scope_categorias] + [asignado_a]
+                where_clauses.append(f"({clause})")
+                params.extend(extra)
+            elif ver_resueltos:
                 where_clauses.append("(asignado_a = ? OR estado IN ('resuelto', 'cerrado'))")
                 params.append(asignado_a)
             else:

@@ -80,3 +80,35 @@ class TestRolesPolicies:
             ticket_roles.require_can_participate(
                 ticket, "alice", "admin", "responder correo",
             )
+
+
+class TestVisibilidadPorArea:
+    """Scope de visibilidad por área (se liga al área/rol, no a la persona)."""
+
+    def _cats(self, roles):
+        from ticketera.backend.services.service._specialties import (
+            categorias_visibles_para_roles,
+        )
+        return categorias_visibles_para_roles(roles)
+
+    def test_admin_ve_todo(self):
+        assert self._cats(["admin"]) is None
+
+    def test_encargado_mesa_ve_todo(self):
+        assert self._cats(["encargado_mesa", "redes"]) is None
+
+    def test_tecnico_ve_su_area(self):
+        assert self._cats(["sistemas"]) == ["sistemas"]
+        assert self._cats(["redes"]) == ["redes"]
+
+    def test_ops_sin_area_mapeable_ve_solo_asignados(self):
+        # 'ops' mapea a 'general', que no es una categoría de ticket → lista vacía
+        # (verá solo los tickets asignados a él).
+        assert self._cats(["ops"]) == []
+
+    def test_gerencia_acotada_a_su_categoria(self):
+        assert self._cats(["gerencia"]) == ["gerencia"]
+
+    def test_rol_desconocido_ve_todo(self):
+        # Un rol sin área definida conserva el comportamiento previo: ve todo.
+        assert self._cats(["directora_social"]) is None

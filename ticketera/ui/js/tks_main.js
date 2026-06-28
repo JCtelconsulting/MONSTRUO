@@ -1005,7 +1005,7 @@ return {
             : `
                 <div class="tks-toolbar">
                     <div class="tks-toolbar-note">
-                        Mostrando solo tickets asignados a tu usuario
+                        Mostrando los tickets de tu área y los asignados a ti
                     </div>
                     <button class="tks-btn tks-btn-ghost tks-btn-icon" onclick="TksMain.refreshList()" title="Recargar"><i class="fas fa-sync-alt"></i></button>
                 </div>
@@ -1034,7 +1034,7 @@ return {
                 </div>
             `
             : '';
-        const mineFilterHtml = (showListFilters && sessionCtx.user)
+        const mineFilterHtml = (showListFilters && sessionCtx.user && !sessionCtx.isAdmin)
             ? `
                 <div class="tks-filter-row" id="tks-mine-filter">
                     <button class="tks-filter-chip ${filters.asignado_a ? 'active' : ''}" id="tks-filter-mine" title="Ver solo los tickets asignados a mí">

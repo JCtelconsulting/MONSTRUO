@@ -385,8 +385,18 @@ async def list_tickets(
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     """Listar tickets con filtros avanzados."""
-    tech_scope = _is_tech_session(sess)
-    scoped_asignado = _scoped_assignee(sess, asignado_a)
+    roles = _normalize_session_roles(sess)
+    # Visibilidad por ÁREA (no por persona): admin / encargado de mesa ven todo;
+    # el resto (técnicos, etc.) ve los tickets de su(s) categoría(s) además de los
+    # asignados a él. Así, si cambia el personal de un área, la vista no se rompe.
+    area_scope = tickets_service.categorias_visibles_para_roles(roles)
+    if area_scope is None:
+        scoped_asignado = asignado_a
+        scope_categorias = None
+    else:
+        scoped_asignado = _normalize_session_user(sess) or "__no_user__"
+        scope_categorias = area_scope
+
     status_norm = str(status or "").strip().lower() or None
     trashed_only = status_norm == "papelera"
 
@@ -398,13 +408,12 @@ async def list_tickets(
 
     # Sin filtro de estado explícito: excluir "cerrado" de la Lista (van a Archivados)
     exclude_cerrado = (
-        not tech_scope
-        and not trashed_only
+        not trashed_only
         and not estados_multiples
         and not status_norm
     )
     effective_estados = estados_multiples
-    effective_estado = None if tech_scope or trashed_only or estados_multiples else status_norm
+    effective_estado = None if trashed_only or estados_multiples else status_norm
     if exclude_cerrado:
         effective_estados = ["abierto", "en_progreso", "resuelto", "pendiente_cliente",
                              "pendiente_compra", "pendiente_tercero", "pendiente_aprobacion_1",
@@ -413,10 +422,10 @@ async def list_tickets(
 
     result = tickets_service.list_tickets(
         estado=effective_estado,
-        q=None if tech_scope else q,
-        categoria=None if tech_scope else categoria,
+        q=q,
+        categoria=categoria,
         asignado_a=scoped_asignado,
-        severidad=None if tech_scope else severidad,
+        severidad=severidad,
         customer_id=customer_id,
         created_after=created_after,
         created_before=created_before,
@@ -424,6 +433,7 @@ async def list_tickets(
         offset=offset,
         trashed_only=trashed_only,
         estados=effective_estados,
+        scope_categorias=scope_categorias,
     )
     return result
 

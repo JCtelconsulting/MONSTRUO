@@ -37,6 +37,57 @@ def _resolve_role_specialties(role_value: Any, secondary_roles_value: Any) -> Li
             out.append(mapped)
     return out
 
+
+# Mapeo de especialidad (área del usuario) -> categoría de ticket. Las especialidades
+# que no aparecen aquí (p.ej. 'general' de ops) no acotan por categoría: ese usuario
+# verá solo los tickets asignados a él.
+SPECIALTY_TO_CATEGORIA = {
+    "redes": "redes",
+    "sistemas": "sistemas",
+    "ejecucion": "ejecucion",
+    "warehouse": "bodega",
+}
+
+# Categorías de ticket válidas: un rol que ya es una categoría (p.ej. 'gerencia')
+# acota directamente a esa categoría.
+_CATEGORIAS_TICKET = {"redes", "sistemas", "ejecucion", "admin", "bodega", "gerencia"}
+
+# Roles no técnicos que igualmente se acotan por área (gerencia ve solo su área).
+_ROLES_ACOTADOS_EXTRA = {"gerencia"}
+
+
+def categorias_visibles_para_roles(roles: Any) -> Optional[List[str]]:
+    """Categorías (áreas) que un usuario puede ver en Lista/Archivados.
+
+    - None  => ve TODO (admin / encargado de mesa).
+    - lista => acotado a esas categorías (además de los tickets asignados a él).
+    - []    => sin área mapeable: verá solo los tickets asignados a él.
+
+    Liga la visibilidad al ÁREA, no a la persona: si cambia el personal de un
+    área, la vista sigue funcionando sin reconfigurar nada.
+    """
+    normalized = _normalize_roles(roles)
+    # Gestión global (admin / encargado de mesa) ve todo.
+    if any(r in ticket_roles.ROLES_ADMIN_GESTION for r in normalized):
+        return None
+    # Solo se acota por área a roles técnicos o de gerencia. Cualquier otro rol
+    # (desconocido / lectura) conserva el comportamiento previo: ve todo.
+    acota = any(
+        (r in ROLES_TECNICOS_SET) or (r in _ROLES_ACOTADOS_EXTRA)
+        for r in normalized
+    )
+    if not acota:
+        return None
+    cats: List[str] = []
+    for role in normalized:
+        spec = ROLE_SPECIALTY_FALLBACK.get(role)
+        cat = SPECIALTY_TO_CATEGORIA.get(spec) if spec else None
+        if not cat and role in _CATEGORIAS_TICKET:
+            cat = role
+        if cat and cat not in cats:
+            cats.append(cat)
+    return cats
+
 def _active_ticket_load_map(conn) -> Dict[str, int]:
     rows = conn.execute(
         """

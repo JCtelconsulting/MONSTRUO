@@ -268,6 +268,7 @@ from ._specialties import (  # noqa: F401
     _resolve_role_specialties,
     _active_ticket_load_map,
     _list_specialties_with_role_fallback,
+    categorias_visibles_para_roles,
 )
 
 # ── _sla: SLA metrics, compliance, evidence, legal holds ─────────────────────
