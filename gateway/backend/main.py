@@ -387,7 +387,7 @@ def auth_login(req: LoginRequest, response: Response, request: Request):
         key="access_token",
         value=token,
         httponly=True,
-        max_age=720 * 60,
+        max_age=app_settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="lax",
         secure=_is_cookie_secure_enabled(request),
         domain=cookie_domain,
@@ -398,7 +398,6 @@ def auth_login(req: LoginRequest, response: Response, request: Request):
         "role": user_data["role"],
         "roles": user_data.get("roles") or [user_data["role"]],
         "name": user_data["username"],
-        "token": token,
     }
 
 
@@ -458,7 +457,8 @@ def check_session_status(
             "display_name": auth_service.get_user_display_name(sess["username"]),
         }
     except Exception as exc:
-        return {"ok": False, "detail": str(exc)}
+        logger.warning("sesion check fallo: %s", exc)
+        return {"ok": False, "detail": "sesion_invalida"}
 
 
 @app.post("/api/auth/change-password")
