@@ -774,6 +774,7 @@ def update_ticket(
         "resolucion",
         "ticket_security_class",
         "customer_id",
+        "cliente_nombre",
         "contact_role",
         "notify_emails",
     }
@@ -806,7 +807,7 @@ def update_ticket(
         if key == "asignado_a":
             normalized_updates[key] = str(value).strip() if value else None
             continue
-        if key == "customer_id" or key == "contact_role":
+        if key in ("customer_id", "contact_role", "cliente_nombre"):
             normalized_updates[key] = str(value).strip() if value else None
             continue
         if key == "notify_emails":
