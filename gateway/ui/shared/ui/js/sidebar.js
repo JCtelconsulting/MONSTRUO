@@ -81,12 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     (async () => {
         let allowed = [];
-        let isAdmin = false;
         try {
             const data = await window.fetchApi('/api/sesion');
             if (data.ok) {
                 allowed = data.allowed_modules || [];
-                isAdmin = String(data.role || '').toUpperCase() === 'ADMIN';
 
                 const whoEl = document.getElementById('who');
                 if (whoEl) {
@@ -216,64 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (typeof window.initModal === 'function') window.initModal();
         if (typeof window.initLogout === 'function') window.initLogout();
-
-        if (isProdHost && isAdmin && !footerContainer.querySelector('.btn-env')) {
-            const isDev = envPrefix === '/dev';
-            const btnEnv = document.createElement('button');
-            btnEnv.className = 'btn-env';
-            btnEnv.title = isDev ? 'Volver a Producción' : 'Ir a Desarrollo';
-            btnEnv.innerHTML = isDev
-                ? '<i class="fas fa-server"></i> <span>VOLVER A PROD</span>'
-                : '<i class="fas fa-flask"></i> <span>IR A DEV</span>';
-            btnEnv.addEventListener('click', () => {
-                window.location.assign(isDev ? '/prod/' : '/dev/');
-            });
-
-            if (!document.getElementById('btn-env-styles')) {
-                const style = document.createElement('style');
-                style.id = 'btn-env-styles';
-                style.textContent = `
-                    .btn-env {
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 8px;
-                        font-weight: 800;
-                        text-transform: uppercase;
-                        padding: 12px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        transition: 0.2s;
-                        font-size: 0.8rem;
-                        background: transparent;
-                        white-space: nowrap;
-                        width: 100%;
-                        font-family: var(--font-main);
-                        letter-spacing: 0.5px;
-                        border: 1px solid ${isDev ? 'var(--danger)' : 'var(--info)'} !important;
-                        color: ${isDev ? 'var(--danger)' : 'var(--info)'} !important;
-                    }
-                    .btn-env:hover {
-                        background: ${isDev ? 'var(--danger)' : 'var(--info)'} !important;
-                        color: ${isDev ? '#fff' : '#000'} !important;
-                        box-shadow: 0 0 20px ${isDev ? 'rgba(255,51,51,0.4)' : 'rgba(0,243,255,0.4)'};
-                    }
-                    body.sidebar-collapsed .btn-env {
-                        width: 42px;
-                        height: 42px;
-                        padding: 0;
-                        border-radius: 10px;
-                        font-size: 1rem;
-                    }
-                    body.sidebar-collapsed .btn-env span {
-                        display: none;
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-
-            footerContainer.insertBefore(btnEnv, footerContainer.firstChild);
-        }
     }
 
     const p = window.location.pathname;

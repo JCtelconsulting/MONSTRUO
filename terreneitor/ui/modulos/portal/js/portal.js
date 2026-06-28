@@ -5,24 +5,11 @@
 const APP_VERSION = '2026-03-11-ADMIN-DELETE-V17';
 const APP_VERSION_KEY = 'portal_app_version';
 
-// --- ENV INTERCEPTOR ---
-(function () {
-  const path = window.location.pathname;
-  if (path.startsWith('/__env/')) {
-    const mode = path.split('/')[2]; // dev or prod
-    if (mode === 'dev' || mode === 'prod') {
-      // Redirigir por URL (no por cookie)
-      window.location.replace(mode === 'dev' ? '/dev/' : '/');
-    }
-  }
-})();
-
 const LOGIN_URL_APP =
   typeof window.getEnvLoginUrl === 'function'
     ? window.getEnvLoginUrl()
     : `${window.location.origin}${window.location.pathname.startsWith('/dev') ? '/dev' : ''}/`;
 let authRedirecting = false;
-let envSwitching = false;
 let adminStatsTimer = null;
 let adminStatsLoading = false;
 let usersLoading = false;
@@ -34,42 +21,6 @@ const ADMIN_AUX_TTL_MS = 120000;
 let usersLastLoadedAt = 0;
 let projectsLastLoadedAt = 0;
 const ADMIN_DATA_TTL_MS = 60000;
-
-async function clearClientStateForEnvSwitch() {
-  try {
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map((r) => r.unregister()));
-    }
-  } catch (e) {}
-  try {
-    if (window.caches && typeof window.caches.keys === 'function') {
-      const keys = await window.caches.keys();
-      await Promise.all(keys.map((k) => window.caches.delete(k)));
-    }
-  } catch (e) {}
-}
-
-window.switchEnvironment = function (targetEnv) {
-  const env = targetEnv === 'dev' ? 'dev' : 'prod';
-  if (envSwitching) {
-    return;
-  }
-  envSwitching = true;
-
-  const targetUrl = env === 'dev' ? '/dev/' : '/';
-  const navigate = () => window.location.replace(targetUrl);
-
-  // Fallback para evitar quedarse pegado si limpiar SW/cache demora.
-  const timeoutId = setTimeout(navigate, 450);
-
-  clearClientStateForEnvSwitch()
-    .catch(() => {})
-    .finally(() => {
-      clearTimeout(timeoutId);
-      navigate();
-    });
-};
 
 function ensureAppVersion() {
   const current = localStorage.getItem(APP_VERSION_KEY);
@@ -108,60 +59,6 @@ function getCookie(name) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(';').shift();
-}
-
-function renderEnvironmentIndicators() {
-  // Entorno SOLO por URL (/dev). La cookie legacy causaba "mezclas" visuales.
-  try {
-    // Intento de limpieza por si quedo una cookie antigua compartida por .telconsulting.cl
-    document.cookie = 'terreneitor_env=; path=/; domain=.telconsulting.cl; max-age=0; samesite=lax';
-  } catch (e) {}
-  const isDevUrl = window.location.pathname.startsWith('/dev');
-
-  const isDev = isDevUrl;
-
-  const container = document.querySelector('.header-actions');
-  if (!container) return;
-
-  const existing = container.querySelectorAll('.env-indicator-group');
-  existing.forEach((e) => e.remove());
-
-  // Solo los admin pueden cambiar de entorno (prod/dev); los demás no ven el botón.
-  if (!window.isAdmin) return;
-
-  const group = document.createElement('div');
-  group.className = 'env-indicator-group footer-buttons-container';
-  group.style.marginTop = 'auto';
-  group.style.marginBottom = '10px';
-
-  if (isDev) {
-    // Estamos en DEV (sin badge de entorno)
-    group.innerHTML = `
-      <button type="button" class="btn-env-switch" data-target-env="prod" title="Ir a Producción">
-        <i class="fas fa-rocket"></i> <span>IR A PROD</span>
-      </button>
-    `;
-  } else {
-    group.innerHTML = `
-        <button type="button" class="btn-env-switch to-dev" data-target-env="dev" title="Ir a Desarrollo">
-            <i class="fas fa-bug"></i> <span>IR A DEV</span>
-        </button>
-    `;
-  }
-
-  const profile = document.getElementById('who');
-  if (profile) {
-    container.insertBefore(group, profile);
-  } else {
-    container.appendChild(group);
-  }
-
-  const btnSwitch = group.querySelector('[data-target-env]');
-  if (btnSwitch) {
-    btnSwitch.addEventListener('click', () => {
-      window.switchEnvironment(btnSwitch.dataset.targetEnv);
-    });
-  }
 }
 
 // Fallback robusto: si la inicialización del nav falla por algún motivo,
@@ -1667,7 +1564,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isDevPath) {
           document.body.classList.add('dev-mode');
         }
-        renderEnvironmentIndicators();
         document.querySelectorAll('.side-link[data-admin="true"]').forEach((btn) => {
           btn.hidden = !window.isAdmin;
         });
