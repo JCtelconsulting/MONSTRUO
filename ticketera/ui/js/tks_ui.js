@@ -5660,6 +5660,13 @@ return `
                     >
                 </div>
 
+                <div class="tks-form-group">
+                    <label>Área</label>
+                    <select id="tks-routing-categoria" class="tks-select">
+                        ${categoryOptions}
+                    </select>
+                </div>
+
                 <div class="tks-form-group" style="align-self: flex-end; padding-bottom: 4px;">
                     ${editing ? `<button class="tks-btn tks-btn-ghost" type="button" onclick="TksMain.editRoutingRule(null);" style="margin-right: 0.5rem;">Cancelar</button>` : ''}
                     <button class="tks-btn tks-btn-primary" type="button" onclick="TksMain.saveRoutingRule()">
@@ -5673,7 +5680,7 @@ return `
     function renderMessageTemplates(data, options = {}) {
         const categories = Array.isArray(data?.categories) && data.categories.length
             ? data.categories
-            : ['admin', 'ejecucion', 'general', 'redes', 'sistemas'];
+            : ['redes', 'sistemas', 'ejecucion', 'bodega', 'gerencia', 'general'];
         const mailTemplates = Array.isArray(data?.mailTemplates) ? data.mailTemplates : [];
         const routingRules = Array.isArray(data?.routingRules) ? data.routingRules : [];
         const editingRule = options?.editingRule || null;
