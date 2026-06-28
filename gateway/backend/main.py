@@ -338,11 +338,41 @@ async def _proxy_to_target(target_url: str, request: Request) -> FastAPIResponse
 
 
 
+# AUTHN-01 (auditoría 2026-06-28): rate-limit en memoria del login para frenar
+# fuerza bruta. Usa las constantes LOGIN_RATE_LIMIT_* de config (estaban definidas
+# pero sin usar). Por IP+email, ventana deslizante. Mitigación práctica sin Redis.
+import time as _rl_time
+from collections import defaultdict as _rl_defaultdict
+
+_login_fail_log: dict = _rl_defaultdict(list)
+
+
+def _login_rl_key(request: Request, email: str) -> str:
+    ip = request.client.host if request.client else "?"
+    return f"{ip}|{(email or '').strip().lower()}"
+
+
+def _login_rl_blocked(key: str) -> bool:
+    now = _rl_time.time()
+    window = getattr(app_settings, "LOGIN_RATE_LIMIT_WINDOW_SECONDS", 300)
+    maxa = getattr(app_settings, "LOGIN_RATE_LIMIT_MAX_ATTEMPTS", 10)
+    _login_fail_log[key] = [t for t in _login_fail_log[key] if now - t < window]
+    return len(_login_fail_log[key]) >= maxa
+
+
 @app.post("/api/auth/login")
 def auth_login(req: LoginRequest, response: Response, request: Request):
+    _rl_key = _login_rl_key(request, req.email)
+    if _login_rl_blocked(_rl_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Demasiados intentos fallidos. Espera unos minutos.",
+        )
     user_data = auth_service.authenticate_user(req.email, req.password)
     if not user_data:
+        _login_fail_log[_rl_key].append(_rl_time.time())
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
+    _login_fail_log.pop(_rl_key, None)
 
     token = security.create_access_token(
         user_data["username"],
