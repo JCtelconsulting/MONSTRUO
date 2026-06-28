@@ -57,6 +57,21 @@ propia, menos madura). Todo lo explotable se aplicó en `dev` el 2026-06-28.
 Verificado: tests OK (gateway 21, gta 18, terreneitor 21, ticketera 21, fundacion 12), las apps
 healthy, LEAK-01 confirmado funcionalmente (401 sin sesión).
 
+### Cierre tras revisión adversarial (10 agentes)
+
+Una revisión adversarial multi-agente sobre todos los fixes encontró **2 huecos reales** que los
+parches iniciales no cerraban (ruta paralela / endpoint hermano), ya corregidos:
+
+| Hallazgo | Sev | Fix | Commit |
+|----------|-----|-----|--------|
+| `/api/gerencia/*` (informes + KPIs) exigía solo `require_session` → TERRENO accedía por ruta paralela a download-job/-direct | **alta** | todo el router `/api/gerencia` → `require_gestion` | db00487 |
+| `/directorio/metricas` y `/directorio/clientes` agregaban datos de otras áreas | media | scope por área en ambos (como `/directorio/tickets`) | 9eec339 |
+| rate-limiter de login dejaba claves muertas en memoria | baja | limpieza de claves vacías | 70c99b7 |
+| `/api/sesion` (fundación) filtraba `str(exc)`; alta de usuario admin sin política de password | baja | detalle genérico + `password>=8` | 3f66275, db00487 |
+
+Falso positivo descartado por verificación: FILE-02 "pierde fotos offline" — el flujo preserva el
+nombre de archivo; solo afectaría a videos (UX, no seguridad).
+
 ## Decisiones de diseño
 
 - **CSRF-01 — NO se implementaron tokens CSRF.** Las cookies de sesión de los 4 servicios
