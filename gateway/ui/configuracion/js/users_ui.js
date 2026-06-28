@@ -805,6 +805,8 @@ const UsersUI = (() => {
             title.textContent = 'Editar Usuario';
             userInput.value = user.username;
             userInput.disabled = true;
+            document.getElementById('inpFirstName').value = user.first_name || '';
+            document.getElementById('inpLastName').value = user.last_name || '';
             document.getElementById('chkActive').checked = user.is_active;
             document.getElementById('inpPassword').placeholder = '(Dejar en blanco para no cambiar)';
             form.dataset.mode = 'edit';
@@ -819,6 +821,8 @@ const UsersUI = (() => {
             title.textContent = 'Nuevo Usuario';
             userInput.value = '';
             userInput.disabled = false;
+            document.getElementById('inpFirstName').value = '';
+            document.getElementById('inpLastName').value = '';
             document.getElementById('inpPassword').placeholder = 'Contrasena';
             document.getElementById('chkActive').checked = true;
             form.dataset.mode = 'create';
@@ -970,6 +974,8 @@ const UsersUI = (() => {
 
         const username = String(document.getElementById('inpUsername').value || '').trim();
         const password = String(document.getElementById('inpPassword').value || '');
+        const firstName = String(document.getElementById('inpFirstName').value || '').trim();
+        const lastName = String(document.getElementById('inpLastName').value || '').trim();
         const isActive = Boolean(document.getElementById('chkActive').checked);
 
         const allowedModules = [];
@@ -1008,10 +1014,10 @@ const UsersUI = (() => {
                 }
                 await window.fetchApi('/api/admin/users', {
                     method: 'POST',
-                    body: { username, password, role, secondary_roles: secondaryRoles, allowed_modules: allowedModules, module_roles: moduleRoles }
+                    body: { username, password, role, secondary_roles: secondaryRoles, allowed_modules: allowedModules, module_roles: moduleRoles, first_name: firstName, last_name: lastName }
                 });
             } else {
-                const body = { role, secondary_roles: secondaryRoles, is_active: isActive, allowed_modules: allowedModules, module_roles: moduleRoles };
+                const body = { role, secondary_roles: secondaryRoles, is_active: isActive, allowed_modules: allowedModules, module_roles: moduleRoles, first_name: firstName, last_name: lastName };
                 if (password) body.password = password;
 
                 await window.fetchApi(`/api/admin/users/${encodeURIComponent(username)}`, {

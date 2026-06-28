@@ -90,10 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (whoEl) {
                     const userName = data.user || 'Usuario';
                     const userRole = (data.role || 'user').toUpperCase();
-                    let displayName = userName;
-                    if (userName.includes('@')) {
-                        displayName = userName.split('@')[0].replace('.', ' ');
-                        displayName = displayName.replace(/\b\w/g, l => l.toUpperCase());
+                    // Nombre real desde la identidad central; si no está cargado, se deriva del correo.
+                    let displayName = String(data.display_name || '').trim();
+                    if (!displayName) {
+                        displayName = userName;
+                        if (userName.includes('@')) {
+                            displayName = userName.split('@')[0].replace('.', ' ');
+                            displayName = displayName.replace(/\b\w/g, l => l.toUpperCase());
+                        }
                     }
 
                     whoEl.innerHTML = `

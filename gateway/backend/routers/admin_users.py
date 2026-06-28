@@ -96,6 +96,8 @@ class UserCreate(BaseModel):
     fundacion_scope: Dict[str, Any] = Field(default_factory=dict)
     module_roles: Dict[str, Any] = Field(default_factory=dict)  # {"terreneitor": "SUPERVISOR", "terreneitor_planes": true}
     organizacion: Optional[str] = None  # 'monstruo' | 'fundacion'
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
@@ -107,6 +109,8 @@ class UserUpdate(BaseModel):
     fundacion_scope: Optional[Dict[str, Any]] = None
     module_roles: Optional[Dict[str, Any]] = None  # {"terreneitor": "SUPERVISOR", "terreneitor_planes": true}
     organizacion: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 _VALID_ORGS = {"monstruo", "fundacion"}
@@ -184,7 +188,7 @@ async def list_users(
 
     sql = (
         "SELECT id, username, role, secondary_roles, is_active, allowed_modules, "
-        "fundacion_scope, module_roles, organizacion, created_at "
+        "fundacion_scope, module_roles, organizacion, first_name, last_name, created_at "
         f"FROM users WHERE {' AND '.join(where_clauses)} ORDER BY username ASC"
     )
 
@@ -206,6 +210,7 @@ async def list_users(
             except Exception:
                 item["secondary_roles"] = []
 
+            item["display_name"] = f"{(item.get('first_name') or '').strip()} {(item.get('last_name') or '').strip()}".strip()
             item["fundacion_scope"] = auth_service.normalize_fundacion_scope(item.get("fundacion_scope"))
             try:
                 item["module_roles"] = json.loads(item.get("module_roles") or "{}")
@@ -250,8 +255,9 @@ async def create_user_endpoint(
 
         conn.execute(
             """INSERT INTO users (username, password_hash, role, secondary_roles, is_active,
-                                  allowed_modules, fundacion_scope, module_roles, organizacion, created_at)
-               VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)""",
+                                  allowed_modules, fundacion_scope, module_roles, organizacion,
+                                  first_name, last_name, created_at)
+               VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 body.username,
                 security.get_password_hash(body.password),
@@ -261,6 +267,8 @@ async def create_user_endpoint(
                 json.dumps(normalized_fundacion_scope),
                 json.dumps(_normalize_module_roles(body.module_roles, body.allowed_modules)),
                 target_org,
+                (body.first_name or "").strip(),
+                (body.last_name or "").strip(),
                 db.now_utc_iso(),
             ),
         )
@@ -343,6 +351,14 @@ async def update_user(
         if body.password:
             updates.append("password_hash = ?")
             params.append(security.get_password_hash(body.password))
+
+        if body.first_name is not None:
+            updates.append("first_name = ?")
+            params.append(body.first_name.strip())
+
+        if body.last_name is not None:
+            updates.append("last_name = ?")
+            params.append(body.last_name.strip())
 
         if body.organizacion is not None:
             new_org = body.organizacion.strip().lower()

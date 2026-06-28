@@ -140,6 +140,24 @@ def get_user_fundacion_scope(username: str) -> Dict[str, Any]:
     finally:
         conn.close()
 
+def get_user_display_name(username: str) -> str:
+    """Nombre real del usuario = '{first_name} {last_name}'.trim().
+
+    Vacío si no está cargado: el consumidor (sidebar, ticketera, etc.) aplica su
+    propio fallback (derivar del correo). La identidad central es la única fuente.
+    """
+    conn = db.get_conn()
+    try:
+        row = conn.execute(
+            "SELECT first_name, last_name FROM users WHERE username = ?",
+            (str(username or "").strip(),),
+        ).fetchone()
+        if not row:
+            return ""
+        return f"{(row.get('first_name') or '').strip()} {(row.get('last_name') or '').strip()}".strip()
+    finally:
+        conn.close()
+
 def _normalize_role(raw_role: str) -> str:
     role = unicodedata.normalize("NFKD", str(raw_role or ""))
     role = role.encode("ascii", "ignore").decode("ascii")

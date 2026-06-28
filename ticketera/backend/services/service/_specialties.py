@@ -187,6 +187,24 @@ def _list_specialties_with_role_fallback(conn) -> List[Dict[str, Any]]:
             existing_keys.add(key)
 
     items.sort(key=lambda row: (str(row.get("specialty") or ""), str(row.get("username") or "")))
+
+    # Enriquecer cada item con el nombre real del usuario (desde auth.users, la identidad
+    # central). Si no hay nombre cargado, queda vacío y el frontend deriva del correo (fallback).
+    name_map: Dict[str, str] = {}
+    try:
+        name_rows = conn.execute(
+            "SELECT username, first_name, last_name FROM users WHERE COALESCE(allowed_modules, '') LIKE ?",
+            ('%"tks"%',),
+        ).fetchall()
+        for nr in name_rows:
+            u = _normalize_username(nr.get("username"))
+            if u:
+                name_map[u] = f"{(nr.get('first_name') or '').strip()} {(nr.get('last_name') or '').strip()}".strip()
+    except Exception:
+        name_map = {}
+    for item in items:
+        item["display_name"] = name_map.get(_normalize_username(item.get("username")), "")
+
     return items
 
 def list_specialties() -> List[Dict[str, Any]]:

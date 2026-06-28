@@ -429,6 +429,8 @@ def init_db() -> None:
             fundacion_scope TEXT DEFAULT '{}',
             module_roles TEXT DEFAULT '{}',
             phone_number TEXT,
+            first_name TEXT DEFAULT '',
+            last_name TEXT DEFAULT '',
             created_at TEXT DEFAULT ''
         );
         """)
@@ -440,6 +442,8 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS fundacion_scope TEXT DEFAULT '{}'")
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS module_roles TEXT DEFAULT '{}'")
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS phone_number TEXT")
+                conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS first_name TEXT DEFAULT ''")
+                conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS last_name TEXT DEFAULT ''")
             else:
                 # SQLite fallback
                 try:
@@ -460,6 +464,14 @@ def init_db() -> None:
                     pass
                 try:
                     conn.execute("ALTER TABLE auth.users ADD COLUMN phone_number TEXT")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE auth.users ADD COLUMN first_name TEXT DEFAULT ''")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE auth.users ADD COLUMN last_name TEXT DEFAULT ''")
                 except Exception:
                     pass
 
