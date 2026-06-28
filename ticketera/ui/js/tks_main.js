@@ -2226,7 +2226,16 @@ return { ticket, permissions };
         if (!container) return;
         container.innerHTML = '<div class="tks-dashboard"><div class="tks-skeleton" style="height:220px;"></div></div>';
         if (token !== tabRequestToken || currentTab !== 'reportes') return;
-        container.innerHTML = TksUI.renderArchivosView();
+        // Mismo layout que la Lista (#tks-list-panel + #tks-detail-panel) para poder abrir el
+        // detalle de un archivado ACÁ MISMO, sin saltar a la pestaña Lista (reusa openDetail/
+        // closeDetail: openDetail oculta la tabla y muestra el detalle; "volver" la restaura).
+        container.innerHTML = `
+            <div class="tks-list-layout">
+                <div class="tks-list-panel" id="tks-list-panel">
+                    ${TksUI.renderArchivosView()}
+                </div>
+                <div class="tks-full-detail-view" id="tks-detail-panel"></div>
+            </div>`;
         // Poblar select de clientes y luego cargar tickets
         window.cargarClientesSelect('tks-arch-filter-cliente').then(() => window.loadArchivados());
         window.cargarClientesSelect('tks-atendidos-cliente');
@@ -2641,9 +2650,11 @@ return {
             if (window.showToast) window.showToast('Vinculación exitosa', 'success');
             closeAssociateModal();
             
-            // Refrescar según donde estemos
+            // Refrescar según donde estemos: recargar el detalle del ticket para que el
+            // botón pase de "Vincular" a "Cambiar" y se vea el cliente recién asignado.
+            // (Antes llamaba showDetail(), que no existe → ReferenceError y no refrescaba.)
             if (cache.detail && cache.detail.id) {
-                showDetail(cache.detail.id);
+                openDetail(cache.detail.id, { preserveTab: true });
             } else {
                 refreshList();
             }
@@ -2920,14 +2931,11 @@ window.cargarClientesSelect = async function(selectId) {
 };
 
 window.tksAbrirArchivado = function(id) {
-    // Abrir el ticket histórico IGUAL que en la pestaña Lista (no en un modal): vamos a
-    // Lista y abrimos el detalle ahí, idéntico a hacer clic en un ticket de la lista.
-    // loadTab('lista') monta el layout (incluido #tks-detail-panel) de forma síncrona
-    // —antes de cualquier await—, así que openDetail lo encuentra enseguida (sin el
-    // setTimeout frágil de versiones anteriores).
-    if (!(window.TksMain && TksMain.loadTab && TksMain.openDetail)) return;
-    TksMain.loadTab('lista');
-    TksMain.openDetail(parseInt(id), { preserveTab: true });
+    // Abrir el detalle del ticket histórico ACÁ MISMO (en la pestaña Archivados), con el
+    // mismo layout que la Lista. La vista de Archivados monta #tks-detail-panel, así que
+    // openDetail lo usa: oculta la tabla de archivados y muestra el detalle. El botón
+    // "volver" (closeDetail) restaura la tabla. No salta a la pestaña Lista.
+    if (window.TksMain && TksMain.openDetail) TksMain.openDetail(parseInt(id), { preserveTab: true });
 };
 
 window.tksGerenciaDecision = function(ticketId, decision) {
