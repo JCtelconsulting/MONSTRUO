@@ -352,7 +352,14 @@ def auth_login(req: LoginRequest, response: Response, request: Request):
     cookie_domain = _resolve_cookie_domain(request)
     cookie_path = _resolve_cookie_path(request)
 
-    response.delete_cookie("access_token", path=cookie_path)
+    # Borrar CUALQUIER access_token previo en ambos paths (/ y /dev) y dominios antes de setear
+    # el nuevo. Si no, al loguear en dev queda también el de prod (path=/) y el navegador manda
+    # las dos cookies juntas; la sesión se lee de forma ambigua y "a veces no deja entrar a dev
+    # hasta pasar por prod". Con un solo access_token vigente desaparece esa intermitencia.
+    for _p in ("/", "/dev"):
+        response.delete_cookie("access_token", path=_p)
+        if cookie_domain:
+            response.delete_cookie("access_token", domain=cookie_domain, path=_p)
     response.set_cookie(
         key="access_token",
         value=token,
