@@ -5323,8 +5323,8 @@ return `
                             <i class="fas fa-link"></i> ${(customerId || (clientNameRaw && clientNameRaw !== 'Desconocido')) ? 'Cambiar Cliente' : 'Vincular Cliente'}
                         </button>
                     </div>
-                    ${categoriaControlHtml}
                     ${assigneeControlHtml}
+                    ${categoriaControlHtml}
                 </div>
             </div>`;
 

@@ -292,23 +292,11 @@ return {
     function assigneeOptionLabel(item, options = {}) {
         const username = String(item?.username || '').trim();
         if (!username) return '';
-        const roles = Array.isArray(item?.roles) ? item.roles.filter(Boolean) : [];
-        const specialties = Array.isArray(item?.specialties) ? item.specialties.filter(Boolean) : [];
         const available = item?.isAvailable !== false;
         const includeAvailability = options.includeAvailability !== false;
         const explicitName = String(item?.display_name || item?.full_name || '').trim();
         let label = explicitName || humanizeUsername(username) || username;
-        const capabilityKeys = roles.length > 0 ? roles : specialties;
-        const capabilityLabels = [];
-        capabilityKeys.forEach((specKey) => {
-            const specLabel = specialtyLabel(specKey);
-            if (specLabel && !capabilityLabels.includes(specLabel)) capabilityLabels.push(specLabel);
-        });
-        if (capabilityLabels.length > 0) {
-            label += ` · ${capabilityLabels.join(' + ')}`;
-        } else {
-            label += ' · Sin rol técnico';
-        }
+        // Solo el nombre de la persona (sin área ni rol). La disponibilidad se mantiene como estado.
         if (includeAvailability && !available) {
             label += ' · no disponible';
         }
