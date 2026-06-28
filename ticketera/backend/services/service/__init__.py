@@ -237,7 +237,6 @@ from ._helpers import (  # noqa: F401
 
 # ── _classify: auto-classification and auto-assignment ───────────────────────
 from ._classify import (  # noqa: F401
-    clasificar_ticket,
     auto_asignar,
     incrementar_carga,
     decrementar_carga,

@@ -23,7 +23,7 @@ from plataforma.core.config import settings as app_settings
 from ticketera.backend.services import roles as ticket_roles
 from ticketera.backend.services import workflow as ticket_workflow
 from ._helpers import *  # noqa: F401,F403
-from ._classify import auto_asignar, clasificar_ticket, incrementar_carga, decrementar_carga
+from ._classify import incrementar_carga, decrementar_carga
 from ._notifications import programar_notificaciones, notify_client_resolution, _get_auto_close_hours
 from ._specialties import list_specialties
 from ._customers import get_client_for_email
@@ -446,7 +446,10 @@ def create_ticket(
             categoria = explicit_categoria
         else:
             routed_categoria = _resolve_routing_category_for_email(conn, origen_email) if origen_email else None
-            categoria = routed_categoria or clasificar_ticket(titulo, descripcion)
+            # Sin auto-detección por palabras clave: el área la define SOLO la regla de enrutamiento
+            # del remitente/dominio; si no hay regla (o el cliente es de varias áreas), queda
+            # 'Sin área asignada' (general) para reclasificación manual.
+            categoria = routed_categoria or "general"
 
         # Normalizar tipo
         tipo = normalize_ticket_type(tipo)
@@ -470,7 +473,7 @@ def create_ticket(
         # Auto-asignación a PERSONA deshabilitada (decisión de producto): los tickets
         # quedan SIN asignar; un humano los toma (claim) o un despachador los asigna.
         # Se conserva el parámetro auto_assign por compatibilidad, pero se ignora.
-        # La auto-detección del ÁREA/categoría se mantiene aparte (clasificar_ticket).
+        # El ÁREA la define la regla de enrutamiento del remitente, o queda 'Sin área asignada'.
         asignado_a = None
 
         if explicit_subestado:

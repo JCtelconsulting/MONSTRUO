@@ -27,23 +27,6 @@ from ._helpers import *  # noqa: F401,F403
 logger = logging.getLogger(__name__)
 
 # ==========================================================================
-# CLASIFICACIÓN AUTOMÁTICA
-# ==========================================================================
-def clasificar_ticket(titulo: str, descripcion: str) -> str:
-    """Clasifica un ticket basado en keywords en título y descripción."""
-    texto = f"{titulo} {descripcion}".lower()
-    scores = {}
-    for cat, keywords in KEYWORDS_CATEGORIAS.items():
-        score = sum(1 for kw in keywords if kw in texto)
-        if score > 0:
-            scores[cat] = score
-
-    if not scores:
-        return "general"
-
-    return max(scores, key=scores.get)
-
-# ==========================================================================
 # AUTO-ASIGNACIÓN
 # ==========================================================================
 def auto_asignar(categoria: str) -> Optional[str]:

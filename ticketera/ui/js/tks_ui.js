@@ -5583,7 +5583,7 @@ return `
     function buildCategoryOptionsHtml(categories, editingRule) {
         return categories.map((cat) => {
             const selected = String(editingRule?.categoria || categories[0] || 'general') === String(cat) ? ' selected' : '';
-            return `<option value="${escapeHtml(cat)}"${selected}>${escapeHtml(cat)}</option>`;
+            return `<option value="${escapeHtml(cat)}"${selected}>${catLabel(cat)}</option>`;
         }).join('');
     }
 

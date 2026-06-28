@@ -32,7 +32,6 @@ from ._crud import (  # noqa: PLC0415
     _persist_incoming_attachments,
     _build_incoming_email_body_html,
 )
-from ._classify import clasificar_ticket
 
 logger = logging.getLogger(__name__)
 
@@ -430,8 +429,8 @@ def _process_new_email_ticket(
 ) -> Optional[int]:
     logger.info("[EMAIL] New Ticket from %s", sender)
     
-    # 1. Clasificación
-    categoria = clasificar_ticket(subject, body)
+    # 1. Área: NO se auto-detecta por palabras clave. La define la REGLA de enrutamiento del
+    #    remitente/dominio (dentro de create_ticket); si no hay regla, queda 'Sin área asignada'.
     # 2. Triaje: por correo entrante se crea SIEMPRE sin asignación (cola manual)
     asignado_a = None
 
@@ -454,7 +453,7 @@ def _process_new_email_ticket(
             titulo=subject,
             descripcion=body,
             creador_id="email_bot",
-            categoria=categoria,
+            categoria=None,  # la define la regla de enrutamiento del remitente, o queda sin área
             origen_email=origen_email,
             cliente_nombre=cliente_nombre,
             email_thread_id=thread_id,
