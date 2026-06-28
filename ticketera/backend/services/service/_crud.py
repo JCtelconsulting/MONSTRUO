@@ -3739,16 +3739,12 @@ def get_assignment_timeline(
         }
 
         if ticket_assignee:
-            if ticket_assignee not in tech_map:
-                tech_map[ticket_assignee] = {
-                    "username": ticket_assignee,
-                    "specialties": [],
-                    "roles": [],
-                    "current_load": 0,
-                    "max_load": 0,
-                    "_items": [],
-                }
-            tech_map[ticket_assignee]["_items"].append(item)
+            # Solo se agregan tickets a técnicos vigentes (con usuario activo).
+            # Los asignados que ya no tienen usuario (p.ej. dejaron la empresa) no
+            # generan un lane fantasma en el timeline: ligamos al área/rol, no a la
+            # persona, para que el cambio de personal no rompa la vista.
+            if ticket_assignee in tech_map:
+                tech_map[ticket_assignee]["_items"].append(item)
             continue
 
         if estado == "abierto":

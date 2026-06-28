@@ -2124,13 +2124,32 @@ const TksUI = (() => {
         };
     }
 
+    const ATTACHMENT_EXT_MIME = {
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+        webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml', avif: 'image/avif',
+        ico: 'image/x-icon', heic: 'image/heic', heif: 'image/heif', tif: 'image/tiff', tiff: 'image/tiff',
+        pdf: 'application/pdf',
+        txt: 'text/plain', csv: 'text/csv', log: 'text/plain', md: 'text/markdown',
+        json: 'application/json', xml: 'text/xml', html: 'text/html',
+        mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/x-m4v', ogv: 'video/ogg',
+        mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', oga: 'audio/ogg', ogg: 'audio/ogg',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls: 'application/vnd.ms-excel',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ppt: 'application/vnd.ms-powerpoint',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        zip: 'application/zip', rar: 'application/vnd.rar', '7z': 'application/x-7z-compressed',
+    };
+
     function attachmentContentType(att) {
         const explicit = String(att?.content_type || att?.mime_type || '').trim().toLowerCase();
         if (explicit) return explicit;
         const filename = String(att?.filename || '').trim().toLowerCase();
         if (!filename.includes('.')) return 'application/octet-stream';
         const ext = filename.split('.').pop();
-    
+        return ATTACHMENT_EXT_MIME[ext] || 'application/octet-stream';
+
     function renderConsole(data) {
         if (!data.ok) return `<div class="tks-card"><p>Error cargando consola: ${data.detail || 'Error desconocido'}</p></div>`;
 
@@ -2329,12 +2348,15 @@ const TksUI = (() => {
     }
 
     function attachmentPreviewKind(att) {
-        const contentType = attachmentContentType(att);
-        if (contentType.startsWith('image/')) return 'image';
-        if (contentType === 'application/pdf') return 'pdf';
-        if (contentType.startsWith('text/') || contentType === 'application/json') return 'text';
-        if (contentType.startsWith('video/')) return 'video';
-        if (contentType.startsWith('audio/')) return 'audio';
+        const contentType = String(attachmentContentType(att) || '').toLowerCase();
+        const name = String(att?.filename || att?.name || '').toLowerCase();
+        const ext = name.includes('.') ? name.split('.').pop() : '';
+        const isExt = (...e) => e.includes(ext);
+        if (contentType.startsWith('image/') || isExt('png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif', 'ico', 'heic', 'heif', 'tif', 'tiff')) return 'image';
+        if (contentType === 'application/pdf' || isExt('pdf')) return 'pdf';
+        if (contentType.startsWith('text/') || contentType === 'application/json' || isExt('txt', 'csv', 'json', 'log', 'md', 'xml', 'html')) return 'text';
+        if (contentType.startsWith('video/') || isExt('mp4', 'webm', 'mov', 'm4v', 'ogv')) return 'video';
+        if (contentType.startsWith('audio/') || isExt('mp3', 'wav', 'm4a', 'aac', 'oga', 'ogg')) return 'audio';
         return 'file';
     }
 
@@ -2364,7 +2386,7 @@ const TksUI = (() => {
 
     function attachmentCanInlinePreview(att) {
         const kind = attachmentPreviewKind(att);
-        return kind === 'image' || kind === 'pdf' || kind === 'text';
+        return kind === 'image' || kind === 'pdf' || kind === 'text' || kind === 'video' || kind === 'audio';
     }
 
     function normalizeInlineContentId(value) {
@@ -2458,6 +2480,14 @@ const TksUI = (() => {
         if (kind === 'image') {
             previewHtml = `<img class="tks-attachment-preview-image" src="${escapeHtml(inlineUrl)}" alt="${escapeHtml(filename)}">`;
         } else if (kind === 'pdf' || kind === 'text') {
+            previewHtml = `<iframe class="tks-attachment-preview-frame" src="${escapeHtml(inlineUrl)}" title="${escapeHtml(filename)}"></iframe>`;
+        } else if (kind === 'video') {
+            previewHtml = `<video class="tks-attachment-preview-image" src="${escapeHtml(inlineUrl)}" controls playsinline></video>`;
+        } else if (kind === 'audio') {
+            previewHtml = `<audio src="${escapeHtml(inlineUrl)}" controls style="width:100%"></audio>`;
+        } else if (inlineUrl) {
+            // Cualquier otro tipo (Office, comprimidos, etc.): intentamos mostrarlo
+            // embebido; si el navegador no puede renderizarlo, queda el botón Descargar.
             previewHtml = `<iframe class="tks-attachment-preview-frame" src="${escapeHtml(inlineUrl)}" title="${escapeHtml(filename)}"></iframe>`;
         }
         return `
@@ -3073,9 +3103,6 @@ const TksUI = (() => {
         const blocksHtml = htmlGroups.length ? htmlGroups.join('') : '<span class="tks-assign-row-empty">Sin actividad en este horario.</span>';
         const trackHeight = Math.max(48, 8 + (rows.filter(r => r.length > 0).length * 40));
 
-        const nextQueueHtml = nextTicket
-            ? `<span class="tks-assign-next-inline">Siguiente sugerido: <strong>${escapeHtml(nextTicket.codigo || `#${nextTicket.ticket_id || '-'}`)}</strong></span>`
-            : '<span class="tks-assign-next-inline empty">Sin ticket en cola sugerido.</span>';
 return `
             <article class="tks-assign-schedule-row">
                 <div class="tks-assign-tech-col">
@@ -3091,8 +3118,7 @@ return `
                         ${blocksHtml}
                     </div>
                     <div class="tks-assign-row-foot">
-                        <span>Tickets: ${escapeHtml(String(items.length || 0))}</span>
-                        ${nextQueueHtml}
+                        <span>Tickets activos: ${escapeHtml(String(tech.active_count || 0))}</span>
                     </div>
                 </div>
             </article>`;
@@ -5641,13 +5667,6 @@ return `
                         <h3>Plantillas de Correo</h3>
                         <p>Administra desde Ticketera el correo automático de acuse al cliente y los mensajes automáticos.</p>
                     </div>
-                    <span class="tks-settings-scope">Admin / Encargado Mesa</span>
-                </div>
-
-                <div class="tks-settings-note">
-                    <strong>Plantillas disponibles:</strong>
-                    auto-respuesta, aviso nuevo TK mesa, asignacion de especialista, notificacion de especialista y cierre de TK.
-                    Al abrir una plantilla, el editor carga el contenido actual efectivo del sistema, aunque no exista una version guardada en DB.
                 </div>
 
                 <div class="tks-template-card-grid">${templateCards}</div>
@@ -5659,7 +5678,6 @@ return `
                         <h3>Enrutamiento y Asociación de Clientes</h3>
                         <p>Define a qué área y cliente cae un ticket cuando entra por un remitente o dominio específico.</p>
                     </div>
-                    <span class="tks-settings-scope">Admin / Encargado Mesa</span>
                 </div>
 
                 ${routingForm}
@@ -5727,7 +5745,6 @@ return `
                         <h3>Tickets Archivados</h3>
                         <p>Todos los tickets cerrados y resueltos. Asigna clientes para construir el historial y habilitar reportes.</p>
                     </div>
-                    <span class="tks-settings-scope">Admin / Encargado Mesa</span>
                 </div>
 
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end">
