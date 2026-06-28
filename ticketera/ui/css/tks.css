@@ -3306,14 +3306,11 @@
 }
 
 /* ==========================================================================
-   Modal de historial de archivados — UN solo scroll
-   El modal-body ya scrollea; evitamos scrolls anidados (la timeline traía su
-   propio max-height/overflow → doble/triple scroll feo dentro del modal).
+   Archivados — el cuadro de resultados scrollea ADENTRO (no la página entera).
+   Limita la altura del cuadro y mete el scroll dentro de esa ventana.
    ========================================================================== */
-#tks-historial-modal .tks-modal {
-    overflow: hidden;
-}
-#tks-historial-modal .tks-timeline {
-    max-height: none;
-    overflow: visible;
+#tks-archivados-results-container {
+    max-height: 58vh;
+    overflow-y: auto;
+    overflow-x: auto;
 }

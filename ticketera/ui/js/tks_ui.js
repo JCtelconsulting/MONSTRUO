@@ -3428,10 +3428,6 @@ return `
     function renderDashboardStats(summary) {
         return `
             <div class="tks-stats-row">
-                <div class="tks-stat-card" style="--card-accent: var(--tks-accent)">
-                    <span class="label">Tickets Totales</span>
-                    <span class="value">${summary.total}</span>
-                </div>
                 <div class="tks-stat-card" style="--card-accent: var(--tks-abierto)">
                     <span class="label">Activos</span>
                     <span class="value">${summary.activos}</span>
@@ -3440,9 +3436,9 @@ return `
                     <span class="label">Resueltos</span>
                     <span class="value">${summary.resueltos}</span>
                 </div>
-                <div class="tks-stat-card" style="--card-accent: var(--tks-critica)">
-                    <span class="label">Críticas</span>
-                    <span class="value">${summary.criticas}</span>
+                <div class="tks-stat-card" style="--card-accent: var(--tks-accent)">
+                    <span class="label">Tickets Totales</span>
+                    <span class="value">${summary.total}</span>
                 </div>
             </div>
         `;
@@ -3473,7 +3469,6 @@ return `
         return `
         <div class="tks-dashboard">
             ${renderDashboardStats(summary)}
-            ${renderDashboardSla(summary)}
             ${historicalHtml}
             <div class="tks-dashboard-assignment">
                 ${renderAssignmentTimeline(assignmentData || {})}
