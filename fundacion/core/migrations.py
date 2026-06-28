@@ -9,7 +9,7 @@ from fundacion.core import db
 
 logger = logging.getLogger(__name__)
 
-# Migraciones centrales del core. Clave en core.migration_log = filename a secas
+# Migraciones centrales del core. Clave en fundacion.migration_log = filename a secas
 # (retrocompatible con lo ya aplicado).
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
 # Raíz del repo (…/plataforma/core/migrations.py -> parents[2]).
@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def _ensure_log_table(conn) -> None:
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS core.migration_log (
+        CREATE TABLE IF NOT EXISTS fundacion.migration_log (
             id SERIAL PRIMARY KEY,
             filename TEXT UNIQUE NOT NULL,
             applied_at TEXT NOT NULL,
@@ -32,7 +32,7 @@ def _ensure_log_table(conn) -> None:
 def _apply_migration_dir(conn, migrations_dir: Path, key_prefix: str = "") -> None:
     """Aplica en orden las migraciones .sql de un directorio.
 
-    La 'clave' que se guarda en core.migration_log es ``key_prefix + filename``,
+    La 'clave' que se guarda en fundacion.migration_log es ``key_prefix + filename``,
     de modo que las migraciones de cada módulo (ticketera/, gta/, …) no
     colisionan con las del core ni entre sí aunque repitan el número (001, 002…).
     """
@@ -42,7 +42,7 @@ def _apply_migration_dir(conn, migrations_dir: Path, key_prefix: str = "") -> No
     for filename in files:
         key = f"{key_prefix}{filename}"
         row = conn.execute(
-            "SELECT success FROM core.migration_log WHERE filename = %s",
+            "SELECT success FROM fundacion.migration_log WHERE filename = %s",
             (key,),
         ).fetchone()
         if row and row.get("success"):
@@ -57,12 +57,12 @@ def _apply_migration_dir(conn, migrations_dir: Path, key_prefix: str = "") -> No
             now = datetime.now(timezone.utc).isoformat()
             if row:
                 conn.execute(
-                    "UPDATE core.migration_log SET success = TRUE, applied_at = %s, error_message = NULL WHERE filename = %s",
+                    "UPDATE fundacion.migration_log SET success = TRUE, applied_at = %s, error_message = NULL WHERE filename = %s",
                     (now, key),
                 )
             else:
                 conn.execute(
-                    "INSERT INTO core.migration_log (filename, applied_at, success) VALUES (%s, %s, TRUE)",
+                    "INSERT INTO fundacion.migration_log (filename, applied_at, success) VALUES (%s, %s, TRUE)",
                     (key, now),
                 )
             conn.commit()
@@ -74,12 +74,12 @@ def _apply_migration_dir(conn, migrations_dir: Path, key_prefix: str = "") -> No
             logger.error("[MIGRATIONS] ERROR en %s: %s", key, error_msg)
             if row:
                 conn.execute(
-                    "UPDATE core.migration_log SET success = FALSE, applied_at = %s, error_message = %s WHERE filename = %s",
+                    "UPDATE fundacion.migration_log SET success = FALSE, applied_at = %s, error_message = %s WHERE filename = %s",
                     (now, error_msg, key),
                 )
             else:
                 conn.execute(
-                    "INSERT INTO core.migration_log (filename, applied_at, success, error_message) VALUES (%s, %s, FALSE, %s)",
+                    "INSERT INTO fundacion.migration_log (filename, applied_at, success, error_message) VALUES (%s, %s, FALSE, %s)",
                     (key, now, error_msg),
                 )
             conn.commit()
