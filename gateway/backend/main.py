@@ -349,8 +349,14 @@ def _login_rl_blocked(key: str) -> bool:
     now = _rl_time.time()
     window = getattr(app_settings, "LOGIN_RATE_LIMIT_WINDOW_SECONDS", 300)
     maxa = getattr(app_settings, "LOGIN_RATE_LIMIT_MAX_ATTEMPTS", 10)
-    _login_fail_log[key] = [t for t in _login_fail_log[key] if now - t < window]
-    return len(_login_fail_log[key]) >= maxa
+    vigentes = [t for t in _login_fail_log.get(key, []) if now - t < window]
+    # Evita acumular claves muertas en memoria (revisión 2026-06-28): si tras podar la
+    # ventana no quedan intentos, se elimina la clave en vez de dejar una lista vacía.
+    if vigentes:
+        _login_fail_log[key] = vigentes
+    else:
+        _login_fail_log.pop(key, None)
+    return len(vigentes) >= maxa
 
 
 @app.post("/api/auth/login")
