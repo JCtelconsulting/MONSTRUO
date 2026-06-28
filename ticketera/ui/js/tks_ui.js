@@ -5265,8 +5265,9 @@ return `
             `;
 
         const categoriaActual = String(t.categoria || 'general').trim().toLowerCase();
+        const ticketTieneAsignado = String(t.asignado_a || '').trim() !== '';
         const AREAS_ASIGNABLES = ['redes', 'sistemas', 'ejecucion', 'bodega', 'gerencia', 'admin', 'general'];
-        const categoriaControlHtml = canAssignTicket
+        const categoriaControlHtml = (canAssignTicket && !ticketTieneAsignado)
             ? `
                 <div class="tks-assignee-control in-customer">
                     <label class="tks-status-editor-label">Área</label>
@@ -5280,6 +5281,7 @@ return `
                 <div class="tks-assignee-control readonly in-customer">
                     <label class="tks-status-editor-label">Área</label>
                     <div class="tks-assignee-readonly">${catLabel(categoriaActual)}</div>
+                    ${ticketTieneAsignado ? '<div class="tks-status-editor-hint">Asignado a una persona: desasígnalo primero para moverlo de área.</div>' : ''}
                 </div>
             `;
 

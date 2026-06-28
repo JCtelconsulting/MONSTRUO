@@ -849,6 +849,18 @@ def update_ticket(
             continue
         normalized_updates[key] = value
 
+    # Regla: un ticket asignado a una persona NO puede cambiar de área (categoría).
+    # Así no se le quita de la vista a quien lo tiene; para moverlo, primero se desasigna.
+    if "categoria" in normalized_updates:
+        _asig_actual = str(current.get("asignado_a") or "").strip()
+        _desasigna = "asignado_a" in normalized_updates and not normalized_updates.get("asignado_a")
+        if _asig_actual and not _desasigna:
+            normalized_updates.pop("categoria", None)
+            logger.info(
+                "[update_ticket] cambio de área ignorado: ticket %s está asignado a '%s'",
+                ticket_id, _asig_actual,
+            )
+
     # Vincular un cliente por nombre (sin id de Laudus): garantizamos customer_id = nombre,
     # así filtros/reportes (que usan customer_id) lo encuentran. Cubre el vínculo manual.
     _nombre_nuevo = normalized_updates.get("cliente_nombre")
