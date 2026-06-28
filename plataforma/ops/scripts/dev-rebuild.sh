@@ -54,6 +54,24 @@ else
     docker compose --env-file plataforma/ops/env/.env.server.dev up -d --build "${CONTAINERS[@]}"
 fi
 
+# ─────────────────────────────────────────────────────────────────────────
+# Limpieza para que los rebuilds iterativos no acumulen basura.
+# Cada rebuild deja imágenes <none> y capas de build cache; en pocos días
+# eso llega a varios GB (auditoría 2026-06-28: 11.7 GB de cache acumulado).
+# OJO: `docker image prune` por sí solo NO libera disco si el cache retiene
+# las capas — por eso limpiamos también el builder cache.
+# Limpiamos SOLO lo más viejo que PRUNE_OLDER_THAN, para conservar el cache
+# reciente (acelera los rebuilds del día) y posibles rollbacks recientes.
+# Configurable:  DEV_REBUILD_PRUNE_OLDER_THAN=0  desactiva la limpieza.
+PRUNE_OLDER_THAN="${DEV_REBUILD_PRUNE_OLDER_THAN:-168h}"   # 7 días por defecto
+if [ "$PRUNE_OLDER_THAN" != "0" ]; then
+    echo ""
+    echo "→ Limpiando imágenes/cache de build más viejas que $PRUNE_OLDER_THAN…"
+    docker image prune -f --filter "until=$PRUNE_OLDER_THAN" >/dev/null 2>&1 || true
+    docker builder prune -f --filter "until=$PRUNE_OLDER_THAN" >/dev/null 2>&1 || true
+    echo "→ Disco: $(df -h / | awk 'NR==2{print $3" usado / "$2" ("$5")"}')"
+fi
+
 echo ""
 echo "ASSET_VERSION en uso: $ASSET_VERSION"
 echo "→ Hacé F5 normal en el browser, no necesitás hard reload."
