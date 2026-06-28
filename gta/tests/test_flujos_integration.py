@@ -24,8 +24,37 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
+def _asegurar_usuario(conn, username: str) -> None:
+    """Crea el usuario en auth.users si no existe. crear_flujo resuelve el actor
+    como FK a auth.users, así que los actores del test ('test_user', 'initiator')
+    deben existir."""
+    conn.execute(
+        """INSERT INTO auth.users (username, password_hash, role, is_active, created_at)
+           VALUES (?, 'x', 'ops', 1, CURRENT_TIMESTAMP)
+           ON CONFLICT (username) DO NOTHING""",
+        (username,),
+    )
+
+
+def _asegurar_subarea(conn, area_code: str, code: str = "general") -> None:
+    """Asegura una subárea activa para el área. crear_flujo resuelve cada paso
+    (area_code) a una subárea activa; si el área no tiene ninguna, salta el paso."""
+    conn.execute(
+        """INSERT INTO gta.subareas (area_code, code, label, activo, orden, created_at, updated_at)
+           VALUES (?, ?, ?, TRUE, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           ON CONFLICT (area_code, code) DO UPDATE SET activo = TRUE""",
+        (area_code, code, code.title()),
+    )
+
+
 def _crear_proceso_test(conn, nombre="Test proceso integración") -> int:
     """Inserta un proceso de prueba con 3 pasos cross-área. Devuelve id."""
+    # Actores que usan los tests (FK a auth.users).
+    for _u in ("test_user", "initiator"):
+        _asegurar_usuario(conn, _u)
+    # Las áreas del proceso de prueba necesitan una subárea activa para resolver.
+    for _a in ("comercial", "sistemas", "contabilidad"):
+        _asegurar_subarea(conn, _a)
     pasos = [
         {"orden": 1, "titulo": "Comercial valida", "area_code": "comercial",
          "sla_horas": 4, "depende_de": []},
@@ -59,22 +88,26 @@ class TestFlujoCreacionYActivacion:
             proceso_id=proceso_id,
         )
 
-        assert result["id"] is not None
-        assert result["estado"] == "activo"
-        assert len(result["tareas"]) == 3
-
-        # Solo la tarea 1 (sin dependencias) debe quedar lista
-        listas = [t for t in result["tareas"] if t["estado"] == "lista"]
-        pendientes = [t for t in result["tareas"] if t["estado"] == "pendiente"]
-        assert len(listas) == 1
-        assert len(pendientes) == 2
-        assert listas[0]["area_code"] == "comercial"
-        assert listas[0]["inicio_at"] is not None
+        # 3 pasos del proceso → 3 tareas materializadas, ninguno saltado por falta de
+        # subárea resoluble (las 3 áreas tienen subárea activa). crear_flujo usa su propia
+        # conexión y commitea, así que verificamos su retorno (no el db_conn del test, que
+        # está en otra transacción y no vería las filas nuevas).
+        assert result["flujo_id"]
+        assert len(result["tareas_ids"]) == 3
+        assert result["pasos_skipeados"] == []
 
 
+# El sistema viejo de confirmación dual (ejecutor/validador) y de ayudas inter-área con
+# pausa de SLA fue REMOVIDO (ver gta/backend/services/flujos.py: "Las funciones del sistema
+# viejo (validar_tarea, pedir_ayuda, etc.) ya no aplican y fueron removidas"). El modelo
+# actual es unificado (tomar/cerrar/devolver tarea). Estos tests quedan en skip hasta
+# reescribirlos contra ese modelo, como parte del desarrollo de GTA.
 @pytest.mark.integration
+@pytest.mark.skip(
+    reason="Sistema viejo confirmación dual removido; reescribir para modelo unificado (tomar/cerrar/devolver)"
+)
 class TestConfirmacionDual:
-    """El ejecutor marca → validador acepta o rechaza."""
+    """El ejecutor marca → validador acepta o rechaza. (SISTEMA VIEJO — REMOVIDO)"""
 
     def test_ejecutor_completa_pasa_a_por_validar(self, db_conn):
         from gta.backend.services import flujos
@@ -129,8 +162,11 @@ class TestConfirmacionDual:
 
 
 @pytest.mark.integration
+@pytest.mark.skip(
+    reason="Sistema viejo de ayudas inter-área con pausa SLA removido del modelo unificado"
+)
 class TestAyudasInterAreas:
-    """Pedir ayuda pausa el SLA si bloquea_sla=True; responder lo reanuda."""
+    """Pedir ayuda pausa el SLA si bloquea_sla=True; responder lo reanuda. (SISTEMA VIEJO — REMOVIDO)"""
 
     def test_pedir_ayuda_con_bloqueo_pausa_sla(self, db_conn):
         from gta.backend.services import flujos
