@@ -136,17 +136,23 @@ class TestCalcularSlaPct:
 
 
 class TestParsePasosDefinicion:
-    """flujos._parse_pasos_definicion — acepta formato viejo y nuevo."""
+    """flujos._parse_pasos_definicion — normaliza la definición de pasos.
+
+    El modelo actual (flujo cross-área) exige que cada paso tenga título + area_code;
+    los strings sueltos del formato viejo se descartan por no tener área. No hay
+    procesos reales con el formato viejo (verificado en dev y prod: 0)."""
 
     def test_input_vacio(self):
         assert flujos._parse_pasos_definicion(None) == []
         assert flujos._parse_pasos_definicion([]) == []
         assert flujos._parse_pasos_definicion("") == []
 
-    def test_lista_de_strings_formato_viejo(self):
+    def test_strings_sueltos_se_descartan_sin_area(self):
+        # Formato viejo (lista de títulos sueltos): ya no genera pasos porque el modelo
+        # cross-área exige area_code.
         result = flujos._parse_pasos_definicion(["Paso A", "Paso B"])
         assert isinstance(result, list)
-        assert len(result) == 2
+        assert result == []
 
     def test_lista_de_dicts_formato_nuevo(self):
         pasos = [
@@ -156,6 +162,9 @@ class TestParsePasosDefinicion:
         result = flujos._parse_pasos_definicion(pasos)
         assert len(result) == 2
 
-    def test_json_string_se_parsea(self):
-        result = flujos._parse_pasos_definicion('["A", "B"]')
+    def test_json_string_de_dicts_se_parsea(self):
+        # Un JSON string con dicts (título + área) se parsea y normaliza.
+        result = flujos._parse_pasos_definicion(
+            '[{"titulo": "A", "area_code": "comercial"}, {"titulo": "B", "area_code": "sistemas"}]'
+        )
         assert len(result) == 2

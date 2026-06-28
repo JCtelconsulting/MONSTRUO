@@ -30,6 +30,90 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _parse_dt(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def calcular_sla_pct(tarea: Dict[str, Any]) -> Dict[str, Any]:
+    """Calcula porcentaje de SLA consumido y semáforo de una tarea.
+
+    Retorna dict con: pct, color, minutos_consumidos, minutos_total,
+    minutos_pausados, vencida, esta_pausada.
+
+    La usa el job de SLA (gta/backend/jobs/sla_check.py). Vive acá como función pura
+    para poder testearla sin DB.
+    """
+    sla_horas = int(tarea.get("sla_horas") or 0)
+    minutos_total = sla_horas * 60
+    if minutos_total <= 0:
+        return {
+            "pct": 0, "color": "gray", "minutos_consumidos": 0,
+            "minutos_total": 0, "minutos_pausados": 0,
+            "vencida": False, "esta_pausada": False,
+        }
+
+    estado = str(tarea.get("estado") or "")
+    inicio = _parse_dt(tarea.get("inicio_at"))
+    if not inicio:
+        return {
+            "pct": 0, "color": "gray", "minutos_consumidos": 0,
+            "minutos_total": minutos_total, "minutos_pausados": 0,
+            "vencida": False, "esta_pausada": False,
+        }
+
+    pausados = int(tarea.get("sla_paused_minutes") or 0)
+    pause_started = _parse_dt(tarea.get("sla_pause_started_at"))
+    fin = _parse_dt(tarea.get("ejecutor_completo_at")) or _parse_dt(tarea.get("validado_at"))
+
+    if estado == "completada" and fin:
+        # Tarea completa: tiempo real
+        consumidos = int((fin - inicio).total_seconds() / 60) - pausados
+    elif pause_started:
+        # Está pausada ahora: contamos hasta el momento de la pausa
+        consumidos = int((pause_started - inicio).total_seconds() / 60) - pausados
+    else:
+        consumidos = int((_now() - inicio).total_seconds() / 60) - pausados
+
+    consumidos = max(0, consumidos)
+    pct = int((consumidos / minutos_total) * 100) if minutos_total > 0 else 0
+
+    if estado == "completada":
+        color = "green" if pct < 100 else "rojo_completado"
+    elif estado in {"cancelada"}:
+        color = "gray"
+    elif pct >= 100:
+        color = "red"
+    elif pct >= 85:
+        color = "orange"
+    elif pct >= 70:
+        color = "yellow"
+    elif estado == "ayuda_pedida":
+        color = "purple"
+    elif estado == "por_validar":
+        color = "blue"
+    elif estado in {"lista", "en_progreso"}:
+        color = "cyan"
+    else:
+        color = "gray"
+
+    return {
+        "pct": pct,
+        "color": color,
+        "minutos_consumidos": consumidos,
+        "minutos_total": minutos_total,
+        "minutos_pausados": pausados,
+        "vencida": pct >= 100 and estado != "completada",
+        "esta_pausada": pause_started is not None,
+    }
+
+
 def _parse_pasos_definicion(raw: Any) -> List[Dict[str, Any]]:
     """Normaliza la definición de pasos del proceso a lista de dicts."""
     if raw is None:
