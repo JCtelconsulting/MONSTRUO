@@ -1049,6 +1049,17 @@ async def get_directorio_tickets(
     sess: dict = Depends(deps.require_permission("tickets:read"))
 ):
     """Tickets filtrados por cliente y/o rango de fechas para la carpeta del Directorio."""
+    # LEAK-03 (auditoría 2026-06-28): aplicar el MISMO scope por área que la Lista.
+    # Antes el directorio devolvía TODOS los tickets del cliente sin importar el área
+    # del usuario (fuga horizontal entre áreas). Admin/encargado_mesa siguen viendo todo.
+    roles = _normalize_session_roles(sess)
+    area_scope = tickets_service.categorias_visibles_para_roles(roles)
+    if area_scope is None:
+        scoped_asignado = None
+        scope_categorias = None
+    else:
+        scoped_asignado = _normalize_session_user(sess) or "__no_user__"
+        scope_categorias = area_scope
     # En el directorio se incluyen TODOS (incluyendo cerrados y descartados), no solo activos
     return tickets_service.list_tickets(
         customer_id=customer_id,
@@ -1061,6 +1072,8 @@ async def get_directorio_tickets(
         include_total=True,
         include_full=False,
         trashed_only=False,
+        asignado_a=scoped_asignado,
+        scope_categorias=scope_categorias,
     )
 
 
