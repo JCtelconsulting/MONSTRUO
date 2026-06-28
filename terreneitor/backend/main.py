@@ -228,37 +228,17 @@ else:
 
 
 # Migracion Automatica
+# SECRET-01 (auditoría 2026-06-28): se quitaron las contraseñas hardcodeadas.
+# El seeding solo corre si la tabla User está vacía (DB nueva). La contraseña
+# se toma de TERRENEITOR_SEED_PASSWORD; si no está, se genera una aleatoria por
+# usuario (hay que resetearla). NUNCA volver a poner contraseñas en este código.
 SEED_USERS = {
-    "juan.lopez@telconsulting.cl": {
-        "name": "Juan Lopez",
-        "role": "ADMIN",
-        "password": "1234",
-    },
-    "diego@telconsulting.cl": {
-        "name": "Diego Quintana",
-        "role": "GERENCIA",
-        "password": "gerencia1234",
-    },
-    "nicolas.cerda@telconsulting.cl": {
-        "name": "Nicolas Cerda",
-        "role": "GERENCIA",
-        "password": "gerencia1234",
-    },
-    "francisco.flores@telconsulting.cl": {
-        "name": "Francisco Flores",
-        "role": "SUPERVISOR",
-        "password": "supervisor1234",
-    },
-    "matias.sandoval@telconsulting.cl": {
-        "name": "Matias Sandoval",
-        "role": "TERRENO",
-        "password": "terreno1234",
-    },
-    "luis.bosch@telconsulting.cl": {
-        "name": "Luis Bosch",
-        "role": "TERRENO",
-        "password": "terreno1234",
-    },
+    "juan.lopez@telconsulting.cl": {"name": "Juan Lopez", "role": "ADMIN"},
+    "diego@telconsulting.cl": {"name": "Diego Quintana", "role": "GERENCIA"},
+    "nicolas.cerda@telconsulting.cl": {"name": "Nicolas Cerda", "role": "GERENCIA"},
+    "francisco.flores@telconsulting.cl": {"name": "Francisco Flores", "role": "SUPERVISOR"},
+    "matias.sandoval@telconsulting.cl": {"name": "Matias Sandoval", "role": "TERRENO"},
+    "luis.bosch@telconsulting.cl": {"name": "Luis Bosch", "role": "TERRENO"},
 }
 
 
@@ -268,14 +248,25 @@ def startup_event():
     db = SessionLocal()
     try:
         if db.query(User).count() == 0:
+            import os as _os
+            import secrets as _secrets
+
+            _seed_pass = _os.environ.get("TERRENEITOR_SEED_PASSWORD")
             for email, data in SEED_USERS.items():
                 try:
+                    _pwd = _seed_pass or _secrets.token_urlsafe(16)
+                    if not _seed_pass:
+                        log.warning(
+                            "[SEED] %s sembrado con password ALEATORIO; resetealo "
+                            "(define TERRENEITOR_SEED_PASSWORD para controlarlo)",
+                            email,
+                        )
                     db.add(
                         User(
                             email=email.lower(),
                             name=data["name"],
                             role=UserRoleEnum(data["role"]),
-                            hashed_password=get_db_hash(data["password"]),
+                            hashed_password=get_db_hash(_pwd),
                         )
                     )
                 except Exception:

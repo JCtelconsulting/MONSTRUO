@@ -1025,13 +1025,16 @@ def get_file_view(path: str):
 
     clean_path = os.path.normpath(path)
 
-    if os.path.isabs(clean_path) and os.path.exists(clean_path):
-        if os.path.isdir(clean_path):
-            raise HTTPException(400, "Es un directorio")
-        return _serve_file(clean_path)
-
-    base_files = os.path.normpath(nucleo.BASE_FILES_DIR)
-    final_path = os.path.join(base_files, clean_path)
+    # FILE-01 (auditoría 2026-06-28): resolver SIEMPRE dentro de BASE_FILES_DIR y
+    # validar contención con realpath. Antes una ruta absoluta (?path=/etc/passwd)
+    # permitía leer cualquier archivo del filesystem (lectura arbitraria post-admin).
+    base_files = os.path.realpath(nucleo.BASE_FILES_DIR)
+    candidate = (
+        clean_path if os.path.isabs(clean_path) else os.path.join(base_files, clean_path)
+    )
+    final_path = os.path.realpath(candidate)
+    if final_path != base_files and not final_path.startswith(base_files + os.sep):
+        raise HTTPException(403, "Acceso denegado")
     if not os.path.exists(final_path):
         raise HTTPException(404, "Archivo no encontrado")
     if os.path.isdir(final_path):

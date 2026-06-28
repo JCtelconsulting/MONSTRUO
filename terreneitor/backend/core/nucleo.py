@@ -9,7 +9,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
@@ -119,15 +119,33 @@ app.add_middleware(
 
 
 @app.get("/api/common/view")
-def serve_file(path: str, thumb: bool = False):  # noqa: C901
+def serve_file(path: str, thumb: bool = False, request: Request = None):  # noqa: C901
     """
     Endpoint universal para servir archivos (Imágenes/Docs).
-    Bypass de Auth estricto para evitar problemas de 'Black Photos'.
+    LEAK-01 (auditoría 2026-06-28): ahora EXIGE sesión. Antes era anónimo (auth
+    bypass accesible desde Internet). Las cookies same-site viajan en los <img>,
+    así que el render de fotos no se rompe.
     """
     import os
 
     from fastapi import HTTPException
     from fastapi.responses import FileResponse
+
+    # LEAK-01: validar sesión. Lazy import porque dependencias importa a nucleo.
+    from terreneitor.backend.core import dependencias as _deps
+
+    _sess_db = SessionLocal()
+    try:
+        _tok = _deps.get_token_from_cookie(request) if request is not None else None
+        _sess = (
+            _deps.get_session_data(request, token=(_tok or ""), db=_sess_db)
+            if request is not None
+            else {"logged": False}
+        )
+    finally:
+        _sess_db.close()
+    if not _sess.get("logged"):
+        raise HTTPException(401, "No autenticado")
 
     if not path:
         raise HTTPException(400, "Path requerido")
