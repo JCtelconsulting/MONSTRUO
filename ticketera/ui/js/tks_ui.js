@@ -5599,14 +5599,6 @@ return `
                 </div>
 
                 <div class="tks-form-group">
-                    <label>Área / Categoría</label>
-                    <select id="tks-routing-categoria" class="tks-select">
-                        <option value="">Automática / Sin especificar</option>
-                        ${categoryOptions}
-                    </select>
-                </div>
-
-                <div class="tks-form-group">
                     <label>Nombre Cliente (Referencia)</label>
                     <input
                         id="tks-routing-customer-name"
