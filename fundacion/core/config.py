@@ -167,23 +167,28 @@ class Settings(BaseSettings):
         # Roles de jefatura del organigrama. Operacionalmente equivalentes a
         # admin para Fundación; los conservamos como roles separados para
         # reflejar el organigrama y permitir afinar permisos en el futuro.
+        # Separación: las jefaturas administran usuarios de Fundación
+        # (admin.settings habilita el panel /api/admin/users propio).
         "directora_social": [
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",
             "audit:read",
+            "admin.settings",
         ],
         "jefa_pedagogica": [
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",
             "audit:read",
+            "admin.settings",
         ],
         "coordinadora_territorial": [
             "dashboard:read",
             "fundacion:read",
             "fundacion:write",
             "audit:read",
+            "admin.settings",
         ],
     }
 

@@ -33,21 +33,12 @@ def _payload_roles(payload: Dict[str, Any]) -> List[str]:
 
 
 def _get_role_permissions(role: str) -> List[str]:
-    """Read permissions for a role from DB, falling back to config.py."""
-    try:
-        from fundacion.core import db
-        conn = db.get_conn()
-        try:
-            rows = conn.execute(
-                "SELECT permission FROM core.sys_role_permissions WHERE role = %s",
-                (role,),
-            ).fetchall()
-            if rows:
-                return [str(r["permission"]) for r in rows]
-        finally:
-            conn.close()
-    except Exception as e:
-        logger.debug("DB role lookup failed for %s, using config fallback: %s", role, e)
+    """Permisos de un rol de Fundación.
+
+    Separación: la fuente de verdad es la config PROPIA de Fundación
+    (settings.ROLE_PERMISSIONS), NO la tabla core.sys_role_permissions de Monstruo.
+    Así los permisos de Fundación no dependen de datos del schema de Monstruo.
+    """
     return list(settings.ROLE_PERMISSIONS.get(role, []))
 
 

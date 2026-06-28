@@ -17,6 +17,7 @@ from fundacion.backend.routers import sync as sync_router
 from fundacion.backend.routers import reportes as reportes_router
 from fundacion.backend.routers import sesiones as sesiones_router
 from fundacion.backend.auth.router import router as auth_router
+from fundacion.backend.auth.admin_users import router as admin_users_router
 from fundacion.core import db, deps
 from fundacion.core.web import build_login_redirect_url
 
@@ -44,6 +45,7 @@ app.include_router(sync_router.router)
 app.include_router(reportes_router.router)
 app.include_router(sesiones_router.router)
 app.include_router(auth_router)
+app.include_router(admin_users_router)
 
 
 @app.get("/", response_class=HTMLResponse)
