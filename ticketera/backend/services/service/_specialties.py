@@ -50,7 +50,7 @@ SPECIALTY_TO_CATEGORIA = {
 
 # Categorías de ticket válidas: un rol que ya es una categoría (p.ej. 'gerencia')
 # acota directamente a esa categoría.
-_CATEGORIAS_TICKET = {"redes", "sistemas", "ejecucion", "admin", "bodega", "gerencia"}
+_CATEGORIAS_TICKET = {"redes", "sistemas", "ejecucion", "bodega", "gerencia"}
 
 # Roles no técnicos que igualmente se acotan por área (gerencia ve solo su área).
 _ROLES_ACOTADOS_EXTRA = {"gerencia"}

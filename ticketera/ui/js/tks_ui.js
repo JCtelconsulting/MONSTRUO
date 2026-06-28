@@ -218,7 +218,6 @@ const TksUI = (() => {
         redes: 'Redes',
         sistemas: 'Sistemas',
         ejecucion: 'Ejecución',
-        admin: 'Admin',
         general: 'Sin área asignada',
         bodega: 'Bodega',
         gerencia: 'Gerencia',
@@ -5923,9 +5922,9 @@ return `
                     </div>
                     <div class="tks-form-row">
                         <div class="tks-form-group">
-                            <label>Área (auto-detecta si vacío)</label>
+                            <label>Área</label>
                             <select class="tks-select" id="tks-new-cat">
-                                <option value="">Auto-detectar</option>
+                                <option value="">Sin área asignada</option>
                                 <option value="redes">🌐 Redes</option>
                                 <option value="sistemas">💻 Sistemas</option>
                                 <option value="ejecucion">🔧 Ejecución</option>
