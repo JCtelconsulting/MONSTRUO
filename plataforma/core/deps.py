@@ -51,6 +51,29 @@ def _get_role_permissions(role: str) -> List[str]:
     return list(settings.ROLE_PERMISSIONS.get(role, []))
 
 
+def _user_is_active(username: str) -> bool:
+    """AUTHN-02 (auditoría 2026-06-28): revalida is_active contra la DB en cada
+    request, para que un usuario deshabilitado pierda acceso de inmediato (antes el
+    JWT seguía válido hasta exp, ~2h). Fail-open ante error de DB: si la consulta
+    falla, degrada a no-revalidar en vez de tumbar el acceso de todos los módulos."""
+    try:
+        from plataforma.core import db
+
+        conn = db.get_conn()
+        try:
+            row = conn.execute(
+                "SELECT is_active FROM users WHERE username = ?", (username,)
+            ).fetchone()
+        finally:
+            conn.close()
+        if row is None:
+            return True  # usuario no en tabla local (p.ej. SSO externo): no bloquear
+        return int(row["is_active"] or 0) == 1
+    except Exception as e:
+        logger.debug("AUTHN-02 is_active check failed for %s: %s", username, e)
+        return True  # fail-open
+
+
 def require_session(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     token = _bearer_token(authorization)
     if not token:
@@ -58,6 +81,8 @@ def require_session(authorization: Optional[str] = Header(default=None)) -> Dict
     payload = security.verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="invalid_token")
+    if not _user_is_active(payload["sub"]):
+        raise HTTPException(status_code=401, detail="user_inactive")
     roles = _payload_roles(payload)
     role = roles[0] if roles else ""
     return {"username": payload["sub"], "role": role, "roles": roles}
@@ -78,6 +103,8 @@ def require_session_hybrid(
     payload = security.verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="invalid_token")
+    if not _user_is_active(payload["sub"]):
+        raise HTTPException(status_code=401, detail="user_inactive")
     roles = _payload_roles(payload)
     role = roles[0] if roles else ""
     return {"username": payload["sub"], "role": role, "roles": roles}
