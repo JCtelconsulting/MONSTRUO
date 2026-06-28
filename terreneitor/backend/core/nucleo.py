@@ -110,7 +110,6 @@ app.add_middleware(
         "https://supervisor.telconsulting.cl",
         "https://gerencial.telconsulting.cl",
         "https://portal.telconsulting.cl",
-        "http://localhost",
     ],
     allow_credentials=True,
     allow_methods=["*"],

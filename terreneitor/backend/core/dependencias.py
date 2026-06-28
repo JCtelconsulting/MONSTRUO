@@ -517,6 +517,25 @@ require_supervisor = require_role("SUPERVISOR")
 require_terreno = require_role("TERRENO")
 
 
+def require_roles_any(*roles_permitidos: str):
+    """AUTHZ-04 (auditoría 2026-06-28): permite cualquiera de varios roles.
+    ADMIN siempre pasa. Para gestión de catálogos (clientes) usamos
+    ADMIN/GERENCIA/SUPERVISOR — el rol TERRENO (campo) queda excluido."""
+    permitidos = set(roles_permitidos) | {"ADMIN"}
+
+    def checker(data: dict = Depends(get_session_data), db: Session = Depends(get_db)):
+        if not data["logged"]:
+            raise HTTPException(status_code=401, detail="No autenticado")
+        if data["role"] not in permitidos:
+            raise HTTPException(status_code=403, detail="Acceso denegado")
+        return db.query(modelos.User).filter(modelos.User.id == data["user_id"]).first()
+
+    return checker
+
+
+require_gestion = require_roles_any("GERENCIA", "SUPERVISOR")
+
+
 def require_session(
     data: dict = Depends(get_session_data), db: Session = Depends(get_db)
 ):

@@ -853,7 +853,7 @@ def get_report_job_status(job_id: str, db: Session = Depends(dependencias.get_db
 
 
 @router.get("/informes/download-job/{job_id}")
-def download_report_job(job_id: str, db: Session = Depends(dependencias.get_db)):
+def download_report_job(job_id: str, db: Session = Depends(dependencias.get_db), _g: modelos.User = Depends(dependencias.require_gestion)):
     job = db.query(modelos.ReportJob).filter(modelos.ReportJob.id == job_id).first()
     if not job:
         raise HTTPException(404, "Tarea no encontrada")
@@ -881,7 +881,7 @@ def download_report_job(job_id: str, db: Session = Depends(dependencias.get_db))
 
 
 @router.get("/informes/download-direct/{report_id}")
-def download_report_direct(report_id: int, db: Session = Depends(dependencias.get_db)):
+def download_report_direct(report_id: int, db: Session = Depends(dependencias.get_db), _g: modelos.User = Depends(dependencias.require_gestion)):
     reporte = (
         db.query(modelos.ReporteHistorial)
         .filter(modelos.ReporteHistorial.id == report_id)

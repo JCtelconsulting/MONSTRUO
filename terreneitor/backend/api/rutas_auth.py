@@ -173,7 +173,7 @@ def change_password(
     if not dependencias.verify_password(req.old_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Clave actual incorrecta")
 
-    if len(req.new_password) < 4:
+    if len(req.new_password) < 8:
         raise HTTPException(status_code=400, detail="Nueva clave muy corta")
 
     user.hashed_password = dependencias.get_db_hash(req.new_password)

@@ -460,6 +460,7 @@ def listar_clientes(db: Session = Depends(dependencias.get_db)):
 def crear_cliente(
     payload: dict,
     db: Session = Depends(dependencias.get_db),
+    _g: modelos.User = Depends(dependencias.require_gestion),
 ):
     """Agrega un cliente al catálogo (normaliza espacios). Reusa si ya existe
     (case-insensitive) para no duplicar."""
@@ -481,7 +482,7 @@ def crear_cliente(
 
 
 @router.patch("/clientes/{cliente_id}")
-def editar_cliente(cliente_id: int, payload: dict, db: Session = Depends(dependencias.get_db)):
+def editar_cliente(cliente_id: int, payload: dict, db: Session = Depends(dependencias.get_db), _g: modelos.User = Depends(dependencias.require_gestion)):
     """Renombra un cliente del catálogo."""
     c = db.query(modelos.Cliente).filter(modelos.Cliente.id == cliente_id).first()
     if not c:
@@ -495,7 +496,7 @@ def editar_cliente(cliente_id: int, payload: dict, db: Session = Depends(depende
 
 
 @router.delete("/clientes/{cliente_id}")
-def borrar_cliente(cliente_id: int, db: Session = Depends(dependencias.get_db)):
+def borrar_cliente(cliente_id: int, db: Session = Depends(dependencias.get_db), _g: modelos.User = Depends(dependencias.require_gestion)):
     """Elimina un cliente del catálogo (no toca proyectos ni planes ya creados)."""
     c = db.query(modelos.Cliente).filter(modelos.Cliente.id == cliente_id).first()
     if not c:
@@ -506,7 +507,7 @@ def borrar_cliente(cliente_id: int, db: Session = Depends(dependencias.get_db)):
 
 
 @router.post("/clientes/sincronizar")
-def sincronizar_clientes(db: Session = Depends(dependencias.get_db)):
+def sincronizar_clientes(db: Session = Depends(dependencias.get_db), _g: modelos.User = Depends(dependencias.require_gestion)):
     """Carga al catálogo los clientes que ya usan los proyectos (SONDA, RICOH, etc.),
     sin duplicar (case-insensitive). Devuelve cuántos se agregaron."""
     reales = [
@@ -818,7 +819,21 @@ def upload_multiple_archivos(
     except Exception:
         pass
 
+    # FILE-02 (auditoría 2026-06-28): allowlist de extensiones de subida. Sin
+    # esto se podían guardar ejecutables/HTML/SVG y luego servirlos por
+    # /api/common/view (XSS almacenado / archivo arbitrario). Solo imágenes + PDF.
+    _ALLOWED_UPLOAD_EXTS = {
+        ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif",
+        ".gif", ".bmp", ".tif", ".tiff", ".pdf",
+    }
     for file in files:
+        _up_ext = os.path.splitext(file.filename or "")[1].lower()
+        if _up_ext not in _ALLOWED_UPLOAD_EXTS:
+            try:
+                file.file.close()
+            except Exception:
+                pass
+            continue
         tmp_path = None
         try:
             fd, tmp_path = tempfile.mkstemp(dir=staging_dir, suffix=f"_{file.filename}")
