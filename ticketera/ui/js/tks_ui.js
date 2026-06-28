@@ -3736,7 +3736,6 @@ return `
                 ${ticket.origen_email ? `<div class="tks-origin-email">${escapeHtml(ticket.origen_email)}</div>` : ''}
             </td>
             <td class="td-min"><span class="tks-cat-badge tks-cat-${escapeHtml(ticket.categoria || 'general')}">${catLabel(ticket.categoria)}</span></td>
-            <td class="td-min"><span class="tks-sev tks-sev-${escapeHtml(ticket.severidad)}">${sevLabel(ticket.severidad)}</span></td>
             <td class="td-min"><span class="tks-status tks-status-${escapeHtml(viewModel.displayStatus)}">${statusLabel(viewModel.displayStatus)}</span></td>
             <td class="td-min tks-sla-cell ${viewModel.slaClass}">
                 ${viewModel.sla.class === 'tks-sla-breached' ? '<i class="fas fa-exclamation-triangle"></i>' : ''}
@@ -3761,7 +3760,6 @@ return `
                         <th>Asunto</th>
                         <th>Cliente</th>
                         <th class="tks-th-cat">Categoria</th>
-                        <th class="tks-th-sev">Severidad</th>
                         <th class="tks-th-status">Estado</th>
                         <th class="tks-th-sla">SLA</th>
                     </tr>
@@ -5614,16 +5612,6 @@ return `
                 </div>
 
                 <div class="tks-form-group">
-                    <label>ID Cliente Laudus / ERP</label>
-                    <input
-                        id="tks-routing-customer-id"
-                        class="tks-input"
-                        type="text"
-                        value="${escapeHtml(editingRule?.customer_id || '')}"
-                        placeholder="Ej: 12345"
-                    >
-                </div>
-                <div class="tks-form-group">
                     <label>Nombre Cliente (Referencia)</label>
                     <input
                         id="tks-routing-customer-name"
@@ -5764,7 +5752,7 @@ return `
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Categoría</label>
-                        <select class="tks-select" id="tks-arch-filter-cat" style="min-width:140px">
+                        <select class="tks-select" id="tks-arch-filter-cat" style="min-width:140px" onchange="window.loadArchivados()">
                             <option value="">Todas</option>
                             <option value="redes">Redes</option>
                             <option value="sistemas">Sistemas</option>
@@ -5778,7 +5766,7 @@ return `
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Estado</label>
-                        <select class="tks-select" id="tks-arch-filter-estado" style="min-width:130px">
+                        <select class="tks-select" id="tks-arch-filter-estado" style="min-width:130px" onchange="window.loadArchivados()">
                             <option value="">Todos</option>
                             <option value="cerrado">Cerrado</option>
                             <option value="resuelto">Resuelto</option>
@@ -5786,15 +5774,12 @@ return `
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
-                        <input type="date" class="tks-input" id="tks-arch-filter-desde" style="min-width:140px">
+                        <input type="date" class="tks-input" id="tks-arch-filter-desde" style="min-width:140px" onchange="window.loadArchivados()">
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Hasta</label>
-                        <input type="date" class="tks-input" id="tks-arch-filter-hasta" style="min-width:140px">
+                        <input type="date" class="tks-input" id="tks-arch-filter-hasta" style="min-width:140px" onchange="window.loadArchivados()">
                     </div>
-                    <button class="tks-btn tks-btn-primary" onclick="window.loadArchivados()" style="align-self:flex-end">
-                        <i class="fas fa-search"></i> Filtrar
-                    </button>
                     <button class="tks-btn tks-btn-ghost" onclick="window.resetArchivadosFiltros()" style="align-self:flex-end">
                         Limpiar
                     </button>
@@ -5826,7 +5811,7 @@ return `
                 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end">
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Agrupar por</label>
-                        <select class="tks-select" id="tks-atendidos-period" style="min-width:120px">
+                        <select class="tks-select" id="tks-atendidos-period" style="min-width:120px" onchange="window.generarReporteAtendidos()">
                             <option value="day">Día</option>
                             <option value="week">Semana</option>
                             <option value="month" selected>Mes</option>
@@ -5834,21 +5819,18 @@ return `
                     </div>
                     <div class="tks-form-group" style="margin:0;min-width:200px">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
-                        <select class="tks-select" id="tks-atendidos-cliente" style="min-width:200px">
+                        <select class="tks-select" id="tks-atendidos-cliente" style="min-width:200px" onchange="window.generarReporteAtendidos()">
                             <option value="">Todos los clientes</option>
                         </select>
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
-                        <input type="date" class="tks-input" id="tks-atendidos-desde" style="min-width:140px">
+                        <input type="date" class="tks-input" id="tks-atendidos-desde" style="min-width:140px" onchange="window.generarReporteAtendidos()">
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Hasta</label>
-                        <input type="date" class="tks-input" id="tks-atendidos-hasta" style="min-width:140px">
+                        <input type="date" class="tks-input" id="tks-atendidos-hasta" style="min-width:140px" onchange="window.generarReporteAtendidos()">
                     </div>
-                    <button class="tks-btn tks-btn-primary" onclick="window.generarReporteAtendidos()" style="align-self:flex-end">
-                        <i class="fas fa-chart-bar"></i> Generar
-                    </button>
                 </div>
                 <div id="tks-atendidos-resultado" style="margin-top:1rem"></div>
             </section>
@@ -5921,15 +5903,6 @@ return `
                         <textarea class="tks-textarea" id="tks-new-desc" rows="4" placeholder="Detalle del ticket..."></textarea>
                     </div>
                     <div class="tks-form-row">
-                        <div class="tks-form-group">
-                            <label>Severidad</label>
-                            <select class="tks-select" id="tks-new-sev">
-                                <option value="baja">🟢 Baja</option>
-                                <option value="media" selected>🔵 Media</option>
-                                <option value="alta">🟠 Alta</option>
-                                <option value="critica">🔴 Crítica</option>
-                            </select>
-                        </div>
                         <div class="tks-form-group">
                             <label>Categoría (auto-detecta si vacío)</label>
                             <select class="tks-select" id="tks-new-cat">

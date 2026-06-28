@@ -19,12 +19,15 @@
     cursor: pointer;
     color: var(--tks-text-muted);
     border-bottom: 2px solid transparent;
+    font-size: 1rem;
 }
 
+/* Mismo estilo de "activa" que las pestañas principales (.tab-btn): acento dorado
+   + negrita, para que todas las pestañas se vean igual. */
 .tks-detail-tab.active {
-    color: var(--tks-text);
-    border-bottom-color: var(--tks-accent);
-    font-weight: 600;
+    color: var(--neon);
+    border-bottom-color: var(--neon);
+    font-weight: 700;
 }
 
 /* Timeline Feed Items (Refined Layout) */
@@ -451,8 +454,18 @@
 
 .tks-template-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
+}
+@media (max-width: 760px) {
+    .tks-template-card-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 480px) {
+    .tks-template-card-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .tks-template-card {
@@ -3290,4 +3303,17 @@
 .tks-assign-ticket-group:hover {
     filter: brightness(1.1);
     z-index: 10;
+}
+
+/* ==========================================================================
+   Modal de historial de archivados — UN solo scroll
+   El modal-body ya scrollea; evitamos scrolls anidados (la timeline traía su
+   propio max-height/overflow → doble/triple scroll feo dentro del modal).
+   ========================================================================== */
+#tks-historial-modal .tks-modal {
+    overflow: hidden;
+}
+#tks-historial-modal .tks-timeline {
+    max-height: none;
+    overflow: visible;
 }

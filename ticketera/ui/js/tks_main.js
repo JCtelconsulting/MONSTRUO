@@ -2981,34 +2981,14 @@ window.loadArchivados = async function() {
 
         const esc = TksUI.escapeHtml.bind(TksUI);
         const rows = items.map(t => {
-            const sinCliente = !t.customer_id && !t.cliente_nombre;
             const clienteLabel = t.cliente_nombre
                 ? `<span>${esc(t.cliente_nombre)}</span>`
                 : `<span style="opacity:0.5;font-style:italic">Sin asignar</span>`;
-            const emailEsc = (t.origen_email || '').replace(/'/g, "\\'");
-            const tituloEsc = (t.titulo || '').replace(/'/g, "\\'");
-            const asignarBtn = sinCliente
-                ? `<button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}', '${tituloEsc}')">
-                       <i class="fas fa-user-tag"></i> Asignar
-                   </button>`
-                : `<span style="display:flex;gap:0.3rem">
-                       <button class="tks-btn tks-btn-ghost tks-btn-sm" onclick="window.abrirAsignarCliente(${t.id}, '${emailEsc}', '${tituloEsc}')" title="Cambiar cliente">
-                           <i class="fas fa-edit"></i>
-                       </button>
-                       <button class="tks-btn tks-btn-ghost tks-btn-sm" style="color:var(--tks-danger)" onclick="window.desasignarCliente(${t.id})" title="Quitar cliente">
-                           <i class="fas fa-user-times"></i>
-                       </button>
-                   </span>`;
             return `
             <tr>
-                <td><span class="tks-code">${esc(t.codigo || '#' + t.id)}</span></td>
-                <td><a href="javascript:void(0)" class="tks-ticket-title fade-overflow" title="Ver cómo se resolvió" style="max-width:260px;cursor:pointer;color:var(--tks-accent)" onclick="window.tksAbrirArchivado(${t.id})">${esc(t.titulo || '-')}</a></td>
-                <td>${esc(t.estado || '-')}</td>
-                <td>${esc(t.categoria || '-')}</td>
+                <td><a href="javascript:void(0)" class="tks-ticket-title" title="Ver cómo se resolvió" style="cursor:pointer;color:var(--tks-accent)" onclick="window.tksAbrirArchivado(${t.id})">${esc(t.titulo || '-')}</a></td>
                 <td>${clienteLabel}</td>
-                <td>${esc(t.origen_email || '-')}</td>
                 <td>${t.created_at ? t.created_at.slice(0,10) : '-'}</td>
-                <td>${asignarBtn}</td>
             </tr>`;
         }).join('');
 
@@ -3018,14 +2998,9 @@ window.loadArchivados = async function() {
             <table class="tks-pivot-table">
                 <thead>
                     <tr>
-                        <th>Código</th>
                         <th>Título</th>
-                        <th>Estado</th>
-                        <th>Área</th>
                         <th>Cliente</th>
-                        <th>Email origen</th>
                         <th>Fecha</th>
-                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
