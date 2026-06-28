@@ -15,8 +15,8 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from plataforma.core import db, deps
-from plataforma.core.audit_decorator import audit_action
+from fundacion.core import db, deps
+from fundacion.core.audit_decorator import audit_action
 
 from fundacion.backend.services import sedes as sedes_service
 

@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from datetime import datetime
-from plataforma.core import auth_service, db, deps
-from plataforma.core.audit_decorator import audit_action
+from fundacion.core import auth_service, db, deps
+from fundacion.core.audit_decorator import audit_action
 from fundacion.backend.services import sedes as sedes_service
 from fundacion.backend.services import membresias as memb_service
 

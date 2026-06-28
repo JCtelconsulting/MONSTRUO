@@ -6,8 +6,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from plataforma.core import db, deps
-from plataforma.core.audit_decorator import audit_action
+from fundacion.core import db, deps
+from fundacion.core.audit_decorator import audit_action
 
 from fundacion.backend.services import drive_sync, sedes as sedes_service
 

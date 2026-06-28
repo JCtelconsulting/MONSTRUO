@@ -19,12 +19,12 @@ repo_root = Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from plataforma.core.env_loader import load_runtime_env
+from fundacion.core.env_loader import load_runtime_env
 
 load_runtime_env(Path(__file__).resolve())
 
 from fundacion.backend.services import drive_sync
-from plataforma.core import db
+from fundacion.core import db
 
 
 def main() -> int:

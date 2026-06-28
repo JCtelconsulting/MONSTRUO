@@ -8,8 +8,8 @@ from fastapi import Cookie, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response as FastAPIResponse
 from fastapi.staticfiles import StaticFiles
 
-from plataforma.core.env_loader import load_runtime_env
-from plataforma.core.version import inject_asset_version
+from fundacion.core.env_loader import load_runtime_env
+from fundacion.core.version import inject_asset_version
 
 load_runtime_env(Path(__file__).resolve())
 
@@ -17,8 +17,8 @@ from fundacion.backend import router as fundacion_router
 from fundacion.backend.routers import sync as sync_router
 from fundacion.backend.routers import reportes as reportes_router
 from fundacion.backend.routers import sesiones as sesiones_router
-from plataforma.core import db, deps
-from plataforma.core.web import build_login_redirect_url
+from fundacion.core import db, deps
+from fundacion.core.web import build_login_redirect_url
 
 repo_root = Path(__file__).resolve().parents[2]
 
@@ -34,7 +34,7 @@ app = FastAPI(title="Monstruo - Fundación API", version="1.0", lifespan=lifespa
 ui_dir = repo_root / "fundacion" / "ui"
 app.mount("/static", StaticFiles(directory=str(ui_dir)), name="fundacion_static")
 
-shared_ui_dir = repo_root / "gateway" / "ui" / "shared" / "ui"
+shared_ui_dir = ui_dir / "shared"
 if shared_ui_dir.exists():
     app.mount("/shared", StaticFiles(directory=str(shared_ui_dir)), name="shared_static")
 

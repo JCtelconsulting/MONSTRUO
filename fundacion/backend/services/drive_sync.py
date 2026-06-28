@@ -22,7 +22,7 @@ from typing import Any, Optional
 import gspread
 from google.oauth2.service_account import Credentials
 
-from plataforma.core import db
+from fundacion.core import db
 
 logger = logging.getLogger(__name__)
 

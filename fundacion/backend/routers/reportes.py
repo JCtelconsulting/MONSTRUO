@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from plataforma.core import db, deps
+from fundacion.core import db, deps
 from fundacion.backend.services import sedes as sedes_service
 
 logger = logging.getLogger(__name__)

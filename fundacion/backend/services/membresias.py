@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from plataforma.core import db
+from fundacion.core import db
 
 
 _VALID_ROLES = {"lider_educativo", "gestora_educativa"}
