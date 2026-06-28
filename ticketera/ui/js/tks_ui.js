@@ -184,7 +184,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -409,7 +409,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -606,7 +606,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -806,7 +806,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -1036,7 +1036,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -1234,7 +1234,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -1421,7 +1421,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -1611,7 +1611,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -1806,7 +1806,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -1992,7 +1992,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -2300,7 +2300,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -2735,7 +2735,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -2981,7 +2981,7 @@ const TksUI = (() => {
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -3413,7 +3413,7 @@ return `
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -3697,7 +3697,7 @@ return `
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -3780,7 +3780,7 @@ return `
                         <th class="tks-th-code">NRº de Ticket</th>
                         <th>Asunto</th>
                         <th>Cliente</th>
-                        <th class="tks-th-cat">Categoria</th>
+                        <th class="tks-th-cat">Área</th>
                         <th class="tks-th-status">Estado</th>
                         <th class="tks-th-sla">SLA</th>
                     </tr>
@@ -4019,7 +4019,7 @@ return `
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -4217,7 +4217,7 @@ return `
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -4523,7 +4523,7 @@ return `
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -5011,7 +5011,7 @@ return `
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
@@ -5755,7 +5755,7 @@ return `
                         </select>
                     </div>
                     <div class="tks-form-group" style="margin:0">
-                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Categoría</label>
+                        <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Área</label>
                         <select class="tks-select" id="tks-arch-filter-cat" style="min-width:140px" onchange="window.loadArchivados()">
                             <option value="">Todas</option>
                             <option value="redes">Redes</option>
@@ -5889,7 +5889,7 @@ return `
                     </div>
                     <div class="tks-form-row">
                         <div class="tks-form-group">
-                            <label>Categoría (auto-detecta si vacío)</label>
+                            <label>Área (auto-detecta si vacío)</label>
                             <select class="tks-select" id="tks-new-cat">
                                 <option value="">Auto-detectar</option>
                                 <option value="redes">🌐 Redes</option>
@@ -6102,7 +6102,7 @@ return `
                     <table class="tks-table" style="font-size: 0.9rem">
                         <thead>
                             <tr>
-                                <th>Categoría</th>
+                                <th>Área</th>
                                 <th style="text-align:right">Tickets</th>
                             </tr>
                         </thead>
