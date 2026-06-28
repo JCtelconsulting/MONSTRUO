@@ -1285,7 +1285,10 @@ def get_atendidos_report(period: str = "day", customer_id: str = None,
     if resolved_before:
         where.append("resolved_at < ?"); params.append(resolved_before)
     if customer_id:
-        where.append("LOWER(COALESCE(customer_id, '')) = ?"); params.append(str(customer_id).strip().lower())
+        # Match por id O nombre (los clientes de reglas no traen customer_id).
+        where.append("(LOWER(COALESCE(customer_id, '')) = ? OR LOWER(COALESCE(cliente_nombre, '')) = ?)")
+        params.append(str(customer_id).strip().lower())
+        params.append(str(customer_id).strip().lower())
     wsql = " AND ".join(where)
     conn = db.get_conn()
     try:
