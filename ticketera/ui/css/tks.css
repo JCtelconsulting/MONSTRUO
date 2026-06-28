@@ -2280,7 +2280,9 @@
 
 .tks-kanban-col-body {
     flex: 1;
-    overflow: visible;
+    max-height: 64vh;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 0.5rem;
     transition: background 0.18s ease, border-color 0.18s ease;
 }
@@ -3315,4 +3317,15 @@
     max-height: 58vh;
     overflow-y: auto;
     overflow-x: auto;
+}
+
+/* ==========================================================================
+   Lista de tickets — tope de altura con scroll interno. Con muchos tickets, antes
+   crecía sin fin y scrolleaba la página entera; ahora los filtros quedan fijos arriba
+   y la lista scrollea dentro de su ventana.
+   ========================================================================== */
+.tks-items-list {
+    max-height: 64vh;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
