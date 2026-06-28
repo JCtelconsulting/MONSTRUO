@@ -16,7 +16,8 @@ def test_login_exitoso(test_client, test_user):
     data = response.json()
     assert data.get("ok") is True
     assert data.get("role") == "ADMIN"
-    assert "access_token" in test_client.cookies
+    # La cookie de sesión de Terreneitor es 'access_token_terreneitor' (namespaced por módulo).
+    assert "access_token_terreneitor" in test_client.cookies
 
 
 def test_login_email_incorrecto(test_client, test_user):

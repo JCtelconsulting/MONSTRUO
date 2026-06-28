@@ -11,8 +11,11 @@ def test_crear_proyecto_pmc(
     """
     Test: Crear proyecto PMC debe generar estructura de carpetas correcta.
     """
-    # Configurar directorio temporal como BASE_FILES_DIR
-    monkeypatch.setattr("backend.core.nucleo.BASE_FILES_DIR", str(temp_files_dir))
+    # Configurar directorio temporal como BASE_FILES_DIR (aísla el test del disco real,
+    # evitando 409 'ruta ya existe'). El módulo real es terreneitor.backend.core.nucleo.
+    monkeypatch.setattr(
+        "terreneitor.backend.core.nucleo.BASE_FILES_DIR", str(temp_files_dir)
+    )
 
     response = test_client.post(
         "/api/admin/proyectos",
