@@ -2238,8 +2238,7 @@ return { ticket, permissions };
             </div>`;
         // Poblar select de clientes y luego cargar tickets
         window.cargarClientesSelect('tks-arch-filter-cliente').then(() => window.loadArchivados());
-        window.cargarClientesSelect('tks-atendidos-cliente');
-        window.cargarResumenClientes();
+        window.cargarClientesSelect('tks-atendidos-cliente').then(() => window.generarReporteAtendidos());
     }
 
     // ---- OPS ----
@@ -3161,7 +3160,11 @@ window.generarReporteAtendidos = async function() {
         var html = '<p style="font-weight:600;margin-bottom:0.5rem">' + scopeLabel + ' — Total atendidos: ' + (r.total || 0) + '</p>';
         html += '<div style="display:flex;gap:1.5rem;flex-wrap:wrap">';
         html += '<div><h4>Por período (' + (r.period || '') + ')</h4><table class="tks-table"><thead><tr><th>Período</th><th>Atendidos</th></tr></thead><tbody>' + (rows || '<tr><td colspan="2">Sin datos</td></tr>') + '</tbody></table></div>';
-        html += '<div><h4>Por cliente</h4><table class="tks-table"><thead><tr><th>Cliente</th><th>Atendidos</th></tr></thead><tbody>' + (cli || '<tr><td colspan="2">Sin datos</td></tr>') + '</tbody></table></div>';
+        // El desglose "Por cliente" solo tiene sentido con "Todos los clientes"; al filtrar por
+        // uno sería una sola fila redundante (arriba ya dice qué cliente es).
+        if (!customerId) {
+            html += '<div><h4>Por cliente</h4><table class="tks-table"><thead><tr><th>Cliente</th><th>Atendidos</th></tr></thead><tbody>' + (cli || '<tr><td colspan="2">Sin datos</td></tr>') + '</tbody></table></div>';
+        }
         html += '</div>';
         if (out) out.innerHTML = html;
     } catch (e) {

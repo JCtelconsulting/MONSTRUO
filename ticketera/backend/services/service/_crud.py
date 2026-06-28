@@ -412,6 +412,11 @@ def create_ticket(
             client_map = get_client_for_email(origen_email)
             if client_map:
                 cliente_nombre = client_map.get("customer_name")
+                # Garantizamos customer_id: los clientes de reglas no traen id de Laudus, así
+                # que usamos el nombre como id. Sin esto el ticket queda con nombre pero id
+                # vacío y los filtros/reportes (que usan customer_id) no lo encuentran.
+                if not customer_id:
+                    customer_id = str(client_map.get("customer_id") or cliente_nombre or "").strip()
             else:
                 # Si NO hay asociación, indicamos "Desconocido" para permitir vincular
                 # (aunque venga un nombre en el header del correo, queremos que el usuario lo asocie)
@@ -820,6 +825,17 @@ def update_ticket(
             normalized_updates[key] = _serialize_notify_emails(value, strict=True)
             continue
         normalized_updates[key] = value
+
+    # Vincular un cliente por nombre (sin id de Laudus): garantizamos customer_id = nombre,
+    # así filtros/reportes (que usan customer_id) lo encuentran. Cubre el vínculo manual.
+    _nombre_nuevo = normalized_updates.get("cliente_nombre")
+    if (
+        _nombre_nuevo
+        and _nombre_nuevo != "Desconocido"
+        and not normalized_updates.get("customer_id")
+        and not str(current.get("customer_id") or "").strip()
+    ):
+        normalized_updates["customer_id"] = _nombre_nuevo
 
     if "asignado_a" in normalized_updates and normalized_updates.get("asignado_a") and "subestado" not in normalized_updates:
         current_sub = normalize_subestado(current.get("subestado"), "recibido")
