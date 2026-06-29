@@ -751,7 +751,7 @@ const UsersUI = (() => {
                 window.fetchApi('/api/admin/users'),
                 window.fetchApi('/api/config/role-scopes').catch(() => null),
                 window.fetchApi('/api/sesion').catch(() => null),
-                window.fetchApi('/api/config/labels').catch(() => null),
+                window.fetchApi('/api/config/labels', { noRedirectOn401: true }).catch(() => null),
             ]);
 
             // Catalogo central de etiquetas: si responde, sobreescribe los

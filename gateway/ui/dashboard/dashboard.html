@@ -358,7 +358,7 @@
       // desc/icon/url/orden siguen viniendo del hardcode de MODS (dependen del
       // entorno). Si el fetch falla, MODS queda intacto como fallback.
       try {
-        const cat = await window.fetchApi('/api/config/ui-modules');
+        const cat = await window.fetchApi('/api/config/ui-modules', { noRedirectOn401: true });
         const mods = (cat && Array.isArray(cat.modules)) ? cat.modules : null;
         if (mods) {
           const labelById = {};

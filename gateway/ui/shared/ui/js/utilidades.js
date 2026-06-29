@@ -49,6 +49,11 @@ async function fetchApi(url, options = {}) {
   const timeoutMs = Number.isFinite(reqOptions.timeoutMs) ? reqOptions.timeoutMs : 12000;
   delete reqOptions.timeoutMs;
 
+  // Llamadas OPCIONALES (catálogos, sincronización de etiquetas, etc.) pueden pedir que un 401
+  // NO dispare el redirect a login: un endpoint secundario jamás debe poder tumbar la sesión en bucle.
+  const noRedirectOn401 = reqOptions.noRedirectOn401 === true;
+  delete reqOptions.noRedirectOn401;
+
   let timeoutId = null;
   let timedOut = false;
   let timeoutController = null;
@@ -97,9 +102,9 @@ async function fetchApi(url, options = {}) {
     const resp = await fetch(url, reqOptions);
 
     if (resp.status === 401) {
-      // No recargar la página si el propio login falló
-      if (url.includes('/api/auth/login')) {
-        throw new Error('Credenciales inválidas');
+      // No redirigir si fue el propio login, o si quien llama lo pidió (llamada opcional).
+      if (url.includes('/api/auth/login') || noRedirectOn401) {
+        throw new Error('Sesión no válida para esta llamada');
       }
       redirectToLogin();
       throw new Error('Sesión expirada o permisos insuficientes');

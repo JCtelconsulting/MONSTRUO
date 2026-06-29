@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // entorno: hosts prod vs puertos locales). Si el fetch falla, no se toca nada.
     const applyModulesCatalog = async () => {
         try {
-            const data = await window.fetchApi('/api/config/ui-modules');
+            const data = await window.fetchApi('/api/config/ui-modules', { noRedirectOn401: true });
             const modules = (data && Array.isArray(data.modules)) ? data.modules : null;
             if (!modules) return;
             const labelById = {};
