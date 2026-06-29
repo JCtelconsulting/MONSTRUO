@@ -373,7 +373,8 @@ def _session_desde_gateway(request: Request, db: Session):
 
         row = db.execute(
             _text(
-                "SELECT role, COALESCE(allowed_modules::text, ''), COALESCE(module_roles::text, '{}') "
+                "SELECT role, COALESCE(allowed_modules::text, ''), COALESCE(module_roles::text, '{}'), "
+                "COALESCE(first_name, ''), COALESCE(last_name, '') "
                 "FROM auth.users WHERE lower(username) = :u "
                 "AND COALESCE(is_active::int, 0) = 1"
             ),
@@ -407,20 +408,27 @@ def _session_desde_gateway(request: Request, db: Session):
             (_SSO_ROL_MAP[r] for r in roles_gw if r in _SSO_ROL_MAP), "TERRENO"
         )
 
-    # Usuario local espejo (get-or-create) + re-sincronización del rol si cambió en el gateway.
+    # Nombre desde la identidad CENTRAL (auth.users es la fuente); si todavía no lo tiene cargado,
+    # se deriva del correo como fallback. terreneitor.users es un ESPEJO: no se edita a mano.
+    nombre_central = f"{(row[3] or '').strip()} {(row[4] or '').strip()}".strip() \
+        or email.split("@")[0].replace(".", " ").title()
+
+    # Usuario local espejo (get-or-create) + re-sincronización de rol y NOMBRE desde el gateway.
     user = db.query(modelos.User).filter(modelos.User.email.ilike(email)).first()
     if not user:
         user = modelos.User(
             email=email,
-            name=email.split("@")[0].replace(".", " ").title(),
+            name=nombre_central,
             hashed_password=get_db_hash(os.urandom(24).hex()),
             role=rol_local,
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-    elif str(getattr(user.role, "value", user.role)).upper() != str(rol_local).upper():
+    elif (str(getattr(user.role, "value", user.role)).upper() != str(rol_local).upper()
+          or (user.name or "") != nombre_central):
         user.role = rol_local
+        user.name = nombre_central
         db.commit()
         db.refresh(user)
     rol_val = getattr(user.role, "value", user.role)
