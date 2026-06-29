@@ -694,7 +694,9 @@
             color: #e7fcff;
         }
 
-        .cfg-check-item input[type="checkbox"] {
+        /* Solo el checkbox PRINCIPAL del módulo (hijo directo) se oculta: el toggle se hace
+           clicando la fila. Con ">" no afecta a checkboxes anidados como "Crea planes". */
+        .cfg-check-item > input[type="checkbox"] {
             position: absolute;
             opacity: 0;
             pointer-events: none;
