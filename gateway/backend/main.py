@@ -57,7 +57,6 @@ app.add_middleware(AuthIdentityMiddleware)
 
 ui_dir = Path(__file__).parent.parent / "ui"
 repo_root = Path(__file__).resolve().parents[2]
-fundacion_ui_dir = repo_root / "fundacion" / "ui"
 gta_ui_dir = repo_root / "gta" / "ui"
 
 
