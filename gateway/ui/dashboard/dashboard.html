@@ -354,6 +354,18 @@
         { id: 'gta', label: 'GTA', desc: 'Tareas por áreas', icon: 'fa-list-check', url: isProd ? `https://login.telconsulting.cl${pfx}/gta` : local(9001, '/gta') },
         { id: 'config', label: 'Configuración', desc: 'Usuarios y parámetros', icon: 'fa-cog', url: isProd ? `https://config.telconsulting.cl${pfx}/` : local(9001, '/configuracion') },
       ];
+      // Catalogo central de modulos: solo sincroniza las ETIQUETAS (id+label).
+      // desc/icon/url/orden siguen viniendo del hardcode de MODS (dependen del
+      // entorno). Si el fetch falla, MODS queda intacto como fallback.
+      try {
+        const cat = await window.fetchApi('/api/config/ui-modules');
+        const mods = (cat && Array.isArray(cat.modules)) ? cat.modules : null;
+        if (mods) {
+          const labelById = {};
+          mods.forEach(m => { if (m && m.id && m.label) labelById[String(m.id)] = String(m.label); });
+          MODS.forEach(m => { if (labelById[m.id]) m.label = labelById[m.id]; });
+        }
+      } catch (e) { /* hardcode de MODS queda como fallback */ }
       let allowed = [];
       try {
         const ses = await window.fetchApi('/api/sesion');

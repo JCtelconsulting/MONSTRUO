@@ -71,7 +71,32 @@ document.addEventListener('DOMContentLoaded', () => {
         .map((item) => item.trim().toLowerCase())
         .filter(Boolean);
 
+    // Catalogo central de modulos (/api/config/ui-modules): solo aporta id+label.
+    // Lo usamos para mantener las ETIQUETAS sincronizadas con el backend, dejando
+    // que icon/link/title/orden sigan viniendo del hardcode (que depende del
+    // entorno: hosts prod vs puertos locales). Si el fetch falla, no se toca nada.
+    const applyModulesCatalog = async () => {
+        try {
+            const data = await window.fetchApi('/api/config/ui-modules');
+            const modules = (data && Array.isArray(data.modules)) ? data.modules : null;
+            if (!modules) return;
+            const labelById = {};
+            modules.forEach((m) => {
+                const id = String((m && m.id) || '').trim();
+                const label = String((m && m.label) || '').trim();
+                if (id && label) labelById[id] = label;
+            });
+            menuItems.forEach((item) => {
+                if (labelById[item.id]) item.label = labelById[item.id];
+            });
+        } catch (e) {
+            // Silencioso: el hardcode de menuItems queda como fallback.
+            console.warn('Catalogo de modulos no disponible, usando labels locales', e);
+        }
+    };
+
     (async () => {
+        await applyModulesCatalog();
         let allowed = [];
         try {
             const data = await window.fetchApi('/api/sesion');

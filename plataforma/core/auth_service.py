@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any, List
-from plataforma.core import db, security
+from plataforma.core import db, security, organigrama
 from plataforma.core.config import settings
 import unicodedata
 import json
@@ -26,6 +26,31 @@ def get_user_display_name(username: str) -> str:
     finally:
         conn.close()
 
+
+def get_users_display_names(usernames: List[str]) -> Dict[str, str]:
+    """Mapa {username: display_name} en LOTE. Para endpoints que listan varios usuarios
+    (comentarios, transiciones, líderes de área) sin una query por cada uno. Devuelve nombre
+    vacío si el usuario no tiene first/last cargado (el caller aplica su fallback)."""
+    clean = sorted({str(u or "").strip() for u in (usernames or []) if str(u or "").strip()})
+    if not clean:
+        return {}
+    conn = db.get_conn()
+    try:
+        placeholders = ",".join("?" for _ in clean)
+        rows = conn.execute(
+            f"SELECT username, first_name, last_name FROM users WHERE username IN ({placeholders})",
+            tuple(clean),
+        ).fetchall()
+        out: Dict[str, str] = {}
+        for r in rows:
+            u = str(r.get("username") or "").strip()
+            if u:
+                out[u] = f"{(r.get('first_name') or '').strip()} {(r.get('last_name') or '').strip()}".strip()
+        return out
+    finally:
+        conn.close()
+
+
 def _normalize_role(raw_role: str) -> str:
     role = unicodedata.normalize("NFKD", str(raw_role or ""))
     role = role.encode("ascii", "ignore").decode("ascii")
@@ -41,12 +66,10 @@ def _normalize_role(raw_role: str) -> str:
         "encargado_mesa": "encargado_mesa",
         "mesa_de_ayuda": "encargado_mesa",
         "operaciones": "pmo",
-        "ops": "pmo",
-        "implementaciones": "pmo",
-        "warehouse": "bodega",
-        "finance": "finanzas",
     }
-    return aliases.get(role, role)
+    # Renombres legacy (warehouse→bodega, finance→finanzas, ops/implementaciones→pmo): fuente
+    # única en organigrama.canonizar_rol, no duplicados acá.
+    return organigrama.canonizar_rol(aliases.get(role, role))
 
 
 def _normalize_secondary_roles(raw_roles: Any, primary_role: str) -> List[str]:

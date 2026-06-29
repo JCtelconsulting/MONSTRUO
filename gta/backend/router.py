@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, File, UploadFile
 from fastapi.responses import FileResponse
 from typing import Optional, Dict, Any
-from plataforma.core import db, deps, organigrama
+from plataforma.core import db, deps, organigrama, auth_service
 from plataforma.core.audit_decorator import audit_action
 from gta.backend.models import (
     ProcesoCreate, ProcesoUpdate,
@@ -194,15 +194,21 @@ async def listar_areas_para_ui(user: dict = Depends(deps.require_permission("gta
             "FROM gta.subareas WHERE activo = TRUE ORDER BY area_code, orden, code"
         ).fetchall()
 
+        # Nombre del líder desde la identidad central (auth.users), no del texto estático guardado
+        # en gta.areas/subareas (que se desincroniza si la persona cambia su nombre). Fallback al texto.
+        _lider_users = [a.get("lider_username") for a in areas] + [s.get("lider_username") for s in subs]
+        _lider_names = auth_service.get_users_display_names([u for u in _lider_users if u])
+
         sub_by_area: dict = {}
         for s in subs:
+            _slu = s.get("lider_username") or ""
             sub_by_area.setdefault(s["area_code"], []).append({
                 "id": int(s["id"]),
                 "area_code": s["area_code"],
                 "code": s["code"],
                 "label": s["label"],
-                "lider_username": s.get("lider_username") or "",
-                "lider_nombre": s.get("lider_nombre") or "",
+                "lider_username": _slu,
+                "lider_nombre": (_lider_names.get(_slu) or s.get("lider_nombre") or ""),
                 "activo": True,
                 "orden": int(s.get("orden") or 99),
             })
@@ -213,7 +219,7 @@ async def listar_areas_para_ui(user: dict = Depends(deps.require_permission("gta
                 "code": a["code"],
                 "label": a["label"],
                 "lider_username": a.get("lider_username") or "",
-                "lider_nombre": a.get("lider_nombre") or "",
+                "lider_nombre": (_lider_names.get(a.get("lider_username") or "") or a.get("lider_nombre") or ""),
                 "es_externa": bool(a.get("es_externa")),
                 "canonica": organigrama.es_area(a["code"]),  # área del catálogo común (vs externa/custom)
                 "activo": True,

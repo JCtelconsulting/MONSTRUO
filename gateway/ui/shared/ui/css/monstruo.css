@@ -27,6 +27,11 @@
      Aprox: 1280px→12px, 1920px→14.5px, 2560px→17px, 3840px→18px (tope). */
   --base-font-size: clamp(12px, 0.4vw + 6.5px, 18px);
   --font-main: 'Space Grotesk', 'Sora', sans-serif;
+  /* Colores no-marca para migrar gradualmente los hardcodes repetidos.
+     Solo definidos aquí: los usos se reemplazarán tras revisión visual. */
+  --color-success: #28a745;
+  --color-info: #6610f2;
+  --color-cyan: #00f3ff;
 }
 
 html {
@@ -3128,6 +3133,7 @@ body:not(.login-shell) .tks-modal {
     color: var(--warning, #ffcc00);
     opacity: 0.6;
     font-size: 0.85rem;
+}
 
 /* Marca de agua: cubo Telconsulting de fondo en todos los módulos (marca) */
 body::after {

@@ -1119,9 +1119,18 @@ def _format_assignee_name(raw: str) -> str:
     val = (raw or "").strip()
     if not val or val.lower() == "sin asignar":
         return "Sin asignar"
+    # Identidad CENTRAL primero: si es un usuario con nombre cargado en auth.users, usar ese
+    # (no derivar del correo, que puede no coincidir con el nombre real).
+    try:
+        from plataforma.core import auth_service
+        display = auth_service.get_user_display_name(val)
+        if display:
+            return display
+    except Exception:
+        pass
+    # Fallback: humanizar el correo/username (juan.lopez -> Juan Lopez).
     if "@" in val:
         local_part = val.split("@")[0]
-        # Ej: juan.lopez -> Juan Lopez
         name_parts = local_part.replace(".", " ").replace("-", " ").replace("_", " ").split()
         return " ".join(p.capitalize() for p in name_parts)
     return val.capitalize()

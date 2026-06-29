@@ -70,6 +70,26 @@ PERMISSION_LABELS = {
 ALL_PERMISSIONS = sorted(PERMISSION_LABELS.keys())
 
 
+@router.get("/ui-modules", summary="Catalogo central de modulos de UI")
+async def get_ui_modules(
+    sess: dict = Depends(deps.require_session),
+):
+    """Fuente unica de verdad de la lista de modulos visibles en la UI."""
+    return {"modules": settings.UI_MODULES}
+
+
+@router.get("/labels", summary="Catalogo central de etiquetas de roles y permisos")
+async def get_labels(
+    sess: dict = Depends(deps.require_session),
+):
+    """Fuente unica de verdad de etiquetas para que la UI no mantenga copias."""
+    return {
+        "roles": ROLE_LABELS,
+        "descriptions": ROLE_DESCRIPTIONS,
+        "permissions": PERMISSION_LABELS,
+    }
+
+
 def _permission_label(permission: str) -> str:
     normalized = str(permission or "").strip().lower()
     if not normalized:

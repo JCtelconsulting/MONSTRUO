@@ -34,7 +34,9 @@ const UsersUI = (() => {
     // El resto del archivo referencia ROLE_OPTIONS para llenar selects de rol primario.
     const ROLE_OPTIONS = [...MONSTRUO_ROLES];
 
-    const ROLE_SCOPE_FALLBACK = {
+    // Etiquetas/descripciones de roles. Arrancan como fallback hardcodeado y se
+    // sobrescriben en load() con el catalogo central /api/config/labels si responde.
+    let ROLE_SCOPE_FALLBACK = {
         admin: {
             description: 'Control total de plataforma, seguridad y configuracion global.',
             permissions: ['Acceso total del sistema']
@@ -263,36 +265,79 @@ const UsersUI = (() => {
         return out;
     }
 
+    // Etiquetas de permisos. Arranca como fallback hardcodeado y se sobrescribe en
+    // load() con el catalogo central /api/config/labels si responde.
+    let PERMISSION_FALLBACK_LABELS = {
+        '*': 'Acceso total del sistema',
+        'dashboard:read': 'Dashboard: lectura',
+        'tickets:read': 'Ticketera: lectura',
+        'tickets:write': 'Ticketera: gestion operativa',
+        'tickets:compliance': 'Ticketera: compliance',
+        'admin.settings': 'Configuracion administrativa',
+        'audit:read': 'Auditoria: lectura',
+        'audit:export': 'Auditoria: exportacion',
+        'invoice:read': 'Facturacion: lectura',
+        'invoice:write': 'Facturacion: edicion',
+        'invoice:sync': 'Facturacion: sincronizacion',
+        'invoice:void': 'Facturacion: anulacion',
+        'payment:write': 'Pagos: gestion',
+        'crm:read': 'CRM: lectura',
+        'crm:write': 'CRM: edicion',
+        'bodega:read': 'Bodega: lectura',
+        'bodega:write': 'Bodega: edicion',
+        'reports:read': 'Reportes: lectura',
+        'finanzas:read': 'Finanzas: lectura'
+    };
+
     function permissionFallbackLabel(permission) {
         const normalized = normalizeKey(permission).replace(/_/g, ':');
-        const map = {
-            '*': 'Acceso total del sistema',
-            'dashboard:read': 'Dashboard: lectura',
-            'tickets:read': 'Ticketera: lectura',
-            'tickets:write': 'Ticketera: gestion operativa',
-            'tickets:compliance': 'Ticketera: compliance',
-            'admin.settings': 'Configuracion administrativa',
-            'audit:read': 'Auditoria: lectura',
-            'audit:export': 'Auditoria: exportacion',
-            'invoice:read': 'Facturacion: lectura',
-            'invoice:write': 'Facturacion: edicion',
-            'invoice:sync': 'Facturacion: sincronizacion',
-            'invoice:void': 'Facturacion: anulacion',
-            'payment:write': 'Pagos: gestion',
-            'crm:read': 'CRM: lectura',
-            'crm:write': 'CRM: edicion',
-            'bodega:read': 'Bodega: lectura',
-            'bodega:write': 'Bodega: edicion',
-            'reports:read': 'Reportes: lectura',
-            'finanzas:read': 'Finanzas: lectura'
-        };
+        const map = PERMISSION_FALLBACK_LABELS;
+        // Las claves del catalogo central pueden venir con '.' (admin.settings);
+        // probamos tanto la forma normalizada como la clave cruda.
+        const rawKey = String(permission || '').trim().toLowerCase();
         if (map[normalized]) return map[normalized];
+        if (map[rawKey]) return map[rawKey];
         if (!normalized) return '-';
         if (normalized.includes(':')) {
             const [prefix, action] = normalized.split(':', 2);
             return `${prefix.toUpperCase()}: ${action}`;
         }
         return normalized;
+    }
+
+    // Aplica el catalogo central de etiquetas (/api/config/labels) sobre los
+    // fallbacks hardcodeados. Si algo falla, se conserva el hardcode.
+    function applyLabelsCatalog(labels) {
+        if (!labels || typeof labels !== 'object') return;
+        try {
+            const perms = labels.permissions;
+            if (perms && typeof perms === 'object') {
+                // Merge: las etiquetas centrales pisan al fallback, conservando
+                // cualquier clave que el backend aun no exponga.
+                PERMISSION_FALLBACK_LABELS = Object.assign({}, PERMISSION_FALLBACK_LABELS, perms);
+            }
+            const roleLabels = labels.roles;
+            const roleDescs = labels.descriptions;
+            if ((roleLabels && typeof roleLabels === 'object') || (roleDescs && typeof roleDescs === 'object')) {
+                const merged = Object.assign({}, ROLE_SCOPE_FALLBACK);
+                const roleIds = new Set([
+                    ...Object.keys(merged),
+                    ...Object.keys(roleLabels || {}),
+                    ...Object.keys(roleDescs || {}),
+                ]);
+                roleIds.forEach((role) => {
+                    const prev = merged[role] || {};
+                    const desc = (roleDescs && roleDescs[role]) || prev.description || 'Rol operativo de plataforma.';
+                    merged[role] = {
+                        description: String(desc),
+                        permissions: Array.isArray(prev.permissions) ? prev.permissions : []
+                    };
+                });
+                ROLE_SCOPE_FALLBACK = merged;
+            }
+        } catch (err) {
+            console.warn('No se pudo aplicar el catalogo central de etiquetas, usando fallback', err);
+        }
     }
 
     function parseScopeLabel(label) {
@@ -702,11 +747,16 @@ const UsersUI = (() => {
         bindTableActions();
 
         try {
-            const [usersData, scopesDataRaw, sesionData] = await Promise.all([
+            const [usersData, scopesDataRaw, sesionData, labelsData] = await Promise.all([
                 window.fetchApi('/api/admin/users'),
                 window.fetchApi('/api/config/role-scopes').catch(() => null),
                 window.fetchApi('/api/sesion').catch(() => null),
+                window.fetchApi('/api/config/labels').catch(() => null),
             ]);
+
+            // Catalogo central de etiquetas: si responde, sobreescribe los
+            // fallbacks hardcodeados antes de construir scopes. Si falla, no pasa nada.
+            applyLabelsCatalog(labelsData);
 
             // /api/sesion devuelve {user, role, roles, ...}. Tomamos `user`
             // (legacy) o `username` (algunos consumidores), lo que esté.

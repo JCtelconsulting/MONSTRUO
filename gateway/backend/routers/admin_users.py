@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Set
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from plataforma.core import db, deps, security
+from plataforma.core import db, deps, security, organigrama
 from plataforma.core.config import settings
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
@@ -29,12 +29,10 @@ def _normalize_role_input(raw_role: Optional[str]) -> str:
         "encargado_mesa": "encargado_mesa",
         "mesa_de_ayuda": "encargado_mesa",
         "operaciones": "pmo",
-        "ops": "pmo",
-        "implementaciones": "pmo",
-        "warehouse": "bodega",
-        "finance": "finanzas",
     }
-    return aliases.get(role, role)
+    # Los renombres de roles legacy (warehouse→bodega, finance→finanzas, ops/implementaciones→pmo)
+    # los centraliza organigrama.canonizar_rol (fuente única), no este dict local.
+    return organigrama.canonizar_rol(aliases.get(role, role))
 
 
 # Módulos que manejan su PROPIO rol (distinto del rol global del gateway) y sus valores válidos.

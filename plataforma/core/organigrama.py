@@ -76,6 +76,23 @@ ALIAS_ROL_AREA: Dict[str, str] = {
 }
 
 
+# Renombres de ROLES legacy -> rol canónico (los roles ahora SON áreas). FUENTE ÚNICA: cada
+# módulo debe usar canonizar_rol() en vez de mantener su propio diccionario de alias.
+_RENOMBRES_ROL: Dict[str, str] = {
+    "warehouse": "bodega",
+    "finance": "finanzas",
+    "ops": "pmo",
+    "implementaciones": "pmo",
+}
+
+
+def canonizar_rol(rol: str) -> str:
+    """Rol canónico actual: resuelve los renombres legacy (warehouse→bodega, finance→finanzas,
+    ops/implementaciones→pmo). Si no es legacy, devuelve el rol normalizado tal cual."""
+    r = str(rol or "").strip().lower()
+    return _RENOMBRES_ROL.get(r, r)
+
+
 def es_area(slug: str) -> bool:
     return str(slug or "").strip().lower() in AREAS
 
