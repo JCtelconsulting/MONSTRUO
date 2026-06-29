@@ -1,0 +1,41 @@
+/* ESPEJO del bloque FILTROS de gateway/ui/shared/ui/css/monstruo.css — Terreneitor no carga el shared. Mantener sincronizado. */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+.filtro {
+  height: 36px;
+  min-width: 150px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  line-height: 1.1;
+  color: #eef5ff;
+  background: rgba(6, 10, 14, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+select.filtro {
+  padding-right: 30px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23a5adb4' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+}
+.filtro-buscar {
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 360px;
+}
+.filtro--sm { min-width: 110px; }
+.filtro::placeholder { color: rgba(220, 228, 236, 0.55); }
+.filtro:focus {
+  outline: none;
+  border-color: rgba(212, 168, 67, 0.5);
+  box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.12);
+}

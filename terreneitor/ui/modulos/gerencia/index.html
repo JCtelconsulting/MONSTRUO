@@ -12,6 +12,7 @@
     />
 
     <link rel="stylesheet" href="css/gerencia.css?v=73.0" />
+    <link rel="stylesheet" href="../_compartido/css/filtros.css?v=1" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
@@ -232,17 +233,17 @@
             <div class="map-controls">
               <div class="field-group">
                 <label>Proyecto</label>
-                <select id="map-project">
+                <select id="map-project" class="filtro">
                   <option value="all">Todos</option>
                 </select>
               </div>
               <div class="field-group">
                 <label>Desde</label>
-                <input type="date" id="map-from" />
+                <input type="date" id="map-from" class="filtro filtro--sm" />
               </div>
               <div class="field-group">
                 <label>Hasta</label>
-                <input type="date" id="map-to" />
+                <input type="date" id="map-to" class="filtro filtro--sm" />
               </div>
               <div class="segmented" id="map-mode">
                 <button class="active" data-map-mode="heat">Calor</button>
@@ -305,19 +306,19 @@
             <div class="filter-controls">
               <div class="field-group">
                 <label>Cliente</label>
-                <select id="historial-cliente">
+                <select id="historial-cliente" class="filtro">
                   <option value="">Todos</option>
                 </select>
               </div>
               <div class="field-group">
                 <label>Proyecto</label>
-                <select id="historial-proyecto">
+                <select id="historial-proyecto" class="filtro">
                   <option value="">Todos</option>
                 </select>
               </div>
               <div class="field-group">
                 <label>Plan</label>
-                <select id="historial-plan">
+                <select id="historial-plan" class="filtro">
                   <option value="">Todos</option>
                 </select>
               </div>

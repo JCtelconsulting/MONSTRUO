@@ -1042,8 +1042,8 @@ main .main-inner {
   color: var(--text-soft);
 }
 
-.map-controls input,
-.map-controls select {
+.map-controls input:not(.filtro),
+.map-controls select:not(.filtro) {
   background: #000;
   border: 1px solid var(--border);
   color: #fff;

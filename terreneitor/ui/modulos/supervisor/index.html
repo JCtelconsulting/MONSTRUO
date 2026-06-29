@@ -15,6 +15,7 @@
     />
 
     <link rel="stylesheet" href="css/supervisor.css?v=70.0" />
+    <link rel="stylesheet" href="../_compartido/css/filtros.css?v=1" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
@@ -198,30 +199,15 @@
               </div>
 
               <!-- FILTER BLOCK -->
-              <div
-                class="plan-filter-block"
-                style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px"
-              >
-                <select
-                  id="filter-sort"
-                  class="input-dark"
-                  style="flex: 1; padding: 6px 10px; min-height: 32px; font-size: 0.8rem"
-                >
+              <div class="filtros">
+                <select id="filter-sort" class="filtro">
                   <option value="activos">Estado (Activos primero)</option>
                   <option value="nombre">Nombre (A-Z)</option>
                 </select>
-                <select
-                  id="filter-cliente"
-                  class="input-dark"
-                  style="flex: 1; padding: 6px 10px; min-height: 32px; font-size: 0.8rem"
-                >
+                <select id="filter-cliente" class="filtro">
                   <option value="">Todo Cliente</option>
                 </select>
-                <select
-                  id="filter-zona-id"
-                  class="input-dark"
-                  style="flex: 1; padding: 6px 10px; min-height: 32px; font-size: 0.8rem"
-                >
+                <select id="filter-zona-id" class="filtro">
                   <option value="">ID o Comuna</option>
                 </select>
               </div>
