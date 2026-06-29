@@ -72,7 +72,7 @@ ALL_PERMISSIONS = sorted(PERMISSION_LABELS.keys())
 
 @router.get("/ui-modules", summary="Catalogo central de modulos de UI")
 async def get_ui_modules(
-    sess: dict = Depends(deps.require_session),
+    sess: dict = Depends(deps.require_session_hybrid),
 ):
     """Fuente unica de verdad de la lista de modulos visibles en la UI."""
     return {"modules": settings.UI_MODULES}
@@ -80,7 +80,7 @@ async def get_ui_modules(
 
 @router.get("/labels", summary="Catalogo central de etiquetas de roles y permisos")
 async def get_labels(
-    sess: dict = Depends(deps.require_session),
+    sess: dict = Depends(deps.require_session_hybrid),
 ):
     """Fuente unica de verdad de etiquetas para que la UI no mantenga copias."""
     return {
