@@ -1372,11 +1372,11 @@
                             <div><h3 class="cfg-panel-title">Proyectos</h3><p class="cfg-panel-subtitle">Obras/proyectos de Terreneitor.</p></div>
                             <div class="cfg-toolbar"><button class="btn-primary" id="terrBtnNuevoProyecto" type="button">+ Nuevo proyecto</button></div>
                         </div>
-                        <div class="cfg-toolbar" style="margin:8px 0 12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                            <input type="search" id="terrProyFiltro" class="cfg-input input-dark" placeholder="Buscar…" style="min-width:200px;">
-                            <select id="terrFiltroCliente" class="cfg-input input-dark" style="min-width:150px;"></select>
-                            <select id="terrFiltroZona" class="cfg-input input-dark" style="min-width:150px;"></select>
-                            <select id="terrFiltroEstado" class="cfg-input input-dark" style="min-width:150px;"></select>
+                        <div class="filtros">
+                            <input type="search" id="terrProyFiltro" class="filtro filtro-buscar" placeholder="Buscar…">
+                            <select id="terrFiltroCliente" class="filtro"></select>
+                            <select id="terrFiltroZona" class="filtro"></select>
+                            <select id="terrFiltroEstado" class="filtro"></select>
                         </div>
                         <div class="cfg-table-wrap">
                             <table class="cfg-table"><thead><tr><th>Proyecto</th><th>Cliente</th><th>Zona</th><th>Estado</th><th class="ta-right">Acciones</th></tr></thead>
