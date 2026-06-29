@@ -22,10 +22,10 @@ const TksMain = (() => {
     let notifAbortController = null;
     const DEFAULT_LIST_LIMIT = 50;
     const CACHE_TTL_MS = 15000;
-    // Espejo del catálogo canónico de áreas (plataforma/core/organigrama.py). DEBE coincidir.
-    // El backend manda las áreas DISPONIBLES (con usuarios) vía /areas; esto da etiqueta/emoji
-    // y permite clasificar un rol de área como técnico con scope.
-    const AREA_META = Object.freeze({
+    // Catálogo de áreas {label, emoji}. Esto es solo FALLBACK degradado: el backend manda el
+    // catálogo real (con emoji) vía /api/tks/areas (campo 'meta') y loadAvailableAreas() actualiza
+    // AREA_META, así NO hay que sincronizar este espejo a mano (antes faltaba 'pmo' acá = bug).
+    let AREA_META = {
         comercial:      { label: 'Comercial',      emoji: '🤝' },
         preventa:       { label: 'Preventa',       emoji: '📋' },
         pmo:            { label: 'PMO',            emoji: '📊' },
@@ -36,7 +36,7 @@ const TksMain = (() => {
         finanzas:       { label: 'Finanzas',       emoji: '💰' },
         capital_humano: { label: 'Capital Humano', emoji: '👥' },
         gerencia:       { label: 'Gerencia',       emoji: '👔' },
-    });
+    };
     const AREA_SIN_ASIGNAR = 'general';
     const AREA_SIN_ASIGNAR_LABEL = 'Sin área asignada';
     // Fallback si el backend no responde /areas (degradado: catálogo completo + sin-área).
@@ -143,6 +143,10 @@ const TksMain = (() => {
             }
             if (data && Array.isArray(data.categories_filtro) && data.categories_filtro.length) {
                 availableAreasFiltro = data.categories_filtro;
+            }
+            // Catálogo {label, emoji} desde el backend (fuente única) — actualiza el fallback local.
+            if (data && data.meta && typeof data.meta === 'object') {
+                AREA_META = { ...AREA_META, ...data.meta };
             }
         } catch (e) { /* fallback: DEFAULT_TICKETERA_CATEGORIES */ }
     }

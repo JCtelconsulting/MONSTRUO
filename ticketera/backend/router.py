@@ -389,6 +389,8 @@ async def get_ticketera_areas(
         "categories": tickets_service.categorias_disponibles(),
         "categories_filtro": tickets_service.categorias_para_filtro(),
         "labels": labels,
+        # meta = {code: {label, emoji}} — fuente ÚNICA del catálogo para la UI (sin espejo manual).
+        "meta": organigrama.area_meta(),
     }
 
 

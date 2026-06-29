@@ -34,10 +34,33 @@ AREAS: Dict[str, str] = {
     "gerencia": "Gerencia",
 }
 
+# Emoji por área (para chips/filtros de la UI). Vive acá para que el frontend NO mantenga
+# un espejo manual y no se desincronice (fue la causa de un bug: 'pmo' faltaba en la UI).
+AREA_EMOJI: Dict[str, str] = {
+    "comercial": "🤝",
+    "preventa": "📋",
+    "pmo": "📊",
+    "sistemas": "💻",
+    "redes": "🌐",
+    "bodega": "📦",
+    "proveedores": "🚚",
+    "finanzas": "💰",
+    "capital_humano": "👥",
+    "gerencia": "👔",
+}
+
 # Pseudo-área para los tickets que aún no tienen área asignada (no es un área de
 # personas; siempre disponible para no perder tickets sin clasificar).
 SIN_AREA = "general"
 SIN_AREA_LABEL = "Sin área asignada"
+SIN_AREA_EMOJI = "📭"
+
+
+def area_meta() -> Dict[str, Dict[str, str]]:
+    """Catálogo {code: {label, emoji}} de las áreas + 'general'. Fuente única para la UI."""
+    meta = {code: {"label": AREAS[code], "emoji": AREA_EMOJI.get(code, "")} for code in AREAS}
+    meta[SIN_AREA] = {"label": SIN_AREA_LABEL, "emoji": SIN_AREA_EMOJI}
+    return meta
 
 # Roles de GESTIÓN GLOBAL: no son un área, ven todo.
 ROLES_GESTION_GLOBAL = {"admin", "encargado_mesa"}
