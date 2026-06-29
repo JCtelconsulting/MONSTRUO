@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, File, UploadFile
 from fastapi.responses import FileResponse
 from typing import Optional, Dict, Any
-from plataforma.core import db, deps
+from plataforma.core import db, deps, organigrama
 from plataforma.core.audit_decorator import audit_action
 from gta.backend.models import (
     ProcesoCreate, ProcesoUpdate,
@@ -215,6 +215,7 @@ async def listar_areas_para_ui(user: dict = Depends(deps.require_permission("gta
                 "lider_username": a.get("lider_username") or "",
                 "lider_nombre": a.get("lider_nombre") or "",
                 "es_externa": bool(a.get("es_externa")),
+                "canonica": organigrama.es_area(a["code"]),  # área del catálogo común (vs externa/custom)
                 "activo": True,
                 "orden": int(a.get("orden") or 99),
                 "subareas": sub_by_area.get(a["code"], []),

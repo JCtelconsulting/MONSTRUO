@@ -9,9 +9,12 @@ servicio vivo, así que si un módulo se cae los demás siguen.
 Principio: el ROL operativo de una persona ES su área. La gestión global
 (admin, encargado de mesa) no es un área: ve todo.
 
-Áreas tomadas del organigrama real (reusando los slugs que ya usa GTA). Se
-excluyen a propósito: pmo (lo reemplaza GTA), ia y zabbix (no son áreas; zabbix
-se integrará por API), y las externas (prevención de riesgos, contabilidad).
+Este es el catálogo de las áreas INTERNAS de la empresa, comunes a Ticketera y GTA.
+'pmo' es el área de gestión de proyectos: el MÓDULO pmo se eliminó, pero el ÁREA es
+real y se usa en GTA. Se EXCLUYEN: ia y zabbix (no son áreas; zabbix se integrará por
+API), y las áreas EXTERNAS que solo maneja GTA (contabilidad, prevención de riesgos) —
+esas no son del organigrama interno ni aparecen en Ticketera; GTA las tiene aparte,
+además de este catálogo.
 """
 from __future__ import annotations
 
@@ -21,6 +24,7 @@ from typing import Dict, List
 AREAS: Dict[str, str] = {
     "comercial": "Comercial",
     "preventa": "Preventa",
+    "pmo": "PMO",
     "sistemas": "Sistemas",
     "redes": "Redes",
     "bodega": "Bodega",

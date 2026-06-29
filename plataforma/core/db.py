@@ -2337,18 +2337,29 @@ def init_db() -> None:
             # Seed de las áreas si la tabla está vacía
             existing = conn.execute("SELECT COUNT(*) AS c FROM gta.areas").fetchone()
             if int((existing or {}).get("c") or 0) == 0:
+                from plataforma.core import organigrama
+                # Líder/orden propios de GTA por área INTERNA. Las áreas en sí (code + label)
+                # salen del catálogo canónico organigrama.AREAS: UNA sola fuente para Ticketera
+                # y GTA. Las EXTERNAS (contabilidad, prevención de riesgos) son solo de GTA.
+                gta_info = {
+                    "gerencia":       ("",               "",               5),
+                    "comercial":      ("brayan.fuentes", "Brayan Fuentes", 10),
+                    "preventa":       ("",               "Elso",           20),
+                    "redes":          ("fabian.correa",  "Fabián Correa",  30),
+                    "sistemas":       ("lukas.moyano",   "Lukas Moyano",   40),
+                    "proveedores":    ("",               "Jonhson",        50),
+                    "finanzas":       ("",               "Tania",          60),
+                    "bodega":         ("",               "",               70),
+                    "capital_humano": ("",               "Cristian Peña",  80),
+                    "pmo":            ("francisco.cea",  "Francisco Cea",  90),
+                }
                 seed_areas = [
-                    ("comercial",         "Comercial",         "brayan.fuentes",   "Brayan Fuentes",   False, 10),
-                    ("preventa",          "Preventa",          "",                 "Elso",             False, 20),
-                    ("redes",             "Redes",             "fabian.correa",    "Fabián Correa",    False, 30),
-                    ("sistemas",          "Sistemas",          "lukas.moyano",     "Lukas Moyano",     False, 40),
-                    ("proveedores",       "Proveedores",       "",                 "Jonhson",          False, 50),
-                    ("finanzas",          "Finanzas",          "",                 "Tania",            False, 60),
-                    ("bodega",            "Bodega",            "",                 "",                 False, 70),
-                    ("capital_humano",    "Capital Humano",    "",                 "Cristian Peña",    False, 80),
-                    ("pmo",               "PMO",               "francisco.cea",    "Francisco Cea",    False, 90),
-                    ("prevencion_riesgos","Prevención de Riesgos", "",             "(externa)",        True,  100),
-                    ("contabilidad",      "Contabilidad",      "",                 "(externa)",        True,  110),
+                    (code, organigrama.AREAS[code], gta_info.get(code, ("", "", 99))[0],
+                     gta_info.get(code, ("", "", 99))[1], False, gta_info.get(code, ("", "", 99))[2])
+                    for code in organigrama.AREAS
+                ] + [
+                    ("prevencion_riesgos", "Prevención de Riesgos", "", "(externa)", True, 100),
+                    ("contabilidad",       "Contabilidad",          "", "(externa)", True, 110),
                 ]
                 for code, label, lider_user, lider_nombre, externa, orden in seed_areas:
                     conn.execute(
