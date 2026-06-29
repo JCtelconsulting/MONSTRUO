@@ -28,6 +28,7 @@ const TksMain = (() => {
     const AREA_META = Object.freeze({
         comercial:      { label: 'Comercial',      emoji: '🤝' },
         preventa:       { label: 'Preventa',       emoji: '📋' },
+        pmo:            { label: 'PMO',            emoji: '📊' },
         sistemas:       { label: 'Sistemas',       emoji: '💻' },
         redes:          { label: 'Redes',          emoji: '🌐' },
         bodega:         { label: 'Bodega',         emoji: '📦' },
