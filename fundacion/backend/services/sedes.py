@@ -22,7 +22,7 @@ def usuario_id_de_username(username: str) -> Optional[int]:
     conn = db.get_conn()
     try:
         row = conn.execute(
-            "SELECT id FROM auth.users WHERE username = %s", (username,),
+            "SELECT id FROM fundacion.users WHERE username = %s", (username,),
         ).fetchone()
         return int(row["id"]) if row else None
     finally:

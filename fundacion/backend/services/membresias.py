@@ -20,7 +20,7 @@ def listar_membresias_sede(sede_id: int, *, incluir_historico: bool = False) -> 
                    u.username,
                    s.code AS sede_code, s.nombre AS sede_nombre
             FROM fundacion.sede_membresias m
-            JOIN auth.users u ON u.id = m.usuario_id
+            JOIN fundacion.users u ON u.id = m.usuario_id
             JOIN fundacion.sedes s ON s.id = m.sede_id
             WHERE m.sede_id = %s
         """
@@ -61,7 +61,7 @@ def listar_todas_membresias_vigentes() -> List[Dict[str, Any]]:
                       u.username,
                       s.code AS sede_code, s.nombre AS sede_nombre
                FROM fundacion.sede_membresias m
-               JOIN auth.users u ON u.id = m.usuario_id
+               JOIN fundacion.users u ON u.id = m.usuario_id
                JOIN fundacion.sedes s ON s.id = m.sede_id
                WHERE m.hasta IS NULL
                ORDER BY s.orden, (m.rol='lider_educativo') DESC, u.username"""
