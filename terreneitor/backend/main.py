@@ -97,7 +97,9 @@ async def add_process_time_header(request: Request, call_next):
 # --- REDIRECTS A MODULOS ---
 @app.get("/portal.html", include_in_schema=False)
 async def portal_redirect():
-    return RedirectResponse(url="/modulos/portal/")
+    # El portal/admin se eliminó (la administración se hace desde la config de Monstruo).
+    # Se mantiene el path viejo redirigiendo a gerencia para no romper enlaces guardados.
+    return RedirectResponse(url="/modulos/gerencia/")
 
 
 @app.get("/terreno.html", include_in_schema=False)
@@ -233,7 +235,7 @@ else:
 # se toma de TERRENEITOR_SEED_PASSWORD; si no está, se genera una aleatoria por
 # usuario (hay que resetearla). NUNCA volver a poner contraseñas en este código.
 SEED_USERS = {
-    "juan.lopez@telconsulting.cl": {"name": "Juan Lopez", "role": "ADMIN"},
+    "juan.lopez@telconsulting.cl": {"name": "Juan Lopez", "role": "GERENCIA"},
     "diego@telconsulting.cl": {"name": "Diego Quintana", "role": "GERENCIA"},
     "nicolas.cerda@telconsulting.cl": {"name": "Nicolas Cerda", "role": "GERENCIA"},
     "francisco.flores@telconsulting.cl": {"name": "Francisco Flores", "role": "SUPERVISOR"},

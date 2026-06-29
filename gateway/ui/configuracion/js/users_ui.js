@@ -863,7 +863,7 @@ const UsersUI = (() => {
                 roleSelect.className = 'cfg-input cfg-module-role-select';
                 roleSelect.style.marginLeft = 'auto';
                 roleSelect.style.maxWidth = '170px';
-                [['', 'Rol en Terreneitor…'], ['TERRENO', 'Terreno'], ['SUPERVISOR', 'Supervisor'], ['GERENCIA', 'Gerencia'], ['ADMIN', 'Admin']]
+                [['', 'Rol en Terreneitor…'], ['TERRENO', 'Terreno'], ['SUPERVISOR', 'Supervisor'], ['GERENCIA', 'Gerencia']]
                     .forEach(([val, txt]) => {
                         const opt = document.createElement('option');
                         opt.value = val;

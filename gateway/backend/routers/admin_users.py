@@ -37,7 +37,9 @@ def _normalize_role_input(raw_role: Optional[str]) -> str:
 
 # Módulos que manejan su PROPIO rol (distinto del rol global del gateway) y sus valores válidos.
 MODULE_ROLE_VALUES: Dict[str, Set[str]] = {
-    "terreneitor": {"TERRENO", "SUPERVISOR", "GERENCIA", "ADMIN"},
+    # ADMIN se eliminó: la administración de Terreneitor se hace desde la config de Monstruo.
+    # Los 3 roles operativos son terreno/supervisor/gerencia (gerencia = rol administrativo).
+    "terreneitor": {"TERRENO", "SUPERVISOR", "GERENCIA"},
 }
 # Capacidades booleanas extra (NO son roles): {clave -> módulo base que la habilita}.
 MODULE_CAPABILITIES: Dict[str, str] = {
