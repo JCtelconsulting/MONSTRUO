@@ -25,7 +25,6 @@ Configuración activa en `/etc/nginx/sites-enabled/`:
 | `monstruo_prod_login_app` | `192.168.60.5:9001` |
 | `monstruo_prod_config_app` | `192.168.60.5:9001` |
 | `monstruo_prod_ticketera_api` | `192.168.60.5:9005` |
-| `monstruo_prod_fundacion_api` | `192.168.60.5:9006` |
 
 ### Upstreams Monstruo DEV
 
@@ -33,7 +32,6 @@ Configuración activa en `/etc/nginx/sites-enabled/`:
 |---|---|
 | `monstruo_dev_base_app` | `192.168.60.8:9001` |
 | `monstruo_dev_ticketera_api` | `192.168.60.8:9005` |
-| `monstruo_dev_fundacion_api` | `192.168.60.8:9006` |
 
 > **Nota importante**: PROD ya usa `9001/9005/9006`. La migración desde `9000` (modelo viejo) ya se completó en el proxy. Confirmar que las apps en `192.168.60.5` también escuchen en esos puertos.
 
@@ -43,8 +41,8 @@ Configuración activa en `/etc/nginx/sites-enabled/`:
 
 | Dominio | Comportamiento |
 |---|---|
-| `ticketera.telconsulting.cl` | PROD `/` → app+api ticketera. DEV `/dev/` → base + api+tks + fundacion |
-| `login.telconsulting.cl` | PROD `/` → login. DEV `/dev/` → base + auth/google + sesion + tks + fundacion |
+| `ticketera.telconsulting.cl` | PROD `/` → app+api ticketera. DEV `/dev/` → base + api+tks |
+| `login.telconsulting.cl` | PROD `/` → login. DEV `/dev/` → base + auth/google + sesion + tks |
 | `config.telconsulting.cl` | PROD `/` → config. DEV `/dev/` → base + tks |
 | `erp.telconsulting.cl` | reservado para apps futuras |
 | `crm.telconsulting.cl` | reservado para apps futuras |

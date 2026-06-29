@@ -22,12 +22,6 @@ ROLE_LABELS = {
     "finance": "Finanzas",
     "warehouse": "Bodega",
     "gerencia": "Gerencia",
-    # Fundación (organigrama 2026)
-    "directora_social": "Directora Social",
-    "jefa_pedagogica": "Jefa Pedagógica",
-    "coordinadora_territorial": "Coordinadora Territorial",
-    "lider_educativo": "Líder Educativo",
-    "gestora_educativa": "Gestora Educativa",
 }
 
 ROLE_DESCRIPTIONS = {
@@ -40,11 +34,6 @@ ROLE_DESCRIPTIONS = {
     "finance": "Gestion financiera y cobranza con foco contable.",
     "warehouse": "Gestion operativa de inventario y movimientos de bodega.",
     "gerencia": "Vision ejecutiva y lectura de indicadores/estado operacional.",
-    "directora_social": "Direccion estrategica de la Fundacion (super-scope a sedes).",
-    "jefa_pedagogica": "Lidera la linea pedagogica de la Fundacion (super-scope a sedes).",
-    "coordinadora_territorial": "Coordina territorialmente las sedes (super-scope a sedes).",
-    "lider_educativo": "Responsable de una o mas sedes; el alcance lo define la membresia.",
-    "gestora_educativa": "Operacion educativa dentro de su sede asignada.",
 }
 
 PERMISSION_LABELS = {
@@ -66,8 +55,6 @@ PERMISSION_LABELS = {
     "bodega:write": "Bodega: edicion",
     "finanzas:read": "Finanzas: lectura",
     "reports:read": "Reportes: lectura",
-    "fundacion:read": "Fundacion: lectura",
-    "fundacion:write": "Fundacion: escritura",
     "admin.settings": "Configuracion administrativa",
     "gta:read": "GTA: lectura",
     "gta:write": "GTA: gestion",

@@ -474,7 +474,6 @@ MODULO/
 | --- | ------ | ------- | -- | ----- |
 | **gateway** | 9001 | `backend/` | `ui/` | Sidebar, login, dashboard, proxy central |
 | **ticketera** | 9005 | `backend/` | `ui/` | Multi-tab. Jobs en `backend/jobs/` |
-| **fundacion** | 9006 | `backend/` | `ui/` | CRUD simple + proxy a gateway |
 | **bodega** | 9007 | `backend/` | `ui/` | WMS — inventario, catálogo, stock |
 | **crm** | 9008 | `backend/` | `ui/` | Clientes, interacciones, cuenta corriente |
 | **erp** | 9009 | `backend/` | `ui/` | Facturación, cobranza, integración Laudus |
@@ -534,7 +533,6 @@ Tocar **5 lugares** en este orden:
 | ------ | -------- | ------------------- |
 | 9001 | gateway | `GATEWAY_PORT` |
 | 9005 | ticketera | `TICKETERA_PORT` |
-| 9006 | fundacion | `FUNDACION_PORT` |
 | 9007 | bodega | `BODEGA_PORT` |
 | 9008 | crm | `CRM_PORT` |
 | 9009 | erp | `ERP_PORT` |

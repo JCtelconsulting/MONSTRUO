@@ -72,7 +72,6 @@ class Settings(BaseSettings):
         {"id": "erp", "label": "ERP & Finanzas"},
         {"id": "crm", "label": "CRM"},
         {"id": "bodega", "label": "Bodega"},
-        {"id": "fundacion", "label": "Fundación"},
         {"id": "terreneitor", "label": "Terreneitor"},
         {"id": "config", "label": "Configuracion"},
         {"id": "gta", "label": "GTA"},
@@ -87,7 +86,6 @@ class Settings(BaseSettings):
         "finanzas": "erp",
         "crm": "crm",
         "bodega": "bodega",
-        "fundacion": "fundacion",
         "terreneitor": "terreneitor",
         "admin.settings": "config",
         "gta": "gta",
@@ -140,41 +138,6 @@ class Settings(BaseSettings):
             "finanzas:read",
             "audit:read",
             "reports:read"
-        ],
-        # Fundación — roles según organigrama 2026.
-        # El scope por sede vive en fundacion.sede_membresias (versionado),
-        # NO en el rol. Aquí solo definimos qué puede hacer cada rol.
-        "lider_educativo": [        # antes: encargado_sede / encargado_<sede>
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-        ],
-        "gestora_educativa": [      # antes: monitora
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-            "audit:read",
-        ],
-        # Roles de jefatura del organigrama. Operacionalmente equivalentes a
-        # admin para Fundación; los conservamos como roles separados para
-        # reflejar el organigrama y permitir afinar permisos en el futuro.
-        "directora_social": [
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-            "audit:read",
-        ],
-        "jefa_pedagogica": [
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-            "audit:read",
-        ],
-        "coordinadora_territorial": [
-            "dashboard:read",
-            "fundacion:read",
-            "fundacion:write",
-            "audit:read",
         ],
     }
 

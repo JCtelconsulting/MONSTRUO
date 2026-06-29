@@ -125,7 +125,6 @@ Login único por gateway, sesión heredada por todas las apps.
 | **crm** | ✅ Producción | Clientes, contactos, leads, oportunidades, espejo Laudus |
 | **erp** | ✅ Producción | Facturación DTE, conciliación bancaria, cobranza |
 | **bodega** | ✅ Producción | Catálogo, stock, movimientos, IA dedupe/categorización |
-| **fundacion** | ✅ Producción | Módulo Fundación (sedes, planificación, scope por usuario) |
 
 ### Especificación por app
 

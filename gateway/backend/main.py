@@ -458,7 +458,6 @@ def check_session_status(
             "role": sess["role"],
             "roles": sess.get("roles") or [sess["role"]],
             "allowed_modules": _get_effective_allowed_modules(sess),
-            "fundacion_scope": auth_service.get_user_fundacion_scope(sess["username"]),
             "display_name": auth_service.get_user_display_name(sess["username"]),
         }
     except Exception as exc:

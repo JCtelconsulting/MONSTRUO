@@ -10,7 +10,6 @@
 # Tabla de puertos fijos:
 #   9001  gateway
 #   9005  ticketera
-#   9006  fundacion
 #   9007  bodega
 #   9008  crm
 #   9009  erp

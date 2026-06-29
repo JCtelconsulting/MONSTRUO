@@ -26,21 +26,10 @@ const UsersUI = (() => {
         { id: 'warehouse',        label: 'Bodega' },
     ];
 
-    const FUNDACION_ROLES = [
-        { id: 'directora_social',          label: 'Directora Social' },
-        { id: 'jefa_pedagogica',           label: 'Jefa Pedagógica' },
-        { id: 'coordinadora_territorial',  label: 'Coordinadora Territorial' },
-        { id: 'lider_educativo',           label: 'Líder Educativo' },
-        { id: 'gestora_educativa',         label: 'Gestora Educativa' },
-    ];
-
     const MONSTRUO_ROLE_IDS = new Set(MONSTRUO_ROLES.map(r => r.id));
-    const FUNDACION_ROLE_IDS = new Set(FUNDACION_ROLES.map(r => r.id));
 
-    // Compat: el resto del archivo aún referencia ROLE_OPTIONS para llenar
-    // selects de rol primario. Combinamos ambos grupos en un único listado
-    // ordenado (Monstruo primero, Fundación después).
-    const ROLE_OPTIONS = [...MONSTRUO_ROLES, ...FUNDACION_ROLES];
+    // El resto del archivo referencia ROLE_OPTIONS para llenar selects de rol primario.
+    const ROLE_OPTIONS = [...MONSTRUO_ROLES];
 
     const ROLE_SCOPE_FALLBACK = {
         admin: {
@@ -125,50 +114,6 @@ const UsersUI = (() => {
                 'Auditoria: lectura',
                 'Reportes: lectura'
             ]
-        },
-        directora_social: {
-            description: 'Dirección estratégica de la Fundación (super-scope a sedes).',
-            permissions: [
-                'Dashboard: lectura',
-                'Fundacion: lectura',
-                'Fundacion: escritura',
-                'Auditoria: lectura'
-            ]
-        },
-        jefa_pedagogica: {
-            description: 'Lidera la línea pedagógica de la Fundación (super-scope a sedes).',
-            permissions: [
-                'Dashboard: lectura',
-                'Fundacion: lectura',
-                'Fundacion: escritura',
-                'Auditoria: lectura'
-            ]
-        },
-        coordinadora_territorial: {
-            description: 'Coordina territorialmente las sedes (super-scope a sedes).',
-            permissions: [
-                'Dashboard: lectura',
-                'Fundacion: lectura',
-                'Fundacion: escritura',
-                'Auditoria: lectura'
-            ]
-        },
-        lider_educativo: {
-            description: 'Responsable de una o más sedes; el alcance lo define la membresía.',
-            permissions: [
-                'Dashboard: lectura',
-                'Fundacion: lectura',
-                'Fundacion: escritura'
-            ]
-        },
-        gestora_educativa: {
-            description: 'Operación educativa dentro de su sede asignada.',
-            permissions: [
-                'Dashboard: lectura',
-                'Fundacion: lectura',
-                'Fundacion: escritura',
-                'Auditoria: lectura'
-            ]
         }
     };
 
@@ -178,7 +123,6 @@ const UsersUI = (() => {
         { id: 'erp', label: 'ERP & Finanzas' },
         { id: 'crm', label: 'CRM' },
         { id: 'bodega', label: 'Bodega' },
-        { id: 'fundacion', label: 'Fundación' },
         { id: 'gta', label: 'GTA (Tareas por Áreas)' },
         { id: 'terreneitor', label: 'Terreneitor' },
         { id: 'config', label: 'Configuracion' }
@@ -202,7 +146,6 @@ const UsersUI = (() => {
         finanzas: 80,
         auditoria: 90,
         reportes: 100,
-        fundacion: 105,
         gta: 106,
         terreneitor: 107,
         configuracion_administrativa: 110,
@@ -233,7 +176,6 @@ const UsersUI = (() => {
         'finanzas',
         'auditoria',
         'reportes',
-        'fundacion',
         'gta',
         'terreneitor',
         'configuracion_administrativa',
@@ -315,8 +257,6 @@ const UsersUI = (() => {
             'bodega:read': 'Bodega: lectura',
             'bodega:write': 'Bodega: edicion',
             'reports:read': 'Reportes: lectura',
-            'fundacion:read': 'Fundacion: lectura',
-            'fundacion:write': 'Fundacion: escritura',
             'finanzas:read': 'Finanzas: lectura'
         };
         if (map[normalized]) return map[normalized];
@@ -494,13 +434,11 @@ const UsersUI = (() => {
         }
 
         const monstruo = [];
-        const fundacion = [];
         const otros = [];
         _roleScopeItems.forEach(item => {
             const id = String(item.role || '').toLowerCase();
-            if (FUNDACION_ROLE_IDS.has(id))      fundacion.push(item);
-            else if (MONSTRUO_ROLE_IDS.has(id))  monstruo.push(item);
-            else                                  otros.push(item);
+            if (MONSTRUO_ROLE_IDS.has(id))  monstruo.push(item);
+            else                            otros.push(item);
         });
 
         const renderItem = (item) => {
@@ -532,7 +470,6 @@ const UsersUI = (() => {
 
         body.innerHTML = [
             renderGroup('Monstruo', 'fa-server', monstruo),
-            renderGroup('Fundación', 'fa-school', fundacion),
             renderGroup('Otros', 'fa-circle-question', otros),
         ].filter(Boolean).join('');
 
@@ -553,7 +490,7 @@ const UsersUI = (() => {
             'invoice:read': 1, 'invoice:sync': 1, 'invoice:write': 1, 'invoice:void': 1,
             'payment:write': 1, 'crm:read': 1, 'crm:write': 1, 'bodega:read': 1,
             'bodega:write': 1, 'finanzas:read': 1,
-            'reports:read': 1, 'fundacion:read': 1, 'fundacion:write': 1,
+            'reports:read': 1,
             'admin.settings': 1, 'gta:read': 1, 'gta:write': 1,
         }).map(id => ({ id, label: permissionFallbackLabel(id) }));
     }

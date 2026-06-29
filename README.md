@@ -15,7 +15,6 @@ Este README es el punto de entrada: en 5 minutos te sitúas.
 | Dashboard (lanzadera) | login.telconsulting.cl/dev/dashboard | 9001 | ídem |
 | Ticketera | ticketera.telconsulting.cl/dev | 9005 | [ticketera/ESTADO.md](ticketera/ESTADO.md) |
 | Terreneitor | terreneitor.telconsulting.cl/dev | 8005 | [terreneitor/ESTADO.md](terreneitor/ESTADO.md) |
-| Fundación | login.telconsulting.cl/dev/fundacion | 9006 | [fundacion/ESTADO.md](fundacion/ESTADO.md) |
 | GTA | vía gateway · /gta | 9012 | [gta/ESTADO.md](gta/ESTADO.md) |
 | Configuración | config.telconsulting.cl/dev | 9001 | — |
 | ERP · CRM · Bodega | compose único | 9009 · 9008 · 9007 | activos (ERP=Laudus/SII, Bodega=kardex, CRM) |
@@ -24,7 +23,7 @@ Este README es el punto de entrada: en 5 minutos te sitúas.
 
 ```bash
 # Compose ÚNICO: todos los módulos en un solo stack
-# (db + gateway + ticketera + fundacion + terreneitor + gta + erp/crm/bodega)
+# (db + gateway + ticketera + terreneitor + gta + erp/crm/bodega)
 docker compose --env-file plataforma/ops/env/.env.server.dev up -d --build
 
 # Rebuild de containers puntuales (maneja ASSET_VERSION para cache-busting):

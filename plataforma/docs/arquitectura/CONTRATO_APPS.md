@@ -4,7 +4,7 @@ Estructura mínima que toda app del repo debe respetar para mantener consistenci
 
 ## Estructura estándar
 
-Una app es una carpeta de primer nivel del repo (`gateway/`, `ticketera/`, `gta/`, `crm/`, `erp/`, `bodega/`, `fundacion/`).
+Una app es una carpeta de primer nivel del repo (`gateway/`, `ticketera/`, `gta/`, `crm/`, `erp/`, `bodega/`).
 
 Layout mínimo:
 

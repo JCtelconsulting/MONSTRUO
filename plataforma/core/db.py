@@ -180,18 +180,18 @@ def get_conn():
     if _pool is not None:
         conn = _pool.getconn()
         pg_conn = PgConn(conn, use_psycopg3=True, pool=_pool)
-        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, fundacion, public;")
+        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, public;")
         return pg_conn
 
     if _HAVE_PSYCOPG3:
         conn = psycopg.connect(db_url, row_factory=dict_row)
         pg_conn = PgConn(conn, use_psycopg3=True)
-        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, fundacion, public;")
+        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, public;")
         return pg_conn
     if _HAVE_PSYCOPG2:
         conn = psycopg2.connect(db_url)
         pg_conn = PgConn(conn, use_psycopg3=False)
-        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, fundacion, public;")
+        pg_conn.execute("SET search_path TO auth, tks, erp, crm, bodega, core, cat, ia, ops, public;")
         return pg_conn
 
     raise RuntimeError("PostgreSQL driver not installed. Install psycopg or psycopg2.")
@@ -329,7 +329,6 @@ def init_db() -> None:
             "cat",
             "ia",
             "ops",
-            "fundacion",
             "gta",
         ):
             conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name};")
@@ -425,7 +424,6 @@ def init_db() -> None:
             is_active INTEGER NOT NULL DEFAULT 1,
             allowed_modules TEXT DEFAULT '[]',
             secondary_roles TEXT DEFAULT '[]',
-            fundacion_scope TEXT DEFAULT '{}',
             module_roles TEXT DEFAULT '{}',
             phone_number TEXT,
             first_name TEXT DEFAULT '',
@@ -438,7 +436,6 @@ def init_db() -> None:
             if is_postgres():
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS allowed_modules TEXT DEFAULT '[]'")
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS secondary_roles TEXT DEFAULT '[]'")
-                conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS fundacion_scope TEXT DEFAULT '{}'")
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS module_roles TEXT DEFAULT '{}'")
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS phone_number TEXT")
                 conn.execute("ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS first_name TEXT DEFAULT ''")
@@ -451,10 +448,6 @@ def init_db() -> None:
                     pass
                 try:
                     conn.execute("ALTER TABLE auth.users ADD COLUMN secondary_roles TEXT DEFAULT '[]'")
-                except Exception:
-                    pass
-                try:
-                    conn.execute("ALTER TABLE auth.users ADD COLUMN fundacion_scope TEXT DEFAULT '{}'")
                 except Exception:
                     pass
                 try:
@@ -2198,50 +2191,6 @@ def init_db() -> None:
 
         _run_guarded_pg_section(conn, "migrate_cat_billing", _migrate_cat_billing_section)
 
-        # -----------------------------
-        # EPIC: Fundación (Planificación)
-        # -----------------------------
-        def _migrate_fundacion_section() -> None:
-            conn.execute("""
-            CREATE TABLE IF NOT EXISTS fundacion.fundacion_tareas (
-                id SERIAL PRIMARY KEY,
-                titulo TEXT NOT NULL,
-                descripcion TEXT,
-                fecha_inicio TIMESTAMP NOT NULL,
-                fecha_fin TIMESTAMP,
-                asignado_a TEXT, -- username del ejecutivo
-                creado_by TEXT,
-                sede TEXT,
-                estado TEXT DEFAULT 'pendiente', -- pendiente, en_progreso, completado, cancelado
-                color TEXT DEFAULT '#4facfe', -- Para visualización en calendario
-                reporte TEXT, -- Feedback de la monitora
-                imprevistos TEXT, -- Problemas surgidos
-                reportado_at TIMESTAMP, -- Momento del reporte
-                curso TEXT,
-                categoria TEXT,
-                categoria_madre TEXT,
-                subcategoria TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """)
-            # Migraciones incrementales para tablas existentes
-            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS sede TEXT;")
-            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS reporte TEXT;")
-            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS imprevistos TEXT;")
-            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS reportado_at TIMESTAMP;")
-            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS curso TEXT;")
-            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS categoria TEXT;")
-            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS categoria_madre TEXT;")
-            conn.execute("ALTER TABLE fundacion.fundacion_tareas ADD COLUMN IF NOT EXISTS subcategoria TEXT;")
-            
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_asignado ON fundacion.fundacion_tareas(asignado_a);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_fecha ON fundacion.fundacion_tareas(fecha_inicio);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_sede ON fundacion.fundacion_tareas(sede);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_fundacion_tareas_curso ON fundacion.fundacion_tareas(curso);")
-
-        _run_guarded_pg_section(conn, "migrate_fundacion", _migrate_fundacion_section)
-
         def _migrate_gta_section() -> None:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS gta.tareas (
@@ -2663,8 +2612,6 @@ def init_db() -> None:
                         "bodega:write": "Bodega: edición",
                         "finanzas:read": "Finanzas: lectura",
                         "reports:read": "Reportes: lectura",
-                        "fundacion:read": "Fundación: lectura",
-                        "fundacion:write": "Fundación: escritura",
                         "admin.settings": "Configuración administrativa",
                         "gta:read": "GTA: lectura",
                         "gta:write": "GTA: gestión",
@@ -2680,12 +2627,6 @@ def init_db() -> None:
                         "finance": "Gestión financiera y cobranza con foco contable.",
                         "warehouse": "Gestión operativa de inventario y movimientos de bodega.",
                         "gerencia": "Visión ejecutiva y lectura de indicadores/estado operacional.",
-                        # Fundación (organigrama 2026)
-                        "directora_social": "Dirección estratégica de la Fundación (super-scope a sedes).",
-                        "jefa_pedagogica": "Lidera la línea pedagógica de la Fundación (super-scope a sedes).",
-                        "coordinadora_territorial": "Coordina territorialmente las sedes (super-scope a sedes).",
-                        "lider_educativo": "Responsable de una o más sedes; el alcance lo define la membresía.",
-                        "gestora_educativa": "Operación educativa dentro de su sede asignada.",
                     }
                     for role, perms in _s.ROLE_PERMISSIONS.items():
                         desc = _ROLE_DESCS.get(role, "Rol operativo de plataforma.")

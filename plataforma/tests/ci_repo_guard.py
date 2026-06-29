@@ -77,7 +77,6 @@ def main() -> int:
         "gateway":   ["README.md", "Dockerfile", "backend/main.py"],
         "ticketera": ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
         "gta":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
-        "fundacion": ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
         "bodega":    ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
         "crm":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
         "erp":       ["README.md", "Dockerfile", "backend/main.py", "backend/router.py"],
