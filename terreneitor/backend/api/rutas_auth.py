@@ -91,6 +91,19 @@ def api_sesion(request: Request, db: Session = Depends(dependencias.get_db)):
     if not info.get("logged"):
         return {"ok": False}
     email = (info.get("email") or "").strip().lower()
+    # Nombre desde la identidad CENTRAL (auth.users); fallback al del JWT/tabla propia de Terreneitor.
+    nombre = info.get("name")
+    try:
+        from sqlalchemy import text as _text_n
+        _nrow = db.execute(
+            _text_n("SELECT TRIM(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')) "
+                    "FROM auth.users WHERE lower(username) = :u"),
+            {"u": email},
+        ).first()
+        if _nrow and (_nrow[0] or "").strip():
+            nombre = (_nrow[0] or "").strip()
+    except Exception:
+        pass
     allowed = []
     # Paridad canónica: preguntarle al gateway de Monstruo (misma red docker)
     # con la cookie SSO; él calcula los módulos efectivos (override o rol).
@@ -113,7 +126,7 @@ def api_sesion(request: Request, db: Session = Depends(dependencias.get_db)):
         return {
             "ok": True,
             "user": email,
-            "name": info.get("name"),
+            "name": nombre,
             "role": info.get("role"),
             "allowed_modules": allowed,
         }
