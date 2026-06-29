@@ -343,10 +343,11 @@ MONSTRUO_SSO_COOKIE = os.environ.get("MONSTRUO_SSO_COOKIE", "access_token").stri
 MONSTRUO_SSO_ALG = os.environ.get("MONSTRUO_SSO_ALG", "HS256").strip()
 # rol del gateway -> rol local
 _SSO_ROL_MAP = {
-    # ADMIN se fusionó en GERENCIA: la administración se hace desde la config de Monstruo,
-    # así que quien era admin/sistemas entra a Terreneitor como GERENCIA (rol administrativo).
-    "admin": "GERENCIA",
-    "sistemas": "GERENCIA",
+    # El admin/sistemas de Monstruo entra a Terreneitor como ADMIN: ve las 3 pestañas (terreno,
+    # supervisor, gerencia) sin asignársele un rol específico. ADMIN ya NO tiene vista propia
+    # (el portal se eliminó); es acceso transversal a las 3 vistas existentes.
+    "admin": "ADMIN",
+    "sistemas": "ADMIN",
     "gerencia": "GERENCIA",
     "supervisor": "SUPERVISOR",
     "supervisor_terreno": "SUPERVISOR",
@@ -400,7 +401,7 @@ def _session_desde_gateway(request: Request, db: Session):
     except Exception:
         _module_roles = {}
     _explicit = str(_module_roles.get("terreneitor") or "").strip().upper()
-    if _explicit in {"TERRENO", "SUPERVISOR", "GERENCIA"}:
+    if _explicit in {"TERRENO", "SUPERVISOR", "GERENCIA", "ADMIN"}:
         rol_local = _explicit
     else:
         roles_gw = [rol_gw] + [
@@ -434,11 +435,10 @@ def _session_desde_gateway(request: Request, db: Session):
         db.commit()
         db.refresh(user)
     rol_val = getattr(user.role, "value", user.role)
-    # Capacidad de crear planes desde Terreno: el flag explícito, o gerencia/supervisor (que ya planifican).
+    # Capacidad de crear planes desde Terreno: el flag explícito, o admin/supervisor (que ya planifican).
     puede_crear_planes = bool(_module_roles.get("terreneitor_planes")) or str(rol_val).upper() in (
         "ADMIN",
         "SUPERVISOR",
-        "GERENCIA",
     )
     return {
         "logged": True,
@@ -522,9 +522,7 @@ def require_role(role_esperado: str):
     return role_checker
 
 
-# ADMIN se fusionó en GERENCIA: los endpoints "admin" (gestión que opera la config de Monstruo)
-# ahora los autoriza GERENCIA. require_role mantiene además el bypass para espejos viejos con ADMIN.
-require_admin = require_role("GERENCIA")
+require_admin = require_role("ADMIN")
 require_gerencia = require_role("GERENCIA")
 require_supervisor = require_role("SUPERVISOR")
 require_terreno = require_role("TERRENO")

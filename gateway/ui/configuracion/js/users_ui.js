@@ -929,6 +929,25 @@ const UsersUI = (() => {
             container.appendChild(div);
         });
 
+        // El admin de Monstruo no elige rol de Terreneitor (ve las 3 vistas). Deshabilitamos el
+        // selector y lo dejamos vacío cuando 'admin' está entre los roles; reactivo a cambios de rol.
+        const aplicarModoAdminTns = () => {
+            const esAdmin = _secondaryRolesDraft.includes('admin');
+            const sel = document.getElementById('terreneitorRoleSelect');
+            if (!sel) return;
+            sel.disabled = esAdmin;
+            if (esAdmin) {
+                _terreneitorRoleDraft = '';
+                sel.value = '';
+                sel.title = 'El admin ve las 3 vistas de Terreneitor; no necesita un rol específico.';
+                if (sel.options[0]) sel.options[0].textContent = 'Admin: ve las 3 vistas';
+            } else {
+                sel.title = '';
+                if (sel.options[0]) sel.options[0].textContent = 'Rol en Terreneitor…';
+            }
+        };
+        aplicarModoAdminTns();
+
         const renderSecondaryRoleChecks = () => {
             secondaryContainer.innerHTML = '';
 
@@ -950,6 +969,7 @@ const UsersUI = (() => {
                         _secondaryRolesDraft.push(roleId);
                     }
                     renderSecondaryRoleChecks();
+                    aplicarModoAdminTns();
                 };
                 secondaryContainer.appendChild(button);
             });
@@ -991,7 +1011,10 @@ const UsersUI = (() => {
         // Rol por módulo (hoy solo Terreneitor): solo si el módulo está habilitado y se eligió rol.
         const moduleRoles = {};
         if (allowedModules.includes('terreneitor')) {
-            if (_terreneitorRoleDraft) moduleRoles.terreneitor = _terreneitorRoleDraft;
+            // El admin de Monstruo ve las 3 vistas de Terreneitor (rol ADMIN vía SSO): NO se le asigna
+            // un rol específico, que sería un "doble rol" limitándolo a una sola vista.
+            const esAdminTns = _secondaryRolesDraft.includes('admin');
+            if (_terreneitorRoleDraft && !esAdminTns) moduleRoles.terreneitor = _terreneitorRoleDraft;
             if (_terreneitorPlanesDraft) moduleRoles.terreneitor_planes = true;
         }
 

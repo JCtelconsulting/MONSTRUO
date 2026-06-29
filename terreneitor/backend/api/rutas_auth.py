@@ -501,11 +501,12 @@ def google_callback(
 
     role = (user.role.value if hasattr(user.role, "value") else str(user.role)).upper()
     dest_by_role = {
+        "ADMIN": "terreneitor.telconsulting.cl",  # el hub: ve las 3 tarjetas (terreno/supervisor/gerencia)
         "GERENCIA": "gerencial.telconsulting.cl",
         "SUPERVISOR": "supervisor.telconsulting.cl",
         "TERRENO": "terreneitor.telconsulting.cl",
     }
-    domain = dest_by_role.get(role, "gerencial.telconsulting.cl")
+    domain = dest_by_role.get(role, "terreneitor.telconsulting.cl")
 
     # Usar el protocolo detectado antes
     proto = request.headers.get("x-forwarded-proto") or "https"

@@ -30,7 +30,7 @@ def _verificar_acceso_asignacion(asignacion, current_user):
     """
     rol = getattr(current_user, "role", None)
     rol_val = getattr(rol, "value", rol)
-    if rol_val in ("ADMIN", "SUPERVISOR", "GERENCIA"):
+    if rol_val in ("ADMIN", "SUPERVISOR"):
         return
     uid = current_user.id
     if asignacion.usuario_id == uid:
@@ -687,7 +687,7 @@ def terreno_crear_plan(
     """Crea un plan desde Terreno con la MISMA lógica que el supervisor (postes reales),
     auto-asignado al técnico. Reemplaza la lógica vieja de /terreno/crear-trabajo."""
     rol = str(getattr(current_user.role, "value", current_user.role)).upper()
-    if rol not in ("ADMIN", "SUPERVISOR", "GERENCIA") and not dependencias.puede_crear_planes_flag(
+    if rol not in ("ADMIN", "SUPERVISOR") and not dependencias.puede_crear_planes_flag(
         db, current_user.email
     ):
         raise HTTPException(403, detail="No tenés permiso para crear planes desde Terreno.")

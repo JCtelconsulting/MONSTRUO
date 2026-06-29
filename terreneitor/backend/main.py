@@ -235,7 +235,7 @@ else:
 # se toma de TERRENEITOR_SEED_PASSWORD; si no está, se genera una aleatoria por
 # usuario (hay que resetearla). NUNCA volver a poner contraseñas en este código.
 SEED_USERS = {
-    "juan.lopez@telconsulting.cl": {"name": "Juan Lopez", "role": "GERENCIA"},
+    "juan.lopez@telconsulting.cl": {"name": "Juan Lopez", "role": "ADMIN"},
     "diego@telconsulting.cl": {"name": "Diego Quintana", "role": "GERENCIA"},
     "nicolas.cerda@telconsulting.cl": {"name": "Nicolas Cerda", "role": "GERENCIA"},
     "francisco.flores@telconsulting.cl": {"name": "Francisco Flores", "role": "SUPERVISOR"},
