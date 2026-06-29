@@ -101,10 +101,14 @@ class TestVisibilidadPorArea:
         assert self._cats(["sistemas"]) == ["sistemas"]
         assert self._cats(["redes"]) == ["redes"]
 
-    def test_ops_sin_area_mapeable_ve_solo_asignados(self):
-        # 'ops' mapea a 'general', que no es una categoría de ticket → lista vacía
-        # (verá solo los tickets asignados a él).
-        assert self._cats(["ops"]) == []
+    def test_ops_se_unifica_en_pmo(self):
+        # 'ops' (rol legacy) ahora se unifica en el área 'pmo' → acota a esa área.
+        assert self._cats(["ops"]) == ["pmo"]
+
+    def test_rol_sin_area_ve_solo_asignados(self):
+        # Un rol que mapea a 'general' (sin área real, p.ej. 'ejecucion') no acota a
+        # ninguna categoría → lista vacía (verá solo los tickets asignados a él).
+        assert self._cats(["ejecucion"]) == []
 
     def test_gerencia_acotada_a_su_categoria(self):
         assert self._cats(["gerencia"]) == ["gerencia"]

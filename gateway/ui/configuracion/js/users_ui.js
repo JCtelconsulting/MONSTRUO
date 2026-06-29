@@ -17,13 +17,16 @@ const UsersUI = (() => {
     const MONSTRUO_ROLES = [
         { id: 'admin',            label: 'Admin (super)' },
         { id: 'encargado_mesa',   label: 'Encargado Mesa Ayuda' },
-        { id: 'redes',            label: 'Redes' },
-        { id: 'sistemas',         label: 'Sistemas' },
-        { id: 'implementaciones', label: 'Implementaciones' },
         { id: 'gerencia',         label: 'Gerencia' },
-        { id: 'ops',              label: 'Operaciones' },
-        { id: 'finance',          label: 'Finanzas' },
-        { id: 'warehouse',        label: 'Bodega' },
+        { id: 'comercial',        label: 'Comercial' },
+        { id: 'preventa',         label: 'Preventa' },
+        { id: 'pmo',              label: 'PMO (Proyectos)' },
+        { id: 'sistemas',         label: 'Sistemas' },
+        { id: 'redes',            label: 'Redes' },
+        { id: 'bodega',           label: 'Bodega' },
+        { id: 'proveedores',      label: 'Proveedores' },
+        { id: 'finanzas',         label: 'Finanzas' },
+        { id: 'capital_humano',   label: 'Capital Humano' },
     ];
 
     const MONSTRUO_ROLE_IDS = new Set(MONSTRUO_ROLES.map(r => r.id));
@@ -46,27 +49,43 @@ const UsersUI = (() => {
                 'Auditoria: lectura'
             ]
         },
-        ops: {
-            description: 'Operacion tecnica transversal para atencion y despacho de tickets.',
+        gerencia: {
+            description: 'Vision ejecutiva y lectura de indicadores/estado operacional.',
             permissions: [
                 'Dashboard: lectura',
-                'Facturacion: lectura',
-                'Facturacion: sincronizacion',
-                'Bodega: lectura',
                 'Ticketera: lectura',
-                'Ticketera: gestion operativa',
-                'CRM: lectura',
-                'CRM: edicion',
+                'Finanzas: lectura',
                 'Auditoria: lectura',
-                'Configuracion administrativa'
+                'Reportes: lectura'
             ]
         },
-        redes: {
-            description: 'Ejecucion tecnica en networking e incidencias de conectividad.',
+        comercial: {
+            description: 'Area comercial: gestion de clientes, oportunidades y CRM.',
+            permissions: [
+                'Dashboard: lectura',
+                'CRM: lectura',
+                'CRM: edicion',
+                'Ticketera: lectura',
+                'Reportes: lectura'
+            ]
+        },
+        preventa: {
+            description: 'Area de preventa: dimensionamiento y soporte tecnico-comercial de propuestas.',
+            permissions: [
+                'Dashboard: lectura',
+                'CRM: lectura',
+                'Ticketera: lectura',
+                'Ticketera: gestion operativa'
+            ]
+        },
+        pmo: {
+            description: 'Oficina de proyectos: planifica y ejecuta proyectos/despliegues (incluye operaciones e implementaciones).',
             permissions: [
                 'Dashboard: lectura',
                 'Ticketera: lectura',
-                'Ticketera: gestion operativa'
+                'Ticketera: gestion operativa',
+                'GTA: lectura',
+                'GTA: gestion'
             ]
         },
         sistemas: {
@@ -77,15 +96,32 @@ const UsersUI = (() => {
                 'Ticketera: gestion operativa'
             ]
         },
-        implementaciones: {
-            description: 'Ejecucion de despliegues/proyectos con alcance tecnico.',
+        redes: {
+            description: 'Ejecucion tecnica en networking e incidencias de conectividad.',
             permissions: [
                 'Dashboard: lectura',
                 'Ticketera: lectura',
                 'Ticketera: gestion operativa'
             ]
         },
-        finance: {
+        bodega: {
+            description: 'Gestion operativa de inventario y movimientos de bodega.',
+            permissions: [
+                'Dashboard: lectura',
+                'Bodega: lectura',
+                'Bodega: edicion'
+            ]
+        },
+        proveedores: {
+            description: 'Gestion de proveedores, compras y abastecimiento de bodega.',
+            permissions: [
+                'Dashboard: lectura',
+                'Bodega: lectura',
+                'CRM: lectura',
+                'Ticketera: lectura'
+            ]
+        },
+        finanzas: {
             description: 'Gestion financiera y cobranza con foco contable.',
             permissions: [
                 'Dashboard: lectura',
@@ -98,21 +134,12 @@ const UsersUI = (() => {
                 'Auditoria: exportacion'
             ]
         },
-        warehouse: {
-            description: 'Gestion operativa de inventario y movimientos de bodega.',
-            permissions: [
-                'Bodega: lectura',
-                'Bodega: edicion'
-            ]
-        },
-        gerencia: {
-            description: 'Vision ejecutiva y lectura de indicadores/estado operacional.',
+        capital_humano: {
+            description: 'Gestion de personas: administracion de equipos y datos del personal.',
             permissions: [
                 'Dashboard: lectura',
-                'Ticketera: lectura',
-                'Finanzas: lectura',
-                'Auditoria: lectura',
-                'Reportes: lectura'
+                'Reportes: lectura',
+                'Auditoria: lectura'
             ]
         }
     };

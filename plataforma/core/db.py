@@ -420,7 +420,7 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'ops',  -- admin|finance|ops|warehouse
+            role TEXT NOT NULL DEFAULT 'pmo',  -- ver plataforma.core.config.ROLE_PERMISSIONS
             is_active INTEGER NOT NULL DEFAULT 1,
             allowed_modules TEXT DEFAULT '[]',
             secondary_roles TEXT DEFAULT '[]',
@@ -2628,16 +2628,20 @@ def init_db() -> None:
                         "gta:write": "GTA: gestión",
                     }
                     _ROLE_DESCS = {
-                        # Monstruo
+                        # Gestión (transversales)
                         "admin": "Control total de plataforma, seguridad y configuración global.",
                         "encargado_mesa": "Gestiona flujo de ticketera, asignación, seguimiento y cumplimiento.",
-                        "ops": "Operación técnica transversal para atención y despacho de tickets.",
-                        "redes": "Ejecución técnica en networking e incidencias de conectividad.",
-                        "sistemas": "Ejecución técnica en servidores, plataformas y sistemas.",
-                        "implementaciones": "Ejecución de despliegues/proyectos con alcance técnico.",
-                        "finance": "Gestión financiera y cobranza con foco contable.",
-                        "warehouse": "Gestión operativa de inventario y movimientos de bodega.",
+                        # Roles de ÁREA (= organigrama)
                         "gerencia": "Visión ejecutiva y lectura de indicadores/estado operacional.",
+                        "comercial": "Área comercial: gestión de clientes y oportunidades (CRM).",
+                        "preventa": "Área de preventa: apoyo técnico-comercial y propuestas.",
+                        "pmo": "Gestión de proyectos: planificación, tareas e implementaciones.",
+                        "sistemas": "Ejecución técnica en servidores, plataformas y sistemas.",
+                        "redes": "Ejecución técnica en networking e incidencias de conectividad.",
+                        "bodega": "Gestión operativa de inventario y movimientos de bodega.",
+                        "proveedores": "Gestión de proveedores y compras.",
+                        "finanzas": "Gestión financiera, facturación y cobranza.",
+                        "capital_humano": "Recursos Humanos: contratación y gestión de personas.",
                     }
                     for role, perms in _s.ROLE_PERMISSIONS.items():
                         desc = _ROLE_DESCS.get(role, "Rol operativo de plataforma.")

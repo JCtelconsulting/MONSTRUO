@@ -12,28 +12,35 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 
 ROLE_LABELS = {
-    # Monstruo
+    # Gestión (transversales)
     "admin": "Admin",
     "encargado_mesa": "Encargado Mesa Ayuda",
-    "ops": "Operaciones",
-    "redes": "Redes",
-    "sistemas": "Sistemas",
-    "implementaciones": "Implementaciones",
-    "finance": "Finanzas",
-    "warehouse": "Bodega",
+    # Roles de ÁREA (= organigrama)
     "gerencia": "Gerencia",
+    "comercial": "Comercial",
+    "preventa": "Preventa",
+    "pmo": "PMO (Proyectos)",
+    "sistemas": "Sistemas",
+    "redes": "Redes",
+    "bodega": "Bodega",
+    "proveedores": "Proveedores",
+    "finanzas": "Finanzas",
+    "capital_humano": "Capital Humano",
 }
 
 ROLE_DESCRIPTIONS = {
     "admin": "Control total de plataforma, seguridad y configuracion global.",
     "encargado_mesa": "Gestiona flujo de ticketera, asignacion, seguimiento y cumplimiento.",
-    "ops": "Operacion tecnica transversal para atencion y despacho de tickets.",
-    "redes": "Ejecucion tecnica en networking e incidencias de conectividad.",
-    "sistemas": "Ejecucion tecnica en servidores, plataformas y sistemas.",
-    "implementaciones": "Ejecucion de despliegues/proyectos con alcance tecnico.",
-    "finance": "Gestion financiera y cobranza con foco contable.",
-    "warehouse": "Gestion operativa de inventario y movimientos de bodega.",
     "gerencia": "Vision ejecutiva y lectura de indicadores/estado operacional.",
+    "comercial": "Area comercial: gestion de clientes y oportunidades (CRM).",
+    "preventa": "Area de preventa: apoyo tecnico-comercial y propuestas.",
+    "pmo": "Gestion de proyectos: planificacion, tareas e implementaciones.",
+    "sistemas": "Ejecucion tecnica en servidores, plataformas y sistemas.",
+    "redes": "Ejecucion tecnica en networking e incidencias de conectividad.",
+    "bodega": "Gestion operativa de inventario y movimientos de bodega.",
+    "proveedores": "Gestion de proveedores y compras.",
+    "finanzas": "Gestion financiera, facturacion y cobranza.",
+    "capital_humano": "Recursos Humanos: contratacion y gestion de personas.",
 }
 
 PERMISSION_LABELS = {

@@ -28,7 +28,11 @@ def _normalize_role_input(raw_role: Optional[str]) -> str:
         "encargado_de_mesa": "encargado_mesa",
         "encargado_mesa": "encargado_mesa",
         "mesa_de_ayuda": "encargado_mesa",
-        "operaciones": "ops",
+        "operaciones": "pmo",
+        "ops": "pmo",
+        "implementaciones": "pmo",
+        "warehouse": "bodega",
+        "finance": "finanzas",
     }
     return aliases.get(role, role)
 

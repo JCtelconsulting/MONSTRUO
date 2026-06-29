@@ -42,11 +42,13 @@ SIN_AREA_LABEL = "Sin área asignada"
 # Roles de GESTIÓN GLOBAL: no son un área, ven todo.
 ROLES_GESTION_GLOBAL = {"admin", "encargado_mesa"}
 
-# Alias de roles/especialidades legacy -> área canónica (para datos/usuarios viejos).
+# Alias de roles legacy -> área canónica actual (los roles ahora SON las áreas; estos cubren
+# datos viejos que aún no se migraron). ops e implementaciones se unificaron en pmo.
 ALIAS_ROL_AREA: Dict[str, str] = {
     "warehouse": "bodega",
-    "ops": SIN_AREA,
-    "implementaciones": SIN_AREA,
+    "finance": "finanzas",
+    "ops": "pmo",
+    "implementaciones": "pmo",
     "ejecucion": SIN_AREA,
 }
 

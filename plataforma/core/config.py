@@ -92,7 +92,10 @@ class Settings(BaseSettings):
     }
     
     # Roles permitidos: admin, encargado_mesa, ops, finance, warehouse
+    # Modelo: el ROL de una persona ES su ÁREA (catálogo organigrama.AREAS), salvo los 2
+    # roles de GESTIÓN transversales (admin, encargado_mesa) que no son un área.
     ROLE_PERMISSIONS: Dict[str, List[str]] = {
+        # ── Gestión (transversales, no son área) ──
         "admin": ["*"],
         "encargado_mesa": [
             "dashboard:read",
@@ -101,44 +104,42 @@ class Settings(BaseSettings):
             "tickets:compliance",
             "audit:read",
         ],
-        "ops": [
-            "dashboard:read",
-            "invoice:read",
-            "invoice:sync",
-            "bodega:read",
-            "tickets:read",
-            "tickets:write",
-            "crm:read",
-            "crm:write",
-            "audit:read",
-            "admin.settings",
-            "gta:read",
-            "gta:write",
-        ],
-        "finance": [
-            "dashboard:read",
-            "invoice:read",
-            "invoice:write",
-            "invoice:void",
-            "payment:write",
-            "crm:read",
-            "crm:write",
-            "audit:export",
-        ],
-        "warehouse": ["bodega:read", "bodega:write"],
-        # Nuevos roles tecnicos
-        "redes": ["tickets:read", "tickets:write", "dashboard:read"],
-        "sistemas": ["tickets:read", "tickets:write", "dashboard:read", "admin.settings"],
-        "implementaciones": ["tickets:read", "tickets:write", "dashboard:read"],
-        # Rol gerencial (lectura global + reportes; write para interactuar con tickets asignados)
+        # ── Roles de ÁREA (= plataforma.core.organigrama.AREAS) ──
         "gerencia": [
             "dashboard:read",
             "tickets:read",
             "tickets:write",
             "finanzas:read",
             "audit:read",
-            "reports:read"
+            "reports:read",
         ],
+        "comercial": ["dashboard:read", "crm:read", "crm:write"],
+        "preventa": ["dashboard:read", "crm:read"],
+        # pmo = gestión de proyectos (absorbe los antiguos 'implementaciones' y 'ops').
+        "pmo": [
+            "dashboard:read",
+            "tickets:read",
+            "tickets:write",
+            "gta:read",
+            "gta:write",
+            "reports:read",
+        ],
+        "sistemas": ["dashboard:read", "tickets:read", "tickets:write", "admin.settings"],
+        "redes": ["dashboard:read", "tickets:read", "tickets:write"],
+        # bodega = antiguo 'warehouse'.
+        "bodega": ["dashboard:read", "bodega:read", "bodega:write"],
+        "proveedores": ["dashboard:read", "bodega:read"],
+        # finanzas = antiguo 'finance'.
+        "finanzas": [
+            "dashboard:read",
+            "invoice:read",
+            "invoice:write",
+            "invoice:void",
+            "payment:write",
+            "crm:read",
+            "audit:export",
+        ],
+        "capital_humano": ["dashboard:read"],
     }
 
     class Config:

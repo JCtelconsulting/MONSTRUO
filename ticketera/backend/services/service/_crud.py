@@ -2585,8 +2585,8 @@ def approve_ticket_change(
         raise ValueError("La decisión debe ser 'approved' o 'rejected'.")
 
     role_values = _normalize_roles(approver_role)
-    step1_roles = {"admin", "implementaciones", "redes", "sistemas", "ops"}
-    step2_roles = {"admin", "finance", "gerencia"}
+    step1_roles = {"admin", "pmo", "redes", "sistemas"}
+    step2_roles = {"admin", "finanzas", "gerencia"}
     allowed_roles = step1_roles if step == 1 else step2_roles
     if not any(role in allowed_roles for role in role_values):
         role_label = ", ".join(role_values) if role_values else str(approver_role or "-")

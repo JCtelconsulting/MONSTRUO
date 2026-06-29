@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-# Roles con ejecución técnica real (pueden operar ticket cuando corresponde).
-ROLES_TECNICOS: tuple[str, ...] = ("redes", "sistemas", "implementaciones", "ops")
+from plataforma.core import organigrama
+
+# El ROL de una persona ES su ÁREA: cualquier rol de área opera/ve los tickets de su área
+# (acotado por scope). La gestión global (admin, encargado_mesa) ve y opera todo.
+ROLES_TECNICOS: tuple[str, ...] = tuple(organigrama.slugs_areas())
 ROLES_TECNICOS_SET = set(ROLES_TECNICOS)
 
-# Roles de gestión global.
+# Roles de gestión global (transversales, no son un área).
 ROLES_ADMIN_GESTION = {"admin", "encargado_mesa"}
-ROLES_DESPACHO_MESA = {"ops", "encargado_mesa"}
+# Despacho de la mesa de ayuda: lo hace el encargado de mesa (el antiguo 'ops' se unificó en pmo).
+ROLES_DESPACHO_MESA = {"encargado_mesa"}
 
 
 def normalize_roles(value: Optional[Any]) -> List[str]:

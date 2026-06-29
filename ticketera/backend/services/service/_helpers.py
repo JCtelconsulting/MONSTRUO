@@ -265,8 +265,9 @@ SUBESTADOS_LEGACY_MAP = ticket_workflow.SUBESTADOS_LEGACY_MAP
 ROLE_SPECIALTY_FALLBACK = {area: area for area in organigrama.slugs_areas()}
 ROLE_SPECIALTY_FALLBACK.update({
     "warehouse": "bodega",
-    "ops": organigrama.SIN_AREA,
-    "implementaciones": organigrama.SIN_AREA,
+    "finance": "finanzas",
+    "ops": "pmo",
+    "implementaciones": "pmo",
 })
 
 AUTO_REPLY_SLA_MINUTES = 30
