@@ -379,8 +379,8 @@ async function renderProductividad(periodo) {
     const data = await fetchApi(`/api/gerencia/dashboard/productividad?periodo=${periodo}`);
     const ctx = document.getElementById('chart-avance').getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, 320);
-    grad.addColorStop(0, 'rgba(0, 255, 65, 0.9)');
-    grad.addColorStop(1, 'rgba(0, 255, 65, 0.2)');
+    grad.addColorStop(0, 'rgba(212, 168, 67, 0.9)');
+    grad.addColorStop(1, 'rgba(212, 168, 67, 0.2)');
 
     if (!productividadChart) {
       productividadChart = new Chart(ctx, {
