@@ -1039,8 +1039,8 @@ return {
         }
         const showListFilters = !sessionCtx.isScopedTech;  // controla SOLO los filtros de área
         const toolbarHtml = `
-                <div class="tks-toolbar">
-                    <input class="tks-search" id="tks-search-input" placeholder="🔍 Buscar tickets por título, código o cliente..." value="${filters.q}">
+                <div class="filtros tks-toolbar">
+                    <input type="search" class="filtro filtro-buscar" id="tks-search-input" placeholder="🔍 Buscar tickets por título, código o cliente..." value="${filters.q}">
                     <button class="tks-btn tks-btn-ghost tks-btn-icon" onclick="TksMain.refreshList()" title="Recargar"><i class="fas fa-sync-alt"></i></button>
                 </div>
             `;

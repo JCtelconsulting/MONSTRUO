@@ -22,8 +22,8 @@
                         Item</button>
                 </div>
             </div>
-            <div class="toolbar">
-                <input type="text" id="cat-search" class="search-box" placeholder="Buscar en catálogo..."
+            <div class="filtros">
+                <input type="text" id="cat-search" class="filtro filtro-buscar" placeholder="Buscar en catálogo..."
                     oninput="window.BodegaCore && window.BodegaCore.handleCatSearch && window.BodegaCore.handleCatSearch(this.value)">
                 <button class="btn-icon" title="Refrescar"
                     onclick="window.BodegaCore && window.BodegaCore.loadCatItems && window.BodegaCore.loadCatItems()">

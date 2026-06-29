@@ -3,8 +3,8 @@
         <div class="kpi-card"><span class="kpi-val" id="kpi-total">-</span><span class="kpi-lbl">Total Items</span></div>
         <div class="kpi-card"><span class="kpi-val" id="kpi-mapped">-</span><span class="kpi-lbl">Mapeados</span></div>
     </div>
-    <div class="toolbar">
-        <input type="text" id="inv-search" class="search-box" placeholder="Buscar en inventario..."
+    <div class="filtros">
+        <input type="text" id="inv-search" class="filtro filtro-buscar" placeholder="Buscar en inventario..."
             oninput="window.handleSearchInput && window.handleSearchInput(this)">
         <button class="btn-icon" onclick="window.BodegaCore && window.BodegaCore.loadInventory && window.BodegaCore.loadInventory()">
             <i class="fas fa-sync-alt"></i>

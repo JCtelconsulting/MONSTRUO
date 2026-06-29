@@ -20,17 +20,17 @@
     </div>
 
     <!-- Filtros -->
-    <div class="gta-tablero-filters">
-        <select id="filtro-area" class="input-dark" onchange="Tablero.filtrar()" style="min-width:160px;">
+    <div class="filtros">
+        <select id="filtro-area" class="filtro" onchange="Tablero.filtrar()">
             <option value="">Todas las áreas</option>
         </select>
-        <select id="filtro-estado" class="input-dark" onchange="Tablero.filtrar()" style="min-width:160px;">
+        <select id="filtro-estado" class="filtro" onchange="Tablero.filtrar()">
             <option value="">Todos los estados</option>
             <option value="activo">Activos</option>
             <option value="completado">Completados</option>
             <option value="cancelado">Cancelados</option>
         </select>
-        <input type="text" id="filtro-busqueda" class="input-dark" placeholder="🔍 Buscar..." oninput="Tablero.filtrar()" style="min-width:200px;">
+        <input type="search" id="filtro-busqueda" class="filtro filtro-buscar" placeholder="Buscar..." oninput="Tablero.filtrar()">
         <button class="btn-secondary" onclick="Tablero.cargar()" title="Refrescar">
             <i class="fas fa-sync-alt"></i>
         </button>

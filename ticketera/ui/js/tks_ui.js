@@ -5793,17 +5793,17 @@ return `
                     </div>
                 </div>
 
-                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end">
-                    <div class="tks-form-group" style="margin:0;min-width:200px">
+                <div class="filtros" style="align-items:flex-end">
+                    <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
-                        <select class="tks-select" id="tks-arch-filter-cliente" style="min-width:200px" onchange="window.loadArchivados()">
+                        <select class="filtro" id="tks-arch-filter-cliente" onchange="window.loadArchivados()">
                             <option value="">Todos los clientes</option>
                         </select>
                     </div>
                     ${isAdmin ? `
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Área</label>
-                        <select class="tks-select" id="tks-arch-filter-cat" style="min-width:140px" onchange="window.loadArchivados()">
+                        <select class="filtro" id="tks-arch-filter-cat" onchange="window.loadArchivados()">
                             <option value="">Todas</option>
                             ${((window.TksMain && TksMain.getAvailableAreasFiltro && TksMain.getAvailableAreasFiltro()) || AREAS_ASIGNABLES_KEYS).map(c => `<option value="${escapeHtml(c)}">${catLabel(c)}</option>`).join('')}
                         </select>
@@ -5811,11 +5811,11 @@ return `
                     ` : ''}
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
-                        <input type="date" class="tks-input" id="tks-arch-filter-desde" style="min-width:140px" onchange="window.loadArchivados()">
+                        <input type="date" class="filtro" id="tks-arch-filter-desde" onchange="window.loadArchivados()">
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Hasta</label>
-                        <input type="date" class="tks-input" id="tks-arch-filter-hasta" style="min-width:140px" onchange="window.loadArchivados()">
+                        <input type="date" class="filtro" id="tks-arch-filter-hasta" onchange="window.loadArchivados()">
                     </div>
                     <button class="tks-btn tks-btn-ghost" onclick="window.resetArchivadosFiltros()" style="align-self:flex-end">
                         Limpiar
@@ -5835,28 +5835,28 @@ return `
                         <p>Tickets atendidos (resueltos/cerrados) agrupados por día, semana o mes. En "Todos los clientes" se ve el desglose por cliente; al filtrar por uno, solo ese.</p>
                     </div>
                 </div>
-                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end">
+                <div class="filtros" style="align-items:flex-end">
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Agrupar por</label>
-                        <select class="tks-select" id="tks-atendidos-period" style="min-width:120px" onchange="window.generarReporteAtendidos()">
+                        <select class="filtro filtro--sm" id="tks-atendidos-period" onchange="window.generarReporteAtendidos()">
                             <option value="day">Día</option>
                             <option value="week">Semana</option>
                             <option value="month" selected>Mes</option>
                         </select>
                     </div>
-                    <div class="tks-form-group" style="margin:0;min-width:200px">
+                    <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Cliente</label>
-                        <select class="tks-select" id="tks-atendidos-cliente" style="min-width:200px" onchange="window.generarReporteAtendidos()">
+                        <select class="filtro" id="tks-atendidos-cliente" onchange="window.generarReporteAtendidos()">
                             <option value="">Todos los clientes</option>
                         </select>
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Desde</label>
-                        <input type="date" class="tks-input" id="tks-atendidos-desde" style="min-width:140px" onchange="window.generarReporteAtendidos()">
+                        <input type="date" class="filtro" id="tks-atendidos-desde" onchange="window.generarReporteAtendidos()">
                     </div>
                     <div class="tks-form-group" style="margin:0">
                         <label style="font-size:0.8rem;margin-bottom:0.25rem;display:block">Hasta</label>
-                        <input type="date" class="tks-input" id="tks-atendidos-hasta" style="min-width:140px" onchange="window.generarReporteAtendidos()">
+                        <input type="date" class="filtro" id="tks-atendidos-hasta" onchange="window.generarReporteAtendidos()">
                     </div>
                 </div>
                 <div id="tks-atendidos-resultado" style="margin-top:1rem"></div>

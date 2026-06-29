@@ -13,22 +13,15 @@
     </div>
 </div>
 
-<div class="filter-bar"
-    style="background:var(--panel); padding:15px; border-radius:12px; margin-bottom:20px; display:flex; gap:10px; align-items:center;">
-    <div style="flex:1;">
-        <label style="font-size:0.8rem; opacity:0.7;">Buscar Cliente</label>
-        <input type="text" id="debtorSearch" class="input-dark" style="width:100%;" placeholder="Nombre..."
-            onkeyup="filterDebtors()">
-    </div>
-    <div style="width:200px;">
-        <label style="font-size:0.8rem; opacity:0.7;">Riesgo Mínimo</label>
-        <select id="riskFilter" class="input-dark" style="width:100%;" onchange="filterDebtors()">
-            <option value="ALL">Todos</option>
-            <option value="CRITICAL">Crítico (Rojo)</option>
-            <option value="WARNING">Advertencia (Amarillo)</option>
-        </select>
-    </div>
-    <button onclick="loadDebtors()" class="btn-primary" style="height:38px; margin-top:18px;">
+<div class="filtros">
+    <input type="search" id="debtorSearch" class="filtro filtro-buscar" placeholder="Buscar cliente..."
+        onkeyup="filterDebtors()">
+    <select id="riskFilter" class="filtro" onchange="filterDebtors()">
+        <option value="ALL">Riesgo: Todos</option>
+        <option value="CRITICAL">Crítico (Rojo)</option>
+        <option value="WARNING">Advertencia (Amarillo)</option>
+    </select>
+    <button onclick="loadDebtors()" class="btn-primary">
         <i class="fas fa-sync"></i> Actualizar
     </button>
 </div>
