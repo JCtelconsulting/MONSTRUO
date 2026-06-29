@@ -77,7 +77,7 @@ async function fetchInvoices() {
             // If NC, row gets specific class
             if (isNC) {
                 tr.classList.add('row-nc');
-                amountColor = '#ff3333'; // Explicit Red (var(--danger))
+                amountColor = 'var(--danger)'; // Explicit Red
             }
 
             const customerId = (inv.customer_id || '').toString().trim();
@@ -92,7 +92,7 @@ async function fetchInvoices() {
                 <td>
                     <div style="font-weight:600; font-size:0.95rem;">${resolvedName}</div>
                     ${customerRef}
-                    ${isNC ? '<div style="display:inline-block; margin-top:4px; font-size:0.7rem; color:#fff; background:#ff3333; padding:2px 8px; border-radius:4px; font-weight:700; border:1px solid rgba(255,255,255,0.2);">NOTA CRÉDITO</div>' : ''}
+                    ${isNC ? '<div style="display:inline-block; margin-top:4px; font-size:0.7rem; color:#fff; background:var(--danger); padding:2px 8px; border-radius:4px; font-weight:700; border:1px solid rgba(255,255,255,0.2);">NOTA CRÉDITO</div>' : ''}
                 </td>
                 <td><span class="pill-status ${statusClass}">${estado}</span></td>
                 <td>
@@ -114,7 +114,7 @@ async function fetchInvoices() {
 
     } catch (e) {
         console.error('Error cargando facturas:', e);
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:#ff3333;">Error al cargar facturas</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--danger);">Error al cargar facturas</td></tr>';
     }
 }
 

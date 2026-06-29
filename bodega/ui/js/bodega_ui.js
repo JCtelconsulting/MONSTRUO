@@ -105,7 +105,7 @@
                 const tr = document.createElement('tr');
                 // Status Color
                 const isMapped = !!item.item_id;
-                const statusColor = isMapped ? '#28a745' : '#dc3545';
+                const statusColor = isMapped ? 'var(--color-success)' : 'var(--danger)';
                 const statusIcon = isMapped ? 'link' : 'unlink';
                 const sku = item.sku || item.product_sku || item.item_sku || '';
 
@@ -251,7 +251,7 @@
             if (!duplicates || duplicates.length === 0) {
                 container.innerHTML = `
                     <div style="display:flex; align-items:center; gap:10px; opacity:0.7; margin-bottom:2rem;">
-                         <i class="fas fa-check-circle" style="color:#28a745"></i> No hay duplicados pendientes. 
+                         <i class="fas fa-check-circle" style="color:var(--color-success)"></i> No hay duplicados pendientes.
                          <button class="btn-primary" onclick="window.BodegaCore.runDuplicateScan()">Escanear Ahora</button>
                     </div>`;
                 return;
@@ -297,7 +297,7 @@
                 bulkBar.id = 'bulk-action-bar';
                 bulkBar.style = `
                     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-                    background: #1a1f2b; border: 1px solid #6610f2; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+                    background: #1a1f2b; border: 1px solid var(--color-info); box-shadow: 0 10px 30px rgba(0,0,0,0.8);
                     padding: 15px 25px; border-radius: 50px; display: none; align-items: center; gap: 15px; z-index: 9999;
                     width: 90%; max-width: 600px;
                 `;
@@ -307,7 +307,7 @@
                     </div>
                     <input type="text" id="bulk-instruction" placeholder="Instrucción para todos..." 
                             style="background:rgba(0,0,0,0.3); border:1px solid #444; color:#fff; border-radius:20px; padding:8px 15px; flex:1;">
-                    <button class="btn-primary" style="background:#6610f2; border-radius:20px;" onclick="window.BodegaAI.processBulkInstructions()">
+                    <button class="btn-primary" style="background:var(--color-info); border-radius:20px;" onclick="window.BodegaAI.processBulkInstructions()">
                         <i class="fas fa-magic"></i> Procesar
                     </button>
                     <button class="btn-success" style="background:#198754; border-radius:20px; margin-left:10px;" onclick="window.BodegaAI.processBulkInstructions(true)">
@@ -341,7 +341,7 @@
                 bulkBar.id = 'bulk-cat-bar';
                 bulkBar.style = `
                     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-                    background: #1a1f2b; border: 1px solid #00f3ff; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+                    background: #1a1f2b; border: 1px solid var(--color-cyan); box-shadow: 0 10px 30px rgba(0,0,0,0.8);
                     padding: 12px 20px; border-radius: 50px; display: none; align-items: center; gap: 12px; z-index: 9999;
                     width: 90%; max-width: 560px;
                 `;
@@ -349,7 +349,7 @@
                     <div style="font-weight:bold; color:#fff; white-space:nowrap;">
                         <span id="bulk-cat-count">0</span> seleccionados
                     </div>
-                    <button class="btn-primary" style="background:#00f3ff; border-radius:20px; color:#000;"
+                    <button class="btn-primary" style="background:var(--color-cyan); border-radius:20px; color:#000;"
                         onclick="window.BodegaCore && window.BodegaCore.openAssignCategoryModalForSelection()">
                         <i class="fas fa-tags"></i> Asignar categoría
                     </button>

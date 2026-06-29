@@ -402,10 +402,10 @@ var BodegaCore = (function () {
 
     // --- INVENTORY LOGIC ---
     function handleSearchInput(el) {
-        if (el) el.style.borderColor = '#6610f2';
+        if (el) el.style.borderColor = 'var(--color-info)';
         clearTimeout(state.invSearchTimer);
         state.invSearchTimer = setTimeout(() => {
-            if (el) el.style.borderColor = '#28a745';
+            if (el) el.style.borderColor = 'var(--color-success)';
             loadInventory(el ? el.value : '');
         }, 300);
     }

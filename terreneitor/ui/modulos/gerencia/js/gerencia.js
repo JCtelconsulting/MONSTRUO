@@ -392,7 +392,7 @@ async function renderProductividad(periodo) {
               label: 'Tareas Validadas',
               data: data.data || [],
               backgroundColor: grad,
-              borderColor: '#00ff41',
+              borderColor: '#D4A843',
               borderWidth: 1,
             },
           ],
@@ -634,8 +634,8 @@ function renderMapPoints(points) {
     const markers = coords.map((c) =>
       L.circleMarker(c, {
         radius: 4,
-        color: '#00ff41',
-        fillColor: '#00ff41',
+        color: '#D4A843',
+        fillColor: '#D4A843',
         fillOpacity: 0.6,
         weight: 1,
       })

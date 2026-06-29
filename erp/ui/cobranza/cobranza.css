@@ -9,8 +9,8 @@
 }
 
 .risk-critical {
-    background-color: #ff3333;
-    box-shadow: 0 0 8px #ff3333;
+    background-color: var(--danger);
+    box-shadow: 0 0 8px var(--danger);
 }
 
 .risk-warning {
@@ -19,11 +19,11 @@
 }
 
 .risk-normal {
-    background-color: #00ff41;
+    background-color: var(--neon);
 }
 
 .amount-critical {
-    color: #ff3333;
+    color: var(--danger);
     font-weight: bold;
 }
 

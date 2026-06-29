@@ -15,7 +15,7 @@
 }
 
 .kpi-val-debt {
-    color: #ff3333;
+    color: var(--danger);
 }
 
 .kpi-val-cash {

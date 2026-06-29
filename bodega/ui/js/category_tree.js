@@ -77,7 +77,7 @@ class CategoryTreeSelector {
         // Conditional HTML based on allowCreate
         const placeholder = this.options.allowCreate ? this.options.filterPlaceholder : "Filtrar...";
         const btnHtml = this.options.allowCreate ?
-            `<button id="btn-tree-create" class="btn-primary" title="Crear Categoría" style="padding:8px 12px; background:#28a745; margin-left:5px;">
+            `<button id="btn-tree-create" class="btn-primary" title="Crear Categoría" style="padding:8px 12px; background:var(--color-success); margin-left:5px;">
                 <i class="fas fa-plus"></i>
              </button>` : '';
 

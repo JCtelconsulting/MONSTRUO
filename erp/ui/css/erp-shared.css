@@ -129,19 +129,19 @@
 }
 
 .status-pagada {
-    background: #00ff41;
+    background: var(--neon);
     color: #000;
     box-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
 }
 
 .status-emitida {
-    background: #00f3ff;
+    background: var(--color-cyan);
     color: #000;
     box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
 }
 
 .status-anulada {
-    background: #ff3333;
+    background: var(--danger);
     color: #fff;
     box-shadow: 0 0 15px rgba(255, 51, 51, 0.4);
 }

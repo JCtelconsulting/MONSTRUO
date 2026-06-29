@@ -23,7 +23,7 @@ async function loadDebtors() {
 
     } catch (e) {
         console.error('Error loading debtors:', e);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:#ff3333;">Error al cargar reporte de cobranza</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--danger);">Error al cargar reporte de cobranza</td></tr>';
     }
 }
 
@@ -59,7 +59,7 @@ function renderDebtors(debtors) {
             <td style="text-align:right; ${(d.debt_30 > 0) ? 'color:#ffcc00; font-weight:bold;' : 'opacity:0.3;'}">
                 ${d.debt_30 > 0 ? fmt(d.debt_30) : '-'}
             </td>
-            <td style="text-align:right; ${(d.debt_60 > 0) ? 'color:#ff3333; font-weight:bold;' : 'opacity:0.3;'}">
+            <td style="text-align:right; ${(d.debt_60 > 0) ? 'color:var(--danger); font-weight:bold;' : 'opacity:0.3;'}">
                 ${d.debt_60 > 0 ? fmt(d.debt_60) : '-'}
             </td>
             <td>

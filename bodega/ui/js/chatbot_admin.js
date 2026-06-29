@@ -3,14 +3,14 @@
     const style = document.createElement('style');
     style.innerHTML = `
         #admin-chat-widget { position: fixed; bottom: 20px; right: 20px; z-index: 10000; font-family: 'Space Grotesk', sans-serif; }
-        #admin-chat-btn { width: 60px; height: 60px; border-radius: 50%; background: #6610f2; color: #fff; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 24px; transition: transform 0.2s; display:flex; align-items:center; justify-content:center;}
+        #admin-chat-btn { width: 60px; height: 60px; border-radius: 50%; background: var(--color-info); color: #fff; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 24px; transition: transform 0.2s; display:flex; align-items:center; justify-content:center;}
         #admin-chat-btn:hover { transform: scale(1.1); }
         #admin-chat-window { position: absolute; bottom: 80px; right: 0; width: 350px; height: 500px; background: #1a1f2b; border: 1px solid #444; border-radius: 12px; display: none; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         #admin-chat-header { padding: 15px; background: rgba(102, 16, 242, 0.2); border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
         #admin-chat-body { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         #admin-chat-footer { padding: 15px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px; }
         #admin-chat-input { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid #444; color: #fff; padding: 8px; border-radius: 4px; outline: none; }
-        #admin-chat-send { background: #6610f2; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+        #admin-chat-send { background: var(--color-info); color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
         .msg { padding: 8px 12px; border-radius: 8px; max-width: 80%; line-height: 1.4; font-size: 0.9rem; }
         .msg-user { align-self: flex-end; background: #007bff; color: #fff; }
         .msg-bot { align-self: flex-start; background: rgba(255,255,255,0.1); color: #ddd; }

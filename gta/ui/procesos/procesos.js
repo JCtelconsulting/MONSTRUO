@@ -310,7 +310,7 @@ window.Procesos = (() => {
             return `
                 <g class="gta-flow-add" onclick="Procesos._agregarPasoDiag('${_esc(areaCode)}')" style="cursor:pointer;">
                     <circle cx="${cx}" cy="${cy}" r="14" fill="rgba(0, 255, 65, 0.18)" stroke="rgba(0, 255, 65, 0.6)" stroke-width="1.5"></circle>
-                    <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#00ff41" font-size="20" font-weight="700">+</text>
+                    <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#D4A843" font-size="20" font-weight="700">+</text>
                 </g>
             `;
         }).join('') : '';

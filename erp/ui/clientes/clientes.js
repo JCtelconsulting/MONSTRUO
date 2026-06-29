@@ -27,7 +27,7 @@ function renderClients(list) {
         const hasDebt = c.status === 'DEBT';
         const debtClass = hasDebt ? 'status-anulada' : 'status-pagada'; // Reuse styling classes essentially
         const debtText = hasDebt ? formatCurrency(c.total_debt) : 'Al día';
-        const badgeStyle = hasDebt ? 'background:#ff3333; color:#fff;' : 'background:#00cc66; color:#000;';
+        const badgeStyle = hasDebt ? 'background:var(--danger); color:#fff;' : 'background:#00cc66; color:#000;';
 
         return `
             <tr class="client-row">
@@ -138,7 +138,7 @@ async function openCollectionDrawer(id, name) {
         const debtFormatted = formatCurrency(clientData.total_debt);
         document.getElementById('collectionStats').innerHTML = `
             <div class="kpi-card mini">
-                <div class="kpi-val" style="font-size:1.5rem; color:${clientData.status === 'DEBT' ? '#ff3333' : '#00cc66'}">${debtFormatted}</div>
+                <div class="kpi-val" style="font-size:1.5rem; color:${clientData.status === 'DEBT' ? 'var(--danger)' : '#00cc66'}">${debtFormatted}</div>
                 <div class="kpi-lbl">Deuda Total</div>
             </div>
         `;
